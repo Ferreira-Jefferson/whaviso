@@ -18,3 +18,5 @@ frontend/dist/
 auth_baileys/
 .baileys.lock
 qr.png
+# Graphify: mapa do codigo gerado (ferramenta de DEV, nao e dependencia do app).
+graphify-out/
