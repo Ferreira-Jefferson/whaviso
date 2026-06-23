@@ -28,12 +28,6 @@ const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
   { value: 'pagar', label: 'Vou pagar' },
 ]
 
-// H4.1: enviar o convite agora ou só anotar na agenda (sem enviar nada).
-const OPCOES_MODO: ReadonlyArray<{ value: 'enviar' | 'agenda'; label: string }> = [
-  { value: 'enviar', label: 'Gerar convite agora' },
-  { value: 'agenda', label: 'Só anotar (não enviar)' },
-]
-
 export default function NovoAvisoPage() {
   const navigate = useNavigate()
   const criar = useCriarAviso()
@@ -65,12 +59,20 @@ export default function NovoAvisoPage() {
   })
 
   const direcao = watch('direcao')
+  // H4.1: o modo (gerar convite agora x só salvar) não é mais um seletor à parte;
+  // ele é definido pelo botão de ação clicado no rodapé do formulário.
   const modo = watch('modo')
-  const ehAgenda = modo === 'agenda'
   // Contador ao vivo do "Sobre o quê" (caracteres). O maxLength já trava a digitação
   // em MAX_MOTIVO_CARACTERES; o schema valida por garantia (paste etc.).
   const motivoLen = (watch('motivo') ?? '').length
   const ehReceber = direcao === 'receber'
+
+  // Cada botão escolhe o modo e dispara o submit. O schema valida conforme o modo
+  // (telefone/Pix só obrigatórios ao gerar o convite), então setamos antes de validar.
+  function salvar(modoEscolhido: 'enviar' | 'agenda') {
+    setValue('modo', modoEscolhido)
+    void handleSubmit(onSubmit)()
+  }
 
   async function onSubmit(dados: NovoAvisoForm) {
     setErroGeral(null)
@@ -136,7 +138,7 @@ export default function NovoAvisoPage() {
     <div className="animate-rise">
       <PageHeader
         titulo="Novo aviso"
-        descricao="Combine os detalhes e gere o convite para revisão."
+        descricao="Combine os detalhes. No fim, gere o convite ou só salve o combinado."
         acoes={
           <Button variante="ghost" onClick={() => navigate('/app/avisos')}>
             <ArrowLeft strokeWidth={1.75} className="size-4" />
@@ -179,30 +181,6 @@ export default function NovoAvisoPage() {
               : 'Quem vai receber recebe um convite para confirmar; os lembretes chegam para você.'}
           </p>
 
-          {/* H4.1: escolher entre gerar o convite agora ou só anotar na agenda. */}
-          <Field label="O que fazer agora">
-            <Controller
-              control={control}
-              name="modo"
-              render={({ field }) => (
-                <SegmentedControl
-                  ariaLabel="O que fazer agora"
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={OPCOES_MODO}
-                  className="self-end"
-                />
-              )}
-            />
-          </Field>
-
-          {ehAgenda && (
-            <Banner tom="info">
-              Nada será enviado. O combinado fica só na sua agenda; você decide quando
-              ativar para gerar o convite. Telefone e Pix ficam para a hora de ativar.
-            </Banner>
-          )}
-
           <Field
             label={ehReceber ? 'Nome de quem vai pagar' : 'Para quem você vai pagar'}
             erro={errors.nome_devedor?.message}
@@ -215,12 +193,8 @@ export default function NovoAvisoPage() {
           </Field>
 
           <Field
-            label={`${ehReceber ? 'WhatsApp de quem vai pagar' : 'WhatsApp de quem vai receber'}${ehAgenda ? ' (opcional)' : ''}`}
-            dica={
-              ehAgenda
-                ? 'Opcional na agenda; pedimos ao ativar o convite.'
-                : 'Para enviar o convite e acompanhar o combinado.'
-            }
+            label={ehReceber ? 'WhatsApp de quem vai pagar' : 'WhatsApp de quem vai receber'}
+            dica="Necessário para gerar o convite. Sem ele, dá para só salvar."
             erro={errors.telefone_devedor?.message}
           >
             <Controller
@@ -289,7 +263,7 @@ export default function NovoAvisoPage() {
 
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-tinta">
-              {ehReceber && !ehAgenda ? 'Chave Pix' : 'Chave Pix (opcional)'}
+              {ehReceber ? 'Chave Pix' : 'Chave Pix (opcional)'}
             </span>
             <p className="text-xs text-tinta-2">
               {ehReceber
@@ -311,17 +285,36 @@ export default function NovoAvisoPage() {
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-1">
-            <Button
-              type="button"
-              variante="secondary"
-              onClick={() => navigate('/app/avisos')}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" loading={isSubmitting}>
-              {ehAgenda ? 'Salvar na agenda' : 'Criar e gerar convite'}
-            </Button>
+          <div className="flex flex-col gap-2 pt-1">
+            <p className="text-xs text-tinta-2">
+              Gerar o convite envia o link de confirmação agora. Só salvar guarda o
+              combinado na sua agenda, sem enviar nada.
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variante="ghost"
+                onClick={() => navigate('/app/avisos')}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variante="secondary"
+                loading={isSubmitting && modo === 'agenda'}
+                onClick={() => salvar('agenda')}
+              >
+                Apenas salvar
+              </Button>
+              <Button
+                type="button"
+                variante="primary"
+                loading={isSubmitting && modo === 'enviar'}
+                onClick={() => salvar('enviar')}
+              >
+                Salvar e gerar convite
+              </Button>
+            </div>
           </div>
         </form>
       </Card>

@@ -10,8 +10,9 @@
 ### H4.1: Cadastrar um combinado em modo agenda 🟢
 Como **criador (cobrador ou devedor)**, quero cadastrar um combinado sem enviar nada para a outra ponta, para usar o Whaviso como agenda particular sem incomodar ninguém.
 *Critérios de aceite:*
-- [ ] Ao criar, posso escolher **modo agenda** (não enviar) em vez de gerar/compartilhar o convite.
+- [ ] A escolha é feita pelos **botões de ação** no rodapé do formulário (sem seletor de modo à parte): **"Apenas salvar"** cria em modo agenda; **"Salvar e gerar convite"** já gera o convite. Os campos do combinado são os mesmos nos dois: muda só o que acontece ao confirmar.
 - [ ] O combinado nasce no estado **`sem_aviso`**, **sem número de convite gerado** e **sem nenhum envio** programado.
+- [ ] **Estado por ação (não confundir os dois):** "Apenas salvar" leva a **`sem_aviso`** (nada gerado, nada enviado); "Salvar e gerar convite" leva direto a **`aguardando_aceite`** (convite gerado, aguardando a outra ponta responder). Nos dois ainda não sai lembrete, mas em `aguardando_aceite` o convite já existe e a intenção é mandar. Um convite gerado e **não respondido não volta** para `sem_aviso`: segue em `aguardando_aceite` até aceite, recusa ou expiração (ver H4.3 e o épico de Convite & Aceite).
 - [ ] A outra ponta (devedor ou cobrador convidado) **não recebe nada** e pode nem saber que o combinado existe.
 - [ ] Os mesmos campos de negócio valem (nome da outra ponta, motivo, valor em centavos, data em America/Sao_Paulo).
 - [ ] O **telefone da outra ponta é opcional** na agenda; só passa a ser obrigatório se eu quiser **ativar** o combinado (transformar em aviso, ver H4.3).
@@ -61,9 +62,9 @@ Como **criador**, quero marcar como pago um combinado que ficou só na agenda, p
 
 ---
 
-### Divergências com a definição atual (precisam de refatoração)
+### Divergências com a definição atual (já implementado)
 
-> Este épico introduz um modo que **hoje não existe** no código: toda criação gera convite e segue para `aguardando_aceite`. Precisa de construção.
+> ✅ **Implementado.** Quando este épico foi escrito, toda criação gerava convite e seguia para `aguardando_aceite`. Hoje o modo agenda existe: "criar" e "gerar convite" estão separados, a criação pode nascer em `sem_aviso`, e a escolha na tela de criar é feita pelos botões de ação ("Apenas salvar" x "Salvar e gerar convite"), sem seletor de modo à parte. Os pontos abaixo ficam como registro do que foi construído.
 
 - **Estado novo `sem_aviso`** (modo agenda): anterior ao convite. Transições a acrescentar na máquina de estados: `sem_aviso → aguardando_aceite` (ativar), `sem_aviso → cancelado` (descartar) e `sem_aviso → pago` (registro manual da H4.5). Em `sem_aviso`, **nenhum** envio/lembrete é programado.
 - **Criação sem convite:** hoje criar já gera o número/convite. Precisa separar "criar" de "gerar convite": o convite só nasce ao **ativar** (H4.3).
