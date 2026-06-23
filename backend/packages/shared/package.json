@@ -1,0 +1,28 @@
+{
+  "name": "@whaviso/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./contracts": "./src/contracts/index.ts",
+    "./db": "./src/db/index.ts",
+    "./logger": "./src/logger/index.ts",
+    "./config": "./src/config/index.ts",
+    "./datas": "./src/datas/index.ts",
+    "./datas/horario": "./src/datas/horario_reservado_repo.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@date-fns/tz": "^1.2.0",
+    "date-fns": "^4.1.0",
+    "pg": "^8.16.0",
+    "pino": "^9.6.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@whaviso/zap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/server.ts",
+    "start": "node --env-file-if-exists=../../.env --import tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rexxhayanasi/elaina-baileys": "^1.3.1",
+    "@whaviso/shared": "*",
+    "fastify": "^5.0.0",
+    "fastify-plugin": "^5.0.0",
+    "fastify-type-provider-zod": "^6.0.0",
+    "jimp": "^0.16.13",
+    "qrcode": "^1.5.4",
+    "zod": "^4.0.0"
+  }
+}

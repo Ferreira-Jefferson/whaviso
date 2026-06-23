@@ -1,0 +1,16 @@
+{
+  "name": "whaviso-dev",
+  "private": true,
+  "description": "Lançador de desenvolvimento — sobe backend (api) + frontend juntos. backend/ e frontend/ continuam projetos independentes.",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c green,cyan \"npm --prefix backend run dev:api\" \"npm --prefix frontend run dev\"",
+    "dev:all": "concurrently -k -n api,zap,web -c green,yellow,cyan \"npm --prefix backend run dev:api\" \"npm --prefix backend run dev:zap\" \"npm --prefix frontend run dev\"",
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "test": "npm --prefix backend test && npm --prefix frontend test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

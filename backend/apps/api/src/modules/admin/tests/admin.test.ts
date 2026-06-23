@@ -1,0 +1,384 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import {
+  criarAppTeste,
+  criarUsuario,
+  encerrarPools,
+  limparUsuario,
+  poolSuper,
+} from '../../../../test/harness'
+
+const AUTH = { authorization: 'Bearer x' }
+
+describe('admin (integração)', () => {
+  let owner: string
+  let comum: string
+
+  beforeAll(async () => {
+    owner = await criarUsuario('Owner')
+    comum = await criarUsuario('Comum')
+    await poolSuper.query(`update public.profiles set role='owner' where id=$1`, [owner])
+  })
+  afterAll(async () => {
+    await limparUsuario(owner)
+    await limparUsuario(comum)
+    await encerrarPools()
+  })
+
+  it('usuário não-owner → 403', async () => {
+    const app = await criarAppTeste(comum)
+    const r = await app.inject({ method: 'GET', url: '/v1/admin/mensagens', headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(403)
+  })
+
+  it('owner lista mensagens do ciclo (migradas para a unificada)', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({ method: 'GET', url: '/v1/admin/mensagens', headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    const chaves = r.json().mensagens.map((m: { chave: string }) => m.chave)
+    expect(chaves).toContain('ciclo.d_menos_2')
+    expect(chaves).toContain('ciclo.d_mais_1')
+  })
+
+  it('apagar mensagem é owner-only → 403 para não-owner', async () => {
+    const app = await criarAppTeste(comum)
+    const r = await app.inject({ method: 'DELETE', url: `/v1/admin/mensagens/00000000-0000-0000-0000-000000000000`, headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(403)
+  })
+
+  // ---- Auditoria (read-only) ----
+
+  it('GET /admin/usuarios: não-owner → 403; owner recebe envelope paginado', async () => {
+    const appComum = await criarAppTeste(comum)
+    const proibido = await appComum.inject({ method: 'GET', url: '/v1/admin/usuarios', headers: AUTH })
+    await appComum.close()
+    expect(proibido.statusCode).toBe(403)
+
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({ method: 'GET', url: '/v1/admin/usuarios', headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    const body = r.json()
+    expect(Array.isArray(body.itens)).toBe(true)
+    expect(body.total).toBeGreaterThanOrEqual(2)
+    expect(typeof body.page).toBe('number')
+    expect(typeof body.per_page).toBe('number')
+  })
+
+  it('GET /admin/usuarios?busca= filtra por nome', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({ method: 'GET', url: '/v1/admin/usuarios?busca=Owner', headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json().itens.every((u: { nome: string }) => u.nome.includes('Owner'))).toBe(true)
+  })
+
+  it('PATCH /admin/usuarios/:id troca o plano; plano inválido → 422', async () => {
+    const app = await criarAppTeste(owner)
+    const ok = await app.inject({
+      method: 'PATCH', url: `/v1/admin/usuarios/${comum}`, headers: AUTH,
+      payload: { plano_id: 'profissional' },
+    })
+    const ruim = await app.inject({
+      method: 'PATCH', url: `/v1/admin/usuarios/${comum}`, headers: AUTH,
+      payload: { plano_id: 'inexistente' },
+    })
+    await app.close()
+    expect(ok.statusCode).toBe(200)
+    expect(ok.json().plano_id).toBe('profissional')
+    expect(ruim.statusCode).toBe(422)
+    expect(ruim.json().error.code).toBe('plano_invalido')
+    const a = await poolSuper.query(`select plano_id from public.assinaturas where profile_id=$1`, [comum])
+    expect(a.rows[0].plano_id).toBe('profissional')
+  })
+
+  it('GET /admin/envios e /admin/avisos: envelopes paginados (owner)', async () => {
+    const app = await criarAppTeste(owner)
+    const envios = await app.inject({ method: 'GET', url: '/v1/admin/envios', headers: AUTH })
+    const avisos = await app.inject({ method: 'GET', url: '/v1/admin/avisos?status=programado', headers: AUTH })
+    await app.close()
+    expect(envios.statusCode).toBe(200)
+    expect(Array.isArray(envios.json().itens)).toBe(true)
+    expect(avisos.statusCode).toBe(200)
+    expect(Array.isArray(avisos.json().itens)).toBe(true)
+    expect(avisos.json().itens.every((a: { status: string }) => a.status === 'programado')).toBe(true)
+  })
+
+  // ---- Suspensão de conta (owner) ----
+
+  it('GET /admin/usuarios reflete suspenso (false por padrão)', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({ method: 'GET', url: `/v1/admin/usuarios?busca=Owner`, headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    const eu = r.json().itens.find((u: { id: string }) => u.id === owner)
+    expect(eu.suspenso).toBe(false)
+  })
+
+  it('owner suspende usuário → próxima requisição autenticada dele = 403 conta_suspensa; reativar volta a 200', async () => {
+    // Suspende o usuário comum.
+    const appOwner = await criarAppTeste(owner)
+    const sus = await appOwner.inject({
+      method: 'PATCH', url: `/v1/admin/usuarios/${comum}`, headers: AUTH,
+      payload: { suspenso: true },
+    })
+    await appOwner.close()
+    expect(sus.statusCode).toBe(200)
+
+    // Reflete na listagem.
+    const appLista = await criarAppTeste(owner)
+    const lista = await appLista.inject({ method: 'GET', url: `/v1/admin/usuarios?busca=Comum`, headers: AUTH })
+    await appLista.close()
+    const linha = lista.json().itens.find((u: { id: string }) => u.id === comum)
+    expect(linha.suspenso).toBe(true)
+
+    // Rota autenticada comum (não-admin) do usuário suspenso → 403 conta_suspensa.
+    const appSus = await criarAppTeste(comum)
+    const bloq = await appSus.inject({ method: 'GET', url: '/v1/perfil', headers: AUTH })
+    await appSus.close()
+    expect(bloq.statusCode).toBe(403)
+    expect(bloq.json().error.code).toBe('conta_suspensa')
+
+    // Reativa.
+    const appReat = await criarAppTeste(owner)
+    const reat = await appReat.inject({
+      method: 'PATCH', url: `/v1/admin/usuarios/${comum}`, headers: AUTH,
+      payload: { suspenso: false },
+    })
+    await appReat.close()
+    expect(reat.statusCode).toBe(200)
+
+    // Volta a funcionar.
+    const appOk = await criarAppTeste(comum)
+    const ok = await appOk.inject({ method: 'GET', url: '/v1/perfil', headers: AUTH })
+    await appOk.close()
+    expect(ok.statusCode).toBe(200)
+  })
+
+  it('owner não pode se auto-suspender → 422 auto_suspensao', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'PATCH', url: `/v1/admin/usuarios/${owner}`, headers: AUTH,
+      payload: { suspenso: true },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(422)
+    expect(r.json().error.code).toBe('auto_suspensao')
+  })
+
+  it('PATCH /admin/usuarios suspensão é owner-only → 403 para não-owner', async () => {
+    const app = await criarAppTeste(comum)
+    const r = await app.inject({
+      method: 'PATCH', url: `/v1/admin/usuarios/${owner}`, headers: AUTH,
+      payload: { suspenso: true },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(403)
+  })
+
+  it('GET /admin/metricas inclui opt-out e aceita período', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({ method: 'GET', url: '/v1/admin/metricas', headers: AUTH })
+    const comPeriodo = await app.inject({
+      method: 'GET', url: '/v1/admin/metricas?de=2020-01-01&ate=2020-12-31', headers: AUTH,
+    })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    const body = r.json()
+    expect(body).toHaveProperty('avisos_por_status')
+    expect(body).toHaveProperty('envios_por_status')
+    expect(body).toHaveProperty('total_usuarios')
+    expect(typeof body.optout_total).toBe('number')
+    expect(typeof body.optout_taxa).toBe('number')
+    expect(comPeriodo.statusCode).toBe(200)
+  })
+
+  // ---- Templates UNIFICADOS por chave (/admin/mensagens) ----
+
+  it('owner lista mensagens (família resposta.* do seed)', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({ method: 'GET', url: '/v1/admin/mensagens', headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    const chaves = r.json().mensagens.map((m: { chave: string }) => m.chave)
+    expect(chaves).toContain('resposta.ja_paguei')
+    expect(chaves).toContain('resposta.ver_pix')
+  })
+
+  it('preview de mensagem renderiza {{n}} e linta texto + rótulo de botão', async () => {
+    const app = await criarAppTeste(owner)
+    const ok = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens/preview', headers: AUTH,
+      payload: { conteudo: { texto: 'Chave Pix: {{1}}', botoes: [{ acao: 'ver_pix', rotulo: 'Ver chave' }] }, variaveis: ['pix_chave'], valores: { pix_chave: 'ana@x.com' } },
+    })
+    const ruim = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens/preview', headers: AUTH,
+      payload: { conteudo: { texto: 'Ok', botoes: [{ acao: 'optout', rotulo: 'Sair da dívida' }] }, variaveis: [], valores: {} },
+    })
+    await app.close()
+    expect(ok.json().render).toBe('Chave Pix: ana@x.com')
+    expect(ok.json().lint_ok).toBe(true)
+    expect(ruim.json().lint_ok).toBe(false) // termo proibido no rótulo do botão
+  })
+
+  // H12.7 / M1: PARIDADE preview↔envio no VALOR AUSENTE. O preview usa o mesmo
+  // renderizador do zap (renderizarTexto): variável sem valor vira string VAZIA
+  // (não o placeholder {{nome}}). O que o owner vê é o que vai sair.
+  it('preview de variável SEM valor renderiza string vazia (não placeholder)', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens/preview', headers: AUTH,
+      payload: { conteudo: { texto: 'Oi {{1}}, sobre {{2}}' }, variaveis: ['nome', 'motivo'], valores: { motivo: 'mensalidade' } },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    // 'nome' ausente -> ''; 'motivo' presente. Igual ao envio real do zap.
+    expect(r.json().render).toBe('Oi , sobre mensalidade')
+  })
+
+  it('criar mensagem com linguagem proibida → 422', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
+      payload: { chave: 'resposta.optout', nome_meta: 'resposta_optout_ruim', conteudo: { texto: 'sobre sua dívida' }, variaveis: [] },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(422)
+    expect(r.json().error.code).toBe('linguagem_proibida')
+  })
+
+  // H13.2: travessão BLOQUEIA ao salvar template (defesa junto do CHECK do banco).
+  it('criar mensagem com travessão → 422 linguagem_travessao', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
+      payload: { chave: 'resposta.optout', nome_meta: 'resposta_optout_dash', conteudo: { texto: 'Oi — tudo certo' }, variaveis: [] },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(422)
+    expect(r.json().error.code).toBe('linguagem_travessao')
+  })
+
+  // H13.2: hífen ASCII NÃO é travessão; mídia com URL e ação com hífen passam.
+  it('preview com hífen ASCII (url/ação) não acende travessão', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens/preview', headers: AUTH,
+      payload: {
+        conteudo: {
+          texto: 'Acesse https://exemplo.com/a-b para pagar-agora',
+          botoes: [{ acao: 'ver_pix', rotulo: 'Ver chave' }],
+        },
+        variaveis: [], valores: {},
+      },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json().lint_ok).toBe(true)
+    expect(r.json().travessao).toBeNull()
+  })
+
+  // H13.10 🟡 / H13.3: gênero gendered é só ALERTA. Salva mesmo assim e devolve
+  // os trechos em avisos_genero (não bloqueia o salvamento).
+  it('criar mensagem com texto gendered → 201, salva com avisos_genero', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
+      payload: {
+        chave: 'resposta.optout', nome_meta: 'resposta_optout_genero',
+        conteudo: { texto: 'Sou a Ana, falo sobre o combinado' }, variaveis: [],
+      },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(201)
+    const body = r.json()
+    expect(Array.isArray(body.avisos_genero)).toBe(true)
+    expect(body.avisos_genero.length).toBeGreaterThan(0) // "Sou a" acende o alerta
+
+    // limpeza
+    await poolSuper.query(`delete from public.templates where nome_meta='resposta_optout_genero'`)
+  })
+
+  // H13.10/H13.3: texto neutro não acende alerta de gênero.
+  it('preview de texto neutro tem avisos_genero vazio', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens/preview', headers: AUTH,
+      payload: { conteudo: { texto: 'Aqui é Ana, sobre o combinado de pagamento.' }, variaveis: [], valores: {} },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json().avisos_genero).toEqual([])
+  })
+
+  it('propor versão (pendente) -> aprovar -> ativar troca a ativa da chave', async () => {
+    const app = await criarAppTeste(owner)
+    const nova = await app.inject({
+      method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
+      payload: { chave: 'resposta.optout', nome_meta: 'resposta_optout_v2', conteudo: { texto: 'Pronto, sem mais lembretes. 🙂' }, variaveis: [] },
+    })
+    expect(nova.statusCode).toBe(201)
+    const id = nova.json().id
+    expect(nova.json().status_meta).toBe('pendente')
+    expect(nova.json().ativo).toBe(false)
+
+    const semAprovar = await app.inject({ method: 'POST', url: `/v1/admin/mensagens/${id}/ativar`, headers: AUTH })
+    expect(semAprovar.statusCode).toBe(409)
+    expect(semAprovar.json().error.code).toBe('template_nao_aprovado')
+
+    const aprovar = await app.inject({ method: 'POST', url: `/v1/admin/mensagens/${id}/aprovar`, headers: AUTH })
+    expect(aprovar.json().status_meta).toBe('aprovado')
+    const ativar = await app.inject({ method: 'POST', url: `/v1/admin/mensagens/${id}/ativar`, headers: AUTH })
+    await app.close()
+    expect(ativar.statusCode).toBe(200)
+
+    const ativas = await poolSuper.query(
+      `select id from public.templates where chave='resposta.optout' and contexto='padrao' and ativo`,
+    )
+    expect(ativas.rowCount).toBe(1)
+    expect(ativas.rows[0].id).toBe(id)
+
+    // limpeza: reativa o seed e remove as versões de teste.
+    await poolSuper.query(`update public.templates set ativo=false where id=$1`, [id])
+    await poolSuper.query(
+      `update public.templates set ativo=true where chave='resposta.optout' and nome_meta='resposta_optout'`,
+    )
+    await poolSuper.query(
+      `delete from public.templates where nome_meta in ('resposta_optout_v2','resposta_optout_ruim')`,
+    )
+  })
+
+  // H13.4: opt-out visível em TODA mensagem do ciclo. "Templates do ciclo" = as
+  // chaves 'ciclo.*' (lembretes D-2..D+1 e suas variantes de revisão), que são as
+  // mensagens enviadas repetidamente ao devedor. Cada uma DEVE declarar o botão
+  // de opt-out (acao='optout'); o rótulo é editável (E12), a presença não é opcional.
+  it('todo template do ciclo carrega o botão de opt-out', async () => {
+    const { rows } = await poolSuper.query<{ chave: string; tem_optout: boolean }>(
+      `select chave,
+              exists (
+                select 1 from jsonb_array_elements(conteudo->'botoes') b
+                where b->>'acao' = 'optout'
+              ) as tem_optout
+       from public.templates
+       where chave like 'ciclo.%'`,
+    )
+    expect(rows.length).toBeGreaterThan(0) // há templates de ciclo semeados
+    const semOptout = rows.filter((r) => !r.tem_optout).map((r) => r.chave)
+    expect(semOptout, `templates do ciclo sem opt-out: ${semOptout.join(', ')}`).toEqual([])
+  })
+
+  it('apagar a versão ativa de uma chave → 409 template_ativo', async () => {
+    const app = await criarAppTeste(owner)
+    const ativa = await poolSuper.query(
+      `select id from public.templates where chave='resposta.ja_paguei' and ativo limit 1`,
+    )
+    const r = await app.inject({
+      method: 'DELETE', url: `/v1/admin/mensagens/${ativa.rows[0].id}`, headers: AUTH,
+    })
+    await app.close()
+    expect(r.statusCode).toBe(409)
+    expect(r.json().error.code).toBe('template_ativo')
+  })
+})

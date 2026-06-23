@@ -1,0 +1,25 @@
+# backend/ é um projeto independente (install próprio). Este .gitignore garante
+# proteção mesmo se o git for inicializado AQUI dentro, e não na raiz (caso em
+# que o .gitignore da raiz não se aplicaria).
+
+node_modules/
+dist/
+*.log
+
+# segredos: ignora todo .env, menos os templates *.example versionáveis.
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# Supabase CLI (estado local, não versionar)
+supabase/.temp/
+supabase/.branches/
+
+# sessão do WhatsApp (Baileys): chaves da sessão, lock de instância e QR. NUNCA
+# versionar (auth_baileys/ guarda as credenciais; na VPS precisa persistir).
+auth_baileys/
+.baileys.lock
+qr.png
+
+.DS_Store

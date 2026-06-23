@@ -1,0 +1,17 @@
+-- NOTA HISTÓRICA (E12): esta migration é de quando a configuração de templates
+-- morava em `templates_mensagem` (criada na 0006). Aquela tabela foi UNIFICADA na
+-- tabela única `templates` (0022) e DROPADA depois (templates_mensagem na 0024,
+-- templates_cobrador na 0023). O DELETE da api hoje vale na tabela `templates`
+-- (grant na 0022). Migration aplicada não se reabre; este grant é inócuo (a tabela
+-- não existe mais). Mantido só pelo histórico; o estado vigente é a 0022.
+--
+-- Owner pode APAGAR versões de template. Exceção cirúrgica à regra "sem DELETE":
+-- templates_mensagem é CONFIGURAÇÃO/conteúdo (um rascunho mal formatado não tem
+-- valor de integridade), não auditoria nem dado financeiro. A regra continua
+-- valendo onde importa: eventos_aviso é append-only; avisos/envios/profiles são
+-- preservados (estado muda, linha não some). Nada referencia templates_mensagem
+-- (sem FK/template_id), então o DELETE é seguro: não órfã envios.
+--
+-- A policy api_templates (for all, 0008) já cobre DELETE; faltava só o GRANT.
+-- O zap continua sem DELETE (só SELECT em templates).
+grant delete on public.templates_mensagem to whaviso_api;

@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+
+/* =====================================================================
+   Design System: "Calmo Editorial" (ver plano seção 1)
+   Identidade: lembrete educado, papelaria fina (nunca tom de fintech).
+   ===================================================================== */
+@theme {
+  /* superfícies */
+  --color-papel: #faf7f0; /* fundo geral */
+  --color-papel-2: #f3eee3; /* superfícies elevadas/hover */
+  --color-cartao: #ffffff; /* cards */
+  --color-linha: #e5decf; /* hairlines/bordas */
+
+  /* tinta */
+  --color-tinta: #20322a; /* texto principal (verde-quase-preto) */
+  --color-tinta-2: #5c6b62; /* texto secundário */
+
+  /* marca */
+  --color-salvia: #1e4d3b; /* verde profundo, ações primárias, títulos */
+  --color-salvia-claro: #dceae0; /* fundos de destaque suaves */
+  --color-folha: #3e7c5b; /* sucesso/pago-recebido */
+  --color-dourado: #b8860b; /* sino da marca (acento dourado, ouro velho) */
+
+  /* semânticas (sempre suaves, nunca alarmistas) */
+  --color-ambar: #b97e22; /* pendente / no ciclo */
+  --color-ambar-claro: #f6ebd7;
+  --color-barro: #a4543f; /* cancelado / destrutivo (terroso) */
+  --color-cinza-expirado: #8b9088;
+  --color-revisao: #2f6f7a; /* informado como pago / em revisão (teal suave) */
+  --color-revisao-claro: #d9eaed;
+
+  /* tipografia */
+  --font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --font-sans: 'Karla', system-ui, sans-serif;
+
+  /* raios */
+  --radius-card: 12px;
+  --radius-input: 8px;
+  --radius-pill: 9999px;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-papel);
+    color: var(--color-tinta);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+
+    /* Grain de papel sutil no fundo geral (SVG noise, opacity .03) */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-optical-sizing: auto;
+    color: var(--color-tinta);
+    line-height: 1.2;
+  }
+
+  /* Valores monetários: Karla tabular + 700 (sem mono, mantém o tom humano) */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+}
+
+/* Motion discreto, CSS-only. Respeita prefers-reduced-motion globalmente. */
+@layer utilities {
+  @keyframes whv-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-rise {
+    animation: whv-rise 300ms ease-out both;
+  }
+
+  /* CycleTimeline: ponto da etapa ativa pulsa suavemente (2s, escala 1→1.08). */
+  @keyframes whv-pulso-etapa {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(185, 126, 34, 0);
+    }
+    50% {
+      transform: scale(1.08);
+      box-shadow: 0 0 0 4px rgba(185, 126, 34, 0.18);
+    }
+  }
+
+  .animate-pulso-etapa {
+    animation: whv-pulso-etapa 2s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
