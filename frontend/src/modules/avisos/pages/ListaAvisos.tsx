@@ -28,16 +28,20 @@ import {
 } from '@/shared/contracts'
 import { useAvisos } from '../api'
 
-type Grupo = 'ativos' | 'agenda' | 'historico'
+type Grupo = 'todos' | 'ativos' | 'agenda' | 'historico'
 
 const FAIXAS: ReadonlyArray<{ value: Grupo; label: string }> = [
+  // "Todos" junta as três faixas numa tabela só (servidor sem filtro de `grupo`).
+  { value: 'todos', label: 'Todos' },
   { value: 'ativos', label: 'Ativos' },
   // H4.2: a agenda (sem_aviso) é separável dos ativos, faixa própria.
   { value: 'agenda', label: 'Sem aviso' },
-  { value: 'historico', label: 'Histórico' },
+  { value: 'historico', label: 'Encerrados' },
 ]
 
-// Estados que o usuário pode filtrar DENTRO da faixa "Ativos" (rótulos da H9.3).
+// Estados filtráveis DENTRO de cada faixa (espelha o servidor, ver shared/estados.ts).
+// Só aparecem como sub-filtro os estados daquela faixa; a faixa "Sem aviso" tem um
+// estado só (sem_aviso), então não mostra filtro (nada a filtrar).
 const ESTADOS_ATIVOS: readonly StatusAviso[] = [
   'aguardando_aceite',
   'programado',
@@ -46,11 +50,25 @@ const ESTADOS_ATIVOS: readonly StatusAviso[] = [
   'aguardando_aprovacao_aviso_editado',
   'desregistrado',
 ]
+const ESTADOS_HISTORICO: readonly StatusAviso[] = ['pago', 'cancelado', 'recusado', 'expirado']
+const ESTADOS_AGENDA: readonly StatusAviso[] = ['sem_aviso']
+const ESTADOS_TODOS: readonly StatusAviso[] = [
+  ...ESTADOS_ATIVOS,
+  ...ESTADOS_AGENDA,
+  ...ESTADOS_HISTORICO,
+]
+const ESTADOS_POR_FAIXA: Record<Grupo, readonly StatusAviso[]> = {
+  todos: ESTADOS_TODOS,
+  ativos: ESTADOS_ATIVOS,
+  agenda: ESTADOS_AGENDA,
+  historico: ESTADOS_HISTORICO,
+}
+
 const FILTRO_TODOS = 'todos'
 type FiltroEstado = typeof FILTRO_TODOS | StatusAviso
 
 function lerGrupo(raw: string | null): Grupo {
-  return raw === 'agenda' || raw === 'historico' ? raw : 'ativos'
+  return raw === 'agenda' || raw === 'historico' || raw === 'todos' ? raw : 'ativos'
 }
 function lerPapel(raw: string | null): PapelAviso | undefined {
   if (!raw) return undefined
@@ -73,17 +91,23 @@ export default function ListaAvisosPage() {
   // Busca com debounce local antes de ir ao servidor (server-side por nome OU motivo).
   const [buscaInput, setBuscaInput] = useState(buscaUrl)
   useEffect(() => {
-    const t = setTimeout(() => setParam('busca', buscaInput.trim() || null), 350)
+    const t = setTimeout(() => setParam({ busca: buscaInput.trim() || null }), 350)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buscaInput])
 
-  // Na faixa "Ativos" o estado é um sub-filtro; nas outras faixas o servidor já fixa o
-  // conjunto pelo `grupo` (H9.8: a regra de quais estados são terminais vive no servidor).
-  const statusFiltro = grupo === 'ativos' && estado !== FILTRO_TODOS ? estado : undefined
+  // Sub-filtro de situação por faixa: só os estados daquela faixa. O filtro só aparece
+  // quando a faixa tem mais de um estado (Sem aviso tem só sem_aviso, nada a filtrar).
+  const estadosFaixa = ESTADOS_POR_FAIXA[grupo]
+  const mostrarFiltroEstado = estadosFaixa.length > 1
+  // Guarda contra estado vindo da URL que não pertence à faixa atual (ex.: troca de aba).
+  const estadoValido =
+    estado !== FILTRO_TODOS && estadosFaixa.includes(estado) ? estado : FILTRO_TODOS
+  const statusFiltro = estadoValido !== FILTRO_TODOS ? estadoValido : undefined
 
   const { data, isLoading, isError } = useAvisos({
-    grupo,
+    // "Todos" = sem filtro de faixa (o servidor devolve todos os estados).
+    grupo: grupo === 'todos' ? undefined : grupo,
     papel,
     status: statusFiltro,
     busca: buscaUrl || undefined,
@@ -93,12 +117,18 @@ export default function ListaAvisosPage() {
     per_page: 100,
   })
 
-  function setParam(chave: string, valor: string | null) {
+  // Aplica um ou mais params numa ÚNICA navegação. Importante: o `setParams` do React
+  // Router entrega o `prev` da render atual (não compõe chamadas sequenciais como o
+  // useState), então mexer em 2 params exige um único patch, senão a 2ª chamada parte
+  // dos params antigos e sobrescreve a 1ª.
+  function setParam(patch: Record<string, string | null>) {
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev)
-        if (valor) next.set(chave, valor)
-        else next.delete(chave)
+        for (const [chave, valor] of Object.entries(patch)) {
+          if (valor) next.set(chave, valor)
+          else next.delete(chave)
+        }
         return next
       },
       { replace: true },
@@ -168,7 +198,7 @@ export default function ListaAvisosPage() {
         <SegmentedControl<PapelAviso | 'todos'>
           ariaLabel="Papel nos combinados"
           value={papel ?? 'todos'}
-          onChange={(v) => setParam('papel', v === 'todos' ? null : v)}
+          onChange={(v) => setParam({ papel: v === 'todos' ? null : v })}
           options={[
             { value: 'todos', label: 'Todos' },
             { value: 'cobrador', label: ROTULO_PAPEL.cobrador },
@@ -179,10 +209,11 @@ export default function ListaAvisosPage() {
         <SegmentedControl<Grupo>
           ariaLabel="Faixa dos combinados"
           value={grupo}
-          onChange={(v) => {
-            setParam('grupo', v === 'ativos' ? null : v)
-            if (v !== 'ativos') setParam('status', null)
-          }}
+          onChange={(v) =>
+            // Troca de faixa limpa o sub-filtro de situação (só vale em "Ativos"),
+            // num único patch para não perder a mudança de `grupo`.
+            setParam({ grupo: v === 'ativos' ? null : v, status: null })
+          }
           options={FAIXAS}
         />
       </div>
@@ -202,15 +233,16 @@ export default function ListaAvisosPage() {
             aria-label="Buscar por nome ou motivo"
           />
         </div>
-        {/* Filtro por estado: só na faixa Ativos (rótulos canônicos da H9.3). */}
-        {grupo === 'ativos' && (
+        {/* Filtro por situação: só os estados da faixa atual; oculto quando a faixa tem
+            um estado só (Sem aviso). Rótulos canônicos da H9.3. */}
+        {mostrarFiltroEstado && (
           <Select<FiltroEstado>
             ariaLabel="Filtrar por situação"
-            value={estado}
-            onChange={(v) => setParam('status', v === FILTRO_TODOS ? null : v)}
+            value={estadoValido}
+            onChange={(v) => setParam({ status: v === FILTRO_TODOS ? null : v })}
             options={[
               { value: FILTRO_TODOS, label: 'Todas as situações' },
-              ...ESTADOS_ATIVOS.map((s) => ({ value: s, label: ROTULO_STATUS_AVISO[s] })),
+              ...estadosFaixa.map((s) => ({ value: s, label: ROTULO_STATUS_AVISO[s] })),
             ]}
             className="lg:w-56"
           />
@@ -242,7 +274,7 @@ export default function ListaAvisosPage() {
                   : 'Crie seu primeiro combinado para gerar o convite.'
           }
           acao={
-            buscaUrl || grupo !== 'ativos' ? undefined : (
+            buscaUrl || (grupo !== 'ativos' && grupo !== 'todos') ? undefined : (
               <Link
                 to="/app/avisos/novo"
                 className="inline-flex items-center gap-2 rounded-pill bg-salvia px-5 py-2.5 text-sm font-medium text-papel hover:bg-tinta"
