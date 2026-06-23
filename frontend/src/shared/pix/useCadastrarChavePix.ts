@@ -11,20 +11,33 @@ interface EntradaCadastro {
   tipo: TipoChavePix | ''
   chave: string
   rotulo?: string | null
+  titular: string
+  banco: string
   padrao?: boolean
 }
 
 export function useCadastrarChavePix() {
   const criar = useCriarChavePix()
 
-  async function cadastrar({ tipo, chave, rotulo, padrao }: EntradaCadastro): Promise<ChavePix> {
+  async function cadastrar({
+    tipo,
+    chave,
+    rotulo,
+    titular,
+    banco,
+    padrao,
+  }: EntradaCadastro): Promise<ChavePix> {
     if (!tipo) throw new Error('Selecione o tipo da chave.')
     if (!chave.trim()) throw new Error('Informe a chave Pix.')
+    if (!titular.trim()) throw new Error('Informe o nome do titular da chave.')
+    if (!banco.trim()) throw new Error('Informe o banco da chave.')
     try {
       return await criar.mutateAsync({
         tipo,
         chave: chave.trim(),
         rotulo: rotulo?.trim() ? rotulo.trim() : null,
+        titular: titular.trim(),
+        banco: banco.trim(),
         padrao: padrao ?? false,
       })
     } catch (e) {

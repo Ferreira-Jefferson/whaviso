@@ -45,6 +45,10 @@ export const chavePixSchema = z.object({
   tipo: tipoChavePix,
   chave: z.string().max(140),
   rotulo: z.string().max(60).nullable(),
+  // Titular + banco da chave (0044): preenchidos no cadastro; o aviso herda como
+  // snapshot (pix_titular/pix_banco). Nullable p/ chaves legadas (pré-0044).
+  titular: z.string().max(120).nullable(),
+  banco: z.string().max(80).nullable(),
   padrao: z.boolean(),
   arquivada: z.boolean(),
   criado_em: z.coerce.date(),

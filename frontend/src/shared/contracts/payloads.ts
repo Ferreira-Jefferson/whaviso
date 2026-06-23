@@ -224,6 +224,9 @@ export const criarChavePixBody = z.object({
   tipo: tipoChavePix,
   chave: z.string().trim().min(1).max(140),
   rotulo: z.string().trim().max(60).nullish(),
+  // titular + banco (0044) obrigatórios: a chave os carrega para o aviso herdar.
+  titular: z.string().trim().min(1).max(120),
+  banco: z.string().trim().min(1).max(80),
   padrao: z.boolean().optional(),
 })
 export type CriarChavePixBody = z.infer<typeof criarChavePixBody>
@@ -231,12 +234,19 @@ export type CriarChavePixBody = z.infer<typeof criarChavePixBody>
 export const atualizarChavePixBody = z
   .object({
     rotulo: z.string().trim().max(60).nullish(),
+    titular: z.string().trim().min(1).max(120).optional(),
+    banco: z.string().trim().min(1).max(80).optional(),
     padrao: z.boolean().optional(),
     arquivada: z.boolean().optional(),
   })
   .refine(
-    (b) => b.rotulo !== undefined || b.padrao !== undefined || b.arquivada !== undefined,
-    { message: 'informe rotulo, padrao e/ou arquivada' },
+    (b) =>
+      b.rotulo !== undefined ||
+      b.titular !== undefined ||
+      b.banco !== undefined ||
+      b.padrao !== undefined ||
+      b.arquivada !== undefined,
+    { message: 'informe rotulo, titular, banco, padrao e/ou arquivada' },
   )
 export type AtualizarChavePixBody = z.infer<typeof atualizarChavePixBody>
 

@@ -303,29 +303,13 @@ export default function NovoAvisoPage() {
               value={watch('pix_chave') ?? ''}
               onChange={(v) => setValue('pix_chave', v)}
               erro={errors.pix_chave?.message}
+              // 0044: titular/banco pertencem à chave; o aviso herda da escolhida.
+              onDetalhes={(titular, banco) => {
+                setValue('pix_titular', titular)
+                setValue('pix_banco', banco)
+              }}
             />
           </div>
-
-          {/* H2.1: titular + banco da chave (obrigatórios no receber). Compõem a 2ª
-              mensagem do Pix enviada a quem vai pagar. */}
-          {ehReceber && (
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Nome do titular da chave" erro={errors.pix_titular?.message}>
-                <Input
-                  placeholder="Ex.: Maria Silva"
-                  autoComplete="off"
-                  {...register('pix_titular')}
-                />
-              </Field>
-              <Field label="Banco da chave" erro={errors.pix_banco?.message}>
-                <Input
-                  placeholder="Ex.: Nubank"
-                  autoComplete="off"
-                  {...register('pix_banco')}
-                />
-              </Field>
-            </div>
-          )}
 
           <div className="flex justify-end gap-2 pt-1">
             <Button

@@ -148,6 +148,8 @@ function GerenciadorChavesPix() {
   const [tipo, setTipo] = useState<TipoChavePix | ''>('')
   const [chave, setChave] = useState('')
   const [rotulo, setRotulo] = useState('')
+  const [titular, setTitular] = useState('')
+  const [banco, setBanco] = useState('')
   const [padrao, setPadrao] = useState(false)
   // Aba do card: 'chaves' (lista) | 'cadastrar' (form). null = antes de inicializar.
   const [aba, setAba] = useState<'chaves' | 'cadastrar' | null>(null)
@@ -164,10 +166,12 @@ function GerenciadorChavesPix() {
     setErro(null)
     try {
       // sem outras chaves, a primeira vira padrão automaticamente.
-      await cadastrar({ tipo, chave, rotulo, padrao: lista.length > 0 ? padrao : true })
+      await cadastrar({ tipo, chave, rotulo, titular, banco, padrao: lista.length > 0 ? padrao : true })
       setTipo('')
       setChave('')
       setRotulo('')
+      setTitular('')
+      setBanco('')
       setPadrao(false)
       setAba('chaves') // mostra a chave recém-adicionada na lista
     } catch (e) {
@@ -220,6 +224,24 @@ function GerenciadorChavesPix() {
 
       {abaAtiva === 'cadastrar' ? (
         <div className="flex flex-col gap-3">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Nome do titular da chave">
+              <Input
+                placeholder="Ex.: Maria Silva"
+                autoComplete="off"
+                value={titular}
+                onChange={(e) => setTitular(e.target.value)}
+              />
+            </Field>
+            <Field label="Banco da chave">
+              <Input
+                placeholder="Ex.: Nubank"
+                autoComplete="off"
+                value={banco}
+                onChange={(e) => setBanco(e.target.value)}
+              />
+            </Field>
+          </div>
           <ChavePixInput
             orientacao="linha"
             tipo={tipo}
@@ -278,10 +300,15 @@ function GerenciadorChavesPix() {
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-tinta-2">
+                <span className="block text-xs text-tinta-2">
                   {ROTULO_TIPO_CHAVE[c.tipo]}
                   {c.rotulo ? ` · ${c.rotulo}` : ''}
                 </span>
+                {(c.titular || c.banco) && (
+                  <span className="block truncate text-xs text-tinta-2">
+                    {[c.titular, c.banco].filter(Boolean).join(' · ')}
+                  </span>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 {!c.padrao && (

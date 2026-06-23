@@ -13,7 +13,8 @@ import { z } from 'zod'
 import { conflito, naoEncontrado } from '../../shared/http_errors'
 
 const COLS_PERFIL = 'id, nome, telefone, role, criado_em, atualizado_em'
-const COLS_CHAVE = 'id, tipo, chave, rotulo, padrao, arquivada, criado_em, atualizado_em'
+const COLS_CHAVE =
+  'id, tipo, chave, rotulo, titular, banco, padrao, arquivada, criado_em, atualizado_em'
 const idParam = z.object({ id: z.uuid() })
 
 /**
@@ -115,7 +116,7 @@ export const perfilRoutes: FastifyPluginAsync = async (raiz) => {
     '/perfil/chaves-pix',
     { preHandler: app.autenticar, schema: { body: criarChavePixBody, response: { 201: chavePixSchema } } },
     async (req, reply) => {
-      const { tipo, chave, rotulo, padrao } = req.body
+      const { tipo, chave, rotulo, titular, banco, padrao } = req.body
       try {
         const linha = await comTransacao(app.pool, async (cli) => {
           if (padrao) {
@@ -126,9 +127,9 @@ export const perfilRoutes: FastifyPluginAsync = async (raiz) => {
             )
           }
           const { rows } = await cli.query(
-            `insert into public.chaves_pix (profile_id, tipo, chave, rotulo, padrao)
-             values ($1, $2, $3, $4, $5) returning ${COLS_CHAVE}`,
-            [req.userId, tipo, chave, rotulo ?? null, padrao ?? false],
+            `insert into public.chaves_pix (profile_id, tipo, chave, rotulo, titular, banco, padrao)
+             values ($1, $2, $3, $4, $5, $6, $7) returning ${COLS_CHAVE}`,
+            [req.userId, tipo, chave, rotulo ?? null, titular, banco, padrao ?? false],
           )
           return rows[0]
         })
@@ -150,7 +151,7 @@ export const perfilRoutes: FastifyPluginAsync = async (raiz) => {
       schema: { params: idParam, body: atualizarChavePixBody, response: { 200: chavePixSchema } },
     },
     async (req) => {
-      const { rotulo, padrao, arquivada } = req.body
+      const { rotulo, titular, banco, padrao, arquivada } = req.body
       // Arquivar (soft-delete) também tira o status de padrão.
       const padraoFinal = arquivada === true ? false : padrao
 
@@ -167,6 +168,14 @@ export const perfilRoutes: FastifyPluginAsync = async (raiz) => {
         if (rotulo !== undefined) {
           valores.push(rotulo)
           sets.push(`rotulo = $${valores.length}`)
+        }
+        if (titular !== undefined) {
+          valores.push(titular)
+          sets.push(`titular = $${valores.length}`)
+        }
+        if (banco !== undefined) {
+          valores.push(banco)
+          sets.push(`banco = $${valores.length}`)
         }
         if (arquivada !== undefined) {
           valores.push(arquivada)

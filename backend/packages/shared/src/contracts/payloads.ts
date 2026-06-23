@@ -262,24 +262,34 @@ export const listaChavesPixResposta = z.array(chavePixSchema)
 export type ListaChavesPixResposta = z.infer<typeof listaChavesPixResposta>
 
 // POST: cria uma chave; padrao=true torna-a a padrão (zera as outras).
+// titular + banco (0044) obrigatórios: a chave precisa carregá-los para o aviso herdar.
 export const criarChavePixBody = z.object({
   tipo: tipoChavePix,
   chave: z.string().trim().min(1).max(140),
   rotulo: z.string().trim().max(60).nullish(),
+  titular: z.string().trim().min(1).max(120),
+  banco: z.string().trim().min(1).max(80),
   padrao: z.boolean().optional(),
 })
 export type CriarChavePixBody = z.infer<typeof criarChavePixBody>
 
-// PATCH: editar rótulo, tornar padrão, ou arquivar (soft-delete). Ao menos 1 campo.
+// PATCH: editar rótulo/titular/banco, tornar padrão, ou arquivar (soft-delete). Ao menos 1 campo.
 export const atualizarChavePixBody = z
   .object({
     rotulo: z.string().trim().max(60).nullish(),
+    titular: z.string().trim().min(1).max(120).optional(),
+    banco: z.string().trim().min(1).max(80).optional(),
     padrao: z.boolean().optional(),
     arquivada: z.boolean().optional(),
   })
   .refine(
-    (b) => b.rotulo !== undefined || b.padrao !== undefined || b.arquivada !== undefined,
-    { message: 'informe rotulo, padrao e/ou arquivada' },
+    (b) =>
+      b.rotulo !== undefined ||
+      b.titular !== undefined ||
+      b.banco !== undefined ||
+      b.padrao !== undefined ||
+      b.arquivada !== undefined,
+    { message: 'informe rotulo, titular, banco, padrao e/ou arquivada' },
   )
 export type AtualizarChavePixBody = z.infer<typeof atualizarChavePixBody>
 

@@ -23,7 +23,13 @@ describe('perfil: chaves Pix', () => {
       method: 'POST',
       url: '/v1/perfil/chaves-pix',
       headers: AUTH,
-      payload: { tipo: 'email', chave: 'fulano@pix.com', ...over },
+      payload: {
+        tipo: 'email',
+        chave: 'fulano@pix.com',
+        titular: 'Maria Silva',
+        banco: 'Nubank',
+        ...over,
+      },
     })
     await app.close()
     return r
@@ -65,6 +71,34 @@ describe('perfil: chaves Pix', () => {
     expect(r.statusCode).toBe(201)
     expect(r.json()).toMatchObject({ chave: 'fulano@pix.com', rotulo: 'Nubank', padrao: false, arquivada: false })
     expect(await listar()).toHaveLength(1)
+  })
+
+  it('0044: cria chave com titular e banco; PATCH edita ambos', async () => {
+    const criada = (await criar({ titular: 'João Souza', banco: 'Inter' })).json()
+    expect(criada).toMatchObject({ titular: 'João Souza', banco: 'Inter' })
+
+    const app = await appA()
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/v1/perfil/chaves-pix/${criada.id}`,
+      headers: AUTH,
+      payload: { titular: 'João S. Souza', banco: 'Banco Inter' },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json()).toMatchObject({ titular: 'João S. Souza', banco: 'Banco Inter' })
+  })
+
+  it('0044: titular/banco obrigatórios ao criar → 400', async () => {
+    const app = await appA()
+    const r = await app.inject({
+      method: 'POST',
+      url: '/v1/perfil/chaves-pix',
+      headers: AUTH,
+      payload: { tipo: 'email', chave: 'semtitular@pix.com' },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(400)
   })
 
   it('só uma chave padrão por vez; padrão vem primeiro na lista', async () => {

@@ -35,6 +35,7 @@ import {
   PageHeader,
   BellLogo,
 } from '@/shared/ui'
+import { SeletorChavePix } from '@/shared/pix'
 import { Inbox } from 'lucide-react'
 import {
   statusAviso,
@@ -153,6 +154,9 @@ export default function DesignSystemPage() {
   const [sel, setSel] = useState<StatusAviso | 'todos'>('todos')
   const [tipoPix, setTipoPix] = useState<TipoChavePix | ''>('')
   const [chavePix, setChavePix] = useState('')
+  const [chavePropria, setChavePropria] = useState('')
+  const [titularDemo, setTitularDemo] = useState('')
+  const [bancoDemo, setBancoDemo] = useState('')
   const [tel, setTel] = useState<string | null>(null)
   const [valor, setValor] = useState<number | null>(null)
   const [dialogAberto, setDialogAberto] = useState(false)
@@ -398,6 +402,28 @@ export default function DesignSystemPage() {
           </p>
           <DicaTipoChave chave="maria@email.com" />
           <DicaTipoChave chave="11999998888" tipo="cpf" />
+        </div>
+      </Secao>
+
+      <Secao titulo="SeletorChavePix">
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-tinta-2">
+            Modo "proprias" (vou receber): abas de chaves + cadastro. Titular e banco
+            fazem parte da chave (form Cadastrar) e são reportados via onDetalhes; o
+            aviso herda da chave escolhida.
+          </p>
+          <SeletorChavePix
+            modo="proprias"
+            value={chavePropria}
+            onChange={setChavePropria}
+            onDetalhes={(titular, banco) => {
+              setTitularDemo(titular)
+              setBancoDemo(banco)
+            }}
+          />
+          <p className="text-xs text-tinta-2">
+            Herdado: titular {titularDemo || '(vazio)'} · banco {bancoDemo || '(vazio)'}
+          </p>
         </div>
       </Secao>
 
