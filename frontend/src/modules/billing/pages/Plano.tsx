@@ -22,15 +22,30 @@ import {
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
 import type { Plano } from '@/shared/contracts'
+import { brl } from '@/shared/format'
 import { useAssinar, useAssinatura, usePlanos, useUsoAtivos } from '../api'
 
-// Escolha em confirmação: o plano e, no Plus, a quantidade de unidades.
+// Escolha em confirmação: o plano e, no Plus, a quantidade de envios/mês.
 interface Escolha {
   plano: Plano
   unidades?: number
 }
 
 type PlanoId = 'free' | 'start' | 'profissional' | 'plus'
+
+// Preço TOTAL (centavos) do Plus por volume de envios: espelho do backend
+// (shared/planos.precoPorEnvioCentavos). Interpola o total entre o piso e o topo
+// publicados no catálogo. O backend recomputa o congelado ao assinar (fonte única);
+// aqui é só exibição. `n` é grampeado na faixa.
+function precoEnvioCentavos(plano: Plano, n: number): number {
+  const lo = plano.envios_min ?? 1
+  const hi = plano.envios_max ?? lo
+  const pLo = plano.preco_centavos
+  const pHi = plano.preco_max_centavos ?? pLo
+  const nn = Math.min(Math.max(n, lo), hi)
+  if (hi === lo) return pLo
+  return Math.round(pLo + ((pHi - pLo) * (nn - lo)) / (hi - lo))
+}
 
 export default function PlanoPage() {
   const planos = usePlanos()
@@ -120,34 +135,34 @@ export default function PlanoPage() {
           }
         />
       ) : planos.isLoading || !planos.data ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Skeleton className="h-64 w-full rounded-card" />
-          <Skeleton className="h-64 w-full rounded-card" />
+        <div className="grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-80 w-full rounded-card" />
+          <Skeleton className="h-80 w-full rounded-card" />
+          <Skeleton className="h-80 w-full rounded-card" />
+          <Skeleton className="h-80 w-full rounded-card" />
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {planos.data
-            .filter((p) => !p.por_unidade)
-            .map((plano) => (
-              <CartaoPlano
-                key={plano.id}
-                plano={plano}
-                ehAtual={plano.id === planoAtualId}
-                onEscolher={() => setAConfirmar({ plano })}
-                alterando={assinar.isPending}
-              />
-            ))}
-          {planos.data
-            .filter((p) => p.por_unidade)
-            .map((plano) => (
+        <div className="grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {planos.data.map((plano) =>
+            plano.por_envio ? (
               <CartaoPlus
                 key={plano.id}
                 plano={plano}
                 ehAtual={plano.id === planoAtualId}
-                onEscolher={(unidades) => setAConfirmar({ plano, unidades })}
+                onEscolher={(envios) => setAConfirmar({ plano, unidades: envios })}
                 alterando={assinar.isPending}
               />
-            ))}
+            ) : (
+              <CartaoPlano
+                key={plano.id}
+                plano={plano}
+                ehAtual={plano.id === planoAtualId}
+                destaque={plano.id === 'profissional'}
+                onEscolher={() => setAConfirmar({ plano })}
+                alterando={assinar.isPending}
+              />
+            ),
+          )}
         </div>
       )}
 
@@ -162,8 +177,16 @@ export default function PlanoPage() {
         {aConfirmar && (
           <span>
             Você passará para o <strong>{aConfirmar.plano.nome}</strong>
-            {aConfirmar.plano.por_unidade ? (
-              <> com {aConfirmar.unidades} unidades.</>
+            {aConfirmar.plano.por_envio ? (
+              <>
+                {' '}
+                com {aConfirmar.unidades} envios por mês (
+                <MoneyText
+                  centavos={precoEnvioCentavos(aConfirmar.plano, aConfirmar.unidades ?? 0)}
+                  className="text-sm"
+                />{' '}
+                por mês).
+              </>
             ) : aConfirmar.plano.preco_centavos > 0 ? (
               <>
                 {' '}
@@ -288,45 +311,60 @@ function Recurso({ ativo, rotulo }: { ativo: boolean; rotulo: string }) {
   )
 }
 
+// Cabeçalho comum dos cartões: faixa de destaque/atual + nome. Mantém todos os
+// cartões alinhados (mesma altura de topo) numa grade de colunas.
+function FaixaCartao({ destaque, ehAtual }: { destaque?: boolean; ehAtual: boolean }) {
+  if (ehAtual) {
+    return (
+      <span className="self-start rounded-pill bg-salvia-claro px-3 py-1 text-xs font-medium text-salvia">
+        Plano atual
+      </span>
+    )
+  }
+  if (destaque) {
+    return (
+      <span className="inline-flex items-center gap-1 self-start rounded-pill bg-salvia px-3 py-1 text-xs font-medium text-papel">
+        <Sparkles strokeWidth={2} className="size-3" />
+        Mais popular
+      </span>
+    )
+  }
+  return <span className="text-xs text-transparent">.</span>
+}
+
 function CartaoPlano({
   plano,
   ehAtual,
+  destaque,
   onEscolher,
   alterando,
 }: {
   plano: Plano
   ehAtual: boolean
+  destaque?: boolean
   onEscolher: () => void
   alterando: boolean
 }) {
+  const borda = destaque
+    ? 'border-salvia ring-2 ring-salvia/40'
+    : ehAtual
+      ? 'border-salvia ring-1 ring-salvia/30'
+      : ''
   return (
-    <Card
-      className={
-        ehAtual
-          ? 'flex flex-col gap-4 border-salvia ring-1 ring-salvia/30'
-          : 'flex flex-col gap-4'
-      }
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-lg text-salvia">{plano.nome}</h3>
-          <p className="mt-1">
-            <MoneyText centavos={plano.preco_centavos} className="text-2xl text-tinta" />
-            {plano.preco_centavos > 0 && (
-              <span className="text-sm text-tinta-2"> /mês</span>
-            )}
-          </p>
-        </div>
-        {ehAtual && (
-          <span className="rounded-pill bg-salvia-claro px-3 py-1 text-xs font-medium text-salvia">
-            Plano atual
-          </span>
-        )}
+    <Card className={`flex h-full flex-col gap-4 ${borda}`}>
+      <FaixaCartao destaque={destaque} ehAtual={ehAtual} />
+
+      <div>
+        <h3 className="text-lg text-salvia">{plano.nome}</h3>
+        <p className="mt-2 flex items-baseline gap-1">
+          <MoneyText centavos={plano.preco_centavos} className="font-display text-3xl text-tinta" />
+          {plano.preco_centavos > 0 && <span className="text-sm text-tinta-2">/mês</span>}
+        </p>
       </div>
 
-      <ul className="flex flex-col gap-2 text-sm text-tinta">
+      <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
         <li className="flex items-center gap-2">
-          <Check strokeWidth={1.75} className="size-4 text-folha" />
+          <Check strokeWidth={1.75} className="size-4 shrink-0 text-folha" />
           {`Agenda de até ${plano.capacidade_agenda} itens`}
         </li>
         <Recurso
@@ -338,13 +376,18 @@ function CartaoPlano({
         <Recurso ativo={plano.totais_periodo} rotulo="Totais por período" />
       </ul>
 
-      <div className="mt-auto pt-2">
+      <div className="pt-2">
         {ehAtual ? (
           <Button variante="secondary" disabled className="w-full">
             Seu plano atual
           </Button>
         ) : (
-          <Button onClick={onEscolher} loading={alterando} className="w-full">
+          <Button
+            variante={destaque ? 'primary' : 'secondary'}
+            onClick={onEscolher}
+            loading={alterando}
+            className="w-full"
+          >
             Escolher {plano.nome}
           </Button>
         )}
@@ -361,74 +404,69 @@ function CartaoPlus({
 }: {
   plano: Plano
   ehAtual: boolean
-  onEscolher: (unidades: number) => void
+  onEscolher: (envios: number) => void
   alterando: boolean
 }) {
-  const [unidades, setUnidades] = useState(5)
-  const total = plano.preco_centavos * unidades
-  const agenda = plano.agenda_por_unidade * unidades
-  const ativaveis = plano.ativaveis_por_unidade * unidades
+  const min = plano.envios_min ?? 16
+  const max = plano.envios_max ?? 200
+  const [envios, setEnvios] = useState(() => Math.min(Math.max(50, min), max))
+  const total = precoEnvioCentavos(plano, envios)
+  const porEnvio = brl(Math.round(total / envios))
 
   return (
-    <Card
-      className={
-        ehAtual
-          ? 'flex flex-col gap-4 border-salvia ring-1 ring-salvia/30 sm:col-span-2'
-          : 'flex flex-col gap-4 sm:col-span-2'
-      }
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-lg text-salvia">{plano.nome}</h3>
-          <p className="mt-1 flex items-baseline gap-1">
-            <MoneyText centavos={total} className="text-2xl text-tinta" />
-            <span className="text-sm text-tinta-2"> /mês para {unidades} unidades</span>
-          </p>
-        </div>
-        {ehAtual && (
-          <span className="rounded-pill bg-salvia-claro px-3 py-1 text-xs font-medium text-salvia">
-            Plano atual
-          </span>
-        )}
+    <Card className={`flex h-full flex-col gap-4 border-salvia ${ehAtual ? 'ring-1 ring-salvia/30' : 'ring-2 ring-salvia/40'}`}>
+      <FaixaCartao ehAtual={ehAtual} destaque={!ehAtual} />
+
+      <div>
+        <h3 className="text-lg text-salvia">{plano.nome}</h3>
+        <p className="mt-2 flex items-baseline gap-1">
+          <MoneyText centavos={total} className="font-display text-3xl text-tinta" />
+          <span className="text-sm text-tinta-2">/mês</span>
+        </p>
+        <p className="mt-1 text-xs text-tinta-2">
+          {porEnvio} por envio · quanto mais envios, mais barato cada um
+        </p>
       </div>
 
-      <ul className="flex flex-col gap-2 text-sm text-tinta">
+      <div className="flex flex-col gap-2 rounded-card bg-papel-2 p-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm text-tinta-2">Envios por mês</span>
+          <span className="tabular text-lg text-salvia">{envios}</span>
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={envios}
+          onChange={(e) => setEnvios(Number(e.target.value))}
+          className="w-full cursor-pointer"
+          style={{ accentColor: 'var(--color-salvia)' }}
+          aria-label="Envios por mês"
+        />
+        <div className="flex justify-between text-xs text-tinta-2">
+          <span>{min}</span>
+          <span>{max}</span>
+        </div>
+      </div>
+
+      <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
         <li className="flex items-center gap-2">
-          <Check strokeWidth={1.75} className="size-4 text-folha" />
-          {`Agenda de ${agenda} itens (${plano.agenda_por_unidade} por unidade)`}
+          <Check strokeWidth={1.75} className="size-4 shrink-0 text-folha" />
+          {`Até ${envios} envios por mês`}
         </li>
-        <li className="flex items-center gap-2">
-          <Check strokeWidth={1.75} className="size-4 text-folha" />
-          {`${ativaveis} combinados ativáveis (1 por unidade)`}
-        </li>
+        <Recurso ativo rotulo="Avisos automáticos no WhatsApp" />
+        <Recurso ativo={plano.permite_recorrente} rotulo="Combinados recorrentes" />
         <Recurso ativo={plano.cadencia_configuravel} rotulo="Cadência configurável" />
         <Recurso ativo={plano.totais_periodo} rotulo="Totais por período" />
       </ul>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-tinta-2">Quantas unidades?</span>
-          <span className="tabular text-lg text-salvia">{unidades}</span>
-        </div>
-        <input
-          type="range"
-          min={1}
-          max={50}
-          value={unidades}
-          onChange={(e) => setUnidades(Number(e.target.value))}
-          className="w-full cursor-pointer"
-          style={{ accentColor: 'var(--color-salvia)' }}
-          aria-label="Quantidade de unidades"
-        />
-      </div>
-
-      <div className="mt-auto pt-2">
+      <div className="pt-2">
         {ehAtual ? (
           <Button variante="secondary" disabled className="w-full">
             Seu plano atual
           </Button>
         ) : (
-          <Button onClick={() => onEscolher(unidades)} loading={alterando} className="w-full">
+          <Button onClick={() => onEscolher(envios)} loading={alterando} className="w-full">
             <Sparkles strokeWidth={1.75} className="size-4" />
             Escolher {plano.nome}
           </Button>

@@ -33,7 +33,7 @@ export interface AlavancasPlano {
   reengajamento_max: number
   /** Teto de edições com reaprovação por combinado (H2.5/G-C2). */
   edicoes_max: number
-  /** Unidades contratadas (só Plus); null nos demais. */
+  /** Plus: nº de ENVIOS/mês contratados (migration 0044; capacidade/vagas 1:1); null nos demais. */
   unidades: number | null
 }
 
@@ -85,6 +85,23 @@ export async function alavancasDoPlano(ex: Executor, uid: string): Promise<Alava
     }
   }
   return r
+}
+
+/**
+ * Preço TOTAL (centavos) do Plus por VOLUME DE ENVIOS (migration 0044). Interpola
+ * linearmente o total entre o piso (`envios_min` -> `preco_centavos`) e o topo
+ * (`envios_max` -> `preco_max_centavos`); o R$/envio cai conforme o volume sobe.
+ * Fonte única: a api usa no `assinar` (preço congelado) e o catálogo publica os
+ * params p/ a UI espelhar. `n` é grampeado na faixa.
+ */
+export function precoPorEnvioCentavos(
+  curva: { envios_min: number; envios_max: number; preco_centavos: number; preco_max_centavos: number },
+  n: number,
+): number {
+  const { envios_min: lo, envios_max: hi, preco_centavos: pLo, preco_max_centavos: pHi } = curva
+  const nn = Math.min(Math.max(n, lo), hi)
+  if (hi === lo) return pLo
+  return Math.round(pLo + ((pHi - pLo) * (nn - lo)) / (hi - lo))
 }
 
 /** Conta a agenda (balde único): anotações não-arquivadas do criador, por papel. */

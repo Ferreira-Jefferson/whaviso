@@ -294,8 +294,10 @@ export type AdminAtualizarUsuarioBody = z.infer<typeof adminAtualizarUsuarioBody
 
 // ---- GET /v1/billing/planos (reusado pela área admin) ----
 // Catálogo dos 4 planos (Épico 11) com a AGENDA como balde único e as alavancas
-// por plano. No Plus (por_unidade=true) o `preco_centavos` é o preço de UMA unidade
-// e a agenda é `agenda_por_unidade` por unidade; o front multiplica pela quantidade.
+// por plano. No Plus (por_envio=true) o preço é por VOLUME DE ENVIOS (migration
+// 0044): `preco_centavos` é o total no piso (`envios_min`), `preco_max_centavos` o
+// total no topo (`envios_max`); o R$/envio cai conforme o volume sobe. O total
+// intermediário é interpolado (o backend recomputa o congelado no assinar).
 export const planoSchema = z.object({
   id: z.string(),
   nome: z.string(),
@@ -314,6 +316,11 @@ export const planoSchema = z.object({
   ativaveis_por_unidade: z.number().int(),
   reengajamento_max: z.number().int(),
   somente_leitura: z.boolean(),
+  // Curva de preço por envio (Plus). Nulos nos planos que não são por_envio.
+  por_envio: z.boolean(),
+  envios_min: z.number().int().nullable(),
+  envios_max: z.number().int().nullable(),
+  preco_max_centavos: z.number().int().nullable(),
 })
 export type Plano = z.infer<typeof planoSchema>
 
@@ -351,14 +358,15 @@ export const assinaturaSchema = z.object({
 export type Assinatura = z.infer<typeof assinaturaSchema>
 
 // ---- POST /v1/billing/assinar (JWT) ----
-// O Plus exige `unidades` (>= 1); os demais a ignoram.
+// No Plus, `unidades` carrega o nº de ENVIOS/mês escolhido; os demais a ignoram. A
+// faixa exata (envios_min..envios_max) é validada no backend contra o catálogo.
 export const assinarBody = z
   .object({
     plano_id: z.enum(['free', 'start', 'profissional', 'plus']),
     unidades: z.number().int().min(1).max(2000).optional(),
   })
   .refine((b) => b.plano_id !== 'plus' || b.unidades !== undefined, {
-    message: 'o plano Plus exige a quantidade de unidades',
+    message: 'o plano Plus exige a quantidade de envios',
   })
 export type AssinarBody = z.infer<typeof assinarBody>
 

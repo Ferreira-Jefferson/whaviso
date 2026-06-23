@@ -11,7 +11,7 @@ Esta pasta é independente do código (`backend/`, `frontend/`). Aqui não mora 
 
 ## Estrutura sugerida (crie conforme precisar)
 
-- `marketing/` — campanhas, canais, copy, anúncios
-- `posicionamento/` — proposta de valor, público, concorrência
-- `conteudo/` — posts, artigos, roteiros
-- `metricas/` — funil, aquisição, retenção
+- `marketing/`: campanhas, canais, copy, anúncios
+- `posicionamento/`: proposta de valor, público, concorrência
+- `conteudo/`: posts, artigos, roteiros
+- `metricas/`: funil, aquisição, retenção

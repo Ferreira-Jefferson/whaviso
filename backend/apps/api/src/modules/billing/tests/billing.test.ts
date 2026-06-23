@@ -45,8 +45,14 @@ describe('billing (integração)', () => {
     expect(prof.totais_periodo).toBe(true)
 
     const plus = planos.find((p) => p.id === 'plus')!
-    expect(plus.por_unidade).toBe(true)
-    expect(plus.agenda_por_unidade).toBe(10)
+    // Plus por VOLUME DE ENVIOS (migration 0045): curva publicada p/ a UI espelhar.
+    expect(plus.por_envio).toBe(true)
+    expect(plus.envios_min).toBe(16)
+    expect(plus.envios_max).toBe(200)
+    expect(plus.preco_centavos).toBe(3090) // piso (16 envios): premium 2900 + 1 envio 190
+    expect(plus.preco_max_centavos).toBe(7990) // total no topo (200 envios)
+    // Capacidade escala 1:1 com os envios (agenda/ativável por "unidade" = 1).
+    expect(plus.agenda_por_unidade).toBe(1)
     expect(plus.ativaveis_por_unidade).toBe(1)
   })
 
@@ -60,34 +66,61 @@ describe('billing (integração)', () => {
     expect(a.json().capacidade_agenda).toBe(50)
   })
 
-  it('assinar Plus grava unidades e congela o preço total (preço de unidade * unidades)', async () => {
+  it('assinar Plus grava os envios e congela o preço interpolado da curva', async () => {
     const app = await criarAppTeste(u)
-    const precoUnidade = (
-      (await app.inject({ method: 'GET', url: '/v1/billing/planos' })).json().planos as Array<{
-        id: string
-        preco_centavos: number
-      }>
-    ).find((p) => p.id === 'plus')!.preco_centavos
-
+    // Curva: total(16)=3090, total(200)=7990. Para 50 envios:
+    //   round(3090 + (7990-3090)*(50-16)/(200-16)) = 3995.
     const r = await app.inject({
       method: 'POST',
       url: '/v1/billing/assinar',
       headers: AUTH,
-      payload: { plano_id: 'plus', unidades: 3 },
+      payload: { plano_id: 'plus', unidades: 50 },
     })
     expect(r.statusCode).toBe(200)
-    expect(r.json().unidades).toBe(3)
-    expect(r.json().preco_centavos).toBe(precoUnidade * 3)
+    expect(r.json().unidades).toBe(50)
+    expect(r.json().preco_centavos).toBe(3995)
 
     const a = await app.inject({ method: 'GET', url: '/v1/billing/assinatura', headers: AUTH })
     await app.close()
     expect(a.json().plano_id).toBe('plus')
-    expect(a.json().unidades).toBe(3)
-    // Plus com 3 unidades → agenda 30 (10/unidade), vagas ativas 3 (1/unidade).
-    expect(a.json().capacidade_agenda).toBe(30)
+    expect(a.json().unidades).toBe(50)
+    // Plus escala 1:1 com os envios → capacidade/vagas = 50.
+    expect(a.json().capacidade_agenda).toBe(50)
   })
 
-  it('assinar Plus sem unidades → 400', async () => {
+  it('assinar Plus no piso (16) e no topo (200) congela os extremos da curva', async () => {
+    const app = await criarAppTeste(u)
+    const piso = await app.inject({
+      method: 'POST',
+      url: '/v1/billing/assinar',
+      headers: AUTH,
+      payload: { plano_id: 'plus', unidades: 16 },
+    })
+    expect(piso.json().preco_centavos).toBe(3090)
+    const topo = await app.inject({
+      method: 'POST',
+      url: '/v1/billing/assinar',
+      headers: AUTH,
+      payload: { plano_id: 'plus', unidades: 200 },
+    })
+    await app.close()
+    expect(topo.json().preco_centavos).toBe(7990)
+  })
+
+  it('assinar Plus fora da faixa (< envios_min) → 422', async () => {
+    const app = await criarAppTeste(u)
+    const r = await app.inject({
+      method: 'POST',
+      url: '/v1/billing/assinar',
+      headers: AUTH,
+      payload: { plano_id: 'plus', unidades: 10 },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(422)
+    expect(r.json().error.code).toBe('envios_fora_da_faixa')
+  })
+
+  it('assinar Plus sem envios → 400', async () => {
     const app = await criarAppTeste(u)
     const r = await app.inject({
       method: 'POST',

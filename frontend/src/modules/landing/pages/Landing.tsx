@@ -12,6 +12,8 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { Button, Card, MoneyText, WhatsAppPreview, BellLogo, cn } from '@/shared/ui'
+import { brl } from '@/shared/format'
+import type { Plano } from '@/shared/contracts'
 import { usePlanos } from '../data'
 
 const MENSAGEM_EXEMPLO =
@@ -365,54 +367,62 @@ function Planos() {
           Comece de graça e mude quando precisar de mais combinados ao mesmo tempo.
         </p>
 
-        <div className="mt-8 grid gap-5 sm:grid-cols-2">
+        <div className="mt-8 grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {planos.data
-            ? planos.data.map((p) => (
-                <Card key={p.id} className="flex flex-col gap-4 bg-cartao">
-                  <div>
-                    <h3 className="text-lg text-salvia">{p.nome}</h3>
-                    <p className="mt-1 flex items-baseline gap-1">
-                      <MoneyText centavos={p.preco_centavos} className="text-3xl text-tinta" />
-                      {p.por_unidade ? (
-                        <span className="text-sm text-tinta-2"> /unidade ao mês</span>
-                      ) : (
-                        p.preco_centavos > 0 && <span className="text-sm text-tinta-2"> /mês</span>
-                      )}
-                    </p>
-                  </div>
-                  <ul className="flex flex-col gap-2 text-sm text-tinta">
-                    <li>
-                      {p.por_unidade
-                        ? `• Agenda de ${p.agenda_por_unidade} itens por unidade`
-                        : `• Agenda de até ${p.capacidade_agenda} itens`}
-                    </li>
-                    <li>
-                      {p.somente_leitura
-                        ? '• Visualização e agenda (sem enviar avisos)'
-                        : '• Avisos automáticos no WhatsApp'}
-                    </li>
-                    {p.permite_recorrente && <li>• Combinados recorrentes</li>}
-                  </ul>
-                  <Link to="/entrar" className="mt-auto">
-                    <Button variante="secondary" className="w-full">
-                      Escolher {p.nome}
-                    </Button>
-                  </Link>
-                </Card>
-              ))
+            ? planos.data.map((p) => {
+                if (p.por_envio) return <CartaoPlusLanding key={p.id} p={p} />
+                const destaque = p.id === 'profissional'
+                const borda = destaque ? 'border-salvia ring-2 ring-salvia/40' : ''
+                return (
+                  <Card key={p.id} className={`flex h-full flex-col gap-4 bg-cartao ${borda}`}>
+                    {destaque ? (
+                      <span className="self-start rounded-pill bg-salvia px-3 py-1 text-xs font-medium text-papel">
+                        Mais popular
+                      </span>
+                    ) : (
+                      <span className="text-xs text-transparent">.</span>
+                    )}
+                    <div>
+                      <h3 className="text-lg text-salvia">{p.nome}</h3>
+                      <p className="mt-2 flex items-baseline gap-1">
+                        <MoneyText centavos={p.preco_centavos} className="font-display text-3xl text-tinta" />
+                        {p.preco_centavos > 0 && <span className="text-sm text-tinta-2">/mês</span>}
+                      </p>
+                    </div>
+                    <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
+                      <li>{`• Agenda de até ${p.capacidade_agenda} itens`}</li>
+                      <li>
+                        {p.somente_leitura
+                          ? '• Visualização e agenda (sem enviar avisos)'
+                          : '• Avisos automáticos no WhatsApp'}
+                      </li>
+                      {p.permite_recorrente && <li>• Combinados recorrentes</li>}
+                      {p.cadencia_configuravel && <li>• Cadência configurável</li>}
+                    </ul>
+                    <Link to="/entrar" className="mt-auto">
+                      <Button variante={destaque ? 'primary' : 'secondary'} className="w-full">
+                        Escolher {p.nome}
+                      </Button>
+                    </Link>
+                  </Card>
+                )
+              })
             : // Fallback estático enquanto carrega / se a api estiver fora: os
               // preços reais vêm de GET /v1/billing/planos; aqui só ilustramos.
               [
                 { nome: 'Whaviso Free', preco: 0, agenda: 'Agenda de até 50 itens (sem envio)' },
                 { nome: 'Whaviso Start', preco: 990, agenda: 'Agenda de até 100 itens' },
+                { nome: 'Whaviso Profissional', preco: 2900, agenda: 'Agenda de até 150 itens' },
+                { nome: 'Whaviso Plus', preco: 3000, agenda: '16 a 200 envios por mês' },
               ].map((p) => (
-                <Card key={p.nome} className="flex flex-col gap-4 bg-cartao">
+                <Card key={p.nome} className="flex h-full flex-col gap-4 bg-cartao">
+                  <span className="text-xs text-transparent">.</span>
                   <h3 className="text-lg text-salvia">{p.nome}</h3>
                   <p>
-                    <MoneyText centavos={p.preco} className="text-3xl text-tinta" />
-                    {p.preco > 0 && <span className="text-sm text-tinta-2"> /mês</span>}
+                    <MoneyText centavos={p.preco} className="font-display text-3xl text-tinta" />
+                    {p.preco > 0 && <span className="text-sm text-tinta-2">/mês</span>}
                   </p>
-                  <p className="text-sm text-tinta">{p.agenda}</p>
+                  <p className="flex-1 text-sm text-tinta">{p.agenda}</p>
                   <Link to="/entrar" className="mt-auto">
                     <Button variante="secondary" className="w-full">
                       Escolher {p.nome}
@@ -423,6 +433,79 @@ function Planos() {
         </div>
       </div>
     </section>
+  )
+}
+
+// Preço TOTAL (centavos) do Plus por volume de envios: espelho do backend
+// (shared/planos.precoPorEnvioCentavos). Interpola o total entre o piso e o topo
+// publicados no catálogo; aqui é só exibição (o backend congela ao assinar).
+function precoEnvioCentavos(p: Plano, n: number): number {
+  const lo = p.envios_min ?? 16
+  const hi = p.envios_max ?? lo
+  const pLo = p.preco_centavos
+  const pHi = p.preco_max_centavos ?? pLo
+  const nn = Math.min(Math.max(n, lo), hi)
+  if (hi === lo) return pLo
+  return Math.round(pLo + ((pHi - pLo) * (nn - lo)) / (hi - lo))
+}
+
+// Cartão do Plus na landing: slider de envios (a partir de envios_min) que mostra,
+// ao vivo, o total/mês e o preço por envio (que cai conforme o volume sobe).
+function CartaoPlusLanding({ p }: { p: Plano }) {
+  const min = p.envios_min ?? 16
+  const max = p.envios_max ?? 200
+  const [envios, setEnvios] = useState(() => Math.min(Math.max(50, min), max))
+  const total = precoEnvioCentavos(p, envios)
+  const porEnvio = brl(Math.round(total / envios))
+
+  return (
+    <Card className="flex h-full flex-col gap-4 border-salvia bg-cartao ring-2 ring-salvia/40">
+      <span className="self-start rounded-pill bg-salvia px-3 py-1 text-xs font-medium text-papel">
+        Para quem cresce
+      </span>
+      <div>
+        <h3 className="text-lg text-salvia">{p.nome}</h3>
+        <p className="mt-2 flex items-baseline gap-1">
+          <MoneyText centavos={total} className="font-display text-3xl text-tinta" />
+          <span className="text-sm text-tinta-2">/mês</span>
+        </p>
+        <p className="mt-1 text-xs text-tinta-2">{porEnvio} por envio</p>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-card bg-papel-2 p-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm text-tinta-2">Envios por mês</span>
+          <span className="tabular text-lg text-salvia">{envios}</span>
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={envios}
+          onChange={(e) => setEnvios(Number(e.target.value))}
+          className="w-full cursor-pointer"
+          style={{ accentColor: 'var(--color-salvia)' }}
+          aria-label="Envios por mês"
+        />
+        <div className="flex justify-between text-xs text-tinta-2">
+          <span>{min}</span>
+          <span>{max}</span>
+        </div>
+      </div>
+
+      <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
+        <li>{`• Até ${envios} envios por mês`}</li>
+        <li>• Avisos automáticos no WhatsApp</li>
+        {p.permite_recorrente && <li>• Combinados recorrentes</li>}
+        {p.cadencia_configuravel && <li>• Cadência configurável</li>}
+      </ul>
+
+      <Link to="/entrar" className="mt-auto">
+        <Button variante="primary" className="w-full">
+          Escolher {p.nome}
+        </Button>
+      </Link>
+    </Card>
   )
 }
 

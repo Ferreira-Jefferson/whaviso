@@ -2,31 +2,37 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { naoAutorizado, regraNegocio } from '../../shared/http_errors'
+import { precoPorEnvioCentavos } from '../../shared/planos'
 import { provedorAtivo } from './provedor'
 
 // Billing do Épico 11: catálogo de 4 planos (free/start/profissional/plus) com
 // AGENDA balde único e alavancas por plano lidas do catálogo (migration 0026). O
-// Plus é vendido por UNIDADE (1 unidade = 1 ativável + 10 de agenda). Conta nasce
-// no free (linha real de assinatura no signup). No MVP o pagamento em dinheiro é
-// stub trial (assinar grava 'trial'); a estrutura de fatura/gateway existe e liga
-// depois (H11.7 🟡).
+// Plus é vendido por VOLUME DE ENVIOS (migration 0044): o cliente escolhe quantos
+// envios/mês quer (de envios_min a envios_max) e o R$/envio CAI com o volume (preço
+// total interpolado entre preco_centavos no piso e preco_max_centavos no topo).
+// Conta nasce no free (linha real de assinatura no signup). No MVP o pagamento em
+// dinheiro é stub trial (assinar grava 'trial'); fatura/gateway liga depois (H11.7).
 
 // Colunas de alavanca expostas pelo catálogo (lidas em runtime, nunca hardcode).
+// `por_envio`/`envios_min`/`envios_max`/`preco_max_centavos` publicam a CURVA do
+// Plus para a UI espelhar (o backend recomputa o total no assinar; fonte única).
 const COLS_PLANO = `
   id, nome, preco_centavos, max_avisos_ativos, permite_recorrente,
   capacidade_agenda, vagas_ativas, cadencia_configuravel, menu_texto_livre,
   informado_pago_habilitado, totais_periodo, por_unidade, agenda_por_unidade,
-  ativaveis_por_unidade, reengajamento_max, somente_leitura
+  ativaveis_por_unidade, reengajamento_max, somente_leitura,
+  por_envio, envios_min, envios_max, preco_max_centavos
 `
 
+// No Plus (por_envio), `unidades` carrega o nº de ENVIOS/mês escolhido (de
+// envios_min a envios_max; a faixa exata é validada no handler contra o catálogo).
 const assinarBody = z
   .object({
     plano_id: z.enum(['free', 'start', 'profissional', 'plus']),
-    // Só o Plus usa `unidades` (>= 1). Os demais ignoram.
     unidades: z.number().int().min(1).max(2000).optional(),
   })
   .refine((b) => b.plano_id !== 'plus' || b.unidades !== undefined, {
-    message: 'o plano Plus exige a quantidade de unidades',
+    message: 'o plano Plus exige a quantidade de envios',
   })
 
 export const billingRoutes: FastifyPluginAsync = async (raiz) => {
@@ -93,15 +99,38 @@ export const billingRoutes: FastifyPluginAsync = async (raiz) => {
       const { plano_id } = req.body
       const { rows: catalogo } = await app.pool.query<{
         preco_centavos: number
-        por_unidade: boolean
-      }>(`select preco_centavos, por_unidade from public.planos where id = $1`, [plano_id])
+        por_envio: boolean
+        envios_min: number | null
+        envios_max: number | null
+        preco_max_centavos: number | null
+      }>(
+        `select preco_centavos, por_envio, envios_min, envios_max, preco_max_centavos
+         from public.planos where id = $1`,
+        [plano_id],
+      )
       const plano = catalogo[0]
       if (!plano) throw regraNegocio('plano_invalido', `Plano "${plano_id}" não existe.`)
 
-      const unidades = plano.por_unidade ? req.body.unidades! : null
-      const preco_centavos = plano.por_unidade
-        ? plano.preco_centavos * unidades!
-        : plano.preco_centavos
+      // Plus: preço por volume de envios (curva do catálogo). `unidades` guarda os
+      // envios escolhidos; o total é interpolado no backend (preço congelado).
+      let unidades: number | null = null
+      let preco_centavos = plano.preco_centavos
+      if (plano.por_envio) {
+        const lo = plano.envios_min ?? 1
+        const hi = plano.envios_max ?? lo
+        const escolhido = req.body.unidades!
+        if (escolhido < lo || escolhido > hi) {
+          throw regraNegocio(
+            'envios_fora_da_faixa',
+            `Escolha entre ${lo} e ${hi} envios por mês.`,
+          )
+        }
+        unidades = escolhido
+        preco_centavos = precoPorEnvioCentavos(
+          { envios_min: lo, envios_max: hi, preco_centavos: plano.preco_centavos, preco_max_centavos: plano.preco_max_centavos ?? plano.preco_centavos },
+          escolhido,
+        )
+      }
 
       const { rows } = await app.pool.query(
         `insert into public.assinaturas (profile_id, plano_id, status, unidades, preco_centavos)

@@ -1,8 +1,8 @@
 # whaviso: Documento de Visão do Produto
 
-> **Status:** Definição consolidada do produto. Reflete o estado atual do projeto (fluxos, estados e telas já existentes).
-> **Data:** 15/06/2026
-> **Inventário técnico (estado × desejado):** [GUIA.md](GUIA.md) · **Guia de agentes:** [backend/AGENTS.md](backend/AGENTS.md)
+> **Status:** Definição consolidada do produto. Reflete o estado atual do projeto após a implementação dos 13 épicos de histórias de usuário (migrations 0001..0043).
+> **Data:** 23/06/2026
+> **Histórias de usuário (fonte de verdade):** [historias/](historias/) · **Guia de agentes:** [backend/AGENTS.md](backend/AGENTS.md)
 
 ---
 
@@ -70,30 +70,32 @@ Campos do combinado:
 - Motivo (ex.: "mensalidade escola", "empréstimo pessoal")
 - Valor (sempre em centavos internamente)
 - Data combinada
-- Chave Pix (de quem recebe)
+- Chave Pix de quem recebe (**obrigatória**, com titular e banco)
 - Telefone do alvo dos lembretes (sempre o devedor)
 
-Ao criar, o sistema gera os **tokens** e o **link de aceite**, e valida o limite do plano.
+Ao criar, o sistema gera o **número de convite** (6 dígitos, guardado só como hash) e o **link `wa.me`** de convite, e valida o limite do plano. Editar o combinado depois do aceite abre um sub-ciclo de aprovação (estado `aguardando_aprovacao_aviso_editado`), com limite de edições por plano.
 
-### 3.2 Convite e aceite (sem conta)
+### 3.2 Convite e aceite (sem conta, 100% pelo WhatsApp)
 
-O convidado confirma o combinado **sem precisar de login**, de duas formas:
+O convidado confirma o combinado **sem precisar de login**, dentro do próprio WhatsApp:
 
-- pelo **botão no WhatsApp** (Aceitar / Recusar); ou
-- pela **página pública** `/aceite/:token`.
+- pelo **botão** Aceitar / Recusar; ou
+- respondendo o **número de convite** (6 dígitos) junto com o telefone certo do papel.
 
-Sem conta, o vínculo é feito **só pelo telefone**; com sessão ativa, vincula ao perfil. No fluxo invertido, o cobrador informa sua chave Pix ao confirmar. Há uma CTA discreta de criar conta após o aceite, **nunca obrigatória**.
+A página pública `/aceite/:token` **não existe mais**: o aceite migrou inteiro para o WhatsApp. Há proteção anti-tentativa (3 erros de número regeneram/bloqueiam o convite). Sem conta, o vínculo é feito **só pelo telefone**; com sessão ativa, vincula ao perfil. No fluxo invertido, o cobrador informa sua chave Pix ao confirmar. Recusar leva ao estado terminal `recusado`. Há uma CTA discreta de criar conta após o aceite, **nunca obrigatória**.
 
 Só **depois do aceite** o ciclo de lembretes é ativado e os envios são programados.
 
-### 3.3 Sequência de lembretes (4 mensagens, máximo)
+### 3.3 Sequência de lembretes (4 etapas, máximo)
 
 | Quando | Objetivo | Botões |
 |---|---|---|
-| **D-2** (2 dias antes) | Aviso antecipado, sem urgência | ❌ Sair dos lembretes |
-| **D-1** (1 dia antes) | Organização: Pix sob demanda | 💳 Ver Pix *(se cadastrado)* · ❌ Sair |
+| **D-2** (2 dias antes) | Aviso antecipado, sem urgência | ✅ Já paguei · 💳 Ver Pix *(se houver chave)* · ❌ Sair |
+| **D-1** (1 dia antes) | Organização | ✅ Já paguei · 💳 Ver Pix · ❌ Sair |
 | **D** (no dia) | Confirmação | ✅ Já paguei · 💳 Ver Pix · ❌ Sair |
 | **D+1** (1 dia depois) | Encerramento: último aviso | ✅ Já paguei · 💳 Ver Pix · ❌ Sair |
+
+Toda etapa traz os **três botões** (a saída fica sempre visível). Cada devedor tem um **horário reservado** no dia (janela 08-18h, slot fixo por devedor), e cada envio tenta no máximo **3 vezes** com backoff curto antes de marcar falha. Se o devedor já informou pagamento (`informado_pago`), o ciclo para: vai só um empurrãozinho discreto em D+1.
 
 **"Ver Pix":** ao tocar, o sistema envia uma mensagem separada só com a chave Pix (fácil de copiar). Cada toque registra um evento `solicitou_pix`, sinal de intenção de pagamento, visível no painel. Aparece só quando há chave cadastrada.
 
@@ -151,10 +153,12 @@ Todo combinado vira um registro gerenciável. O painel mostra:
 
 - **A receber**: combinados onde sou o cobrador (com indicador "Solicitou Pix" e "Informou pagamento" quando houver).
 - **A pagar**: meus compromissos como devedor.
+- **Precisa de você**: bloco que junta o que aguarda uma ação minha (ex.: pagamento informado a confirmar).
 - **Recebidos / Pagos**: histórico do que já entrou e do que já paguei.
 - **Totais**: soma por categoria/período (visão simples, em centavos; não é contabilidade).
+- **Timeline com ator**: cada evento mostra quem agiu (distingue "informado pelo devedor" de "marcado pelo cobrador"), e o status de envio separa retry temporário de falha persistente.
 
-Quando o devedor informa pagamento, o cobrador é **notificado** (fila própria, drenada pelo serviço de WhatsApp). O mesmo vale para opt-out.
+Quando o devedor informa pagamento, o cobrador é **notificado** (fila própria, drenada pelo serviço de WhatsApp), com espaçamento por destinatário e coalescing conservador. O mesmo vale para opt-out.
 
 ---
 
@@ -189,7 +193,7 @@ A conta nasce no **Free** e o plano define **alavancas** (capacidade de agenda, 
 | **Whaviso Free** | R$ 0 | 50 itens | Agenda e visualização; **não envia avisos** (somente leitura) |
 | **Whaviso Start** | R$ 9,90/mês | 100 itens | Avisos automáticos no WhatsApp, menu de texto livre, confirmação de pagamento |
 | **Whaviso Profissional** | R$ 29/mês | 150 itens | Tudo do Start + recorrência, cadência configurável, totais por período |
-| **Whaviso Plus** | R$ 29/unidade ao mês | 10 itens por unidade | Vendido por unidade (1 unidade = 1 combinado ativável + 10 de agenda); todos os recursos |
+| **Whaviso Plus** | de R$ 30,90 a R$ 79,90/mês | escala com os envios | Vendido por **volume de envios/mês** (16 a 200); piso = preço do Profissional (R$ 29) + 1 envio (R$ 1,90); o preço por envio cai conforme o volume (de ~R$ 1,93 a ~R$ 0,40), desconto visível; todos os recursos |
 
 Free mantém a agenda e visualiza, mas qualquer envio leva à CTA de upgrade (nada se perde). No MVP o billing é um **stub trial** (limites valem de verdade; cobrança em dinheiro e troca de plano com pagamento ficam para a fase de gateway real, 🟡). Validação de limite **sempre no servidor**, sem janela de corrida.
 
@@ -218,12 +222,12 @@ Conexão de marketing: *"Para quem já se cansou de cobrar na mão."*
 
 ## 11. Funcionalidades pendentes / gated
 
-Existem no produto mas ainda **não estão ligadas**:
+Existem no produto mas ainda **não estão ligadas** (dependem em geral da migração do transporte de WhatsApp de Baileys para a Meta Cloud API oficial):
 
-1. **Auto-envio do convite** como template Meta com botões Aceitar/Recusar: hoje o convite é compartilhado por link `wa.me` + página pública de aceite.
-2. **Backfill por telefone no signup** (puxar combinados de um número ao criar conta): depende de **OTP de telefone**, que ainda não existe; ligar sem verificação abriria risco de sequestro de combinados.
-3. **Fases 2/3 do `informado_pago`**: dependem de template Meta aprovado.
+1. **Auto-envio do convite** como template Meta com botões Aceitar/Recusar: hoje o convite é compartilhado por link `wa.me` e o aceite acontece dentro do WhatsApp (por botão ou número de convite).
+2. **Backfill por telefone no signup** (puxar combinados de um número ao criar conta): depende de **OTP de telefone** entregue a +55, gated por verificação Meta; ligar sem verificação abriria risco de sequestro de combinados.
+3. **Cadência configurável** (E6), **recorrência por ocorrência** (E8/E9) e **billing real com gateway de pagamento** (E11): hoje o billing é um stub trial e a cadência/recorrência ficam para uma fase posterior de UX/modelagem.
 
 ---
 
-*Este documento consolida a visão de produto. Decisões de stack e arquitetura estão em [backend/AGENTS.md](backend/AGENTS.md) e [CLAUDE.md](CLAUDE.md); o mapa estado × desejado de cada peça está em [GUIA.md](GUIA.md).*
+*Este documento consolida a visão de produto. Decisões de stack e arquitetura estão em [backend/AGENTS.md](backend/AGENTS.md) e [CLAUDE.md](CLAUDE.md); o detalhamento por épico (fonte de verdade) está em [historias/](historias/).*
