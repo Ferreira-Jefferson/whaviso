@@ -62,10 +62,8 @@ export const criarAvisoBody = z
     message: 'informe o banco da chave Pix',
     path: ['pix_banco'],
   })
-  .refine((b) => b.modo === 'agenda' || b.direcao !== 'pagar' || (b.pix_chave != null && b.pix_chave.length > 0), {
-    message: 'a chave Pix de quem vai receber é obrigatória',
-    path: ['pix_chave'],
-  })
+  // No invertido (pagar) a chave Pix é OPCIONAL ao gerar o convite: o cobrador (quem vai
+  // receber) pode informar/ajustar depois. Sem refine de Pix aqui (espelha o backend).
 export type CriarAvisoBody = z.infer<typeof criarAvisoBody>
 
 export const criarAvisoResposta = z.object({

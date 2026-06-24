@@ -1,7 +1,8 @@
 // E4 (Modo agenda), H4.1..H4.5. Cobre: criar agenda (sem_aviso, sem convite/envios,
 // telefone opcional, free permitido até capacidade); agenda NÃO conta em ativos mas
 // conta em agenda; ativar gera convite + consome vaga + free -> CTA; ativar pede
-// telefone/Pix faltante; ativar invertido resolve telefone_devedor; duplo-tap
+// telefone/Pix faltante (receber); ativar invertido sem Pix (opcional) resolve
+// telefone_devedor; duplo-tap
 // concorrente -> 409; editar livre em sem_aviso; descartar -> cancelado; marcar pago
 // manual -> pago com evento pago_manual e ator correto (inclusive invertido).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -250,17 +251,20 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
       },
     })
     const id = criado.json().aviso.id
-    // Ativa fornecendo a outra ponta (cobrador) e Pix; telefone_devedor vem do perfil.
+    // Ativa fornecendo só a outra ponta (cobrador), SEM Pix: no invertido o Pix é
+    // OPCIONAL (decisão do dono), ativar sem chave é permitido. telefone_devedor vem do
+    // perfil. pix_chave fica null e pode entrar depois via PATCH.
     const ativar = await app.inject({
       method: 'POST', url: `/v1/avisos/${id}/ativar`, headers: AUTH,
-      payload: { nome_cobrador: 'Joao', telefone_cobrador: '+5511944443333', pix_chave: 'joao@pix.com' },
+      payload: { nome_cobrador: 'Joao', telefone_cobrador: '+5511944443333' },
     })
     expect(ativar.statusCode).toBe(200)
-    const row = await poolSuper.query<{ td: string | null }>(
-      `select telefone_devedor as td from public.avisos where id = $1`,
+    const row = await poolSuper.query<{ td: string | null; pix: string | null }>(
+      `select telefone_devedor as td, pix_chave as pix from public.avisos where id = $1`,
       [id],
     )
     expect(row.rows[0]!.td).toBe('+5511955554444')
+    expect(row.rows[0]!.pix).toBeNull()
     await app.close()
     await limparUsuario(inv)
   })

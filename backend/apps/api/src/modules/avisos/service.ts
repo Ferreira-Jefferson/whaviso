@@ -132,13 +132,11 @@ export async function criarAviso(
     }
 
     // No modo agenda os campos da outra ponta são OPCIONAIS (H4.1, cobrados só ao
-    // ativar). No modo enviar, valida Pix (H2.1/H3.1) como defesa do contrato.
+    // ativar). No modo enviar, valida Pix (H2.1) como defesa do contrato APENAS no
+    // receber: no invertido o Pix é OPCIONAL (decisão do dono), pode entrar depois.
     if (!ehAgenda) {
       if (ehReceber && (!body.pix_chave || !body.pix_titular || !body.pix_banco)) {
         throw regraNegocio('pix_obrigatorio', 'A chave Pix, o titular e o banco são obrigatórios.')
-      }
-      if (!ehReceber && !body.pix_chave) {
-        throw regraNegocio('pix_obrigatorio', 'A chave Pix de quem vai receber é obrigatória.')
       }
     }
 
@@ -277,7 +275,8 @@ export async function ativarAviso(
       if (!pixBancoAtivo) faltando.push('banco da chave Pix')
     } else {
       if (!telefoneCobradorAtivo) faltando.push('telefone de quem vai receber')
-      if (!pixAtivo) faltando.push('chave Pix de quem vai receber')
+      // Pix OPCIONAL no invertido (decisão do dono): ativar sem chave é permitido (pode
+      // entrar depois via PATCH). Só os telefones são exigidos para ativar.
       // G-M5: alvo dos lembretes no invertido = telefone do criador (perfil).
       if (!telefoneDevedorAtivo) faltando.push('seu telefone no perfil (alvo dos lembretes)')
     }

@@ -66,6 +66,35 @@ describe('avisos (integração com whaviso_dev)', () => {
     await app.close()
   })
 
+  it('cria invertido (pagar) em modo enviar SEM Pix → 201 (Pix opcional no invertido)', async () => {
+    // Decisão do dono (sobrepõe H3.1): no invertido a chave Pix é OPCIONAL. Criar o
+    // convite sem pix_chave deve passar (não 400/422 pix_obrigatorio). O receber segue
+    // exigindo Pix (coberto pelos demais testes). A chave pode entrar depois via PATCH.
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: {
+        direcao: 'pagar',
+        nome_devedor: 'Eu Mesmo',
+        telefone_devedor: null,
+        nome_cobrador: 'João',
+        telefone_cobrador: '+5511988887777',
+        motivo: 'aluguel',
+        valor_centavos: 5000,
+        data_combinada: '2026-12-15',
+        // sem pix_chave de propósito
+      },
+    })
+    expect(r.statusCode).toBe(201)
+    const body = r.json()
+    expect(body.aviso.status).toBe('aguardando_aceite')
+    expect(body.aviso.pix_chave).toBeNull()
+    expect(body.numero_convite).toMatch(/^\d{3}-\d{3}$/)
+    await app.close()
+  })
+
   it('payload inválido (valor 0) → 400', async () => {
     const app = await criarAppTeste(uid)
     const r = await app.inject({
@@ -120,8 +149,8 @@ describe('avisos (integração com whaviso_dev)', () => {
           telefone_devedor: null,
           nome_cobrador: 'João',
           telefone_cobrador: '+5511988887777',
-          // Pix obrigatório no invertido (H3.1): o devedor-criador informa a chave de
-          // quem vai receber (cobrador); titular/banco ficam para o cobrador confirmar.
+          // Pix OPCIONAL no invertido (decisão do dono): aqui só informamos a chave
+          // porque queremos exercitar a contagem de agenda, não a exigência de Pix.
           pix_chave: 'joao@pix.com',
         }),
       })

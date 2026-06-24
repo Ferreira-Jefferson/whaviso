@@ -42,10 +42,10 @@ export const criarAvisoBody = z
     motivo: motivoAviso,
     valor_centavos: valorCentavos,
     data_combinada: dataCombinada,
-    // Pix OBRIGATÓRIO nos DOIS fluxos (H2.1 e H3.1): no receber é a chave de quem cria
-    // (cobrador); no `pagar` invertido é a chave de quem VAI RECEBER (informada pelo
-    // devedor-criador), que o cobrador confere/confirma ou aponta incorreta no aceite.
-    // No modo `agenda` o Pix é DIFERIDO (só ao ativar, H4.1/H4.3): opcional aqui.
+    // Pix OBRIGATÓRIO no receber (H2.1): chave de quem cria (cobrador). No `pagar`
+    // invertido é OPCIONAL (decisão do dono): chave de quem VAI RECEBER (informada pelo
+    // devedor-criador), que o cobrador confere/confirma ou aponta incorreta no aceite,
+    // ou que pode entrar depois. No modo `agenda` o Pix é DIFERIDO (só ao ativar).
     pix_chave: z.string().trim().max(140).nullish(),
     // Titular + banco da chave (compõem a 2ª msg do Pix, E7 H7.3). Obrigatórios junto
     // da chave no receber; no invertido o cobrador valida/ajusta no aceite (H3.3), por
@@ -76,13 +76,10 @@ export const criarAvisoBody = z
     message: 'informe o banco da chave Pix',
     path: ['pix_banco'],
   })
-  // Pix obrigatório no invertido (H3.1): o devedor-criador informa a chave de quem vai
-  // RECEBER (sem ela não há convite). Titular/banco NÃO são exigidos na criação: o
-  // cobrador valida/ajusta ao confirmar (H3.3). Espelha a regra do receber só na chave.
-  .refine((b) => b.modo === 'agenda' || b.direcao !== 'pagar' || (b.pix_chave != null && b.pix_chave.length > 0), {
-    message: 'a chave Pix de quem vai receber é obrigatória',
-    path: ['pix_chave'],
-  })
+  // Pix OPCIONAL no invertido (decisão do dono, sobrepõe H3.1): o devedor-criador PODE
+  // informar a chave de quem vai RECEBER, mas não é exigido para gerar o convite. O
+  // cobrador valida/ajusta ao confirmar (H3.3) e a chave pode ser preenchida depois via
+  // PATCH /avisos/:id. Por isso NÃO há refine de pix no `pagar` (o receber segue exigindo).
 export type CriarAvisoBody = z.infer<typeof criarAvisoBody>
 
 // Resposta da criação (H2.2): além do aviso e do link de aceite (legado, E5 vai
