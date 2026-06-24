@@ -2,26 +2,28 @@
 
 Automatize avisos de pagamento por WhatsApp e controle tudo pelo painel: o que está pendente, o que já recebeu, o que ainda vai pagar.
 
+> **Fonte da verdade do produto/negócio: a pasta [historias/](historias/).** Toda regra de negócio (estados e transições, fluxos receber/pagar, convite e aceite, ciclo de lembretes, interação do devedor, confirmação de pagamento, painel, notificações, planos/limites, templates, linguagem e compliance) vive nas histórias de usuário, já verificadas e aprovadas. Este CLAUDE.md cobre **apenas** arquitetura, comandos e ferramentas de desenvolvimento, e **não define regra de negócio**. Se algo aqui contradisser uma história, a história vence. Na dúvida sobre comportamento do produto, leia `historias/` (comece por [historias/README.md](historias/README.md)), não este arquivo.
+
 **Layout (dois projetos independentes, um checkout, deploy numa VPS, sem Vercel):**
 - **`backend/`**: monorepo Node: `apps/api` (REST p/ SPA, :3001) · `apps/zap` (scheduler + webhook WhatsApp, :3002) · `packages/shared` (`@whaviso/shared`) · `supabase/` (migrations + seed) · `scripts/`. Workspace e install próprios.
-- **`frontend/`**: SPA React+Vite **standalone** (install próprio; **não** importa `@whaviso/shared`, tem os contratos Zod próprios espelhando a api). Em construção.
+- **`frontend/`**: SPA React+Vite **standalone** (install próprio; **não** importa `@whaviso/shared`, tem os contratos Zod próprios espelhando a api).
 
 As três peças (frontend, `api`, `zap`) são **independentes**: o front só consome a API REST (nunca conhece implementação do backend); `api` e `zap` se integram pelo **banco Supabase compartilhado** (outbox), nunca importando um ao outro.
 
-Leia sob demanda: produto → [PROJETO.md](PROJETO.md) · fronteiras/especialistas do backend → [backend/AGENTS.md](backend/AGENTS.md) · planos → [backend](../../../.claude/plans/voc-ser-o-respons-vel-partitioned-leaf.md), [frontend](../../../.claude/plans/aqui-criaremos-o-plano-compiled-aurora.md).
+Leia sob demanda: regras de produto/negócio → [historias/](historias/) (fonte da verdade) · fronteiras/especialistas do backend → [backend/AGENTS.md](backend/AGENTS.md) · visão de produto (referência, pode estar desatualizada) → [PROJETO.md](PROJETO.md).
 
 ## Comandos (sempre verifique o trabalho)
 
 `node`/`npm` estão no PATH do Windows (User + Machine): rode no **PowerShell** numa sessão nova, ou no **Bash**, tanto faz (o `concurrently` usa o `cmd.exe`, sempre presente no PowerShell). Se uma sessão antiga não achar o `npm`, reabra o terminal.
 
-**Subir tudo localmente (raiz):** `npm run dev` sobe **api (:3001) + front (:5173)** juntos via `concurrently`. `npm run dev:all` inclui o `zap` (que agora sobe sem credenciais Meta: o WhatsApp é via Baileys, pareado por QR no 1º boot, ver `WHATS_*` no `.env`). Primeira vez / após clone: `npm install` na raiz (pega o `concurrently`) + `npm run install:all` (deps do backend e do front). A raiz é só um lançador; `backend/` e `frontend/` seguem independentes.
+**Subir tudo localmente (raiz):** `npm run dev` sobe **api (:3001) + front (:5173)** juntos via `concurrently`. `npm run dev:all` inclui o `zap` (que sobe sem credenciais Meta: o WhatsApp é via Baileys, pareado por QR no 1º boot, ver `WHATS_*` no `.env`). Primeira vez / após clone: `npm install` na raiz (pega o `concurrently`) + `npm run install:all` (deps do backend e do front). A raiz é só um lançador; `backend/` e `frontend/` seguem independentes.
 
 **Backend** (rode de dentro de `backend/`):
 ```bash
 cd backend
 npm run lint        # ESLint + fronteiras feature-first  ── rode os 3 a cada mudança
 npm run typecheck   # tsc --noEmit (3 workspaces)
-npm test            # vitest (api 142 +1 todo + zap 147 + shared 40 = 329); conecta ao banco whaviso_dev
+npm test            # vitest (api + zap + shared); conecta ao banco whaviso_dev
 
 bash scripts/validate_migrations.sh whaviso_dev   # recria o banco de DEV (Postgres LOCAL, sem Docker); RODE ISTO se mexer no schema
 # ATENÇÃO: o runtime api+zap de DEV aponta para o Supabase CLOUD, não para o whaviso_dev local (só os testes usam o local).
@@ -35,6 +37,10 @@ curl 127.0.0.1:3001/healthz   # use 127.0.0.1 (há outro app no ::1 desta máqui
 
 **Frontend** (rode de dentro de `frontend/`): `npm run dev` (Vite, :5173) · `npm run build` (estáticos p/ nginx na VPS) · `npm run lint` · `npm run typecheck`.
 
+Quirks desta máquina (Bash + Postgres no Windows): caminho do `psql` tem espaço → chame via função com aspas, não `$VAR`. Ao capturar saída do `psql`: `export PGCLIENTENCODING=UTF8` e `tr -d '\r'`. Se o `npm install` bloquear postinstall: `npm approve-scripts esbuild unrs-resolver && npm rebuild esbuild unrs-resolver`. Senha do superusuário Postgres em `backend/.env` (`POSTGRES_PASSWORD`). Env local: `backend/.env` (serve api+zap, vars prefixadas `API_*`/`ZAP_*`) e `frontend/.env` (`VITE_*`).
+
+Estado do projeto e pendências (Supabase cloud, app Meta, secrets/VPS): ver memória [[whaviso-dev-db]].
+
 ## Graphify (mapa do código, use sempre)
 
 Existe um grafo de conhecimento do projeto em `graphify-out/` (`graph.json`, `graph.html`, `GRAPH_REPORT.md`), gerado pela skill `/graphify`. Ferramenta de DEV, não é dependência do app. Setup desta máquina em [[whaviso-graphify]].
@@ -43,35 +49,31 @@ Existe um grafo de conhecimento do projeto em `graphify-out/` (`graph.json`, `gr
 - **DEPOIS de toda mudança de código**, atualize o grafo: `/graphify . --update` (reextrai só os arquivos novos/alterados). Mantém o mapa em dia com o código.
 - Os hooks em `.claude/settings.json` já cutucam esse fluxo quando `graphify-out/graph.json` existe. Vale para subagents também: inclua a regra no prompt deles ao explorar código.
 
-Quirks desta máquina (Bash + Postgres no Windows): caminho do `psql` tem espaço → chame via função com aspas, não `$VAR`. Ao capturar saída do `psql`: `export PGCLIENTENCODING=UTF8` e `tr -d '\r'`. Se o `npm install` bloquear postinstall: `npm approve-scripts esbuild unrs-resolver && npm rebuild esbuild unrs-resolver`. Senha do superusuário Postgres em `backend/.env` (`POSTGRES_PASSWORD`). Env local: `backend/.env` (serve api+zap, vars prefixadas `API_*`/`ZAP_*`) e `frontend/.env` (`VITE_*`).
+## Arquitetura e stack (decisões técnicas, não reverter sem combinar)
 
-## Regras inegociáveis
+Decisões de **engenharia**. Não são regra de negócio (essas estão em `historias/`).
 
-**Produto (regras de ouro):**
-- **NUNCA** usar "dívida", "devendo", "atraso", "cobrança", "inadimplência"; sempre "aviso/lembrete/combinado". Vale no banco, na api, **e na UI**. Ao mudar o padrão, atualizar **juntos** o `contracts/linguagem.ts` do backend (lista de proibidas + travessão), o dicionário de linguagem do front e o CHECK de templates sem travessão (migration `0025`).
-- Opt-out visível em toda mensagem; estado terminal (pago/cancelado/expirado) **nunca mais envia**; devedor só interage por botões (sem chat/IA/Pix automático).
-- **Nunca usar travessão (—, em dash)** em texto algum (código, copy, comentários, mensagens, docs): é marca de texto gerado por IA. Prefira vírgula, dois-pontos, parênteses ou reescreva a frase.
-- **Nenhum modelo de IA (Claude, Anthropic, etc.) pode aparecer como autor ou co-autor** em commits nem em qualquer lugar do projeto. Proibido: trailer `Co-Authored-By: Claude...`, rodapés tipo `Generated with Claude Code`, ou menção a modelo/IA em mensagens de commit, código, comentários e docs. Commits saem **apenas** no nome do humano (autor do git).
-
-**Stack/arquitetura (decididas, não reverter sem combinar):**
 - Supabase = **Postgres + Auth apenas**. Sem Edge Functions; sem PostgREST p/ dados (RLS deny-all p/ anon/authenticated). Frontend usa `supabase-js` só p/ login; dados 100% via `api`.
-- **Login SEM e-mail/senha (2026-06-17):** só **Google OAuth** + **WhatsApp OTP** (cadastro fundido no login; sem páginas de senha). Motivo: fugir do limite de e-mail do SMTP do Supabase. Ambos cabem no **plano free**. O OTP do telefone (gerado pelo Supabase Auth) é entregue pelo **nosso WhatsApp** via **Send SMS Hook** → endpoint `POST /hooks/sms` no `zap` (módulo `hook_otp`, assinatura Standard Webhooks `SEND_SMS_HOOK_SECRET`). JWT continua sendo do Supabase (validado por JWKS na api). **Gated:** entrega de OTP a +55 exige verificação de empresa Meta + template de Autenticação aprovado; o `zap` precisa estar público (a nuvem do Supabase chama o hook). Google funciona sem Meta. Config de painel (Google Cloud + Supabase Providers/Hooks) é manual, ver `.claude/plans/whaviso-auth-otp-telefone.md`.
-- Backend: só Node.js; Fastify + TS estrito + Zod; runtime `tsx` (sem build/emit). WhatsApp **por enquanto via Baileys** (não oficial, roda no próprio `zap`): é o provider atual até a base chegar a ~100 clientes. A partir daí migramos para a **Meta Cloud API oficial** (alvo final; é o que destrava as fases gated: convite por template com botões, OTP de telefone, `informado_pago`). Isole o provider atrás de uma interface de envio no `zap` para a troca ser pontual. Evite Z-API/Evolution.
+- Backend: só Node.js; Fastify + TS estrito + Zod; runtime `tsx` (sem build/emit). JWT do Supabase validado localmente via JWKS na api.
+- WhatsApp **por enquanto via Baileys** (não oficial, roda no próprio `zap`), com migração futura para a **Meta Cloud API oficial** prevista. Isole o provider atrás de uma interface de envio no `zap` para a troca ser pontual. Evite Z-API/Evolution. (Quais recursos dependem da Meta oficial é regra de produto, ver `historias/`.)
 - Frontend: **React 19 + Vite 7 + TS estrito + Tailwind v4**, SPA puro; estado de servidor via TanStack Query; contratos Zod **próprios** (não compartilha pacote com o backend).
-- Integração entre serviços = banco compartilhado + outbox (`envios` p/ lembretes; `notificacoes_cobrador` p/ avisar o cobrador quando o devedor informa pagamento: a `api` só enfileira, o `zap` drena/envia), claim `FOR UPDATE SKIP LOCKED`. Sem fila/Redis.
-- Roles de privilégio mínimo (`whaviso_api`/`whaviso_zap`); **sem DELETE em auditoria/negócio** (`eventos_aviso` é append-only; `avisos`/`envios`/`profiles` mudam de estado, nunca somem — "suspender" em vez de apagar). **Exceção:** `templates` (tabela unificada de mensagens por chave) é configuração, não auditoria → o owner pode apagar versões; `whaviso_api` tem DELETE só nessa tabela (guarda na api: nunca apaga a versão ativa). JWT validado localmente via JWKS.
-- **Módulo nunca importa módulo** (lint barra): vale no backend e no front; coordene via banco/contrato. Detalhes em backend/AGENTS.md.
+- Integração entre serviços = banco compartilhado + outbox (`envios`, `notificacoes_cobrador`): quem produz só **enfileira**, o consumidor **drena/envia**, com claim `FOR UPDATE SKIP LOCKED`. Sem fila/Redis.
+- Roles de privilégio mínimo (`whaviso_api`/`whaviso_zap`); **sem DELETE em auditoria/negócio** (tabelas de negócio mudam de estado, nunca somem; auditoria é append-only). **Exceção:** `templates` é configuração, não auditoria → `whaviso_api` tem DELETE só nessa tabela (com guarda na api).
+- **Módulo nunca importa módulo** (lint barra): vale no backend e no front; coordene via banco/contrato. Detalhes em [backend/AGENTS.md](backend/AGENTS.md).
 
-**Convenções que causam bug se ignoradas:**
+## Convenções de engenharia (causam bug se ignoradas)
+
 - Dinheiro em **centavos** (int); datas de negócio em **America/Sao_Paulo**, banco em UTC. Etapa/agendamento nunca calculados no cliente.
-- Tokens **só como hash sha256** no banco (claro nunca persiste). Botão do WhatsApp leva **`aviso_id`** no payload (webhook é HMAC-autenticado), não o token.
-- Erros da api: envelope `{ error: { code, message } }`. **Nunca logar** telefone (devedor **e** cobrador), Pix/titular/banco, token nem número de convite (a redaction de log cobre campos aninhados).
-- Transições válidas de `avisos` (renomeado `pendente`→`programado` em F-STATE/migration `0028`): `sem_aviso→{aguardando_aceite,cancelado,pago}`, `aguardando_aceite→{programado,cancelado,expirado,recusado}`, `programado→{informado_pago,pago,cancelado,expirado,pausado,aguardando_aprovacao_aviso_editado,desregistrado}`, `informado_pago→{pago,programado,cancelado,expirado}`, `pago→programado` (reabertura), `pausado→{programado,cancelado,expirado}`, `aguardando_aprovacao_aviso_editado→{programado,cancelado,expirado}`, `desregistrado→{programado,cancelado,expirado}` (trigger + app). Terminais: `pago` (salvo reabertura), `cancelado`, `recusado`, `expirado`; suspensão (param envios, não terminais): `pausado`/`aguardando_aprovacao_aviso_editado`/`desregistrado`. `informado_pago`: devedor informou que pagou, aguardando o cobrador confirmar; cobrador confirma (→pago) ou rejeita (→programado, evento `rejeitado_cobrador`).
-- **Dois fluxos, mesma maquinaria de convite/aceite** (migration `0017`): `receber` (criador = cobrador, convida o devedor) e `pagar` **invertido** (criador = devedor, convida o cobrador; *não* é mais lembrete a si mesmo). Por isso `avisos.cobrador_id` é **nullable** e há `criador_papel`/`nome_cobrador`/`telefone_cobrador`. Convenção de telefones: `telefone_devedor` = sempre o alvo dos lembretes; `telefone_cobrador` = alvo do convite no invertido. Painel é por **papel** (a receber = sou cobrador; a pagar = sou devedor), não por direção.
-- **Aceite 100% pelo WhatsApp, sem conta** (E5/migration `0037`): a página pública `/aceite/:token` **foi removida** (não existe mais módulo `aceite` na api nem rota no front). O convidado confirma pelo botão do WhatsApp **ou** respondendo o **número de convite** (6 dígitos, guardado só como hash, único por telefone alvo) + o telefone certo do papel. Anti-brute-force: 3 tentativas, depois regeneração/bloqueio/desbloqueio. Sem conta, fica vinculado **só pelo telefone**; com sessão depois, vincula o `profile.id`. No invertido o cobrador informa sua chave Pix ao confirmar. `recusado` é terminal próprio. As páginas públicas que sobraram são só de **ação do devedor** por link: `/aviso/:token` (já paguei) e `/sair-lembretes/:token` (opt-out).
-- **Gated (ainda não ligado):** (1) **auto-envio do convite** como template Meta com botões Aceitar/Recusar (depende da Meta Cloud API; hoje o convite é compartilhado por link `wa.me` e o aceite acontece dentro do WhatsApp por botão/número); (2) **backfill por telefone no signup** (puxar os whavisos de um número ao criar conta) exige **OTP de telefone** entregue a +55 (Meta), que ainda não está ligado; não acionar pelo `PATCH /perfil` (não verificado) sob risco de sequestro de combinados. Ver memória [[whaviso-pagar-invertido]].
+- Tokens **só como hash sha256** no banco (claro nunca persiste).
+- Erros da api: envelope `{ error: { code, message } }`.
+- **Nunca logar** dado sensível: telefone (devedor **e** cobrador), Pix/titular/banco, token, número de convite (a redaction de log cobre campos aninhados).
 
-Estado do projeto e pendências (Supabase cloud, app Meta, secrets/VPS): ver memória [[whaviso-dev-db]].
+## Convenções de escrita do repositório
+
+Valem para tudo que você escreve (código, comentários, commits, docs). Não são regra de negócio, mas são inegociáveis:
+
+- **Nunca usar travessão (—, em dash)** em texto algum: prefira vírgula, dois-pontos, parênteses ou reescreva a frase. (A linguagem das mensagens ao usuário, palavras proibidas e gênero neutro, é regra de produto: ver `historias/13-compliance.md`.)
+- **Nenhum modelo de IA (Claude, Anthropic, etc.) pode aparecer como autor ou co-autor** em commits nem em qualquer lugar do projeto. Proibido: trailer `Co-Authored-By: Claude...`, rodapés tipo `Generated with Claude Code`, ou menção a modelo/IA em mensagens de commit, código, comentários e docs. Commits saem **apenas** no nome do humano (autor do git).
 
 ## graphify
 
