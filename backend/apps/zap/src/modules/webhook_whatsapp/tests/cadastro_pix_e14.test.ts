@@ -16,7 +16,7 @@ import {
   porPlano,
 } from '../../../../test/harness'
 
-const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never
 const TEL_COBRADOR = '+5511960002222'
 const TEL_DEVEDOR = '+5511970001111'
 const FUTURO = '2026-12-15'
