@@ -8,4 +8,8 @@ Pilares (slug): financa-leve · dor-de-lembrar · parcelar-com-seguranca · bast
 
 ## Ideias
 
-(vazio ainda; a skill acrescenta uma linha por ideia gerada)
+- dor-de-lembrar · A mensagem que você digita e apaga · dor-de-lembrar-01.md
+- dor-de-lembrar · Lembrar virou seu segundo expediente · dor-de-lembrar-01.md
+- financa-leve · Quanto do seu mês está na mão dos outros · financa-leve-01.md
+- financa-leve · O mês fecha pelo que entrou, não pelo que você vendeu · financa-leve-01.md
+- financa-leve · Anotar quem combinou de te pagar não é desconfiança · financa-leve-01.md

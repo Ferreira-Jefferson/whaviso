@@ -12,7 +12,7 @@ O conteúdo segue o funil do [plano-divulgacao.md](plano-divulgacao.md): topo (a
 
 ## Pilar 1: Finança leve pra quem vende (TOPO, amplo)
 
-Objetivo: alcance grande, atrair qualquer um que ganhe vendendo. Não fala do produto.
+Objetivo: alcance grande, atrair qualquer um que ganhe vendendo. Não fala do produto. Âncora: é finança de quem vende NA CONFIANÇA e recebe depois (o que falta entrar, o dinheiro combinado, anotar quem vai te pagar), nunca dica genérica de poupar ou precificar (essa não orbita o whaviso).
 
 - **"Separe o dinheiro do negócio do dinheiro de casa."**
   - Por que serve: erro número um de quem vende informal; conselho simples, prático, salvável.

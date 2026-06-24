@@ -13,6 +13,14 @@ A estratégia de marketing já existe em `business/marketing/`. Esta skill é o 
 
 Quando o usuário pedir conteúdo de divulgação, posts, criativos, legendas, ideias de marketing, ou disser algo como "3 ideias do pilar da dor". Sempre para Facebook e Instagram (mesmo conteúdo serve os dois; ver decisão de canais no briefing).
 
+## Relevância ao whaviso (filtro inegociável)
+
+Toda ideia, em QUALQUER estágio do funil, tem que orbitar o problema que o whaviso resolve: vender ou emprestar na confiança, dinheiro combinado pra receber depois, controlar o que está pendente, receber o que combinou sem precisar cobrar.
+
+Topo de funil pode ter público amplo e tom leve, mas o TEMA fica nessa órbita. Antes de aceitar uma ideia, faça o teste: "quem é atraído por isso tem a dor que o whaviso resolve? a ideia constrói ponte pro produto?" Se a resposta é não, descarte.
+
+Conteúdo de finanças só vale quando é a finança de quem vende na confiança e recebe depois (o mês que fecha pelo que entrou, quanto do seu dinheiro está combinado pra depois, anotar quem combinou de te pagar). Dica genérica que qualquer página de finanças poderia postar (poupar, precificar, montar planilha) NÃO serve, por mais "leve" que pareça.
+
 ## Arquivos de referência (leia sob demanda)
 
 - **Frameworks de copy** (como escrever a legenda): [referencia/copywriting.md](referencia/copywriting.md)
@@ -45,7 +53,7 @@ Copie este checklist e marque conforme avança:
 
 ```
 - [ ] Passo 0: garantir o briefing-produto.md (gerar na 1a vez)
-- [ ] Passo 1: definir pilar + quantidade (perguntar se faltar)
+- [ ] Passo 1: perguntar estágio do funil, depois pilar + quantidade
 - [ ] Passo 2: ler o ledger e o catálogo, escolher ângulos novos
 - [ ] Passo 3: gerar N ideias (5 blocos cada)
 - [ ] Passo 4: validar linguagem (3 checagens) e corrigir
@@ -56,17 +64,27 @@ Copie este checklist e marque conforme avança:
 
 Se `business/marketing/briefing-produto.md` **não existe**, gere-o agora seguindo a seção "Primeira execução" abaixo. Se existe, leia-o: ele é o contexto de produto e público que alimenta todas as ideias.
 
-### Passo 1: pilar e quantidade
+### Passo 1: estágio do funil, pilar e quantidade
 
-Os pilares vivem em `business/marketing/ideias-conteudo.md`. São cinco (slug entre parênteses, usado no nome do arquivo):
+Os cinco pilares vivem em `business/marketing/ideias-conteudo.md`, agrupados por estágio do funil (slug entre parênteses, usado no nome do arquivo):
 
-1. Finança leve pra quem vende (`financa-leve`) · topo
-2. A dor de lembrar sem cobrar (`dor-de-lembrar`) · meio, emocional
-3. Vender parcelado na confiança sem perder dinheiro (`parcelar-com-seguranca`) · meio, prático
-4. Bastidor e propósito do projeto (`bastidor-proposito`) · fundo, storytelling
-5. Mostrar o produto (`mostrar-produto`) · fundo, conversão
+**Topo de funil** (alcance amplo, não fala do produto)
+- Finança leve pra quem vende (`financa-leve`)
 
-Se o usuário informou pilar e quantidade, siga. Se faltar algum, **pergunte** (use AskUserQuestion): liste os cinco pilares, indique quantas ideias já existem de cada um (conte no ledger) e sugira preferir os menos explorados. Não invente pilares fora desses cinco sem o usuário pedir.
+**Meio de funil** (toca a dor, qualifica)
+- A dor de lembrar sem cobrar (`dor-de-lembrar`) · emocional
+- Vender parcelado na confiança sem perder dinheiro (`parcelar-com-seguranca`) · prático
+
+**Fundo de funil / ponta** (converte)
+- Bastidor e propósito do projeto (`bastidor-proposito`) · storytelling
+- Mostrar o produto (`mostrar-produto`) · conversão
+
+**Por padrão, pergunte. Não assuma o pilar.** Use AskUserQuestion, começando pelo estágio do funil:
+
+1. **Pergunte o estágio do funil:** Topo, Meio ou Fundo (ponta), com uma linha explicando cada um. A quantidade de ideias pode ser perguntada junto (é independente do estágio).
+2. **Depois liste os pilares daquele estágio** e pergunte qual pilar o usuário quer. Indique quantas ideias já existem de cada pilar (conte no ledger) e sugira preferir os menos explorados. Se o estágio tem um pilar só (Topo), pule essa pergunta e siga com ele.
+
+Só pule uma pergunta se o usuário já tiver dito aquilo no pedido (ex.: já nomeou o pilar, ou já disse "topo de funil, 3 ideias"). Não invente pilares fora desses cinco sem o usuário pedir.
 
 ### Passo 2: evitar repetição
 
@@ -76,11 +94,12 @@ Antes de gerar, leia `business/marketing/criativos/_indice.md` (se existir) e a 
 
 Para cada uma das N ideias, produza os cinco blocos no formato do template abaixo. Aplique:
 
+- **Relevância**: passe cada ideia pelo filtro de "Relevância ao whaviso" (acima) antes de escrever. Descarte qualquer ângulo genérico que não orbite o problema do produto, mesmo que seja um bom conteúdo solto.
 - **Copy**: escolha o framework adequado ao pilar (PAS para dor, BAB para transformação, AIDA para fechar). Ver [referencia/copywriting.md](referencia/copywriting.md).
 - **Imagem**: monte o prompt pela anatomia e siga o guia visual do whaviso. Ver [referencia/imagem-prompts.md](referencia/imagem-prompts.md).
 - **Público**: persona, região, faixa de renda, área de trabalho, coerentes com o estágio do funil. Ver [referencia/publico.md](referencia/publico.md).
 
-**Formatos permitidos:** só estáticos, carrossel ou imagem única. Sem vídeo/Reels (decisão de canais: conteúdo visual e de leitura, automatizável; ver briefing). Não prometa funções ainda não ligadas (auto-envio por template Meta, OTP, backfill); fale só do que já funciona.
+**Formato padrão: imagem única.** Gere sempre UMA imagem única por ideia (proporção 4:5), a não ser que o usuário peça carrossel explicitamente. Só estáticos, sem vídeo/Reels (decisão de canais; ver briefing). Para montar o prompt de imagem com qualidade profissional e sem alucinações, siga [referencia/imagem-prompts.md](referencia/imagem-prompts.md). Não prometa funções ainda não ligadas (auto-envio por template Meta, OTP, backfill); fale só do que já funciona.
 
 ### Passo 4: validar linguagem
 
@@ -97,7 +116,7 @@ Rode as três checagens da seção "Regras de linguagem" no arquivo salvo. Corri
 ```markdown
 ### Ideia N: <título curto do ângulo>
 
-- **Pilar:** <nome do pilar> · **Funil:** <topo|meio|fundo> · **Formato:** <carrossel de N quadros | imagem única>
+- **Pilar:** <nome do pilar> · **Funil:** <topo|meio|fundo> · **Formato:** <imagem única (padrão) | carrossel de N quadros (só se o usuário pedir)>
 - **Framework de copy:** <PAS | BAB | AIDA | híbrido>
 
 **Ângulo (a ideia):**
