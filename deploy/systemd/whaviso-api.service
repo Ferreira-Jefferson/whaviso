@@ -1,0 +1,32 @@
+# whaviso api (REST, :3001). Instalar em /etc/systemd/system/whaviso-api.service
+[Unit]
+Description=whaviso api (REST :3001)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=whaviso
+Group=whaviso
+WorkingDirectory=/opt/whaviso/app/backend/apps/api
+EnvironmentFile=/etc/whaviso/whaviso.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/env npm run start
+Restart=on-failure
+RestartSec=5
+
+# ── Hardening (systemd sandbox) ──
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Limites de memoria (KVM 1 = 4 GB). Soft em High, teto em Max.
+MemoryHigh=384M
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
