@@ -62,7 +62,10 @@ export const tipoEvento = z.enum([
   'reengajamento_cobrador',
   'pago_manual',
   'optout',
+  // 'cancelado_cobrador' é o valor legado; o cancelamento atual grava
+  // 'cancelado_criador' (ator = papel de quem criou). Mantemos ambos no enum.
   'cancelado_cobrador',
+  'cancelado_criador',
   'expirado',
   'solicitou_pix',
   'recusado',

@@ -203,6 +203,7 @@ export const ROTULO_EVENTO: Record<TipoEvento, string> = {
   pago_manual: 'Marcado como recebido',
   optout: 'Saiu dos lembretes',
   cancelado_cobrador: 'Combinado cancelado',
+  cancelado_criador: 'Combinado cancelado',
   expirado: 'Encerrado sem confirmação',
   solicitou_pix: 'Pediu a chave Pix',
   recusado: 'Convite recusado',

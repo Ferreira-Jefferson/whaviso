@@ -374,6 +374,19 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     expect(Number(rows[0]!.n)).toBe(1)
   })
 
+  it('H9.4: GET /avisos/:id/eventos valida 200 após cancelar (evento cancelado_criador no contrato)', async () => {
+    const { id } = await criarAceito()
+    const appC = await criarAppTeste(cobrador)
+    await appC.inject({ method: 'POST', url: `/v1/avisos/${id}/cancelar`, headers: AUTH })
+    // A resposta passa pela validação Zod (listaEventosResposta usa tipoEvento);
+    // se o enum não conhecesse cancelado_criador, a serialização quebraria.
+    const r = await appC.inject({ method: 'GET', url: `/v1/avisos/${id}/eventos`, headers: AUTH })
+    await appC.close()
+    expect(r.statusCode).toBe(200)
+    const tipos = r.json().map((e: { tipo: string }) => e.tipo)
+    expect(tipos).toContain('cancelado_criador')
+  })
+
   it('H2.6: cancelar ANTES do aceite NÃO notifica o devedor (ainda não está no combinado)', async () => {
     const appC = await criarAppTeste(cobrador)
     const criado = await appC.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
