@@ -45,8 +45,11 @@ Gera `~/.ssh/whaviso_ci` (privada, vai pro secret do GitHub) e
 O `deploy.sh` precisa de root (systemctl, `/var/www`). Liberamos `NOPASSWD`
 **apenas** pra ele, sem abrir sudo geral:
 
+O `deploy.sh` não tem bit de execução no git (`100644`), então invocamos via
+`bash`. O sudoers libera exatamente `bash <caminho do deploy.sh>`, nada mais:
+
 ```bash
-echo 'deploy ALL=(root) NOPASSWD: /opt/whaviso/app/deploy/scripts/deploy.sh' \
+echo 'deploy ALL=(root) NOPASSWD: /usr/bin/bash /opt/whaviso/app/deploy/scripts/deploy.sh' \
   | sudo tee /etc/sudoers.d/whaviso-deploy
 sudo chmod 440 /etc/sudoers.d/whaviso-deploy
 sudo visudo -cf /etc/sudoers.d/whaviso-deploy   # deve dizer "parsed OK"
@@ -60,13 +63,17 @@ deploy (sem shell, sem port-forward):
 
 ```bash
 # <CONTEUDO_DE_whaviso_ci.pub> = a linha inteira ssh-ed25519 AAAA... whaviso-ci
-echo 'command="sudo /opt/whaviso/app/deploy/scripts/deploy.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty <CONTEUDO_DE_whaviso_ci.pub>' \
-  >> ~/.ssh/authorized_keys
+# Roda como root ou deploy (usa sudo e mira /home/deploy explicitamente). Uma vez so.
+sudo mkdir -p /home/deploy/.ssh
+echo 'command="sudo /usr/bin/bash /opt/whaviso/app/deploy/scripts/deploy.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty <CONTEUDO_DE_whaviso_ci.pub>' \
+  | sudo tee -a /home/deploy/.ssh/authorized_keys
+sudo chown -R deploy:deploy /home/deploy/.ssh
+sudo chmod 700 /home/deploy/.ssh && sudo chmod 600 /home/deploy/.ssh/authorized_keys
 ```
 
 Sua chave pessoal continua com shell normal (entrada separada no mesmo arquivo);
 a restrição vale só pra linha da chave de CI. Pra deploy manual, você ainda roda
-`sudo /opt/whaviso/app/deploy/scripts/deploy.sh` logado normalmente.
+`sudo bash /opt/whaviso/app/deploy/scripts/deploy.sh` logado normalmente.
 
 ### 4. Capturar o host key do VPS (no seu PC)
 
