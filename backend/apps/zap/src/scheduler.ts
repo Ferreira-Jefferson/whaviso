@@ -11,6 +11,8 @@ export interface DepsScheduler {
   logger: Logger
   whats: ClienteWhats
   intervaloMs: number
+  // Origem do SPA, repassada ao notificar_cobrador para a CTA de cadastro (H10.7).
+  appUrl: string
 }
 
 export interface Scheduler {

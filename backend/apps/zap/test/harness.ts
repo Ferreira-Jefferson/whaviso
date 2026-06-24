@@ -249,6 +249,7 @@ export function envZapFake(over: Partial<EnvZap> = {}): EnvZap {
     DATABASE_URL: 'x',
     SCHEDULER_INTERVAL_MS: 30_000,
     LOG_LEVEL: 'silent',
+    ZAP_APP_URL: 'http://app.local',
     WHATS_AUTH_DIR: './auth_baileys',
     WHATS_USE_PAIRING: false,
     WHATS_BROWSER: 'Whaviso',

@@ -23,3 +23,20 @@ export function valoresNotificacao(d: DadosNotificacao): Record<string, string> 
     motivo: d.motivo,
   }
 }
+
+/**
+ * H10.7/H8.5: CTA DISCRETA de criar conta, anexada em RUNTIME (não fica no template,
+ * decisão do dono, ver migration 0042) APENAS para o cobrador SEM conta (cobrador_id
+ * nulo, alvo_papel='cobrador'). Quem já tem conta NÃO recebe esta linha. Convite gentil
+ * e neutro a acompanhar pelo painel; nunca obrigatório. Sem palavra proibida, sem
+ * travessão, neutro quanto a gênero.
+ */
+export function linhaCtaCriarConta(appUrl: string): string {
+  const link = `${appUrl.replace(/\/$/, '')}/entrar`
+  return `Quer acompanhar tudo pelo painel? Crie sua conta: ${link}`
+}
+
+/** Anexa a linha da CTA ao fim do texto, separada por uma linha em branco. */
+export function anexarCta(texto: string, appUrl: string): string {
+  return `${texto}\n\n${linhaCtaCriarConta(appUrl)}`
+}

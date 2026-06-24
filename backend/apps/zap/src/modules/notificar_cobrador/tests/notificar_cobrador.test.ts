@@ -13,6 +13,7 @@ import {
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never
 const futuro = '2026-12-15'
+const APP_URL = 'http://app.local'
 
 // Insere direto na outbox generalizada (atalho de fixture; o roteamento por alvo é
 // testado pelo enfileirador real mais abaixo).
@@ -74,7 +75,7 @@ describe('notificar_cobrador: gating por template (H12.8)', () => {
     const notifId = await enfileirar(avisoId, { cobradorId })
     const whats = clienteWhatsFake(() => ({ wamid: 'nao_deveria' }))
 
-    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(n).toBe(0)
     expect(whats.enviadas).toHaveLength(0)
     const notif = await lerNotif(notifId)
@@ -89,11 +90,11 @@ describe('notificar_cobrador: gating por template (H12.8)', () => {
     const notifId = await enfileirar(avisoId, { cobradorId })
     const whats = clienteWhatsFake(() => ({ wamid: 'w_redrain' }))
 
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect((await lerNotif(notifId)).erro).toBe('sem_template_ativo')
 
     await ativarTemplate('cobrador.pagamento_informado', true)
-    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(n).toBe(1)
     const notif = await lerNotif(notifId)
     expect(notif.status).toBe('enviado')
@@ -111,35 +112,44 @@ describe('notificar_cobrador: roteamento por alvo (H10.1/H10.7)', () => {
     await ativarTemplate('cobrador.pagamento_informado', false)
   })
 
-  it('cobrador COM conta: envia ao telefone do profile', async () => {
+  it('cobrador COM conta: envia ao telefone do profile, SEM a CTA de criar conta (H10.7)', async () => {
     const { cobradorId, avisoId } = await emRevisao()
     await poolSuper.query(`update public.profiles set telefone='+5511988887777' where id=$1`, [cobradorId])
     const notifId = await enfileirar(avisoId, { cobradorId })
     let destino = ''
+    let texto = ''
     const whats = clienteWhatsFake((m) => {
       destino = m.para
+      texto = m.texto
       return { wamid: 'w1' }
     })
 
-    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(n).toBe(1)
     expect(destino).toBe('+5511988887777')
+    // Quem já tem conta NÃO recebe a linha de cadastro.
+    expect(texto).not.toContain(`${APP_URL}/entrar`)
+    expect(texto.toLowerCase()).not.toContain('crie sua conta')
     expect((await lerNotif(notifId)).status).toBe('enviado')
     await limpar(cobradorId)
   })
 
-  it('cobrador SEM conta: envia ao telefone_alvo (cobrador_id null)', async () => {
+  it('cobrador SEM conta: envia ao telefone_alvo (cobrador_id null) COM a CTA de criar conta (H10.7)', async () => {
     const { cobradorId, avisoId } = await emRevisao()
     const notifId = await enfileirar(avisoId, { cobradorId: null, telefoneAlvo: '+5511955554444', alvoPapel: 'cobrador' })
     let destino = ''
+    let texto = ''
     const whats = clienteWhatsFake((m) => {
       destino = m.para
+      texto = m.texto
       return { wamid: 'w2' }
     })
 
-    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(n).toBe(1)
     expect(destino).toBe('+5511955554444')
+    // Cobrador sem conta recebe a CTA discreta com o link de cadastro ao fim da mensagem.
+    expect(texto).toContain(`${APP_URL}/entrar`)
     expect((await lerNotif(notifId)).status).toBe('enviado')
     await limpar(cobradorId)
   })
@@ -155,7 +165,7 @@ describe('notificar_cobrador: roteamento por alvo (H10.1/H10.7)', () => {
       return { wamid: 'w3' }
     })
 
-    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(n).toBe(1)
     expect(destino).toBe('+5511970001111')
     await limpar(devedorId)
@@ -168,7 +178,7 @@ describe('notificar_cobrador: roteamento por alvo (H10.1/H10.7)', () => {
     await poolSuper.query(`update public.avisos set status='pago' where id=$1`, [avisoId])
     const whats = clienteWhatsFake(() => ({ wamid: 'x' }))
 
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(whats.enviadas).toHaveLength(0)
     const notif = await lerNotif(notifId)
     expect(notif.status).toBe('cancelado')
@@ -182,7 +192,7 @@ describe('notificar_cobrador: roteamento por alvo (H10.1/H10.7)', () => {
     const notifId = await enfileirar(avisoId, { cobradorId })
     const whats = clienteWhatsFake(() => ({ wamid: 'x' }))
 
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(whats.enviadas).toHaveLength(0)
     const notif = await lerNotif(notifId)
     expect(notif.status).toBe('cancelado')
@@ -209,7 +219,7 @@ describe('notificar_cobrador: retry 20-60s, exatamente 3 tentativas (H6.8/H10.1)
     })
 
     // 1a tentativa -> reagenda (tentativas=1), proxima em 20-60s.
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     let n = await lerNotif(notifId)
     expect(n.status).toBe('agendado')
     expect(n.tentativas).toBe(1)
@@ -219,14 +229,14 @@ describe('notificar_cobrador: retry 20-60s, exatamente 3 tentativas (H6.8/H10.1)
 
     // Libera o relógio (zera proxima_tentativa_em) e tenta de novo: 2a -> reagenda.
     await poolSuper.query(`update public.notificacoes_cobrador set proxima_tentativa_em=null where id=$1`, [notifId])
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     n = await lerNotif(notifId)
     expect(n.status).toBe('agendado')
     expect(n.tentativas).toBe(2)
 
     // 3a -> falha definitiva (nunca uma 4a).
     await poolSuper.query(`update public.notificacoes_cobrador set proxima_tentativa_em=null where id=$1`, [notifId])
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     n = await lerNotif(notifId)
     expect(n.status).toBe('falhou')
     expect(n.tentativas).toBe(3)
@@ -293,8 +303,8 @@ describe('notificar_cobrador: 2 drainers concorrentes (SKIP LOCKED)', () => {
     const whats = clienteWhatsFake()
 
     const [a, b] = await Promise.all([
-      processarNotificacoesCobrador({ pool: poolZap, logger, whats }),
-      processarNotificacoesCobrador({ pool: poolZap, logger, whats }),
+      processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL }),
+      processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL }),
     ])
     expect(a + b).toBe(1) // só um dos dois reivindica e envia
     expect(whats.enviadas).toHaveLength(1)
@@ -334,14 +344,14 @@ describe('notificar_cobrador: E10b fila de saída (H10.5/H10.8/H10.9)', () => {
     const whats = clienteWhatsFake()
 
     // 1o drain: só uma das duas sai (a outra fica represada pelo espaçamento de 10min).
-    const e1 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const e1 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(e1).toBe(1)
     expect(whats.enviadas).toHaveLength(1)
     const enviadas1 = [await lerNotif(n1), await lerNotif(n2)].filter((n) => n.status === 'enviado')
     expect(enviadas1).toHaveLength(1)
 
     // 2o drain imediato: a 2a ainda está dentro dos 10min do envio recente -> não sai.
-    const e2 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const e2 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(e2).toBe(0)
     expect(whats.enviadas).toHaveLength(1)
 
@@ -350,7 +360,7 @@ describe('notificar_cobrador: E10b fila de saída (H10.5/H10.8/H10.9)', () => {
       `update public.notificacoes_cobrador set enviado_em=now() - interval '11 minutes' where status='enviado' and cobrador_id=$1`,
       [cobradorId],
     )
-    const e3 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const e3 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(e3).toBe(1)
     expect(whats.enviadas).toHaveLength(2)
     const ambasEnviadas = [await lerNotif(n1), await lerNotif(n2)].every((n) => n.status === 'enviado')
@@ -407,7 +417,7 @@ describe('notificar_cobrador: E10b fila de saída (H10.5/H10.8/H10.9)', () => {
     expect(Number(audit.rows[0]!.n)).toBe(1)
     // Drain: nada chega ao cobrador (par anulado, nenhuma reativação enfileirada).
     const whats = clienteWhatsFake()
-    const e = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const e = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(e).toBe(0)
     expect(whats.enviadas).toHaveLength(0)
     await limpar(cobradorId)
@@ -440,7 +450,7 @@ describe('notificar_cobrador: E10b fila de saída (H10.5/H10.8/H10.9)', () => {
     // A janela passou: solta o agendamento e drena -> opt-out sai.
     await poolSuper.query(`update public.notificacoes_cobrador set agendar_para=now() - interval '1 second' where aviso_id=$1 and tipo='optout'`, [avisoId])
     const whats = clienteWhatsFake()
-    const e1 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const e1 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(e1).toBe(1)
     expect(whats.enviadas).toHaveLength(1)
 
@@ -459,7 +469,7 @@ describe('notificar_cobrador: E10b fila de saída (H10.5/H10.8/H10.9)', () => {
     }
     // O envio recente do opt-out está dentro dos 10min: solta o espaçamento p/ testar a 2a.
     await poolSuper.query(`update public.notificacoes_cobrador set enviado_em=now() - interval '11 minutes' where status='enviado' and aviso_id=$1`, [avisoId])
-    const e2 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const e2 = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(e2).toBe(1)
     expect(whats.enviadas).toHaveLength(2)
     const reativ = await poolSuper.query<{ status: string }>(
@@ -480,7 +490,7 @@ describe('notificar_cobrador: E10b fila de saída (H10.5/H10.8/H10.9)', () => {
     const notifId = await enfileirar(avisoId, { cobradorId })
     const whats = clienteWhatsFake(() => ({ wamid: 'nao_deveria_enviar' }))
 
-    const e = await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    const e = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(e).toBe(0)
     expect(whats.enviadas).toHaveLength(0)
     const notif = await lerNotif(notifId)
@@ -525,7 +535,7 @@ describe('E8: encerramento ao devedor + corrida claim-vs-reabertura (C1)', () =>
     await poolSuper.query(`update public.notificacoes_cobrador set criado_em=now() - interval '20 minutes' where id=$1`, [notifId])
 
     const whats = clienteWhatsFake(() => ({ wamid: 'nao_deveria_sair' }))
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     // C1: o aviso não está mais 'pago' -> aindaValida falha -> NÃO envia, coalesce auditado.
     expect(whats.enviadas).toHaveLength(0)
     const notif = await lerNotif(notifId)
@@ -541,7 +551,7 @@ describe('E8: encerramento ao devedor + corrida claim-vs-reabertura (C1)', () =>
       telefoneAlvo: '+5511999998888', alvoPapel: 'devedor', tipo: 'encerramento',
     })
     const whats = clienteWhatsFake(() => ({ wamid: 'w_enc' }))
-    await processarNotificacoesCobrador({ pool: poolZap, logger, whats })
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
     expect(whats.enviadas).toHaveLength(1)
     const notif = await lerNotif(notifId)
     expect(notif.status).toBe('enviado')

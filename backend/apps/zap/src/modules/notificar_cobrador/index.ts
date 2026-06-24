@@ -18,7 +18,7 @@ import { ErroEnvio, type ClienteWhats } from '../../shared/baileys_client'
 import { carregarTemplateAtivo, renderMensagem, type ContextoTemplate } from '../../shared/templates'
 import * as repo from './repo'
 import type { DadosNotificacao, NotificacaoClaim } from './repo'
-import { valoresNotificacao } from './render'
+import { anexarCta, valoresNotificacao } from './render'
 
 // Motivo recuperável e SEM PII gravado na linha quando falta a versão ativa do
 // template: visível ao owner em /admin/notificacoes. A linha continua 'agendado' e
@@ -29,6 +29,8 @@ export interface DepsNotificarCobrador {
   pool: Pool
   logger: Logger
   whats: ClienteWhats
+  // Origem do SPA, para montar o link de cadastro da CTA ao cobrador sem conta (H10.7).
+  appUrl: string
 }
 
 /**
@@ -229,6 +231,12 @@ async function processarUma(deps: DepsNotificarCobrador, notif: NotificacaoClaim
     valores: valoresNotificacao(dados),
     refId: notif.aviso_id, // botões (E8) levam o aviso_id no payload (HMAC no webhook).
   })
+  // H10.7/H8.5: cobrador SEM conta (cobrador_id nulo, alvo é o cobrador) recebe uma CTA
+  // discreta de criar conta ao fim da mensagem, injetada em RUNTIME (não no template).
+  // Quem TEM conta (cobrador_id presente) NÃO recebe a linha; alvo devedor também não.
+  if (notif.cobrador_id === null && notif.alvo_papel === 'cobrador') {
+    mensagem.texto = anexarCta(mensagem.texto, deps.appUrl)
+  }
   const { wamid } = await deps.whats.enviarMensagem(mensagem)
   await repo.marcarEnviado(pool, notif.id, wamid)
   return 'enviada'

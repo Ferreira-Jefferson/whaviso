@@ -16,6 +16,9 @@ import { iniciarScheduler } from './scheduler'
 if (process.env.ZAP_PORT && !process.env.PORT) process.env.PORT = process.env.ZAP_PORT
 if (process.env.ZAP_DATABASE_URL && !process.env.DATABASE_URL)
   process.env.DATABASE_URL = process.env.ZAP_DATABASE_URL
+// O .env único traz APP_URL (origem do SPA, sem prefixo): reaproveita para a CTA de
+// cadastro ao cobrador sem conta (H10.7), sem duplicar a var.
+if (process.env.APP_URL && !process.env.ZAP_APP_URL) process.env.ZAP_APP_URL = process.env.APP_URL
 
 const env = parseEnv(envSchema)
 const logger = criarLogger('zap', env.LOG_LEVEL)
@@ -62,6 +65,7 @@ const scheduler = iniciarScheduler({
   logger,
   whats,
   intervaloMs: env.SCHEDULER_INTERVAL_MS,
+  appUrl: env.ZAP_APP_URL,
 })
 
 // Conecta ao WhatsApp em paralelo ao boot do HTTP (o envio só ocorre quando online).

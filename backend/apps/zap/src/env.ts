@@ -14,6 +14,11 @@ export const envSchema = z.object({
   SCHEDULER_INTERVAL_MS: z.coerce.number().int().min(1000).default(30_000),
   LOG_LEVEL: z.string().default('info'),
 
+  // Origem do SPA: usada para montar o link de cadastro da CTA discreta ao cobrador
+  // sem conta (H10.7/H8.5). Espelha o APP_URL da api; o server.ts faz o alias do
+  // APP_URL do .env único quando ZAP_APP_URL não vier explícito.
+  ZAP_APP_URL: z.url().default('http://localhost:5173'),
+
   // WhatsApp via Baileys (não oficial). É o transporte atual até a base chegar a
   // ~100 clientes; depois migra p/ a Meta Cloud API (ver CLAUDE.md). Sessão em
   // WHATS_AUTH_DIR (precisa persistir na VPS); processo único (lock no boot).
