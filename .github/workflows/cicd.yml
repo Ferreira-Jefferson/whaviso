@@ -1,0 +1,144 @@
+# whaviso: CI/CD.
+#
+#   gate    -> roda em push para main/development e em PR para main.
+#              Sobe um Postgres de servico, reconstroi o banco de teste
+#              (shim + migrations + seed, igual ao validate_migrations.sh) e
+#              roda lint + typecheck + testes do backend e lint + build do front.
+#   deploy  -> roda SO em push para a main, e SO se o gate passar. Faz SSH no
+#              VPS (Hostinger) e dispara o deploy.sh que ja existe.
+#
+# A main e o que esta no ar: todo push nela publica. O trabalho do dia a dia
+# vive na development; a publicacao e o merge development -> main.
+#
+# Setup (chave de CI, secrets, sudoers no VPS): ver deploy/CICD.md.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main]
+
+# Token do job so le o repo (nao precisa de mais nada).
+permissions:
+  contents: read
+
+# Serializa por ref: corridas de PR/development antigas sao canceladas, mas um
+# deploy da main nunca e cancelado no meio.
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  gate:
+    name: Lint, typecheck, testes e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Postgres de teste: mesma topologia que o harness espera (127.0.0.1:5432,
+    # superusuario postgres). O banco whaviso_dev e criado no passo de bootstrap.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22 (cache de npm dos dois projetos)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Cliente psql
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap do banco de teste (shim + migrations + seed)
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -d postgres -c "drop database if exists whaviso_dev;"
+          psql -d postgres -c "create database whaviso_dev;"
+          psql -v ON_ERROR_STOP=1 -q -d whaviso_dev -f backend/scripts/test_shim_auth.sql
+          for m in backend/supabase/migrations/0*.sql; do
+            psql -v ON_ERROR_STOP=1 -q -d whaviso_dev -f "$m"
+            echo "   $(basename "$m") OK"
+          done
+          psql -v ON_ERROR_STOP=1 -q -d whaviso_dev -f backend/supabase/seed.sql
+          echo ">> banco whaviso_dev pronto"
+
+      - name: Backend, instalar dependencias
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend, lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Backend, typecheck
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Backend, testes (vitest com banco)
+        working-directory: backend
+        env:
+          POSTGRES_PASSWORD: postgres
+          PGHOST: 127.0.0.1
+          PGDATABASE: whaviso_dev
+        run: npm test
+
+      - name: Frontend, instalar dependencias
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend, lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Frontend, build (inclui typecheck)
+        working-directory: frontend
+        run: npm run build
+
+  deploy:
+    name: Deploy na Hostinger
+    needs: gate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Garante que dois pushes na main nao deployem ao mesmo tempo.
+    concurrency:
+      group: deploy-main
+      cancel-in-progress: false
+
+    steps:
+      - name: Disparar o deploy via SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # A chave esta travada por comando forcado no VPS: o deploy.sh roda
+          # independente do que mandarmos aqui. Nao passamos comando nenhum.
+          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes deploy@"$HOST"
