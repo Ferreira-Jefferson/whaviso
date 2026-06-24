@@ -1,7 +1,7 @@
 # Épico 5: Convite & Aceite pelo WhatsApp
 
 > O aceite acontece **100% pelo WhatsApp**, sem site e sem login. É a regra de ouro: o convidado só interage por botões.
-> Vale para os dois fluxos: no **receber** o convidado é o devedor; no **pagar invertido** o convidado é o cobrador (que confere a chave Pix).
+> Vale para os dois fluxos: no **receber** o convidado é o devedor; no **pagar invertido** o convidado é o cobrador (que confere a chave Pix, ou a informa depois quando o convite veio sem ela, Épico 14).
 > O convite é identificado por um **número de 6 dígitos** + **telefone** (Épicos 2 e 3), nunca por token exposto.
 > Três respostas possíveis no aceite: **aceitar**, **algum dado está incorreto** (no invertido: **chave Pix incorreta**) e **recusar**. Em qualquer uma, **o criador é notificado**.
 > Toda mensagem segue as convenções: gênero neutro, sem palavras proibidas, sem travessão (ver README).
@@ -131,7 +131,7 @@ Como **sistema (zap)**, quero reagir quando alguém erra o número de validaçã
 - **Número como hash, 3 tentativas:** validação compara hash; claro nunca persistido nem logado.
 - **Três respostas, sem texto livre:** aceitar / dado incorreto / recusar; "dado incorreto" só notifica o criador.
 - **Criador sempre notificado** da resposta (aceite, dado incorreto, recusa).
-- **Pix obrigatório no invertido** (Épico 3): o cobrador apenas confirma ou aponta como incorreta.
+- **Pix opcional no invertido** (Épico 3, decisão revista): se a chave veio no convite, o cobrador confirma ou aponta como incorreta; se o convite veio sem chave, o cobrador pode **informar a própria chave depois**, de forma guiada (Épico 14).
 - **Linguagem neutra** quanto a gênero em todas as mensagens.
 - **Recusa vira `recusado`** (não `cancelado`): terminal próprio para distinguir recusa do convidado de cancelamento pelo criador.
 - **Compartilhamento manual do convite é permanente:** quem convida envia a mensagem pronta para o convidado (link `wa.me`), e o aceite começa quando o convidado escreve a mensagem inicial (H5.1). Isso vale **mesmo após migrar para a Meta oficial** e é proposital: evita que o número do Whaviso inicie conversa com quem não o conhece (risco de bloqueio) e evita disparo para números digitados errados. **Por isso não há história de auto-envio** do convite por template.
@@ -147,3 +147,4 @@ Como **sistema (zap)**, quero reagir quando alguém erra o número de validaçã
 - ❌ Interação do devedor já ativo (Já paguei / Ver Pix / Sair) (Épico 7).
 - ❌ Confirmação de pagamento `informado_pago` (Épico 8).
 - ❌ Conteúdo das notificações ao criador/cobrador (Épico 10).
+- ❌ Oferta ao cobrador, no aceite de um invertido sem chave, para cadastrar a chave de pagamento (Épico 14).

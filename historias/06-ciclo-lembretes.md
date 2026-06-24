@@ -166,3 +166,4 @@ Como **criador**, quero definir por quanto tempo e com que cadência os lembrete
 - ❌ Layout do painel e estado dos envios na tela (Épico 9).
 - ❌ Mecânica e textos do opt-out (Épico 13).
 - ❌ Limites de envios por plano que restringem a cadência (Épico 11).
+- ❌ Botão "Solicitar chave Pix" no lembrete do devedor quando o invertido está sem chave (Épico 14).

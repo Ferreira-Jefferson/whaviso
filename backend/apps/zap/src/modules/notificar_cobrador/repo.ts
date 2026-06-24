@@ -25,6 +25,11 @@ export interface DadosNotificacao {
   motivo: string
   valor_centavos: number
   data_combinada: string
+  // E14: chave/titular/banco do combinado, para a notificação devedor.pix_chave_recebida.
+  // NUNCA logados (só vão a render/envio).
+  pix_chave: string | null
+  pix_titular: string | null
+  pix_banco: string | null
   // Telefone resolvido do ALVO (com conta = profile; sem conta = telefone_alvo).
   telefone_alvo: string | null
   // Nome para a saudação do alvo (profile.nome quando tem conta; senão o do aviso).
@@ -113,6 +118,8 @@ export async function carregarDados(pool: Pool, notifId: string): Promise<DadosN
             a.nome_devedor, coalesce(a.nome_cobrador, '') as nome_cobrador, a.motivo,
             a.valor_centavos::bigint as valor_centavos,
             to_char(a.data_combinada,'YYYY-MM-DD') as data_combinada,
+            -- E14: snapshot do Pix p/ a notificação ao devedor (devedor.pix_chave_recebida).
+            a.pix_chave, a.pix_titular, a.pix_banco,
             -- telefone do alvo: profile (com conta) OU telefone_alvo (sem conta).
             coalesce(p.telefone, n.telefone_alvo) as telefone_alvo,
             -- nome de saudação do alvo: profile, senão o nome do aviso por papel.

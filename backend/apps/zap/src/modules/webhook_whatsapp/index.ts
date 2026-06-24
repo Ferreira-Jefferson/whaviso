@@ -1,5 +1,9 @@
 import { processarBotao, processarTexto, type DepsInbound } from './service'
 
+// E14: expiração das sessões de wizard de chave (abandono). Re-exportada para o
+// app-root (scheduler) chamar pela fronteira do módulo (não por arquivo interno).
+export { expirarSessoesPix } from './wizard_pix'
+
 /**
  * Liga o inbound do WhatsApp: o Baileys entrega cliques de botão E mensagens de texto
  * pelos eventos do socket (não há mais webhook HTTP da Meta). Botões = ações do convite/

@@ -21,6 +21,11 @@ export function valoresNotificacao(d: DadosNotificacao): Record<string, string> 
     data: formatarDataBr(d.data_combinada),
     valor: formatarValorBr(d.valor_centavos),
     motivo: d.motivo,
+    // E14 devedor.pix_chave_recebida: a chave e seus dados. Vazio quando o combinado não
+    // tem chave (a notificação só é enfileirada quando há, então na prática vêm cheios).
+    pix_chave: d.pix_chave ?? '',
+    pix_titular: d.pix_titular ?? '',
+    pix_banco: d.pix_banco ?? '',
   }
 }
 

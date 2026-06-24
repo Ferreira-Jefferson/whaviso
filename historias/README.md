@@ -66,6 +66,7 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 | 11 | Planos, limites e billing | [11-planos-billing.md](11-planos-billing.md) | escrito |
 | 12 | Templates / mensagens (admin) | [12-templates-admin.md](12-templates-admin.md) | escrito |
 | 13 | Linguagem, opt-out e compliance | [13-compliance.md](13-compliance.md) | escrito |
+| 14 | Cadastro da chave de pagamento pelo cobrador (fluxo invertido) | [14-cadastro-chave-pix-cobrador.md](14-cadastro-chave-pix-cobrador.md) | escrito |
 
 ## Dívidas técnicas levantadas durante a escrita
 

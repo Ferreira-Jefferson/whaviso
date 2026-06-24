@@ -10,6 +10,7 @@ import {
   grupoEncerramento,
   cancelarOptoutPendente,
 } from '../../shared/notificacoes'
+import { criarSessaoOferta } from './wizard_pix'
 
 /** Janela de 1min do opt-out (H10.5): a notificação ao cobrador só sai após esse adiamento. */
 const OPTOUT_ADIAMENTO_SEG = 60
@@ -27,6 +28,9 @@ export type AcaoBotao =
   // E8 H8.5: ações do COBRADOR por botão no WhatsApp (notificação "já paguei").
   | 'confirmar'
   | 'rejeitar'
+  // E14 H14.3: pedido do devedor (botão no lembrete invertido sem chave) que dispara a
+  // oferta de cadastro de chave ao cobrador (Gatilho B).
+  | 'solicitar_pix'
 
 /** Etapa do ciclo carregada no botão (H7.7); re-exportada para o service tipar o parse. */
 export type AcaoBotaoEtapa = EtapaEnvio
@@ -35,7 +39,7 @@ export type AcaoBotaoEtapa = EtapaEnvio
  *  G-M1) e respeitam "só o último aviso age" (H7.7). As de convite (aceite/recusa/
  *  dado_incorreto) validam contra o convidado (que no invertido é o cobrador) e não usam
  *  o marcador de último aviso. */
-const ACOES_CICLO = ['ja_paguei', 'ver_pix', 'optout', 'ativar'] as const
+const ACOES_CICLO = ['ja_paguei', 'ver_pix', 'optout', 'ativar', 'solicitar_pix'] as const
 function ehAcaoCiclo(acao: AcaoBotao): boolean {
   return (ACOES_CICLO as readonly string[]).includes(acao)
 }
@@ -74,6 +78,12 @@ export interface ResultadoBotao {
   encerrado?: boolean
   /** H7.1/H7.7: o dono (criador) do combinado tem o menu/cortesia liberado (plano pago)? */
   menuLiberado?: boolean
+  /**
+   * E14: o service deve enviar a oferta de cadastro de chave (resposta.pix_oferecer) ao
+   * COBRADOR (`para`), com o nome de quem vai pagar. Gatilho A (aceite invertido sem chave)
+   * e Gatilho B (solicitar_pix pelo devedor).
+   */
+  ofertaPix?: { para: string; nomeDevedor: string }
 }
 
 const MAX_TENTATIVAS = 3
@@ -576,7 +586,21 @@ export async function aplicarAcaoBotao(
         `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'aceite',$2)`,
         [avisoId, papelConv],
       )
-      await enfileirarNotificacao(cli, alvoNotif, 'convite_aceito')
+      // E14 Gatilho A: invertido SEM chave -> oferece ao cobrador cadastrar a própria chave
+      // ANTES de notificar o devedor do aceite. Cria a sessão de oferta; se criada, a
+      // notificação de aceite fica SEGURADA (sai quando o cobrador pular ou a sessão
+      // expirar) e a resposta ao cobrador é a oferta (ofertaPix). Se já existe uma sessão
+      // ativa para o cobrador, cai no fluxo normal (notifica o aceite agora).
+      const invertidoSemChave =
+        aviso.criador_papel === 'devedor' && aviso.direcao === 'pagar' && !aviso.pix_chave
+      let ofertaPix: { para: string; nomeDevedor: string } | undefined
+      if (invertidoSemChave && telConvidado) {
+        const criada = await criarSessaoOferta(cli, { telefone: telConvidado, avisoId, origem: 'aceite' })
+        if (criada) ofertaPix = { para: telConvidado, nomeDevedor: aviso.nome_devedor }
+      }
+      if (!ofertaPix) {
+        await enfileirarNotificacao(cli, alvoNotif, 'convite_aceito')
+      }
       // H5.3: a conta-no-aceite (criar conta FREE + vincular profile) roda FORA desta
       // transação (chamada de rede ao GoTrue), só quando o convidado ainda não tem
       // profile vinculado e há telefone. O service cuida disso (best-effort, idempotente).
@@ -584,7 +608,17 @@ export async function aplicarAcaoBotao(
       const nomeConvidado = papelConv === 'devedor' ? aviso.nome_devedor : (aviso.nome_cobrador ?? aviso.nome_devedor)
       const conta: ContaConvidado | undefined =
         !jaVinculado && telConvidado ? { telefone: telConvidado, nome: nomeConvidado, papel: papelConv } : undefined
-      return { aplicado: true, novoStatus: 'programado', telefone: telConvidado, pixChave: null, chaveResposta: 'resposta.aceite', conta }
+      return {
+        aplicado: true,
+        novoStatus: 'programado',
+        telefone: telConvidado,
+        pixChave: null,
+        // Com oferta, a resposta ao cobrador é a própria oferta (ofertaPix); sem oferta, a
+        // confirmação de aceite de sempre.
+        chaveResposta: ofertaPix ? undefined : 'resposta.aceite',
+        conta,
+        ofertaPix,
+      }
     }
 
     // ----- Ações do DEVEDOR (ciclo): ja_paguei / ver_pix / optout / ativar. -----
@@ -624,6 +658,37 @@ export async function aplicarAcaoBotao(
           encerrado: true,
           menuLiberado: await donoTemMenuLiberado(cli, aviso.cobrador_id, aviso.devedor_profile_id, aviso.criador_papel),
         }
+      }
+    }
+
+    if (acao === 'solicitar_pix') {
+      // E14 Gatilho B (H14.3): o devedor pede a chave no lembrete. Só vale no invertido
+      // SEM chave. Cria a oferta ao cobrador (sessão de oferta) e responde ao devedor.
+      // Idempotente: 1 sessão ativa por telefone do cobrador (índice único parcial); se já
+      // há um pedido em aberto, fica silencioso (não reabre nem duplica evento).
+      const invertidoSemChave = aviso.criador_papel === 'devedor' && !aviso.pix_chave
+      if (!invertidoSemChave || !aviso.telefone_cobrador) {
+        return { aplicado: false, novoStatus: aviso.status, telefone: aviso.telefone_devedor, pixChave: null }
+      }
+      const criada = await criarSessaoOferta(cli, {
+        telefone: aviso.telefone_cobrador,
+        avisoId,
+        origem: 'pedido_devedor',
+      })
+      if (!criada) {
+        return { aplicado: false, novoStatus: aviso.status, telefone: aviso.telefone_devedor, pixChave: null }
+      }
+      await cli.query(
+        `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'pix_solicitada','devedor')`,
+        [avisoId],
+      )
+      return {
+        aplicado: true,
+        novoStatus: aviso.status,
+        telefone: aviso.telefone_devedor,
+        pixChave: null,
+        chaveResposta: 'resposta.pix_solicitado_devedor',
+        ofertaPix: { para: aviso.telefone_cobrador, nomeDevedor: aviso.nome_devedor },
       }
     }
 

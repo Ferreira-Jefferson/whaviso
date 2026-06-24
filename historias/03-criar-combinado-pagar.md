@@ -13,7 +13,7 @@ Como **devedor**, quero cadastrar um combinado que eu vou pagar e convidar quem 
 *Critérios de aceite:*
 - [ ] Informo: **nome de quem recebe** (cobrador), **motivo**, **valor**, **data combinada**, **telefone do cobrador** (alvo do convite).
 - [ ] O **nome de quem paga** (devedor) é o do próprio criador (pré-preenchido a partir da conta).
-- [ ] Informo a **chave Pix** de quem recebe (para onde vou pagar): é **obrigatória** para criar e enviar o convite no fluxo invertido (sem Pix não há convite). Ela vai no convite para o cobrador **conferir e confirmar** (ou apontar como incorreta), ver H3.3. Ao confirmar, o cobrador também valida/ajusta o **nome do titular** e o **banco** da chave (usados na resposta de Pix ao devedor, Épico 7 H7.3).
+- [ ] Posso informar a **chave Pix** de quem recebe (para onde vou pagar), mas ela é **opcional** no fluxo invertido: o devedor nem sempre conhece a chave de quem vai receber. Se eu informar, ela vai no convite para o cobrador **conferir e confirmar** (ou apontar como incorreta), ver H3.3, e o cobrador valida/ajusta o **nome do titular** e o **banco** (usados na resposta de Pix ao devedor, Épico 7 H7.3). Se eu **não** informar, o combinado nasce sem chave e o **cobrador informa a própria chave depois**, de forma guiada (Épico 14).
 - [ ] O combinado nasce com `criador_papel = devedor` e **sem cobrador vinculado** (`cobrador_id` nulo); o cobrador entra denormalizado por `nome_cobrador` / `telefone_cobrador`.
 - [ ] O valor é exibido em reais, mas persiste em **centavos** (int).
 - [ ] A data é interpretada em **America/Sao_Paulo**; o banco guarda em UTC.
@@ -85,9 +85,10 @@ Como **devedor criador**, quero editar, cancelar ou pausar o combinado que criei
 - **Backfill por telefone:** ao criar conta/salvar telefone, o sistema vincula combinados pelo número (`PATCH /perfil`). Hoje roda **sem verificação de posse** do número (risco aceito); quando houver verificação (OTP), condicionar o backfill a ela. Tratado no Épico 1/10, citado aqui por afetar o vínculo do cobrador convidado.
 
 ### Decisões tomadas
-- **Pix obrigatório no convite invertido:** o devedor só cria/envia o convite ao cobrador se informar a chave Pix. Não existe convite invertido sem Pix; o cobrador apenas confere e confirma ou aponta como incorreta (H3.3).
+- **Pix opcional no convite invertido (decisão revista):** o devedor pode criar/enviar o convite ao cobrador **sem** a chave, porque nem sempre conhece a chave de quem vai receber (migration `0047`). Se informar, o cobrador confere e confirma ou aponta como incorreta (H3.3); se não informar, o cobrador **informa a própria chave depois**, de forma guiada (Épico 14).
 
 ### Fora de escopo deste épico
 - ❌ Aceite/recusa e validação do número de convite no WhatsApp (Épico 5).
 - ❌ Disparo e textos dos lembretes ao devedor (Épico 6).
 - ❌ Confirmação de pagamento e notificação ao cobrador (Épicos 7 e 9).
+- ❌ Cadastro da chave pelo cobrador **depois** do aceite, quando o invertido nasce sem chave (Épico 14).

@@ -31,6 +31,8 @@ export type TipoNotificacao =
   | 'status_alterado'
   | 'rejeicao'
   | 'reengajamento'
+  // E14: chave de pagamento cadastrada pelo cobrador (fluxo invertido), ao DEVEDOR.
+  | 'pix_chave_recebida'
 
 type Papel = 'cobrador' | 'devedor'
 
@@ -72,6 +74,8 @@ const EVENTO_FONTE: Partial<Record<TipoNotificacao, string>> = {
   // pelas reaberturas tardias. `encerramento` usa coalesce_grupo + reconferência no drainer.
   rejeicao: 'rejeitado_cobrador',
   status_alterado: 'reaberto_cobrador',
+  // E14: a ocorrência avança a cada chave cadastrada (1 por cadastro -> dedupe estável).
+  pix_chave_recebida: 'pix_cadastrada',
 }
 
 async function ocorrenciaAtual(cli: PoolClient, avisoId: string, tipo: TipoNotificacao): Promise<number> {

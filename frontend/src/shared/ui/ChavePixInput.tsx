@@ -11,40 +11,10 @@ import { Field } from './Field'
 import { Input } from './Input'
 import { Select, type SelectOption } from './Select'
 import { ROTULO_TIPO_CHAVE } from '../format'
-import type { TipoChavePix } from '../contracts'
+import { detectarTipoChavePix, type TipoChavePix } from '../contracts'
 
-// --- detecção do tipo (auxílio de UX) ----------------------------------------
-// Convenções do Pix (DICT) para desambiguar:
-//  - email:     contém @ e parece um e-mail.
-//  - aleatoria: chave EVP no formato UUID (8-4-4-4-12 hex).
-//  - telefone:  o DICT valida em E.164 (^\+[1-9]\d{1,14}$), NÃO é exclusivo de
-//               +55; com o +, qualquer país conta. Sem o +, só inferimos quando
-//               vêm 12-13 dígitos começando em 55 (um celular BR sem país tem 11
-//               dígitos, IGUAL ao CPF, e aí não dá para saber).
-//  - cnpj:      14 dígitos.  cpf: 11 dígitos.
-// Quando não há confiança suficiente (incompleto/ambíguo), devolve null.
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** Adivinha o tipo da chave Pix a partir do texto, ou null se ambíguo/incompleto. */
-function detectarTipoChavePix(bruto: string): TipoChavePix | null {
-  const v = bruto.trim()
-  if (!v) return null
-
-  if (v.includes('@')) return EMAIL.test(v) ? 'email' : null
-  if (UUID.test(v)) return 'aleatoria'
-
-  const digitos = v.replace(/\D/g, '')
-  if (v.startsWith('+')) {
-    return digitos.length >= 8 && digitos.length <= 15 ? 'telefone' : null
-  }
-  if (digitos.length >= 12 && digitos.length <= 13 && digitos.startsWith('55')) {
-    return 'telefone'
-  }
-  if (digitos.length === 14) return 'cnpj'
-  if (digitos.length === 11) return 'cpf'
-  return null
-}
+// Detecção do tipo da chave (auxílio de UX): a lógica vive em ../contracts/pix
+// (espelho de @whaviso/shared, fonte única no backend). Aqui só consumimos.
 
 const OPCOES_TIPO_CHAVE: ReadonlyArray<SelectOption<string>> = [
   { value: '', label: 'Selecione…' },

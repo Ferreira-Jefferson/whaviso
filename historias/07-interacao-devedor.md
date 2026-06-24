@@ -126,3 +126,4 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 - ❌ Confirmação/rejeição do pagamento e o ciclo de vida do `informado_pago` (Épico 8).
 - ❌ Abrangência ampla e compliance do opt-out (Épico 13).
 - ❌ Como esses eventos (`solicitou_pix`, opt-out, reativação, já paguei) aparecem no painel (Épico 9).
+- ❌ Como o cobrador cadastra a própria chave quando o invertido nasceu sem ela (Épico 14).

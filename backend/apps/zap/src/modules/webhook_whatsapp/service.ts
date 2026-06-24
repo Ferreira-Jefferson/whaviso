@@ -10,6 +10,7 @@ import type { ClienteWhats, EventoBotao, EventoTexto } from '../../shared/bailey
 import type { AdminSupabase } from '../../shared/supabase_admin'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import * as repo from './repo'
+import { ehAcaoWizardPix, tratarBotaoWizard, tratarTextoWizard } from './wizard_pix'
 
 // Logger estrutural mínimo: aceita tanto o pino quanto o log do Fastify.
 interface Log {
@@ -18,7 +19,13 @@ interface Log {
   error(obj: unknown, msg?: string): void
 }
 
-const ACOES_BOTAO = ['ja_paguei', 'optout', 'ver_pix', 'ativar', 'aceite', 'recusa', 'dado_incorreto', 'confirmar', 'rejeitar'] as const
+// E14: além das ações de convite/ciclo, o webhook reconhece `solicitar_pix` (pedido do
+// devedor no lembrete) e as ações do wizard de chave (informar/pular/corrigir/confirmar).
+const ACOES_BOTAO = [
+  'ja_paguei', 'optout', 'ver_pix', 'ativar', 'aceite', 'recusa', 'dado_incorreto', 'confirmar', 'rejeitar',
+  'solicitar_pix',
+  'informar_pix', 'pix_pular', 'pix_corrigir', 'pix_confirma_tipo', 'pix_corrige_tipo', 'pix_confirmar',
+] as const
 type AcaoBotaoPayload = (typeof ACOES_BOTAO)[number]
 
 const ETAPAS = ['d_menos_2', 'd_menos_1', 'd', 'd_mais_1'] as const
@@ -27,7 +34,7 @@ type EtapaPayload = (typeof ETAPAS)[number]
 // D-BAILEYS: fallback por resposta NUMERADA quando os botões interativos não chegam.
 // O convidado responde "1"/"2"/"3" e mapeamos para a ação do convite. A ordem segue a do
 // resumo (1 Aceitar, 2 Algum dado incorreto, 3 Recusar). Compartilhado (uma vez aqui).
-const FALLBACK_NUMERADO: Record<string, AcaoBotaoPayload> = {
+const FALLBACK_NUMERADO: Record<string, repo.AcaoBotao> = {
   '1': 'aceite',
   '2': 'dado_incorreto',
   '3': 'recusa',
@@ -93,8 +100,16 @@ async function responder(
 export async function processarBotao(deps: DepsInbound, evento: EventoBotao): Promise<void> {
   const info = parsearPayloadBotao(evento.buttonId)
   if (!info) return
-  await aplicarEResponder(deps, info.avisoId, info.acao, {
-    telefone: normalizarTelefone(evento.telefone),
+  const telefone = normalizarTelefone(evento.telefone)
+  // E14: os botões do WIZARD de chave vão para o tratador do wizard (não tocam a máquina
+  // de estados do aviso). `solicitar_pix` (pedido do devedor) segue pela máquina (ação do
+  // ciclo: valida telefone e regra do último aviso).
+  if (ehAcaoWizardPix(info.acao)) {
+    await tratarBotaoWizard(deps, telefone, info.acao, info.avisoId)
+    return
+  }
+  await aplicarEResponder(deps, info.avisoId, info.acao as repo.AcaoBotao, {
+    telefone,
     etapa: info.etapa,
   })
 }
@@ -122,7 +137,6 @@ async function aplicarEResponder(
     }
     return
   }
-  if (!r.telefone || !r.chaveResposta) return
   // Idempotência (H5.6/H7.2): um botão tocado duas vezes (estado já mudou) NÃO reenvia
   // nada. Só responde quando a ação foi de fato APLICADA agora.
   if (!r.aplicado) return
@@ -137,7 +151,20 @@ async function aplicarEResponder(
     await entregarChaveDePagamento(deps, avisoId, r.pixChave, r.pixTitular ?? '', r.pixBanco ?? '')
     return
   }
-  await responder(deps, r.telefone, r.chaveResposta, { valores: {}, refId: avisoId })
+  // E14: oferta de cadastro de chave ao COBRADOR (Gatilho A no aceite invertido sem chave,
+  // Gatilho B quando o devedor toca solicitar_pix). Vai ao telefone do cobrador, com o
+  // nome de quem vai pagar.
+  if (r.ofertaPix) {
+    await responder(deps, r.ofertaPix.para, 'resposta.pix_oferecer', {
+      valores: { nome_devedor: r.ofertaPix.nomeDevedor },
+      refId: avisoId,
+    })
+  }
+  // Resposta principal ao respondente (quando houver). No aceite COM oferta, a resposta é
+  // a própria oferta (acima) e chaveResposta vem indefinido.
+  if (r.telefone && r.chaveResposta) {
+    await responder(deps, r.telefone, r.chaveResposta, { valores: {}, refId: avisoId })
+  }
 }
 
 /** Intervalo (ms) entre as duas mensagens do Pix (H7.3: até 3s). Configurável (0 nos testes). */
@@ -232,6 +259,11 @@ async function garantirContaNoAceite(
 export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Promise<void> {
   const telefone = normalizarTelefone(evento.telefone)
   if (!telefone) return
+
+  // E14: se há um wizard de chave ATIVO para o telefone, o texto é dado da etapa atual
+  // (titular/banco/chave ou resposta numerada do tipo). Precede a detecção de número de
+  // convite/menu (H14.4): um número durante o wizard é dado da etapa, não convite.
+  if (await tratarTextoWizard(deps, telefone, evento.texto)) return
 
   // Fallback numerado (D-BAILEYS): "1"/"2"/"3" só agem se houver convite pendente p/ o
   // telefone (senão é texto livre qualquer, ignorado pela regra de negócio).

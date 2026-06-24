@@ -13,6 +13,9 @@ export interface EnvioClaim {
 export interface DadosEnvio {
   aviso_id: string
   aviso_status: string
+  // E14: no invertido (pagar) sem chave, o lembrete troca "Chave de Pag." por "Solicitar
+  // chave de pagamento" (o devedor pede a chave a quem vai receber).
+  direcao: 'receber' | 'pagar'
   nome_devedor: string
   telefone_devedor: string | null
   motivo: string
@@ -94,7 +97,7 @@ export async function carregarDados(pool: Pool, avisoId: string, etapa: EtapaEnv
   // a única mensagem possível nesse estado. Para as demais etapas não há variante revisao
   // ativa; se um envio remanescente cair aqui em informado_pago, o index.ts o cancela.
   const { rows } = await pool.query<DadosEnvio>(
-    `select a.id as aviso_id, a.status as aviso_status, a.nome_devedor, a.telefone_devedor,
+    `select a.id as aviso_id, a.status as aviso_status, a.direcao, a.nome_devedor, a.telefone_devedor,
             a.motivo, a.valor_centavos::bigint as valor_centavos,
             to_char(a.data_combinada,'YYYY-MM-DD') as data_combinada, a.pix_chave,
             coalesce(a.nome_cobrador, p.nome) as nome_cobrador,

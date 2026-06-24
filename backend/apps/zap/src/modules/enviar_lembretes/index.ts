@@ -1,8 +1,8 @@
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import { janelaPerdida } from '@whaviso/shared/datas'
-import { ErroEnvio, type ClienteWhats } from '../../shared/baileys_client'
-import { renderMensagem } from '../../shared/templates'
+import { ErroEnvio, type ClienteWhats, type MensagemWhats } from '../../shared/baileys_client'
+import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import * as repo from './repo'
 import { valoresCiclo } from './render'
 
@@ -73,6 +73,13 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
         dados.telefone_devedor,
         { valores: valoresCiclo(dados), refId: `${dados.aviso_id}:${envio.etapa}` },
       )
+      // E14: invertido SEM chave -> o devedor não tem o que "ver"; troca o botão
+      // "Chave de Pag." (ver_pix) por "Solicitar chave de pagamento" (solicitar_pix), que
+      // pede a chave a quem vai receber (Gatilho B). Quando a chave passa a existir, volta
+      // o ver_pix normal (H7.3). Rótulo editável pelo owner (template botao.solicitar_pix).
+      if (dados.direcao === 'pagar' && !dados.pix_chave) {
+        await trocarVerPixPorSolicitar(pool, mensagem, `${dados.aviso_id}:${envio.etapa}`)
+      }
       const { wamid } = await whats.enviarMensagem(mensagem)
       await repo.marcarEnviado(pool, envio.id, wamid)
       enviados++
@@ -89,4 +96,22 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
   }
 
   return enviados
+}
+
+/**
+ * E14 (Gatilho B): troca o botão "Chave de Pag." (ver_pix) do lembrete pelo "Solicitar
+ * chave de pagamento" (solicitar_pix), mantendo a etapa no payload (H7.7, só o último
+ * aviso age). O rótulo vem do template `botao.solicitar_pix` (editável pelo owner). Sem
+ * esse template ativo, mantém o ver_pix (que responde resposta.sem_pix; degrada sem
+ * quebrar). Idempotente: não faz nada se não houver um botão ver_pix na mensagem.
+ */
+async function trocarVerPixPorSolicitar(pool: Pool, mensagem: MensagemWhats, refId: string): Promise<void> {
+  const botoes = mensagem.botoes
+  if (!botoes) return
+  const idx = botoes.findIndex((b) => b.id.startsWith('ver_pix:'))
+  if (idx < 0) return
+  const t = await carregarTemplateAtivo(pool, 'botao.solicitar_pix', 'padrao')
+  const rotulo = t?.conteudo.texto
+  if (!rotulo) return
+  botoes[idx] = { id: `solicitar_pix:${refId}`, rotulo }
 }
