@@ -19,6 +19,7 @@ on:
     branches: [main, development]
   pull_request:
     branches: [main]
+  workflow_dispatch:        # dispara o deploy sob demanda (botao "Run workflow" na main, ou gh workflow run)
 
 # Token do job so le o repo (nao precisa de mais nada).
 permissions:
@@ -119,7 +120,7 @@ jobs:
   deploy:
     name: Deploy na Hostinger
     needs: gate
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Garante que dois pushes na main nao deployem ao mesmo tempo.
