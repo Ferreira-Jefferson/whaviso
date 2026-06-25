@@ -33,24 +33,28 @@ describe('billing (integração)', () => {
     expect(free.preco_centavos).toBe(0)
     expect(free.capacidade_agenda).toBe(50)
     expect(free.somente_leitura).toBe(true)
+    expect(free.vagas_ativas).toBe(0) // 0 envios de aviso (somente leitura)
 
     const start = planos.find((p) => p.id === 'start')!
     expect(start.preco_centavos).toBe(990)
     expect(start.capacidade_agenda).toBe(100)
+    expect(start.vagas_ativas).toBe(10) // 10 envios de aviso (teto de vagas ativas, 0049)
     expect(start.cadencia_configuravel).toBe(false)
 
     const prof = planos.find((p) => p.id === 'profissional')!
+    expect(prof.preco_centavos).toBe(2990) // R$ 29,90 (0049)
     expect(prof.capacidade_agenda).toBe(150)
+    expect(prof.vagas_ativas).toBe(25) // 25 envios de aviso (teto de vagas ativas, 0049)
     expect(prof.cadencia_configuravel).toBe(true)
     expect(prof.totais_periodo).toBe(true)
 
     const plus = planos.find((p) => p.id === 'plus')!
-    // Plus por VOLUME DE ENVIOS (migration 0045): curva publicada p/ a UI espelhar.
+    // Plus por VOLUME DE ENVIOS (curva linear no total; faixa 26..200 desde a 0049).
     expect(plus.por_envio).toBe(true)
-    expect(plus.envios_min).toBe(16)
+    expect(plus.envios_min).toBe(26)
     expect(plus.envios_max).toBe(200)
-    expect(plus.preco_centavos).toBe(3090) // piso (16 envios): premium 2900 + 1 envio 190
-    expect(plus.preco_max_centavos).toBe(7990) // total no topo (200 envios)
+    expect(plus.preco_centavos).toBe(3110) // piso (26 envios): R$ 31,10 (contínuo c/ o Profissional)
+    expect(plus.preco_max_centavos).toBe(14000) // topo (200 envios): R$ 140,00 (0,70/envio)
     // Capacidade escala 1:1 com os envios (agenda/ativável por "unidade" = 1).
     expect(plus.agenda_por_unidade).toBe(1)
     expect(plus.ativaveis_por_unidade).toBe(1)
@@ -68,8 +72,8 @@ describe('billing (integração)', () => {
 
   it('assinar Plus grava os envios e congela o preço interpolado da curva', async () => {
     const app = await criarAppTeste(u)
-    // Curva: total(16)=3090, total(200)=7990. Para 50 envios:
-    //   round(3090 + (7990-3090)*(50-16)/(200-16)) = 3995.
+    // Curva: total(26)=3110, total(200)=14000. Para 50 envios:
+    //   round(3110 + (14000-3110)*(50-26)/(200-26)) = 4612.
     const r = await app.inject({
       method: 'POST',
       url: '/v1/billing/assinar',
@@ -78,7 +82,7 @@ describe('billing (integração)', () => {
     })
     expect(r.statusCode).toBe(200)
     expect(r.json().unidades).toBe(50)
-    expect(r.json().preco_centavos).toBe(3995)
+    expect(r.json().preco_centavos).toBe(4612)
 
     const a = await app.inject({ method: 'GET', url: '/v1/billing/assinatura', headers: AUTH })
     await app.close()
@@ -88,15 +92,15 @@ describe('billing (integração)', () => {
     expect(a.json().capacidade_agenda).toBe(50)
   })
 
-  it('assinar Plus no piso (16) e no topo (200) congela os extremos da curva', async () => {
+  it('assinar Plus no piso (26) e no topo (200) congela os extremos da curva', async () => {
     const app = await criarAppTeste(u)
     const piso = await app.inject({
       method: 'POST',
       url: '/v1/billing/assinar',
       headers: AUTH,
-      payload: { plano_id: 'plus', unidades: 16 },
+      payload: { plano_id: 'plus', unidades: 26 },
     })
-    expect(piso.json().preco_centavos).toBe(3090)
+    expect(piso.json().preco_centavos).toBe(3110)
     const topo = await app.inject({
       method: 'POST',
       url: '/v1/billing/assinar',
@@ -104,7 +108,7 @@ describe('billing (integração)', () => {
       payload: { plano_id: 'plus', unidades: 200 },
     })
     await app.close()
-    expect(topo.json().preco_centavos).toBe(7990)
+    expect(topo.json().preco_centavos).toBe(14000)
   })
 
   it('assinar Plus fora da faixa (< envios_min) → 422', async () => {
@@ -161,7 +165,7 @@ describe('billing (integração)', () => {
        where profile_id = $1 order by criado_em desc limit 1`,
       [u],
     )
-    expect(rows[0]!.valor_centavos).toBe(2900) // preço congelado do profissional (R$ 29)
+    expect(rows[0]!.valor_centavos).toBe(2990) // preço congelado do profissional (R$ 29,90)
     const ref = rows[0]!.provedor_ref
 
     const wh = await app.inject({

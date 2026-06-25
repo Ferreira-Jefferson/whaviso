@@ -28,7 +28,7 @@ function LinhaRecurso({ rotulo, ativo }: { rotulo: string; ativo: boolean }) {
 // Preço TOTAL (centavos) do Plus por volume de envios: espelho do backend
 // (shared/planos.precoPorEnvioCentavos). Interpola o total entre piso e topo.
 function precoEnvioCentavos(p: Plano, n: number): number {
-  const lo = p.envios_min ?? 16
+  const lo = p.envios_min ?? 26
   const hi = p.envios_max ?? lo
   const pLo = p.preco_centavos
   const pHi = p.preco_max_centavos ?? pLo
@@ -40,7 +40,7 @@ function precoEnvioCentavos(p: Plano, n: number): number {
 // Input range interativo: arraste para ver, ao vivo, o total/mês e o R$/envio em
 // cada volume (a partir de envios_min). Bolha do valor acompanha o thumb.
 function SliderEnvios({ plano }: { plano: Plano }) {
-  const min = plano.envios_min ?? 16
+  const min = plano.envios_min ?? 26
   const max = plano.envios_max ?? 200
   const [envios, setEnvios] = useState(min)
   const total = precoEnvioCentavos(plano, envios)
@@ -117,15 +117,17 @@ function PlanoCard({ plano }: { plano: Plano }) {
           </span>
         </li>
         <li>
-          Avisos ativos:{' '}
+          Envios de aviso (vagas ativas):{' '}
           <span className="text-tinta">
             {plano.somente_leitura
-              ? 'somente leitura (não ativa)'
+              ? '0 (somente leitura)'
               : plano.por_envio
                 ? 'escala com os envios'
                 : plano.por_unidade
                   ? `${plano.ativaveis_por_unidade} por unidade`
-                  : 'dentro da agenda'}
+                  : plano.vagas_ativas != null
+                    ? `${plano.vagas_ativas} ao mesmo tempo`
+                    : 'dentro da agenda'}
           </span>
         </li>
         <LinhaRecurso rotulo="Lembretes recorrentes" ativo={plano.permite_recorrente} />

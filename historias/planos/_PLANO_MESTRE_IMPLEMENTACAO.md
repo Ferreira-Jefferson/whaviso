@@ -20,7 +20,7 @@
 3. **Ciclo quebra no invertido** (`enviar_lembretes/repo.ts` INNER JOIN em `cobrador_id`): trocar por LEFT JOIN + `coalesce(nome_cobrador, p.nome)`. [E6-G1]
 4. **Notificar o devedor/criador** (não só cobrador) em recusa/dado-incorreto/rejeição/aceite: D-NOTIF. [E3-M3, E8-C2/C3, E5-G]
 5. **Contagem por papel no invertido** (não existe coluna `criador_id`): usar a dupla condição `(criador_papel='cobrador' and cobrador_id) or (criador_papel='devedor' and devedor_profile_id)`. [E11-C1]
-6. **Constraint `assinaturas_quantidade_minima (>=16)` bloqueia Plus por unidade:** dropar e recriar `unidades>=1`. [E11-C2]
+6. **Constraint `assinaturas_quantidade_minima (>=16)` bloqueia o Plus (mínimo de unidades baixo):** dropar e recriar `unidades>=1`. [E11-C2] (feito na 0026; o Plus hoje é por volume de envios 26-200, ver épico 11.)
 7. **Validação de linguagem ao salvar template** estende travessão (só em-dash/en-dash, nunca hífen ASCII); sincronizar os 3 padrões (CHECK banco + shared + front). [E12-B1/B2, E13]
 8. **`horario_reservado_seg` liberar em toda porta de saída** (terminal via api, opt-out, expiração) e tratar `desregistrado`/`pausado` como **suspensão** (mantém `_orig`), não liberação definitiva. [E6-G3/G4, E10-C1]
 

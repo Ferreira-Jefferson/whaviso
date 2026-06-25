@@ -13,7 +13,7 @@ Como **owner/admin**, quero um catálogo de planos versionado, para que cada con
 *Critérios de aceite:*
 - [ ] Existe um catálogo de planos com, no mínimo, estas **alavancas** por plano: **vagas de aviso ativo**, **capacidade de agenda**, **recorrência habilitada (sim/não)**, **cadência configurável (sim/não)**, **menu de texto livre (sim/não)**, **confirmação de pagamento / `informado_pago` (sim/não)**, **histórico/totais por período (sim/não)**.
 - [ ] São **4 planos**: **Free**, **Start**, **Profissional** e **Plus** (chaves estáveis ex.: `free`, `start`, `profissional`, `plus`).
-- [ ] Cada plano tem **chave estável**, **nome de exibição** e **preço** (em centavos; pode ser 0). **Preços = os de hoje** (PROJETO.md), só os nomes mudaram e o Free foi adicionado: **Free R$ 0**, **Start R$ 9,90/mês** (era o "pessoal"), **Profissional R$ 29/49** (mesmo preço/nome de hoje), **Plus** vendido por **unidade** (cada unidade = 1 combinado ativável, ver H11.3).
+- [ ] Cada plano tem **chave estável**, **nome de exibição** e **preço** (em centavos; pode ser 0): **Free R$ 0**, **Start R$ 9,90/mês**, **Profissional R$ 29,90/mês**, **Plus** vendido por **volume de envios** (de 26 a 200 envios de aviso, total de **R$ 31,10 a R$ 140,00**; o R$/envio cai conforme o volume sobe, ver H11.3 e a curva nas Decisões).
 - [ ] O catálogo vive em **migration (upsert idempotente)**, não no seed; mudar valor de plano é mudança de catálogo e exige `supabase db push` no cloud (ver CLAUDE.md / memória `whaviso-dev-db`).
 - [ ] Toda conta referencia **um** plano vigente (default na criação = **free**, ver Épico 1).
 - [ ] A linguagem do catálogo respeita as regras de ouro (sem "dívida/cobrança/atraso") e gênero neutro.
@@ -36,10 +36,11 @@ Como **sistema**, quero controlar quem pode ativar envio e quanto, conforme o pl
 *Critérios de aceite:*
 - [ ] Ativar = um combinado **sai da agenda e passa a enviar** (`sem_aviso → aguardando_aceite` e os estados seguintes do ciclo), ver Épico 4 H4.3.
 - [ ] **Free não ativa nada**: pode manter anotações na agenda, mas qualquer ativação leva à CTA de upgrade (H11.6).
-- [ ] **Start e Profissional** podem ativar dentro do limite de agenda do plano (não há contagem de "vaga ativa" separada da agenda; a agenda é o balde único, ver H11.4).
-- [ ] **Plus** é vendido por **unidade**: cada unidade = **1 combinado ativável**. A conta pode ter no máximo tantos combinados ativos quantas unidades contratou; a agenda é **10 anotações por unidade** (ver H11.4).
+- [ ] Cada plano tem um teto de **vagas de aviso ativo**, vendido ao cliente como **"envios de aviso"**: **Free 0**, **Start 10**, **Profissional 25**, **Plus de 26 a 200** (o cliente escolhe o volume). Esse teto é **separado** da capacidade de agenda (H11.4): a conta pode **anotar** mais do que **ativa e envia**.
+- [ ] **Start e Profissional** ativam até o seu teto de vagas (10 e 25). Ao atingir o teto, ativar é recusado com CTA de upgrade (H11.6), sem desativar nada do que já está ativo.
+- [ ] **Plus** é vendido por **volume de envios**: cada envio contratado vale **1 vaga de aviso ativo** e **1 anotação de agenda** (escala 1:1, ver H11.4). A conta pode ter no máximo tantos combinados ativos quantos envios contratou.
 - [ ] **`pausado` ocupa vaga** e continua contando (o combinado segue "vivo", só não dispara no momento). `sem_aviso` é anotação (não envia, mas conta na agenda).
-- [ ] Ao tentar ativar **além do permitido** (free, ou personalizado sem unidade livre), a API recusa com envelope `{ error: { code, message } }` e o front mostra a **CTA de upgrade** (H11.6), mantendo o item na agenda.
+- [ ] Ao tentar ativar **além do permitido** (free, ou plano sem vaga de aviso ativo livre), a API recusa com envelope `{ error: { code, message } }` e o front mostra a **CTA de upgrade** (H11.6), mantendo o item na agenda.
 - [ ] A contagem é **por conta** (isolamento por usuário, ver Épico 9 H9.8) e validada **no servidor** (H11.8), nunca só no front.
 
 ---
@@ -47,9 +48,9 @@ Como **sistema**, quero controlar quem pode ativar envio e quanto, conforme o pl
 ### H11.4: Limite de capacidade de agenda 🟢
 Como **sistema**, quero limitar quantas anotações cada conta mantém na agenda, conforme o plano, para a agenda não virar um depósito infinito.
 *Critérios de aceite:*
-- [ ] A **agenda é um balde único**: **toda** anotação conta igual (ativa, pausada ou só anotação `sem_aviso`). Não há contagem separada de "agenda" vs "ativos"; o limite do plano é o **total de anotações**.
+- [ ] A **capacidade de agenda é um balde único**: **toda** anotação conta igual para esse teto (ativa, pausada ou só anotação `sem_aviso`); não há sub-balde de "agenda" vs "ativos" na contagem de **capacidade**. (O teto de **vagas de aviso ativo** da H11.3 é uma alavanca **à parte**: limita quantas dessas anotações ficam **ativas enviando ao mesmo tempo**, não a capacidade total. A conta pode anotar mais do que envia.)
 - [ ] **Um item ativado continua ocupando seu lugar na agenda** (ativar não libera o slot, é a mesma anotação).
-- [ ] Valores por plano: **Free 50**, **Start 100**, **Profissional 150**, **Plus 10 por unidade** (ex.: 5 unidades → 50 anotações).
+- [ ] Valores por plano (capacidade de agenda): **Free 50**, **Start 100**, **Profissional 150**, **Plus 1 por envio contratado** (escala 1:1; ex.: 50 envios → 50 anotações).
 - [ ] Ao atingir a capacidade, criar nova anotação é recusado no servidor com CTA de upgrade, sem apagar nada do que já existe.
 - [ ] **Anotações em estado terminal** (`pago`/`cancelado`/`recusado`/`expirado`) **continuam contando**: a agenda registra o que aconteceu, como uma agenda de verdade. O **sistema nunca remove sozinho**.
 - [ ] **Só o usuário** pode tirar algo da agenda, por ação manual. Como há a regra de não-DELETE de negócio (auditoria append-only), "excluir da agenda" é **arquivamento** (sai da contagem/visão da agenda), **não** um DELETE físico do registro. *Ver divergência.*
@@ -115,23 +116,25 @@ Como **pessoa assinante**, quero trocar de plano, para subir quando preciso de m
 
 > O catálogo de planos do **PROJETO.md** (seção 8) e o que os épicos foram decidindo **não batem**. As histórias são a fonte de verdade: o catálogo precisa ser reescrito para o modelo abaixo.
 
-- **Modelo de planos:** PROJETO.md descreve "pessoal R$ 9,90 (até 5 avisos)" e "profissional R$ 29/49". As histórias decidiram **4 planos: Free, Start, Profissional, Plus**, com a **agenda como balde único** (Free 50 / Start 100 / Profissional 150 / Plus 10 por unidade) e o Plus vendido por unidade (1 unidade = 1 combinado ativável). PROJETO.md seção 8 precisa ser reescrito para este modelo. **Preços finais ainda em aberto.**
+- **Modelo de planos:** PROJETO.md descreve "pessoal R$ 9,90 (até 5 avisos)" e "profissional R$ 29/49". As histórias decidiram **4 planos: Free, Start, Profissional, Plus**, com **dois eixos**: a **capacidade de agenda como balde único** (Free 50 / Start 100 / Profissional 150 / Plus 1 por envio) e o teto de **vagas de aviso ativo** (vendido como "envios de aviso": Free 0 / Start 10 / Profissional 25 / Plus 26 a 200). PROJETO.md seção 8 precisa ser reescrito para este modelo. **Preços decididos** (ver Decisões).
 - **Free passa a manter agenda:** hoje o free "só visualiza" (Épico 1 H1.5 / Épico 2). Com o modo agenda (Épico 4), o free **cria item de agenda** mas **não ativa**. Refatorar a regra de plano para distinguir "criar agenda" de "ativar/enviar".
 - **Limites no servidor a partir do catálogo:** se hoje há limite fixado em código, mover para leitura do catálogo (H11.1) em migration.
 - **`informado_pago` / cadência / recorrência como recurso de plano:** amarrar esses recursos ao plano exige um ponto único que consulta as alavancas do catálogo; verificar se a checagem hoje existe e onde.
 - **"Excluir da agenda" manual = arquivar, não DELETE:** o usuário pode tirar uma anotação da agenda (libera o slot do limite), mas pela regra de não-DELETE de negócio (Épico 4 H4.4 / CLAUDE.md) isso é um **arquivamento** (estado/flag que some da visão e da contagem), nunca um DELETE físico. Precisa de um estado/flag de "arquivado na agenda" a modelar; verificar se hoje existe.
 
 ### Decisões tomadas
-- **Quatro planos:** **Free, Start, Profissional, Plus** (este vendido por unidade).
-- **Agenda é balde único:** tudo é anotação (ativo, pausado ou só anotação contam igual). Capacidade: **Free 50, Start 100, Profissional 150, Plus 10 por unidade**. Item ativado **continua ocupando** seu lugar na agenda.
+- **Quatro planos:** **Free, Start, Profissional, Plus** (este vendido por volume de envios).
+- **Dois eixos por plano:** **capacidade de agenda** (quantas anotações a conta mantém) e **vagas de aviso ativo** (quantos combinados ficam ativos enviando ao mesmo tempo, vendidas como "envios de aviso"). Os dois são alavancas separadas: a conta pode anotar mais do que envia.
+- **Vagas de aviso ativo ("envios de aviso") = eixo comercial:** **Free 0, Start 10, Profissional 25, Plus 26 a 200** (contínuo: o Plus começa onde o Profissional termina). Imposto no servidor (`exigirVagaDeAtivo`, H11.8).
+- **Agenda é balde único:** tudo é anotação (ativo, pausado ou só anotação contam igual). Capacidade: **Free 50, Start 100, Profissional 150, Plus 1 por envio contratado**. Item ativado **continua ocupando** seu lugar na agenda.
 - **Free = agenda + visualização, sem ativar.** Free não dispara nada e, por isso, **não recebe `informado_pago`** como cobrador.
-- **1 unidade do Plus = 1 combinado ativável**; cada unidade dá 10 anotações de agenda.
+- **Plus por volume de envios:** cada envio contratado vale **1 vaga de aviso ativo** e **1 anotação de agenda** (escala 1:1).
 - **`pausado` ocupa vaga** (segue vivo, só não dispara).
 - **Cadência configurável** (escolher quais D-avisos / como o devedor invertido recebe): só **Profissional e Plus**; Free e Start usam a padrão.
 - **Reengajamento manual pós-ciclo** (H8.3): até **3 envios por combinado**, nunca dois no mesmo dia.
 - **`informado_pago` e dados do free persistem:** os dados ficam no banco normalmente (mesmo sem conta criada), pois são base para a agenda/combinados do cobrador; se a conta vier a ativar depois, nada se perde.
 - **Downgrade com excedente: mantém ativo** o que existe; só trava criar/ativar novos até voltar abaixo do limite.
-- **Preços = os de hoje:** Free R$ 0, Start R$ 9,90 (era o "pessoal"), Profissional R$ 29/49 (mantém nome e preço de hoje), Plus por unidade.
+- **Preços:** Free R$ 0, Start R$ 9,90, Profissional R$ 29,90, Plus por volume de envios (curva linear no total): piso **26 envios = R$ 31,10** (R$ 1,196/envio, contínuo com o Profissional) ao topo **200 envios = R$ 140,00** (R$ 0,70/envio). O R$/envio cai progressivamente (~1,196 a 0,70) e fica **sempre acima do custo** (R$ 0,53 no pior caso), garantindo margem mesmo no topo. O Plus é parametrizado no catálogo por piso e topo, e o total intermediário é calculado por uma função única (`precoPorEnvioCentavos`). Catálogo: migration 0049.
 - **Anotações em estado terminal continuam contando** na agenda (a agenda registra o que aconteceu). O sistema nunca remove sozinho; só o usuário, manualmente (arquivamento, não DELETE físico).
 - **Validação no servidor** (defesa em profundidade): o front só antecipa; API+banco decidem.
 - **MVP = stub trial:** limites valem, cobrança em dinheiro é futura.

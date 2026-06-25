@@ -1,5 +1,7 @@
 # Plano de desenvolvimento: Épico 11 (Planos, limites e billing)
 
+> **ATUALIZAÇÃO 2026-06-25 (supera trechos abaixo):** o modelo do Plus passou de "por unidade" para **por volume de envios** (26 a 200 envios; piso R$ 31,10, topo R$ 140,00, R$/envio caindo de 1,196 a 0,70) e foram definidos: Profissional **R$ 29,90** e os tetos de **vagas de aviso ativo** (vendidas como "envios de aviso") Free 0 / Start 10 / Profissional 25 / Plus 26-200 (migration 0049, imposto por `exigirVagaDeAtivo`). A história canônica `11-planos-billing.md` já reflete isso. As referências abaixo a "Plus por unidade", "R$ 29/49" ou "preços em aberto" são do plano original e foram superadas.
+>
 > Fonte da verdade: `historias/11-planos-billing.md`. Onde o código diverge, o plano
 > manda mudar o código. Estado atual aferido lendo migrations `0007`/`0019`, módulo
 > `billing` da api, `avisos/service.ts`+`repo.ts`, e o front `modules/billing`.
@@ -352,9 +354,9 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 
 ## 7. Decisões em aberto a confirmar com o humano
 
-- **Preços finais** (épico diz "Preços = os de hoje" mas marca "Preços finais ainda
-  em aberto"): Free R$ 0, Start R$ 9,90, Profissional R$ 29 **ou** R$ 49 (qual?),
-  **Plus: preço por unidade** ainda não definido em reais. Confirmar antes da `0025`.
+- **Preços finais** (RESOLVIDO 2026-06-25, migration 0049): Free R$ 0, Start R$ 9,90,
+  Profissional **R$ 29,90**, **Plus por volume de envios** (26 a 200): piso R$ 31,10,
+  topo R$ 140,00 (R$/envio de 1,196 a 0,70). Não há degrau "R$ 49".
 - **Mapping de migração** das assinaturas atuais: `pessoal`→`start` ok;
   `personalizado` (limite = `quantidade` de ativos por fórmula) → `plus` por unidade:
   como converter `quantidade` em `unidades` (cada unidade = 1 ativável + 10 agenda)?

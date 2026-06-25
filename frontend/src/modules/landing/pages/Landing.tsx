@@ -390,6 +390,9 @@ function Planos() {
                       </p>
                     </div>
                     <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
+                      {p.vagas_ativas != null && (
+                        <li className="font-medium">{`• ${p.vagas_ativas} envios de aviso`}</li>
+                      )}
                       <li>{`• Agenda de até ${p.capacidade_agenda} itens`}</li>
                       <li>
                         {p.somente_leitura
@@ -398,6 +401,7 @@ function Planos() {
                       </li>
                       {p.permite_recorrente && <li>• Combinados recorrentes</li>}
                       {p.cadencia_configuravel && <li>• Cadência configurável</li>}
+                      {p.totais_periodo && <li>• Totais por período</li>}
                     </ul>
                     <Link to="/entrar" className="mt-auto">
                       <Button variante={destaque ? 'primary' : 'secondary'} className="w-full">
@@ -410,10 +414,10 @@ function Planos() {
             : // Fallback estático enquanto carrega / se a api estiver fora: os
               // preços reais vêm de GET /v1/billing/planos; aqui só ilustramos.
               [
-                { nome: 'Whaviso Free', preco: 0, agenda: 'Agenda de até 50 itens (sem envio)' },
-                { nome: 'Whaviso Start', preco: 990, agenda: 'Agenda de até 100 itens' },
-                { nome: 'Whaviso Profissional', preco: 2900, agenda: 'Agenda de até 150 itens' },
-                { nome: 'Whaviso Plus', preco: 3000, agenda: '16 a 200 envios por mês' },
+                { nome: 'Whaviso Free', preco: 0, agenda: '0 envios de aviso · agenda até 50 itens' },
+                { nome: 'Whaviso Start', preco: 990, agenda: '10 envios de aviso · agenda até 100 itens' },
+                { nome: 'Whaviso Profissional', preco: 2990, agenda: '25 envios de aviso · agenda até 150 itens' },
+                { nome: 'Whaviso Plus', preco: 3110, agenda: '26 a 200 envios de aviso por mês' },
               ].map((p) => (
                 <Card key={p.nome} className="flex h-full flex-col gap-4 bg-cartao">
                   <span className="text-xs text-transparent">.</span>
@@ -440,7 +444,7 @@ function Planos() {
 // (shared/planos.precoPorEnvioCentavos). Interpola o total entre o piso e o topo
 // publicados no catálogo; aqui é só exibição (o backend congela ao assinar).
 function precoEnvioCentavos(p: Plano, n: number): number {
-  const lo = p.envios_min ?? 16
+  const lo = p.envios_min ?? 26
   const hi = p.envios_max ?? lo
   const pLo = p.preco_centavos
   const pHi = p.preco_max_centavos ?? pLo
@@ -452,7 +456,7 @@ function precoEnvioCentavos(p: Plano, n: number): number {
 // Cartão do Plus na landing: slider de envios (a partir de envios_min) que mostra,
 // ao vivo, o total/mês e o preço por envio (que cai conforme o volume sobe).
 function CartaoPlusLanding({ p }: { p: Plano }) {
-  const min = p.envios_min ?? 16
+  const min = p.envios_min ?? 26
   const max = p.envios_max ?? 200
   const [envios, setEnvios] = useState(() => Math.min(Math.max(50, min), max))
   const total = precoEnvioCentavos(p, envios)
@@ -494,10 +498,11 @@ function CartaoPlusLanding({ p }: { p: Plano }) {
       </div>
 
       <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
-        <li>{`• Até ${envios} envios por mês`}</li>
+        <li className="font-medium">{`• Até ${envios} envios de aviso por mês`}</li>
         <li>• Avisos automáticos no WhatsApp</li>
         {p.permite_recorrente && <li>• Combinados recorrentes</li>}
         {p.cadencia_configuravel && <li>• Cadência configurável</li>}
+        {p.totais_periodo && <li>• Totais por período</li>}
       </ul>
 
       <Link to="/entrar" className="mt-auto">

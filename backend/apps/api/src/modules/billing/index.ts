@@ -38,8 +38,9 @@ const assinarBody = z
 export const billingRoutes: FastifyPluginAsync = async (raiz) => {
   const app = raiz.withTypeProvider<ZodTypeProvider>()
 
-  // Catálogo de planos (centavos). No Plus, `preco_centavos` é o preço de UMA
-  // unidade; o front multiplica pela quantidade escolhida.
+  // Catálogo de planos (centavos). No Plus (por volume de envios), `preco_centavos`
+  // é o total no piso (`envios_min`) e `preco_max_centavos` o total no topo
+  // (`envios_max`); o total escolhido é interpolado por `precoPorEnvioCentavos`.
   app.get('/billing/planos', async () => {
     const { rows } = await app.pool.query(
       `select ${COLS_PLANO} from public.planos

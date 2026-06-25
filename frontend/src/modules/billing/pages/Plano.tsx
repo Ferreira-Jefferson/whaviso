@@ -6,8 +6,9 @@
 // tratados no formulário de novo aviso, que traz um link pra cá).
 // Linguagem das Regras de Ouro: só "aviso/lembrete/combinado/assinatura/plano".
 //
-// Plus é vendido por UNIDADE (1 unidade = 1 combinado ativável + 10 anotações de
-// agenda); o cliente escolhe a quantidade de unidades e o preço é por unidade.
+// Plus é vendido por VOLUME DE ENVIOS (de envios_min a envios_max): o cliente
+// escolhe quantos envios de aviso quer e o R$/envio cai com o volume; capacidade e
+// vagas de aviso ativo escalam 1:1 com os envios escolhidos.
 import { useState } from 'react'
 import { Check, Minus, Sparkles } from 'lucide-react'
 import {
@@ -363,6 +364,10 @@ function CartaoPlano({
       </div>
 
       <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
+        <Recurso
+          ativo={(plano.vagas_ativas ?? 0) > 0}
+          rotulo={`${plano.vagas_ativas ?? 0} envios de aviso`}
+        />
         <li className="flex items-center gap-2">
           <Check strokeWidth={1.75} className="size-4 shrink-0 text-folha" />
           {`Agenda de até ${plano.capacidade_agenda} itens`}
@@ -407,7 +412,7 @@ function CartaoPlus({
   onEscolher: (envios: number) => void
   alterando: boolean
 }) {
-  const min = plano.envios_min ?? 16
+  const min = plano.envios_min ?? 26
   const max = plano.envios_max ?? 200
   const [envios, setEnvios] = useState(() => Math.min(Math.max(50, min), max))
   const total = precoEnvioCentavos(plano, envios)

@@ -36,10 +36,10 @@ Legenda: `[x]` o código atende · `[~]` atende em parte · `[!]` diverge (refat
 
 ### Symmetry/cosmético (a história não obriga, mas vale)
 - **08 [~] Parar o ciclo ao informar pagamento** tem o MESMO efeito observável nos dois canais (ciclo para, só empurrãozinho D+1), mas por mecanismos diferentes (webhook pré-cancela; devedor logado/link deixam o drainer cancelar no envio). Padronizar por simetria, opcional.
-- **04 / 11**: comentários de escopo desatualizados em `planos/index.ts` e migrations (dizem que `sem_aviso` "não existe"; descrevem Plus "por unidade"). Limpeza.
+- **04 / 11**: comentários de escopo em `planos/index.ts` e migrations que dizem que `sem_aviso` "não existe" (limpeza pendente). Os comentários que descreviam o Plus "por unidade" já foram corrigidos para o modelo por volume de envios (2026-06-25).
 
 ## Precisa de decisão do dono
-- **11 [!] Planos divergem da história, mas o código é uma mudança recente e deliberada.** A história 11 define Plus **por unidade** (1 unidade = 1 ativável + 10 de agenda) e Profissional **R$ 29/49**. O código (commit recente "Plus por volume de envios + layout dos planos", migrations 0045/0046) mudou Plus para **por volume de envios** (16..200, R$ 30,90..79,90) e Profissional para **R$ 29 fixo**. Pela regra (história manda), o código deveria voltar ao modelo por unidade, mas isso reverteria uma decisão de negócio recente. **Não mexo sem a sua confirmação.**
+- **11 [RESOLVIDO 2026-06-25] Planos: a história foi alinhada ao código.** O dono confirmou o Plus **por volume de envios** e definiu os números: Profissional **R$ 29,90**, Plus **26 a 200 envios** (R$ 31,10 a R$ 140,00, R$/envio caindo de 1,196 a 0,70), e os tetos de **vagas de aviso ativo** ("envios de aviso") Free 0 / Start 10 / Profissional 25 / Plus 26-200. A história canônica (épico 11) foi reescrita e a **migration 0049** fixou os valores. Nenhuma reversão de código.
 
 ## Deferido
 - **01 Conta & Autenticação.** A história pede login/cadastro por **botão** (Acessar/Negar, Sim sou eu/Não fui eu); o código faz **OTP por código**. Decisão delicada, ligada ao que a Meta permite (identificar número + enviar botão). Itens atrelados (eventos `login_negado`/`cadastro_negado` nunca inseridos; link de "acompanhar no painel" no aceite, H1.4) ficam com o épico 01, para conversa dedicada.

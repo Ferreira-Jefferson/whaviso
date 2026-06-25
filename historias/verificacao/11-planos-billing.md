@@ -1,8 +1,8 @@
 # Verificação — Épico 11: Planos, limites e billing
 
-## Veredito (32 [x] · 3 [~] · 2 [!] · 0 [+])
+## Veredito (35 [x] · 2 [~] · 0 [!] · 0 [+]): divergências de preço/modelo RESOLVIDAS em 2026-06-25
 
-O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativação no servidor (com lock anti-corrida), o arquivamento soft, o billing stub trial e a CTA de upgrade no front estão todos implementados e testados. As duas divergências reais são de **preço/modelo do Plus**: a história define Plus **por unidade** (1 unidade = 1 ativável + 10 de agenda) e **Profissional R$ 29/49**, mas o código vendeu o Plus **por volume de envios** (curva 16..200, R$ 30,90..79,90, migrations 0045/0046) e fixou Profissional em R$ 29,00. Pela regra de direção, onde o código diverge da história, o errado é o código.
+O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativação no servidor (com lock anti-corrida), o arquivamento soft, o billing stub trial e a CTA de upgrade no front estão todos implementados e testados. As duas divergências de **preço/modelo do Plus** foram **RESOLVIDAS em 2026-06-25**: o dono confirmou o modelo do Plus **por volume de envios** e definiu os números finais (Profissional **R$ 29,90**; Plus **26 a 200 envios**, total de R$ 31,10 a R$ 140,00), além dos tetos de **vagas de aviso ativo** (vendidas como "envios de aviso": Free 0, Start 10, Profissional 25, Plus 26-200). A **história canônica (épico 11) foi atualizada** para este modelo e a **migration 0049** fixou os valores. Portanto o código NÃO volta ao modelo "por unidade": foi a história que se alinhou ao código (direção invertida por decisão de negócio registrada).
 
 ## Por história
 
@@ -12,7 +12,7 @@ O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativaç
 | Catálogo com alavancas por plano (vagas ativas, agenda, recorrência, cadência, menu, informado_pago, totais) | [x] | `0026_planos_balde_unico.sql:28-48` cria as colunas; `0033` adiciona `edicoes_max` | `billing.test.ts:23-57` |
 | 4 planos: free, start, profissional, plus (chaves estáveis) | [x] | `0026:66-73` upsert dos 4 ids | `billing.test.ts:30` |
 | Cada plano com chave, nome e preço (centavos, pode 0) | [x] | `0026:66-73`; `planos_preco_nao_negativo` em `0007:9` | `billing.test.ts:33,38` |
-| Preços = os de hoje: Free 0, Start 990, Profissional **R$ 29/49**, Plus por unidade | [!] | Free 0 e Start 990 batem (`0026:66-68`). Profissional fixado em **2900** (só 29, não 29/49). **Plus virou por VOLUME DE ENVIOS** (`0045:43-52`, `0046:12-14`: piso 3090, topo 7990, faixa 16..200), não "por unidade" como a história define | `billing.test.ts:38,47-56` |
+| Preços: Free 0, Start 990, Profissional **R$ 29,90**, Plus por volume de envios | [x] | RESOLVIDO 2026-06-25 (história alinhada ao código): Free 0 / Start 990 (`0026:66-68`); Profissional **2990** (`0049`); Plus por **volume de envios**, faixa **26..200**, piso **3110** / topo **14000** (`0045`/`0046`/`0049`). A história agora define este mesmo modelo | `billing.test.ts:33-56` |
 | Catálogo em migration upsert idempotente, não no seed | [x] | `0026:60-90` insert ... on conflict do update; comentário `0026:18` confirma seed não roda no cloud | (n/a) |
 | Toda conta referencia um plano vigente, default free na criação | [x] | `handle_new_user()` cria assinatura free no signup (`0026:129-145`); backfill `0026:117-124` | `billing.test.ts:59-67` |
 | Linguagem do catálogo respeita regras de ouro e gênero neutro | [x] | nomes "Whaviso Free/Start/Profissional/Plus"; sem termos proibidos nas migrations | (n/a) |
@@ -31,8 +31,8 @@ O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativaç
 |---|---|---|---|
 | Ativar = sai da agenda e passa a enviar (sem_aviso -> aguardando_aceite) | [x] | `ativarAviso` em `service.ts:292+`, gera convite (`service.ts:298`) | `modo_agenda.test.ts:3` |
 | Free não ativa nada; ativação leva à CTA | [x] | `exigirVagaDeAtivo` guard `somente_leitura` (`planos/index.ts:211-216`) | `modo_agenda.test.ts:3` |
-| Start e Profissional ativam dentro do limite da agenda (sem contagem separada) | [x] | `vagas_ativas` null vira capacidade da agenda no SQL (`0026:189-195`); comentário `planos/index.ts:23` | `billing.test.ts` |
-| Plus por unidade: 1 unidade = 1 ativável; agenda 10 por unidade | [!] | A aritmética 1:1 por "unidade" existe (`0026:186-196`), mas a 0045 redefiniu `agenda_por_unidade=1`/`ativaveis_por_unidade=1` e `unidades` passou a guardar **envios/mês**, não unidades de 10 anotações. O modelo "10 anotações por unidade" foi substituído por "1 anotação por envio" (`0045:48-52`, `billing.test.ts:54-56,87-88`) | `billing.test.ts:69-89` |
+| Start e Profissional têm teto de vagas de aviso ativo (10 e 25) | [x] | `vagas_ativas` agora explícito: Start 10, Profissional 25 (`0049`), imposto por `exigirVagaDeAtivo` (`planos/index.ts:206-228`, chamado em `service.ts:291`). Antes era null (= capacidade da agenda) | `billing.test.ts:33-56` (assertivas de vagas) |
+| Plus por volume de envios: 1 envio = 1 vaga ativa + 1 anotação (1:1) | [x] | RESOLVIDO 2026-06-25 (história alinhada): `agenda_por_unidade=1`/`ativaveis_por_unidade=1`, `unidades` guarda os envios/mês escolhidos (`0045:48-52`, `0049`). A história agora define o Plus por volume de envios | `billing.test.ts:69-89` |
 | pausado ocupa vaga; sem_aviso conta na agenda | [x] | `contarAtivos` exclui só terminais e sem_aviso (`planos/index.ts:184-193`); `contar_agenda` conta tudo não-arquivado (`0026:214-224`) | `modo_agenda.test.ts:2` |
 | Ativar além do permitido: API recusa com envelope, front mostra CTA, item fica na agenda | [x] | `regraNegocio('limite_plano_atingido' / 'plano_somente_leitura')` (`planos/index.ts:213-225`); front trata no formulário (`Plano.tsx:4-6`) | `modo_agenda.test.ts:3` |
 | Contagem por conta, validada no servidor | [x] | funções SQL por papel + lock (`planos/index.ts:108-121`) | `avisos.test.ts:180-204` (corrida) |
@@ -42,7 +42,7 @@ O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativaç
 |---|---|---|---|
 | Agenda balde único: toda anotação conta igual | [x] | `contar_agenda` conta todo aviso não-arquivado do criador (`0026:214-224`) | `avisos.test.ts:150-178` |
 | Item ativado continua ocupando o lugar | [x] | ativar só muda status, não arquiva; contagem não exclui ativos (`0026:219-223`) | (coberto) |
-| Valores: Free 50, Start 100, Profissional 150, Plus 10 por unidade | [~] | Free 50 / Start 100 / Profissional 150 batem (`0026:66-71`, `billing.test.ts:34,39,43`). **Plus NÃO é mais 10 por unidade**: `agenda_por_unidade=1`, escala 1:1 com envios (`0045:49`, `billing.test.ts:55,88`) | `billing.test.ts:34-56` |
+| Valores (capacidade de agenda): Free 50, Start 100, Profissional 150, Plus 1 por envio | [x] | RESOLVIDO 2026-06-25 (história alinhada): Free 50 / Start 100 / Profissional 150 (`0026:66-71`); Plus escala 1:1 com os envios, `agenda_por_unidade=1` (`0045:49`). A história agora define "Plus 1 por envio contratado" | `billing.test.ts:34-56` |
 | Ao encher, criar nova é recusado no servidor com CTA, sem apagar nada | [x] | `agenda_cheia` em `exigirCapacidadeDeAgenda`/`exigirVagaDeAgenda` (`planos/index.ts:148-154,169-174`) | `avisos.test.ts:144-145` |
 | Terminais continuam contando; sistema nunca remove sozinho | [x] | `contar_agenda` não exclui terminais, só arquivados (`0026:220-223`) | `avisos.test.ts:170-175` |
 | Só o usuário tira da agenda = arquivamento (flag), não DELETE físico | [x] | `arquivado_em` (`0026:151`); `arquivarAviso` faz `set arquivado_em=now()` (`repo.ts:441-442`, `service.ts:608-616`); rota POST `/avisos/:id/arquivar` (`avisos/index.ts:91-93`) | `avisos.test.ts:150-178` |
@@ -92,11 +92,15 @@ O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativaç
 | 🟡 Nenhuma troca dispara DELETE de negócio | [x] | `assinar` é upsert de assinatura; sem DELETE | (n/a) |
 | 🟡 Depende do billing real (fora do MVP) | [~] | UX/billing da troca fica para o gateway; stub já permite trocar (linha 110 marca 🟡) | (n/a, 🟡) |
 
-## O que o código precisa mudar para seguir a história (mudanças de CÓDIGO)
+## Resolução das divergências (2026-06-25)
 
-1. **Plus: voltar ao modelo "por unidade" da história** (H11.3/H11.4, decisões linhas 40, 52, 128). A história define Plus vendido **por unidade**, onde **1 unidade = 1 combinado ativável + 10 anotações de agenda** (ex.: 5 unidades = 50 anotações). O código (migrations `0045`/`0046`) trocou isso por **preço por volume de envios** (faixa 16..200, curva interpolada R$ 30,90 a R$ 79,90, `agenda_por_unidade=1`). Para seguir a história: restaurar `agenda_por_unidade=10` e `ativaveis_por_unidade=1`, remover o modelo `por_envio`/`envios_min`/`envios_max`/`preco_max_centavos` (ou levar essa mudança de modelo ao dono para entrar na história). Ajustar em consequência `billing/index.ts:assinar`, `precoPorEnvioCentavos` (`shared/planos`), `Plano.tsx:CartaoPlus` e os testes `billing.test.ts:47-108`. Nota: a história deixa "Preços finais ainda em aberto" (linhas 118, 134), mas o **modelo** (por unidade x por envio) é decisão firmada (decisões tomadas).
+As duas divergências de preço/modelo foram **resolvidas a favor do código** (o dono confirmou o modelo e a história canônica foi atualizada; migration 0049). **Nenhuma mudança de código é necessária.**
 
-2. **Profissional: a história diz "R$ 29/49"** (linha 16 e decisão linha 134); o código fixou **2900 (R$ 29,00)** (`0026:71`, `billing.test.ts:164`), sem o degrau de 49. Confirmar com o dono se o piso R$ 29 satisfaz ou se falta modelar o 49; hoje o código só tem o piso.
+1. **Plus por volume de envios (não "por unidade"):** confirmado. A história (H11.1/H11.3/H11.4 e Decisões) agora define o Plus vendido por volume de envios (26 a 200), com cada envio valendo 1 vaga de aviso ativo + 1 anotação de agenda (1:1) e a curva linear piso **3110** (R$ 31,10, R$ 1,196/envio, contínuo com o Profissional) a topo **14000** (R$ 140,00, R$ 0,70/envio). `por_envio`/`envios_min`/`envios_max`/`preco_max_centavos` e `precoPorEnvioCentavos` permanecem.
+
+2. **Profissional R$ 29,90:** confirmado e fixado (`0049`, `billing.test.ts:164`). Não há degrau "49"; a história foi atualizada para R$ 29,90.
+
+3. **Novo eixo comercial, vagas de aviso ativo ("envios de aviso") com teto explícito:** Free 0, Start 10, Profissional 25, Plus 26-200 (`0049`). Imposto por `exigirVagaDeAtivo`; a história (H11.3) registra o teto. É alavanca separada da capacidade de agenda (anotar).
 
 ## Itens que a própria história marca como 🟡/fora de escopo (com a linha)
 
@@ -111,9 +115,9 @@ O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativaç
 
 ## Observações
 
-- **Comentários stale (não funcionais):** `billing/index.ts:41-42` ("preço de UMA unidade; o front multiplica") e `Plano.tsx:9-10` (cabeçalho "vendido por UNIDADE (1 unidade = ... 10 anotações)") ainda descrevem o modelo por unidade, contradizendo o código por envio efetivo. Inofensivo para runtime, mas confunde a leitura.
+- **Comentários corrigidos (2026-06-25):** os cabeçalhos stale de `billing/index.ts` e `Plano.tsx` que descreviam o Plus "por unidade" foram atualizados para o modelo por volume de envios.
 - **Coerência do balde único bem feita:** `contar_agenda` e `contarAtivos` usam a mesma dupla condição por papel (cobrador_id / devedor_profile_id), contando certo no fluxo invertido. Índices parciais por papel/arquivado (`0026:228-233`).
 - **Anti-corrida sólido:** `travarConta` com `for update` dentro da mesma transação do insert/update fecha a janela do H11.8, com teste dedicado (`avisos.test.ts:180-204`).
 - **Arquivamento (soft-delete) correto:** `arquivado_em` sai da contagem e da visão sem DELETE físico; teste confirma que o registro permanece.
 - **Migrations antigas (`0007`, `0019`, planos pessoal/profissional/personalizado) preservadas** e migradas (não apagadas), respeitando a regra de não-DELETE; `0026` migra pessoal->start e personalizado->plus.
-- **A constraint `assinaturas_unidades_minima >= 1`** (`0026:99-100`) permite Plus com 1 unidade, mas o `assinarBody` aceita `unidades` 1..2000 validando contra `envios_min`/`envios_max` (16..200) do catálogo (`billing/index.ts:118-127`). Coerente com o modelo por-envio atual, divergente do por-unidade da história.
+- **A constraint `assinaturas_unidades_minima >= 1`** (`0026:99-100`) permite Plus com 1 unidade, mas o `assinarBody` aceita `unidades` 1..2000 validando contra `envios_min`/`envios_max` (**26..200**) do catálogo (`billing/index.ts:118-127`). Coerente com o modelo por volume de envios, que a história agora também adota.

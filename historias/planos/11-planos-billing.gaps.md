@@ -1,5 +1,7 @@
 # Relatório de validação: Épico 11 (Planos, limites e billing)
 
+> **ATUALIZAÇÃO 2026-06-25 (supera trechos abaixo):** o Plus é **por volume de envios** (26 a 200; R$ 31,10 a R$ 140,00), o Profissional é **R$ 29,90**, e há tetos de **vagas de aviso ativo** ("envios de aviso") Free 0 / Start 10 / Profissional 25 / Plus 26-200 (migration 0049). A história canônica já reflete isso; menções a "Plus por unidade" abaixo são do plano original e foram superadas.
+>
 > Revisão adversarial do plano `11-planos-billing.plano.md` contra a história
 > `11-planos-billing.md` (fonte da verdade), o `_CONTEXTO.md` e o código real
 > (migrations `0007`/`0019`, `modules/billing`, `modules/avisos`).
