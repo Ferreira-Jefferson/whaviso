@@ -73,9 +73,17 @@ export function Select<T extends string>({
         // Opaco (bg-cartao) cobrindo o texto nativo do estado fechado; some quando a
         // lista abre (o popup do SO fica por cima). pointer-events-none deixa o clique
         // passar para o <select>; right-9 preserva a área do chevron.
+        //
+        // Recuo (inset-y-1/left-1) bem dentro da borda DE PROPÓSITO: como o span tem a
+        // mesma cor do <select> (bg-cartao), o recuo é invisível e a única coisa que
+        // importa é cobrir o texto SEM encostar na borda. Com recuo de 1px, em telas
+        // escaladas (125%/150% no Windows) ou com zoom o arredondamento sub-pixel fazia
+        // o span pintar sobre parte da borda de baixo (só no trecho que ele cobre),
+        // deixando a linha "quebrada". Com folga de 4px isso não acontece em escala
+        // nenhuma. pl-2 mantém o rótulo alinhado onde o texto normalmente fica (~12px).
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-px left-px right-9 flex items-center truncate rounded-l-input bg-cartao pl-3 text-sm text-tinta"
+          className="pointer-events-none absolute inset-y-1 left-1 right-9 flex items-center truncate bg-cartao pl-2 text-sm text-tinta"
         >
           {displayLabel}
         </span>
