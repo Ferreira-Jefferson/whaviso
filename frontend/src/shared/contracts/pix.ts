@@ -8,7 +8,10 @@
 //  - telefone:  o DICT valida em E.164 (^\+[1-9]\d{1,14}$), NÃO é exclusivo de +55; com
 //               o +, qualquer país conta. Sem o +, só inferimos quando vêm 12-13 dígitos
 //               começando em 55 (um celular BR sem país tem 11 dígitos, IGUAL ao CPF).
-//  - cnpj:      14 dígitos.  cpf: 11 dígitos.
+//  - cnpj:      14 dígitos.
+//  - cpf:       11 dígitos QUE passam nos dígitos verificadores. Um celular BR sem país
+//               também tem 11 dígitos; o checksum separa os dois (um telefone quase nunca
+//               passa), então só sugerimos "parece CPF" quando o CPF é de fato válido.
 // Quando não há confiança suficiente (incompleto/ambíguo), devolve null.
 import type { TipoChavePix } from './enums'
 
@@ -31,6 +34,20 @@ export function detectarTipoChavePix(bruto: string): TipoChavePix | null {
     return 'telefone'
   }
   if (digitos.length === 14) return 'cnpj'
-  if (digitos.length === 11) return 'cpf'
+  if (cpfValido(digitos)) return 'cpf'
   return null
+}
+
+// Confere os dois dígitos verificadores do CPF. É o que separa um CPF de um celular BR
+// sem país (ambos com 11 dígitos): um telefone quase nunca fecha o checksum. Rejeita
+// também sequências repetidas (000…, 111…), que passam na conta mas não são CPF.
+function cpfValido(digitos: string): boolean {
+  if (digitos.length !== 11 || /^(\d)\1{10}$/.test(digitos)) return false
+  const dv = (ate: number): number => {
+    let soma = 0
+    for (let i = 0; i < ate; i++) soma += Number(digitos[i]) * (ate + 1 - i)
+    const resto = (soma * 10) % 11
+    return resto === 10 ? 0 : resto
+  }
+  return dv(9) === Number(digitos[9]) && dv(10) === Number(digitos[10])
 }
