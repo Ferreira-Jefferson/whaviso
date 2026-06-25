@@ -171,7 +171,16 @@ export default function NovoAvisoPage() {
                 <SegmentedControl
                   ariaLabel="Tipo de combinado"
                   value={field.value}
-                  onChange={field.onChange}
+                  onChange={(v) => {
+                    field.onChange(v)
+                    // Trocar a direção zera o Pix do form: cada modo (proprias x
+                    // externa) tem origem diferente. Sem isso, a chave própria
+                    // pré-selecionada em "receber" vazaria para o input de "pagar"
+                    // (o seletor remonta via key, mas value vem do form).
+                    setValue('pix_chave', '')
+                    setValue('pix_titular', '')
+                    setValue('pix_banco', '')
+                  }}
                   options={OPCOES_DIRECAO}
                   className="self-end"
                 />
