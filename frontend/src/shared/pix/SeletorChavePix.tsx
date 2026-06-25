@@ -164,16 +164,16 @@ function ChavesProprias({ onChange, erro, onDetalhes }: SeletorChavePixProps) {
               />
               <span className="min-w-0">
                 <span className="block truncate">
-                  <span className="text-tinta-2">{ROTULO_TIPO_CHAVE[c.tipo]} · </span>
-                  {c.chave}
-                  {c.rotulo ? ` · ${c.rotulo}` : ''}
+                  {[c.banco, ROTULO_TIPO_CHAVE[c.tipo]].filter(Boolean).join(' · ')}
                   {c.padrao ? ' (padrão)' : ''}
                 </span>
-                {(c.titular || c.banco) && (
-                  <span className="block truncate text-xs text-tinta-2">
-                    {[c.titular, c.banco].filter(Boolean).join(' · ')}
-                  </span>
+                {c.titular && (
+                  <span className="block truncate text-xs text-tinta-2">{c.titular}</span>
                 )}
+                <span className="block truncate text-xs text-tinta-2">
+                  {c.chave}
+                  {c.rotulo ? ` · ${c.rotulo}` : ''}
+                </span>
               </span>
             </label>
           ))}

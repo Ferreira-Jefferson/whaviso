@@ -293,22 +293,22 @@ function GerenciadorChavesPix() {
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm text-tinta">{c.chave}</span>
+                  <span className="truncate text-sm text-tinta">
+                    {[c.banco, ROTULO_TIPO_CHAVE[c.tipo]].filter(Boolean).join(' · ')}
+                  </span>
                   {c.padrao && (
                     <span className="shrink-0 rounded-full bg-salvia/10 px-2 py-0.5 text-xs text-salvia">
                       padrão
                     </span>
                   )}
                 </div>
-                <span className="block text-xs text-tinta-2">
-                  {ROTULO_TIPO_CHAVE[c.tipo]}
+                {c.titular && (
+                  <span className="block truncate text-xs text-tinta-2">{c.titular}</span>
+                )}
+                <span className="block truncate text-xs text-tinta-2">
+                  {c.chave}
                   {c.rotulo ? ` · ${c.rotulo}` : ''}
                 </span>
-                {(c.titular || c.banco) && (
-                  <span className="block truncate text-xs text-tinta-2">
-                    {[c.titular, c.banco].filter(Boolean).join(' · ')}
-                  </span>
-                )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 {!c.padrao && (
