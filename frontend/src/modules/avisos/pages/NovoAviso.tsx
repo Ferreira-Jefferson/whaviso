@@ -18,6 +18,7 @@ import {
 import { ApiError } from '@/shared/api_client'
 import type { CriarAvisoResposta, DirecaoAviso } from '@/shared/contracts'
 import { usePerfil } from '@/shared/auth'
+import { usePlanoSomenteLeitura } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
 import { useCriarAviso } from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
@@ -32,6 +33,9 @@ export default function NovoAvisoPage() {
   const navigate = useNavigate()
   const criar = useCriarAviso()
   const perfil = usePerfil()
+  // Plano que só mantém agenda (free, H4): não pode gerar convite (enviar). A UI esconde
+  // a ação de envio; a autoridade da restrição é a api. Flag do backend, nunca inferido.
+  const { somenteLeitura } = usePlanoSomenteLeitura()
   const [resultado, setResultado] = useState<CriarAvisoResposta | null>(null)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   const [limiteAtingido, setLimiteAtingido] = useState<string | null>(null)
@@ -287,8 +291,9 @@ export default function NovoAvisoPage() {
 
           <div className="flex flex-col gap-2 pt-1">
             <p className="text-xs text-tinta-2">
-              Gerar o convite envia o link de confirmação agora. Só salvar guarda o
-              combinado na sua agenda, sem enviar nada.
+              {somenteLeitura
+                ? 'Guarda o combinado na sua agenda, sem enviar nada. Para gerar o convite e enviar o link, escolha um plano.'
+                : 'Gerar o convite envia o link de confirmação agora. Só salvar guarda o combinado na sua agenda, sem enviar nada.'}
             </p>
             <div className="flex flex-wrap justify-end gap-2">
               <Button
@@ -300,20 +305,24 @@ export default function NovoAvisoPage() {
               </Button>
               <Button
                 type="button"
-                variante="secondary"
+                variante={somenteLeitura ? 'primary' : 'secondary'}
                 loading={isSubmitting && modo === 'agenda'}
                 onClick={() => salvar('agenda')}
               >
-                Apenas salvar
+                {somenteLeitura ? 'Salvar' : 'Apenas salvar'}
               </Button>
-              <Button
-                type="button"
-                variante="primary"
-                loading={isSubmitting && modo === 'enviar'}
-                onClick={() => salvar('enviar')}
-              >
-                Salvar e gerar convite
-              </Button>
+              {/* H4: o plano que só mantém agenda (free) não gera convite; a ação de envio
+                  some e "Apenas salvar" vira o "Salvar" primário. */}
+              {!somenteLeitura && (
+                <Button
+                  type="button"
+                  variante="primary"
+                  loading={isSubmitting && modo === 'enviar'}
+                  onClick={() => salvar('enviar')}
+                >
+                  Salvar e gerar convite
+                </Button>
+              )}
             </div>
           </div>
         </form>
