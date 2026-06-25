@@ -310,14 +310,28 @@ function LinhaProposta({ template }: { template: Template }) {
 }
 
 // Rótulos padrão por ação (ponto de partida no editor; o rótulo é editável).
+// Cobre TODO o enum acaoBotaoTemplate (é um Record exaustivo): cada ação tratada pelo
+// webhook do zap (ACOES_BOTAO) tem um default. Os textos seguem as Regras de Ouro.
 const ROTULO_PADRAO: Record<AcaoBotaoTemplate, string> = {
   ja_paguei: 'Já paguei',
   ver_pix: 'Ver chave Pix',
   optout: 'Não quero mais lembretes',
+  ativar: 'Ativar lembretes',
   aceite: 'Confirmar',
   recusa: 'Recusar',
   // 3ª opção do aceite (E5, gated): reservada para o convite por template Meta.
   dado_incorreto: 'Algum dado está incorreto',
+  // Confirmação de pagamento (E8): quem recebe confirma ou nega o recebimento.
+  confirmar: 'Confirmar pagamento',
+  rejeitar: 'Ainda não recebi',
+  // Cadastro de chave Pix pelo devedor (E14): pedido + wizard de chave.
+  solicitar_pix: 'Pedir chave Pix',
+  informar_pix: 'Informar chave',
+  pix_pular: 'Agora não',
+  pix_corrigir: 'Corrigir anterior',
+  pix_confirma_tipo: 'Confirmar',
+  pix_corrige_tipo: 'Corrigir tipo',
+  pix_confirmar: 'Confirmar',
 }
 
 interface BotaoEditavel {

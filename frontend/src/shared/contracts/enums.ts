@@ -86,16 +86,32 @@ export const contextoTemplate = z.enum(['padrao', 'revisao'])
 export type ContextoTemplate = z.infer<typeof contextoTemplate>
 
 // Ações de botão conhecidas pelo código (comportamento). O rótulo é editável no template.
+// Espelha o enum da api (@whaviso/shared acaoBotaoTemplate), que por sua vez espelha
+// ACOES_BOTAO do webhook do zap (a fonte da verdade de quais botões o transporte trata).
+// TODA ação semeada em algum template (mesmo via migration) precisa constar aqui: uma
+// única ação fora do enum derruba a validação Zod de GET /admin/mensagens (z.array falha
+// inteiro) e a tela de templates deixa de carregar.
+//
 // FRONTEIRA E5 (H12.3 / M3): 'dado_incorreto' é a terceira opção do aceite (aceitar /
-// algum dado incorreto / recusar), reservada para quando o convite por template Meta
-// (família convite.*) destravar no E5. O fluxo é GATED: nada a emite hoje.
+// algum dado incorreto / recusar), gated até o convite por template Meta (família
+// convite.*) destravar no E5; nada a emite hoje.
 export const acaoBotaoTemplate = z.enum([
   'ja_paguei',
-  'ver_pix',
   'optout',
+  'ver_pix',
+  'ativar',
   'aceite',
   'recusa',
   'dado_incorreto',
+  'confirmar',
+  'rejeitar',
+  'solicitar_pix',
+  'informar_pix',
+  'pix_pular',
+  'pix_corrigir',
+  'pix_confirma_tipo',
+  'pix_corrige_tipo',
+  'pix_confirmar',
 ])
 export type AcaoBotaoTemplate = z.infer<typeof acaoBotaoTemplate>
 

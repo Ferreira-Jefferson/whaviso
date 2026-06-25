@@ -83,21 +83,33 @@ export const contextoTemplate = z.enum(['padrao', 'revisao'])
 export type ContextoTemplate = z.infer<typeof contextoTemplate>
 
 // Ações de botão conhecidas pelo código (comportamento). O rótulo é editável no template.
+// Este enum é o REGISTRO de ações do produto (E12 é dono do modelo de botões/ações) e
+// espelha ACOES_BOTAO do webhook do zap (apps/zap/.../webhook_whatsapp/service.ts), a
+// fonte da verdade de quais botões o transporte sabe tratar. Manter os dois em sincronia:
+// uma ação semeada em template (via migration, que não passa pela validação da api) e
+// ausente aqui faz GET /admin/mensagens falhar a validação Zod no front e a tela de
+// templates não carregar.
 //
-// FRONTEIRA E5 (H12.3 / M3): o aceite tem TRÊS opções de botão (aceitar / algum dado
-// incorreto / recusar). 'aceite' e 'recusa' já existem; 'dado_incorreto' é a terceira,
-// reservada AQUI (E12 é dono do modelo de botões/ações) para o enum já comportar as
-// três quando o convite por template Meta (família convite.*) destravar no E5. O
-// FLUXO de 'dado_incorreto' (o que o botão dispara) é GATED: ainda não há chave
-// convite.* nem handler no webhook; nada o emite hoje. Quando E5 ligar o convite,
-// basta semear a chave e tratar a ação, sem migração nem alteração de enum.
+// FRONTEIRA E5 (H12.3 / M3): 'dado_incorreto' é a terceira opção do aceite (aceitar /
+// algum dado incorreto / recusar), gated até o convite por template Meta (família
+// convite.*) destravar no E5: o enum já a comporta; nada a emite hoje.
 export const acaoBotaoTemplate = z.enum([
   'ja_paguei',
-  'ver_pix',
   'optout',
+  'ver_pix',
+  'ativar',
   'aceite',
   'recusa',
   'dado_incorreto',
+  'confirmar',
+  'rejeitar',
+  'solicitar_pix',
+  'informar_pix',
+  'pix_pular',
+  'pix_corrigir',
+  'pix_confirma_tipo',
+  'pix_corrige_tipo',
+  'pix_confirmar',
 ])
 export type AcaoBotaoTemplate = z.infer<typeof acaoBotaoTemplate>
 
