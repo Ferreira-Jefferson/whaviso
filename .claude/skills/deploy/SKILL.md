@@ -36,9 +36,12 @@ Quando o usuário pedir "faça o deploy", "deploy", "publicar", "subir pra produ
 - `backend/.env` com `SUPABASE_PASSWORD` (senha do banco cloud, pooler session).
 - Deploy automático de pé: chave de CI no VPS + 3 secrets no GitHub
   (`DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `SSH_KNOWN_HOSTS`). Detalhes em deploy/CICD.md.
-- Opcional, para automação total: `gh` instalado e autenticado. Sem ele, a skill
-  dispara o deploy por push na `main` e valida por curl, pedindo ao usuário que
-  confirme o status na aba Actions (ele enxerga o run, a skill não lê o log sem gh).
+- `gh` (GitHub CLI) instalado e **autenticado** nesta máquina (`gh auth status` deve
+  dizer "Logged in as Ferreira-Jefferson"). Em terminais novos o `gh` está no PATH;
+  se algum shell não achar, chame pelo caminho completo
+  `"/c/Program Files/GitHub CLI/gh.exe"`. Com o `gh`, a skill **dispara e verifica o
+  deploy sozinha** (lê o run pelo Actions). Fallback sem `gh`: push na `main` +
+  validação por curl + pedir ao usuário que olhe a aba Actions e reporte.
 
 ## Passo 1: Diagnóstico (o que precisa ir?)
 
@@ -92,12 +95,22 @@ usuário antes do push na `main`**, é o ato que publica em produção.
 Forçar re-deploy do mesmo código (sem commit novo): disparar `workflow_dispatch`
 (botão "Run workflow" na Action, branch `main`, ou `gh workflow run cicd.yml --ref main`).
 
-Acompanhar o run:
-- **Com `gh`:** `gh run watch` no run mais recente da `main`; leia o job
-  "Deploy na Hostinger".
-- **Sem `gh`:** diga ao usuário pra acompanhar em
-  `https://github.com/Ferreira-Jefferson/whaviso/actions` (run da `main`) e reportar
-  o status dos 2 jobs. O deploy só roda se o gate ficar verde.
+Acompanhar o run (com `gh`, caminho padrão): pegue o run do commit que acabou de
+subir, espere terminar e leia os jobs:
+
+```bash
+RID=$(gh run list -R Ferreira-Jefferson/whaviso -b main -L 1 --json databaseId,headSha -q '.[0].databaseId')
+gh run watch "$RID" -R Ferreira-Jefferson/whaviso --exit-status   # bloqueia ate terminar; exit !=0 se falhou
+gh run view  "$RID" -R Ferreira-Jefferson/whaviso                 # mostra os 2 jobs + conclusao
+```
+
+Confira que o `RID` é do commit recém-empurrado (campo `headSha`); logo após o push o
+run pode levar uns segundos pra registrar. Se o shell não achar `gh`, use o caminho
+completo `"/c/Program Files/GitHub CLI/gh.exe"`. O deploy só roda se o gate ficar verde.
+
+Fallback sem `gh`: peça ao usuário pra acompanhar em
+`https://github.com/Ferreira-Jefferson/whaviso/actions` (run da `main`) e reportar
+o status dos 2 jobs.
 
 ## Passo 4: Validação (no fim, sempre)
 
@@ -109,7 +122,8 @@ curl -sS -m 20 https://api.whaviso.com/healthz    # espera {"ok":true,"servico":
 ```
 
 - SPA deve dar `200`; healthz deve dar `{"ok":true,"servico":"api"}`.
-- Com `gh`: confirme os 2 jobs verdes. Sem `gh`: confie no relato do usuário + nesse curl.
+- Faça o curl **depois** do `gh run watch` terminar (não no meio do deploy). O
+  `--exit-status` já diz se o run passou; confirme os 2 jobs com `gh run view`.
 - Emita um resumo claro **PASS/FAIL** do que foi aplicado (migrations) e publicado (código).
 
 Se o job de deploy falhar, reproduza o deploy do PC com a chave de CI para ver o log
