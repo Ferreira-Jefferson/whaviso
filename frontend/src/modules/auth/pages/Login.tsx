@@ -27,6 +27,10 @@ export default function LoginPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const next = params.get('next')
+  // Quem chega pelos botões de "Criar conta" traz ?modo=cadastro: muda só a copy
+  // do passo 1 (cadastrar x entrar). O passo 2 do OTP decide login/cadastro pelo
+  // status real do número, então não depende disso.
+  const modoCadastro = params.get('modo') === 'cadastro'
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   // null = ainda pedindo o telefone; string = já enviamos o código para este E.164.
   const [telefoneEnviado, setTelefoneEnviado] = useState<string | null>(null)
@@ -128,13 +132,16 @@ export default function LoginPage() {
   }
 
   // ---- Passo 1: escolher o método ----
+  const tituloPasso1 = modoCadastro ? 'Criar conta' : 'Entrar'
+  const subtituloPasso1 = WHATSAPP_LOGIN_ATIVO
+    ? modoCadastro
+      ? 'Crie sua conta com o Google ou o WhatsApp.'
+      : 'Use o Google ou o WhatsApp.'
+    : modoCadastro
+      ? 'Crie sua conta com o Google.'
+      : 'Entre com o Google.'
   return (
-    <AuthCard
-      titulo="Entrar"
-      subtitulo={
-        WHATSAPP_LOGIN_ATIVO ? 'Use o Google ou o WhatsApp.' : 'Entre com o Google.'
-      }
-    >
+    <AuthCard titulo={tituloPasso1} subtitulo={subtituloPasso1}>
       <div className="flex flex-col gap-4">
         {erroGeral && <Banner tom="erro">{erroGeral}</Banner>}
 

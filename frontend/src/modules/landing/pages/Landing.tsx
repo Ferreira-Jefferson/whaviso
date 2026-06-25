@@ -89,7 +89,7 @@ function CabecalhoMarketing() {
         >
           Entrar
         </Link>
-        <Link to="/entrar">
+        <Link to="/entrar?modo=cadastro">
           <Button>Criar conta</Button>
         </Link>
       </nav>
@@ -115,7 +115,7 @@ function Hero() {
             ainda falta.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/entrar">
+            <Link to="/entrar?modo=cadastro">
               <Button className="px-7 py-3 text-base">Começar de graça</Button>
             </Link>
             <a
@@ -401,7 +401,7 @@ function Planos() {
                       {p.permite_recorrente && <li>• Combinados recorrentes</li>}
                       {p.cadencia_configuravel && <li>• Cadência configurável</li>}
                     </ul>
-                    <Link to="/entrar" className="mt-auto">
+                    <Link to="/entrar?modo=cadastro" className="mt-auto">
                       <Button variante={destaque ? 'primary' : 'secondary'} className="w-full">
                         Escolher {p.nome}
                       </Button>
@@ -519,7 +519,7 @@ function ChamadaFinal() {
         <p className="max-w-prose text-papel/85">
           Crie sua conta em minutos e gere o primeiro combinado hoje mesmo.
         </p>
-        <Link to="/entrar">
+        <Link to="/entrar?modo=cadastro">
           <Button variante="secondary" className="px-7 py-3 text-base">
             Criar conta grátis
           </Button>
