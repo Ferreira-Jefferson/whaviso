@@ -56,7 +56,7 @@ Como **cobrador convidado**, quero conferir o combinado (inclusive a chave Pix) 
 ### H3.4: Respeitar o limite do plano ao criar 🟢
 Como **sistema (api)**, quero validar o limite do plano antes de criar o combinado invertido, para impedir uso acima do contratado.
 *Critérios de aceite:*
-- [ ] Vale a **mesma regra da H2.3**: free não cria (só visualiza); pessoal respeita o teto de ativos; checagem na **API**.
+- [ ] Vale a **mesma regra da H2.3**: free não cria (só visualiza); os planos pagos respeitam o teto de **vagas de aviso ativo** do plano vigente (Épico 11); checagem na **API**.
 - [ ] Combinados em estado terminal não contam para o limite de "ativos".
 - [ ] O limite considera os combinados onde sou o **criador**, independente do papel (receber ou pagar).
 

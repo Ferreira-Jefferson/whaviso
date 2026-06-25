@@ -52,7 +52,7 @@ Backend cumpre a história 03 integralmente. A única falha real está no FRONTE
 
 | Critério | Status | Evidência | Teste |
 |---|---|---|---|
-| Mesma regra da H2.3: free não cria (só visualiza); pessoal respeita teto; checagem na API | [x] | `exigirVagaDeAgenda` na transação `service.ts:131`; guard free | `avisos.test.ts:94-104` (free → plano_somente_leitura) |
+| Mesma regra da H2.3: free não cria (só visualiza); planos pagos respeitam o teto de vagas de aviso ativo; checagem na API | [x] | `exigirVagaDeAgenda` na transação `service.ts:131`; guard free | `avisos.test.ts:94-104` (free → plano_somente_leitura) |
 | Terminais não contam para "ativos" | [x] | `contarAtivos` exclui `pago/cancelado/recusado/expirado/sem_aviso` `planos/index.ts:187` | — |
 | Limite considera combinados onde sou o criador, independente do papel | [x] | `contarAtivos` por papel: `(criador_papel='cobrador' and cobrador_id=$1) or (criador_papel='devedor' and devedor_profile_id=$1)` `planos/index.ts:188-189` | `avisos.test.ts:106-148` (invertido conta, C1) |
 

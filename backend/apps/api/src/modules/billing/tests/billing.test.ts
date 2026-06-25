@@ -34,6 +34,7 @@ describe('billing (integração)', () => {
     expect(free.capacidade_agenda).toBe(50)
     expect(free.somente_leitura).toBe(true)
     expect(free.vagas_ativas).toBe(0) // 0 envios de aviso (somente leitura)
+    expect(free.totais_periodo).toBe(true) // totais por periodo virou base em todos os planos (0050)
 
     const start = planos.find((p) => p.id === 'start')!
     expect(start.preco_centavos).toBe(990)

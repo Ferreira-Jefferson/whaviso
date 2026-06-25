@@ -23,7 +23,7 @@ O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativaç
 | Free cria itens de agenda (sem_aviso) até o limite e visualiza tudo | [x] | `exigirCapacidadeDeAgenda` (sem guard free) no modo agenda (`service.ts:125-128`, `planos/index.ts:165-176`) | `modo_agenda.test.ts:143` (FREE cria agenda até 50) |
 | Free não ativa nada; ativar leva à CTA de upgrade, sem erro feio | [x] | `exigirVagaDeAtivo` lança `plano_somente_leitura` (`planos/index.ts:206-216`); chamado em ativar (`service.ts:292`) | `modo_agenda.test.ts:3` ("ativar ... free -> CTA") |
 | Menu de texto livre no free = silêncio | [x] | `donoTemMenuLiberado` lê `menu_texto_livre` (`zap webhook_whatsapp/repo.ts:123-136`); free=false silencia | `interacao_devedor.test.ts:27-30` |
-| Free não tem recorrência/cadência/totais; aparecem bloqueados/CTA, não somem | [x] | catálogo: free com tudo false (`0026:66-67`); front mostra recursos com check/minus (`Plano.tsx:374-376,301-312`) | `billing.test.ts:35` |
+| Free não tem recorrência/cadência; aparecem bloqueados/CTA, não somem | [x] | catálogo: free com recorrência/cadência/menu false (`0026:66-67`); front mostra recursos com check/minus. **Totais por período virou base** em todos os planos (0050) e saiu da lista de vantagens | `billing.test.ts:35` |
 | Nada no free dispara mensagem | [x] | gate free no envio (`exigirVagaDeAtivo`) + fila de saída checa `not somente_leitura` (`0041:81`) | (coberto pelos gates) |
 
 ### H11.3: Ativação de envio por plano
@@ -55,7 +55,7 @@ O catálogo de 4 planos, o balde único de agenda, os gates de criação/ativaç
 | Cadência configurável só Profissional e Plus (Free e Start não) | [x] | catálogo: free/start false, prof/plus true (`0026:67-73`); nota de dono em `planos/index.ts:43-46` | `billing.test.ts:40,44` |
 | Menu de texto livre habilitado nos pagos, silêncio no free | [x] | `menu_texto_livre` lido pelo zap (`webhook_whatsapp/repo.ts:123-136,819`) | `interacao_devedor.test.ts:27-30` |
 | Confirmação / informado_pago: free não recebe como cobrador (não ativa avisos) | [x] | estrutural: free não ativa (`exigirVagaDeAtivo`), logo não tem aviso a confirmar; alavanca `informado_pago_habilitado` publicada (`billing/index.ts:86`) | (coberto pelo gate de ativar) |
-| Histórico/totais por período recurso de pago; free vê o básico | [x] | `totais_periodo` no catálogo (free false, prof/plus true) (`0026`); consumido em `recebimentos/service.ts:195` | `billing.test.ts:45` |
+| Histórico completo / múltiplos clientes recurso de pago; totais por período é BASE | [x] | RESOLVIDO 2026-06-25: `totais_periodo` agora true em todos (0050), a consolidação do painel é base; histórico completo segue de pago | `billing.test.ts:45,49` |
 | Reengajamento manual: até 3 por combinado, nunca 2 no mesmo dia | [x] | `reengajamento_max` (start/prof/plus=3, free=0) (`0026:69-73`); mecânica em `recebimentos/service.ts:196-214` (teto + "1 hoje") | `confirmacao_pagamento_e8.test.ts` |
 | Cada recurso bloqueado aparece como CTA, não some | [x] | `Plano.tsx:301-312,374-376,457-460` | (front) |
 

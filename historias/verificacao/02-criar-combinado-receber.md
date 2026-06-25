@@ -43,7 +43,7 @@ O épico está implementado de ponta a ponta (api + contratos + migrations + fro
 | Critério | Status | Evidência (arquivo:linha) | Teste |
 |---|---|---|---|
 | Free não cria combinado (CTA de plano) | [x] | `planos/index.ts:134-145` (`plano_somente_leitura`); FE `NovoAviso.tsx:113-116` | `avisos.test.ts:94-104` (free → 422 plano_somente_leitura) |
-| Pessoal/teto de ativos; ao estourar erro `{error:{code,message}}` | [x] | `planos/index.ts:147-154` (`agenda_cheia`); `exigirVagaDeAtivo:218-225` (`limite_plano_atingido`) | `avisos.test.ts:78-92`; `avisos_e2.test.ts:307-330` (limite edições) |
+| Teto de vagas de aviso ativo (Start 10 / Profissional 25); ao estourar erro `{error:{code,message}}` | [x] | `planos/index.ts:147-154` (`agenda_cheia`); `exigirVagaDeAtivo:218-225` (`limite_plano_atingido`) | `avisos.test.ts:78-92`; `avisos_e2.test.ts:307-330` (limite edições) |
 | Checagem na API, não só UI | [x] | gate na transação `service.ts:125-132`; `planos/index.ts:119-156` | `avisos.test.ts:94-104,180-205` (corrida) |
 | Terminais não contam como ativos | [x] | `planos/index.ts:184-193` (`contarAtivos` exclui pago/cancelado/recusado/expirado/sem_aviso) | `avisos_e2.test.ts:398-409` (pausado/edição contam; terminais não) |
 

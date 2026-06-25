@@ -11,7 +11,7 @@
 ### H11.1: Catálogo de planos 🟢
 Como **owner/admin**, quero um catálogo de planos versionado, para que cada conta seja associada a um plano com limites e recursos bem definidos.
 *Critérios de aceite:*
-- [ ] Existe um catálogo de planos com, no mínimo, estas **alavancas** por plano: **vagas de aviso ativo**, **capacidade de agenda**, **recorrência habilitada (sim/não)**, **cadência configurável (sim/não)**, **menu de texto livre (sim/não)**, **confirmação de pagamento / `informado_pago` (sim/não)**, **histórico/totais por período (sim/não)**.
+- [ ] Existe um catálogo de planos com, no mínimo, estas **alavancas** por plano: **vagas de aviso ativo**, **capacidade de agenda**, **recorrência habilitada (sim/não)**, **cadência configurável (sim/não)**, **menu de texto livre (sim/não)**, **confirmação de pagamento / `informado_pago` (sim/não)**, **histórico completo (sim/não)**. (**Totais por período**, a consolidação do painel, **não** é alavanca: é base em todos os planos, ver H11.5.)
 - [ ] São **4 planos**: **Free**, **Start**, **Profissional** e **Plus** (chaves estáveis ex.: `free`, `start`, `profissional`, `plus`).
 - [ ] Cada plano tem **chave estável**, **nome de exibição** e **preço** (em centavos; pode ser 0): **Free R$ 0**, **Start R$ 9,90/mês**, **Profissional R$ 29,90/mês**, **Plus** vendido por **volume de envios** (de 26 a 200 envios de aviso, total de **R$ 31,10 a R$ 140,00**; o R$/envio cai conforme o volume sobe, ver H11.3 e a curva nas Decisões).
 - [ ] O catálogo vive em **migration (upsert idempotente)**, não no seed; mudar valor de plano é mudança de catálogo e exige `supabase db push` no cloud (ver CLAUDE.md / memória `whaviso-dev-db`).
@@ -26,7 +26,7 @@ Como **pessoa no plano free**, quero usar o Whaviso como agenda e visualizar tud
 - [ ] No free consigo **criar itens de agenda** (`sem_aviso`) até o limite do free (ver H11.4) e **visualizar** o painel inteiro (ver Épico 9).
 - [ ] No free **não consigo ativar** nenhum combinado (não gera convite, não dispara lembrete): a ação **ativar** leva à **CTA de upgrade** (H11.6), sem erro feio.
 - [ ] O menu de **texto livre** do devedor, no free, é **silêncio** (sem resposta automática a mensagem fora dos botões), ver Épico 7 H7.1.
-- [ ] Free **não tem** recorrência, cadência configurável nem totais por período; esses recursos aparecem como **bloqueados/CTA**, não somem da interface.
+- [ ] Free **não tem** recorrência nem cadência configurável; esses recursos aparecem como **bloqueados/CTA**, não somem da interface. (**Totais por período** é base: o free também consolida o painel, ver H11.5.)
 - [ ] Nada no free dispara mensagem ao devedor ou ao cobrador: free é estado **sem custo de envio**.
 
 ---
@@ -65,7 +65,8 @@ Como **sistema**, quero ligar/desligar recursos conforme o plano, para diferenci
 - [ ] **Cadência configurável** (Épico 6 H6.10): o **cobrador escolhe quais D-avisos** do ciclo são enviados (quais dias do D-2 a D+1); o **devedor do fluxo invertido** também pode configurar como quer receber as notificações. **Free e Start NÃO têm** essa opção (usam a cadência padrão); **Profissional e Plus** têm.
 - [ ] **Menu de texto livre** ao devedor (Épico 7 H7.1): habilitado nos planos pagos, **silêncio** no free.
 - [ ] **Confirmação de pagamento / `informado_pago`** (Épico 8): como o **free não ativa avisos**, ele **não recebe `informado_pago`** (não há devedor confirmando pagamento de um aviso que ele nem disparou). Como **devedor** de um aviso de outra conta, um usuário free só recebe o que decorre de ser devedor (lembretes, aviso de "pagamento informado/confirmado pelo cobrador"). O ciclo de confirmação como cobrador exige plano que ative envio.
-- [ ] **Histórico completo / totais por período / múltiplos clientes** (Épico 9): recurso de plano pago; no free o painel mostra o básico.
+- [ ] **Totais por período** (consolidação do painel: somar a receber / recebido / a pagar / pago num intervalo de datas) é **base, em TODOS os planos** (Free incluso). É table-stakes, não diferencial, e não entra na lista de vantagens dos planos.
+- [ ] **Histórico completo / múltiplos clientes** (Épico 9) seguem como recurso de plano pago; no free o painel mostra o básico fora a consolidação por período.
 - [ ] **Reengajamento manual pós-ciclo** (Épico 8 H8.3, "ainda não localizei o pagamento"): **até 3 envios por combinado**, **nunca dois no mesmo dia**.
 - [ ] Cada recurso bloqueado aparece como **CTA**, não some da interface (H11.6).
 
@@ -135,6 +136,7 @@ Como **pessoa assinante**, quero trocar de plano, para subir quando preciso de m
 - **`informado_pago` e dados do free persistem:** os dados ficam no banco normalmente (mesmo sem conta criada), pois são base para a agenda/combinados do cobrador; se a conta vier a ativar depois, nada se perde.
 - **Downgrade com excedente: mantém ativo** o que existe; só trava criar/ativar novos até voltar abaixo do limite.
 - **Preços:** Free R$ 0, Start R$ 9,90, Profissional R$ 29,90, Plus por volume de envios (curva linear no total): piso **26 envios = R$ 31,10** (R$ 1,196/envio, contínuo com o Profissional) ao topo **200 envios = R$ 140,00** (R$ 0,70/envio). O R$/envio cai progressivamente (~1,196 a 0,70) e fica **sempre acima do custo** (R$ 0,53 no pior caso), garantindo margem mesmo no topo. O Plus é parametrizado no catálogo por piso e topo, e o total intermediário é calculado por uma função única (`precoPorEnvioCentavos`). Catálogo: migration 0049.
+- **Totais por período é base (não diferencial):** a consolidação do painel por intervalo de datas está em **todos** os planos (Free incluso); saiu da lista de vantagens dos cartões (landing e painel do dono). A coluna `totais_periodo` segue no catálogo, agora uniforme = true (migration 0050). Decisão 2026-06-25.
 - **Anotações em estado terminal continuam contando** na agenda (a agenda registra o que aconteceu). O sistema nunca remove sozinho; só o usuário, manualmente (arquivamento, não DELETE físico).
 - **Validação no servidor** (defesa em profundidade): o front só antecipa; API+banco decidem.
 - **MVP = stub trial:** limites valem, cobrança em dinheiro é futura.

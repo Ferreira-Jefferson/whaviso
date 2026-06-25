@@ -378,7 +378,6 @@ function CartaoPlano({
         />
         <Recurso ativo={plano.permite_recorrente} rotulo="Combinados recorrentes" />
         <Recurso ativo={plano.cadencia_configuravel} rotulo="Cadência configurável" />
-        <Recurso ativo={plano.totais_periodo} rotulo="Totais por período" />
       </ul>
 
       <div className="pt-2">
@@ -462,7 +461,6 @@ function CartaoPlus({
         <Recurso ativo rotulo="Avisos automáticos no WhatsApp" />
         <Recurso ativo={plano.permite_recorrente} rotulo="Combinados recorrentes" />
         <Recurso ativo={plano.cadencia_configuravel} rotulo="Cadência configurável" />
-        <Recurso ativo={plano.totais_periodo} rotulo="Totais por período" />
       </ul>
 
       <div className="pt-2">

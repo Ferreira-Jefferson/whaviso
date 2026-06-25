@@ -35,6 +35,8 @@ curl 127.0.0.1:3001/healthz   # use 127.0.0.1 (há outro app no ::1 desta máqui
 ./scripts/scaffold_module.sh <api|zap> <nome>     # novo módulo (depois: 1 linha em src/routes.ts)
 ```
 
+> **Regra de commit + migrations no cloud:** ao fazer um `git commit` que envolva migrations novas ou alteradas, **pergunte** se deve também aplicar essas migrations no Supabase **cloud** (`supabase db push`, session pooler 5432, rodando de dentro de `backend/`). Nem o `git commit` nem o `git push` aplicam migration: esquema e dados de catálogo (ex.: planos) só mudam no app depois do `db push` no cloud.
+
 **Frontend** (rode de dentro de `frontend/`): `npm run dev` (Vite, :5173) · `npm run build` (estáticos p/ nginx na VPS) · `npm run lint` · `npm run typecheck`.
 
 Quirks desta máquina (Bash + Postgres no Windows): caminho do `psql` tem espaço → chame via função com aspas, não `$VAR`. Ao capturar saída do `psql`: `export PGCLIENTENCODING=UTF8` e `tr -d '\r'`. Se o `npm install` bloquear postinstall: `npm approve-scripts esbuild unrs-resolver && npm rebuild esbuild unrs-resolver`. Senha do superusuário Postgres em `backend/.env` (`POSTGRES_PASSWORD`). Env local: `backend/.env` (serve api+zap, vars prefixadas `API_*`/`ZAP_*`) e `frontend/.env` (`VITE_*`).

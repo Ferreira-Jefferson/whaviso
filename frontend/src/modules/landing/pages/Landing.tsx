@@ -12,7 +12,6 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { Button, Card, MoneyText, WhatsAppPreview, BellLogo, cn } from '@/shared/ui'
-import { brl } from '@/shared/format'
 import type { Plano } from '@/shared/contracts'
 import { usePlanos } from '../data'
 
@@ -401,7 +400,6 @@ function Planos() {
                       </li>
                       {p.permite_recorrente && <li>• Combinados recorrentes</li>}
                       {p.cadencia_configuravel && <li>• Cadência configurável</li>}
-                      {p.totais_periodo && <li>• Totais por período</li>}
                     </ul>
                     <Link to="/entrar" className="mt-auto">
                       <Button variante={destaque ? 'primary' : 'secondary'} className="w-full">
@@ -460,7 +458,6 @@ function CartaoPlusLanding({ p }: { p: Plano }) {
   const max = p.envios_max ?? 200
   const [envios, setEnvios] = useState(() => Math.min(Math.max(50, min), max))
   const total = precoEnvioCentavos(p, envios)
-  const porEnvio = brl(Math.round(total / envios))
 
   return (
     <Card className="flex h-full flex-col gap-4 border-salvia bg-cartao ring-2 ring-salvia/40">
@@ -473,7 +470,6 @@ function CartaoPlusLanding({ p }: { p: Plano }) {
           <MoneyText centavos={total} className="font-display text-3xl text-tinta" />
           <span className="text-sm text-tinta-2">/mês</span>
         </p>
-        <p className="mt-1 text-xs text-tinta-2">{porEnvio} por envio</p>
       </div>
 
       <div className="flex flex-col gap-2 rounded-card bg-papel-2 p-3">
@@ -502,7 +498,6 @@ function CartaoPlusLanding({ p }: { p: Plano }) {
         <li>• Avisos automáticos no WhatsApp</li>
         {p.permite_recorrente && <li>• Combinados recorrentes</li>}
         {p.cadencia_configuravel && <li>• Cadência configurável</li>}
-        {p.totais_periodo && <li>• Totais por período</li>}
       </ul>
 
       <Link to="/entrar" className="mt-auto">

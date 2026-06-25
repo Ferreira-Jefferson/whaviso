@@ -134,7 +134,6 @@ function PlanoCard({ plano }: { plano: Plano }) {
         <LinhaRecurso rotulo="Cadência configurável" ativo={plano.cadencia_configuravel} />
         <LinhaRecurso rotulo="Menu de texto livre" ativo={plano.menu_texto_livre} />
         <LinhaRecurso rotulo="Confirmação de pagamento" ativo={plano.informado_pago_habilitado} />
-        <LinhaRecurso rotulo="Totais por período" ativo={plano.totais_periodo} />
       </ul>
     </Card>
   )

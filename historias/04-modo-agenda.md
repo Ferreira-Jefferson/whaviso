@@ -73,7 +73,7 @@ Como **criador**, quero marcar como pago um combinado que ficou só na agenda, p
 
 ### Decisões tomadas
 - **Nome do estado:** `sem_aviso`, exibido como **"Sem aviso"**. Escolhido por dizer exatamente o que é: um combinado do qual nenhum aviso é enviado.
-- **Limite da agenda por plano** (capacidade própria, separada do limite de avisos ativos): **free 10**, **start 20**, planos por envio = **10 itens de agenda por envio do plano** (ex.: plano de 15 envios → 150 itens), **plano flexível até 2000**. Os nomes/valores finais dos planos ficam no Épico 11.
+- **Limite da agenda por plano** (capacidade própria, separada do teto de **vagas de aviso ativo**): **Free 50, Start 100, Profissional 150, Plus 1 item de agenda por envio contratado** (escala 1:1). Os tetos de vagas de aviso ativo (Free 0 / Start 10 / Profissional 25 / Plus 26 a 200) e os valores finais ficam no Épico 11.
 - **H4.5 no MVP:** sim. A agenda já nasce **completa e usável**, incluindo marcar como pago manualmente.
 
 ### Fora de escopo deste épico

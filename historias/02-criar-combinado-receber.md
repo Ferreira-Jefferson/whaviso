@@ -42,7 +42,7 @@ Como **cobrador**, quero receber uma mensagem pronta com número de convite e li
 Como **sistema (api)**, quero validar o limite do plano antes de criar, para impedir uso acima do contratado.
 *Critérios de aceite:*
 - [ ] Plano **free** não pode criar combinados (só visualizar); a tentativa retorna erro e a UI mostra CTA de plano (ver H1.5 e Épico 11).
-- [ ] Plano **pessoal** respeita o teto de avisos ativos (ex.: 5); ao estourar, retorna erro `{ error: { code, message } }`.
+- [ ] Os planos respeitam o **teto de vagas de aviso ativo** ("envios de aviso") do plano vigente (ex.: Start 10, Profissional 25, ver Épico 11); ao estourar, retorna erro `{ error: { code, message } }`.
 - [ ] A checagem acontece na **API**, não só na UI.
 - [ ] Combinados em estado terminal não contam para o limite de "ativos".
 
