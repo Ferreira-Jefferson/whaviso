@@ -190,17 +190,20 @@ const whatsappSessaoResposta = z.object({
 export type WhatsappStatus = z.infer<typeof whatsappStatus>
 export type WhatsappSessao = z.infer<typeof whatsappSessaoResposta>
 
-// Poll só ENQUANTO há uma intenção pendente (a tela disparou conectar/desconectar
-// e o banco ainda não refletiu o desfecho). Quem decide isso é a página, que
-// mantém a intenção local até o status real chegar ao destino (ver Conexao.tsx);
-// aqui só ligamos/desligamos o refetch de 1,5s. Fora disso é zero polling: o
-// status é manual pelo botão de recarregar. Evita o poll perpétuo (enxurrada/500).
+// Poll de 1,5s em duas situações: (1) há uma intenção pendente (a tela disparou
+// conectar/desconectar e o banco ainda não refletiu o desfecho); ou (2) o status
+// real é 'aguardando_qr', ou seja, o QR está na tela esperando a leitura. O caso
+// (2) é o que faz a conexão ser detectada SOZINHA: quando o owner escaneia, o zap
+// grava 'conectado' e o poll vira a tela na hora (sem clicar em atualizar); de
+// quebra, o QR rotacionado pelo Baileys também atualiza sozinho. Para de pollar ao
+// conectar ou ao voltar para desconectado ocioso, evitando o poll perpétuo.
 export function useWhatsappSessao(aguardando: boolean) {
   return useQuery<WhatsappSessao>({
     queryKey: adminKeys.whatsapp,
     retry: false,
     refetchOnWindowFocus: false,
-    refetchInterval: aguardando ? 1_500 : false,
+    refetchInterval: (query) =>
+      aguardando || query.state.data?.status === 'aguardando_qr' ? 1_500 : false,
     queryFn: ({ signal }) =>
       apiClient.get<WhatsappSessao>('/admin/whatsapp', {
         schema: whatsappSessaoResposta,

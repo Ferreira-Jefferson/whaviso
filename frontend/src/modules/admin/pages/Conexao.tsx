@@ -6,8 +6,10 @@
 // mantemos até o status REAL do banco chegar ao destino. Isso é necessário
 // porque `comando_pendente` zera no instante em que o zap CONSOME o comando,
 // antes de concluí-lo (gerar o QR / deslogar). Sem a intenção, a tela piscava de
-// volta nesse intervalo e exigia um segundo clique. Enquanto há intenção, a query
-// faz poll curto (useWhatsappSessao(true)); fora disso, status é manual (reload).
+// volta nesse intervalo e exigia um segundo clique. A query faz poll curto
+// enquanto há intenção E ENQUANTO o QR está na tela aguardando leitura
+// (status aguardando_qr): assim a conexão entra sozinha quando o owner escaneia,
+// sem clicar em atualizar. Conectado/desconectado ocioso = sem poll (reload manual).
 import { useEffect, useState } from 'react'
 import { Power, QrCode, RefreshCw, RotateCw, Smartphone } from 'lucide-react'
 import { Banner, Button, Card, PageHeader, Spinner, cn } from '@/shared/ui'
@@ -175,7 +177,9 @@ export default function ConexaoPage() {
               que cobre tanto a geração quanto o QR pronto). Três estados no MESMO
               lugar: 1. QR real (qrImg); 2. placeholder esmaecido (ícone de QR,
               claramente inválido) enquanto o QR não chegou; 3. spinner por cima
-              enquanto está gerando (conectando) ou atualizando (isFetching). */}
+              só enquanto está gerando (conectando) ou ainda sem QR. O poll de fundo
+              (a cada 1,5s aguardando a leitura) NÃO cobre o QR com spinner: senão
+              ele piscaria a cada busca; o "verificando" fica no botão de recarregar. */}
           {status === 'aguardando_qr' && (
             <div className="flex flex-col items-center gap-3 border-t border-linha pt-5">
               <div className="relative flex size-64 items-center justify-center overflow-hidden rounded-card border border-linha bg-cartao p-2">
@@ -185,7 +189,7 @@ export default function ConexaoPage() {
                   // Placeholder: um QR genérico e esmaecido, só para marcar o lugar.
                   <QrCode aria-hidden strokeWidth={1} className="size-40 text-linha" />
                 )}
-                {(conectando || isFetching || !qrImg) && (
+                {(conectando || !qrImg) && (
                   <div className="absolute inset-0 flex items-center justify-center bg-cartao/75">
                     <Spinner className="size-7" />
                   </div>
@@ -193,7 +197,7 @@ export default function ConexaoPage() {
               </div>
               <p className="text-center text-xs text-tinta-2">
                 No celular: WhatsApp → Aparelhos conectados → Conectar um
-                aparelho. Depois de escanear, clique em atualizar para confirmar.
+                aparelho. A confirmação aparece sozinha assim que você escanear.
                 Se o QR expirar, use Gerar novo QR.
               </p>
             </div>
