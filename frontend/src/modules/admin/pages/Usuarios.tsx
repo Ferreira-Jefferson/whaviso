@@ -27,6 +27,18 @@ const ROTULO_ROLE: Record<string, string> = {
   user: 'Cliente',
 }
 
+// Sufixo quando a assinatura não está vigente (status diferente de 'ativa').
+const SUFIXO_STATUS_PLANO: Record<string, string> = {
+  trial: ' (cortesia)',
+  cancelada: ' (cancelada)',
+}
+
+// O catálogo guarda o tipo do plano em minúsculas (free, start, profissional,
+// plus). Na tela mostramos capitalizado (Free, Start, ...).
+function rotuloPlano(planoId: string): string {
+  return planoId.charAt(0).toUpperCase() + planoId.slice(1)
+}
+
 export default function UsuariosPage() {
   const [params, setParams] = useSearchParams()
   const busca = params.get('busca') ?? ''
@@ -81,6 +93,20 @@ export default function UsuariosPage() {
       chave: 'role',
       titulo: 'Tipo',
       render: (u) => ROTULO_ROLE[u.role] ?? u.role,
+    },
+    {
+      chave: 'plano',
+      titulo: 'Plano',
+      render: (u) => {
+        if (!u.plano_id) return <span className="text-tinta-2">Sem plano</span>
+        const sufixo = (u.plano_status && SUFIXO_STATUS_PLANO[u.plano_status]) ?? ''
+        return (
+          <span>
+            {rotuloPlano(u.plano_id)}
+            {sufixo && <span className="text-tinta-2">{sufixo}</span>}
+          </span>
+        )
+      },
     },
     {
       chave: 'acoes',
