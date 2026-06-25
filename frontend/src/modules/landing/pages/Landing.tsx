@@ -104,19 +104,19 @@ function Hero() {
         <div className="animate-rise">
           <span className="inline-flex items-center gap-2 rounded-pill bg-salvia-claro px-3 py-1 text-sm font-medium text-salvia">
             <BellRing strokeWidth={1.75} className="size-4" />
-            Avise o combinado
+            Lembretes no automático
           </span>
           <h1 className="mt-5 font-display text-4xl leading-tight text-salvia sm:text-5xl">
-            Automatize seus avisos de pagamento. Saiba exatamente o que foi pago.
+            Você combina, o whaviso lembra por você.
           </h1>
           <p className="mt-4 max-w-prose text-lg text-tinta-2">
-            Cadastre o combinado, o whaviso agenda e dispara os avisos pelo
-            WhatsApp automaticamente, do D-2 até o dia seguinte. O painel
-            mostra tudo: pendente, confirmado, recebido.
+            Cadastre o combinado uma vez. O whaviso manda os lembretes pelo
+            WhatsApp na hora certa e mostra no painel quem já pagou e quem
+            ainda falta.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link to="/entrar">
-              <Button className="px-7 py-3 text-base">Começar agora</Button>
+              <Button className="px-7 py-3 text-base">Começar de graça</Button>
             </Link>
             <a
               href="#como-funciona"
@@ -126,7 +126,7 @@ function Hero() {
             </a>
           </div>
           <p className="mt-4 text-sm text-tinta-2">
-            Comece de graça. Não precisa instalar nenhum aplicativo.
+            Grátis para começar. Sem instalar nenhum aplicativo.
           </p>
         </div>
 
@@ -148,7 +148,7 @@ const PASSOS = [
     icone: CalendarClock,
     titulo: 'Você combina os detalhes',
     texto:
-      'Cadastre o nome, o valor, a data e (se quiser) sua chave Pix. Geramos um convite para a outra pessoa revisar e confirmar.',
+      'Cadastre o nome, o valor, a data e/ou sua chave Pix. Geramos um convite para a outra pessoa revisar e confirmar.',
   },
   {
     icone: MessageSquare,
