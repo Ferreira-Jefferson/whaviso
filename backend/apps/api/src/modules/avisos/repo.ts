@@ -28,6 +28,23 @@ const COLS = `
   aceito_em, arquivado_em, criado_em, atualizado_em
 `
 
+// Mesmas colunas (forma LinhaAviso), mas projetadas da VIEW combinado_linhas (E9 H9.6):
+// id = aviso_id; status/data_combinada/valor vêm da OCORRÊNCIA (linha_*); ocorrencia_atual
+// = índice da ocorrência (alimenta o badge "k de N" daquela linha). Usada só no filtro por
+// período; sem período a lista lê public.avisos (uma linha por combinado), via COLS.
+const COLS_VIEW = `
+  aviso_id as id, cobrador_id, devedor_profile_id, direcao, criador_papel,
+  linha_status as status,
+  nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador, motivo,
+  linha_valor::bigint as valor_centavos,
+  to_char(linha_data, 'YYYY-MM-DD') as data_combinada, pix_chave,
+  pix_titular, pix_banco,
+  recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
+  ocorrencias_total, indice as ocorrencia_atual,
+  cadencia_etapas::text[] as cadencia_etapas,
+  aceito_em, arquivado_em, criado_em, atualizado_em
+`
+
 interface LinhaAviso {
   id: string
   cobrador_id: string | null
@@ -173,6 +190,10 @@ export interface FiltroLista {
   /** H9.3: ordenação (default criado_em desc). */
   ordenar?: 'data_combinada' | 'criado_em'
   dir?: 'asc' | 'desc'
+  /** E9 H9.6: filtro por período (data da linha). Com de/ate, lê a VIEW combinado_linhas
+   *  (uma linha por OCORRÊNCIA do recorrente); sem de/ate, lê public.avisos (uma por combinado). */
+  de?: string
+  ate?: string
   limit: number
   offset: number
 }
@@ -181,6 +202,15 @@ export async function listarAvisos(
   ex: Executor,
   f: FiltroLista,
 ): Promise<{ itens: Aviso[]; total: number }> {
+  // Com período, a fonte é a VIEW de ocorrências (desmembra o recorrente, H9.6); sem
+  // período, é a tabela avisos (comportamento de sempre: uma linha por combinado).
+  const usaPeriodo = Boolean(f.de || f.ate)
+  const fonte = usaPeriodo ? 'public.combinado_linhas' : 'public.avisos'
+  const cols = usaPeriodo ? COLS_VIEW : COLS
+  // O nome da coluna de situação difere entre a view (linha_status) e a tabela (status).
+  const colStatus = usaPeriodo ? 'linha_status' : 'status'
+  const colData = usaPeriodo ? 'linha_data' : 'data_combinada'
+
   const cond: string[] = []
   const params: unknown[] = [f.uid]
   // Visibilidade por PAPEL (H9.1): cobrador = cobrador_id; devedor = devedor_profile_id;
@@ -190,11 +220,11 @@ export async function listarAvisos(
   else cond.push('(cobrador_id = $1 or devedor_profile_id = $1)')
   if (f.status) {
     params.push(f.status)
-    cond.push(`status = $${params.length}`)
+    cond.push(`${colStatus} = $${params.length}`)
   }
   if (f.estados && f.estados.length > 0) {
     params.push(f.estados as unknown as string[])
-    cond.push(`status = any($${params.length})`)
+    cond.push(`${colStatus} = any($${params.length})`)
   }
   if (f.direcao) {
     params.push(f.direcao)
@@ -208,17 +238,27 @@ export async function listarAvisos(
       `(nome_devedor ilike $${i} or coalesce(nome_cobrador,'') ilike $${i} or motivo ilike $${i})`,
     )
   }
+  if (f.de) {
+    params.push(f.de)
+    cond.push(`${colData} >= $${params.length}`)
+  }
+  if (f.ate) {
+    params.push(f.ate)
+    cond.push(`${colData} <= $${params.length}`)
+  }
   const where = cond.join(' and ')
   const total = await ex.query<{ n: string }>(
-    `select count(*) as n from public.avisos where ${where}`,
+    `select count(*) as n from ${fonte} where ${where}`,
     params,
   )
-  const colOrdem = f.ordenar === 'data_combinada' ? 'data_combinada' : 'criado_em'
+  const colOrdem = f.ordenar === 'data_combinada' ? colData : 'criado_em'
   const dirOrdem = f.dir === 'asc' ? 'asc' : 'desc'
+  // Na view, o índice agrupa as ocorrências do mesmo combinado de forma estável.
+  const desempate = usaPeriodo ? 'criado_em desc, indice asc' : 'criado_em desc'
   params.push(f.limit, f.offset)
   const { rows } = await ex.query<LinhaAviso>(
-    `select ${COLS} from public.avisos where ${where}
-     order by ${colOrdem} ${dirOrdem}, criado_em desc
+    `select ${cols} from ${fonte} where ${where}
+     order by ${colOrdem} ${dirOrdem}, ${desempate}
      limit $${params.length - 1} offset $${params.length}`,
     params,
   )

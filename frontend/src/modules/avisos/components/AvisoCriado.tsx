@@ -145,10 +145,10 @@ export function AvisoCriado({ resultado, onNovo }: AvisoCriadoProps) {
             Ver detalhe
           </Link>
           <Link
-            to="/app/avisos"
+            to="/app"
             className="rounded-pill px-4 py-2 text-sm font-medium text-tinta-2 hover:text-salvia hover:underline"
           >
-            Ir para a lista
+            Ir para o painel
           </Link>
         </div>
       </Card>

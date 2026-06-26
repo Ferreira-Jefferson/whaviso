@@ -1,5 +1,6 @@
 import { lazy } from 'react'
 
-export const ListaAvisosPage = lazy(() => import('./pages/ListaAvisos'))
+// A lista (ListaAvisos) foi consolidada no Painel (modules/painel). Este módulo
+// mantém só a criação e o detalhe do combinado.
 export const NovoAvisoPage = lazy(() => import('./pages/NovoAviso'))
 export const DetalheAvisoPage = lazy(() => import('./pages/DetalheAviso'))

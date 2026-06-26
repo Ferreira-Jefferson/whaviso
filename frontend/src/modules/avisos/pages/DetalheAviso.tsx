@@ -92,8 +92,8 @@ export default function DetalheAvisoPage() {
           titulo="Aviso não encontrado"
           descricao="Ele pode ter sido removido ou o link está incorreto."
           acao={
-            <Link to="/app/avisos" className="text-sm font-medium text-salvia hover:underline">
-              Voltar para a lista
+            <Link to="/app" className="text-sm font-medium text-salvia hover:underline">
+              Voltar ao painel
             </Link>
           }
         />
@@ -179,11 +179,11 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   return (
     <div className="animate-rise">
       <Link
-        to="/app/avisos"
+        to="/app"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-tinta-2 hover:text-salvia"
       >
         <ArrowLeft strokeWidth={1.75} className="size-4" />
-        Voltar para a lista
+        Voltar ao painel
       </Link>
 
       <PageHeader

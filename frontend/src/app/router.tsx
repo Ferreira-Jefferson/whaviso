@@ -5,6 +5,8 @@ import {
   createBrowserRouter,
   RouterProvider,
   Outlet,
+  Navigate,
+  useSearchParams,
 } from 'react-router'
 import { Spinner } from '@/shared/ui'
 import { PublicLayout } from './layouts/PublicLayout'
@@ -21,7 +23,7 @@ import { LandingPage } from '@/modules/landing'
 import { LoginPage, OnboardingPage } from '@/modules/auth'
 import { AcaoAvisoPage, SairLembretesPage } from '@/modules/aceite'
 import { PainelPage } from '@/modules/painel'
-import { ListaAvisosPage, NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
+import { NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
 import { CreditosPage } from '@/modules/billing'
 import { ContaPage } from '@/modules/conta'
 import {
@@ -56,6 +58,14 @@ function ComSuspense() {
       <Outlet />
     </Suspense>
   )
+}
+
+// A lista de avisos foi consolidada no Painel (/app). A rota antiga /app/avisos vira
+// um redirect que PRESERVA a query (papel/grupo/status/busca espelham os filtros do
+// Painel), para não quebrar links e favoritos. /app/avisos/novo e /:id continuam.
+function RedirectAvisos() {
+  const [params] = useSearchParams()
+  return <Navigate to={{ pathname: '/app', search: params.toString() }} replace />
 }
 
 const router = createBrowserRouter([
@@ -113,7 +123,7 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <PainelPage /> },
-          { path: 'avisos', element: <ListaAvisosPage /> },
+          { path: 'avisos', element: <RedirectAvisos /> },
           { path: 'avisos/novo', element: <NovoAvisoPage /> },
           { path: 'avisos/:id', element: <DetalheAvisoPage /> },
           { path: 'creditos', element: <CreditosPage /> },

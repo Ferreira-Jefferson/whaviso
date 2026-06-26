@@ -453,6 +453,8 @@ export async function listarAvisos(
     busca: query.busca,
     ordenar: query.ordenar,
     dir: query.dir,
+    de: query.de,
+    ate: query.ate,
     limit: query.per_page,
     offset: (query.page - 1) * query.per_page,
   })

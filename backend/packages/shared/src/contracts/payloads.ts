@@ -188,6 +188,11 @@ export const listarAvisosQuery = z.object({
   busca: z.string().trim().min(1).max(120).optional(),
   ordenar: z.enum(['data_combinada', 'criado_em']).default('criado_em'),
   dir: z.enum(['asc', 'desc']).default('desc'),
+  // E9 H9.6: filtro por periodo. Com de/ate, a lista desmembra o recorrente em uma
+  // linha por OCORRENCIA daquele periodo (data/status proprios); sem de/ate, uma linha
+  // por combinado. Mesmo periodo rege os totais (H9.2) na mesma pagina.
+  de: dataCombinada.optional(),
+  ate: dataCombinada.optional(),
   page: z.coerce.number().int().min(1).default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(20),
 })

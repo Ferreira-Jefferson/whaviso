@@ -170,7 +170,7 @@ export default function NovoAvisoPage() {
         titulo="Novo aviso"
         descricao="Combine os detalhes. No fim, gere o convite ou só salve o combinado."
         acoes={
-          <Button variante="ghost" onClick={() => navigate('/app/avisos')}>
+          <Button variante="ghost" onClick={() => navigate('/app')}>
             <ArrowLeft strokeWidth={1.75} className="size-4" />
             Voltar
           </Button>
@@ -365,7 +365,7 @@ export default function NovoAvisoPage() {
               <Button
                 type="button"
                 variante="ghost"
-                onClick={() => navigate('/app/avisos')}
+                onClick={() => navigate('/app')}
               >
                 Cancelar
               </Button>

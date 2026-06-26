@@ -1,7 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
-  Bell,
   PlusCircle,
   UserCircle,
   History,
@@ -34,10 +33,10 @@ export function secaoDaRota(pathname: string): Secao {
 }
 
 // Qual item do menu fica marcado para a rota atual. O `isActive` do NavLink marca
-// por prefixo, então `/app/avisos/novo` acende "Avisos" E "Novo" ao mesmo tempo.
-// Regra: entre os itens que casam (exato, ou prefixo com borda de segmento), só o
-// MAIS específico (maior `to`) fica ativo. Resolve criar (/novo) e detalhe (/:id)
-// numa só regra. `end` mantém o item preso ao match exato (ex.: Painel em /app).
+// por prefixo, então sem cuidado um pai acenderia junto com o filho. Regra: entre os
+// itens que casam (exato, ou prefixo com borda de segmento), só o MAIS específico
+// (maior `to`) fica ativo. `end` prende o item ao match exato (ex.: Painel em /app, que
+// não acende em /app/avisos/novo). O detalhe /app/avisos/:id não casa nenhum item.
 export function rotaAtiva(pathname: string, itens: NavItem[]): string | null {
   let melhor: string | null = null
   for (const { to, end } of itens) {
@@ -51,8 +50,9 @@ export function rotaAtiva(pathname: string, itens: NavItem[]): string | null {
 
 export const NAV_POR_SECAO: Record<Secao, NavItem[]> = {
   app: [
+    // O Painel (/app) agora reúne totais + a lista de combinados (a antiga aba
+    // "Avisos" saiu; /app/avisos redireciona para cá).
     { to: '/app', label: 'Painel', icon: LayoutDashboard, end: true },
-    { to: '/app/avisos', label: 'Avisos', icon: Bell },
     { to: '/app/avisos/novo', label: 'Novo', icon: PlusCircle },
     { to: '/app/creditos', label: 'Créditos', icon: CreditCard },
     { to: '/app/conta', label: 'Conta', icon: UserCircle },

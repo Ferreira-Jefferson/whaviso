@@ -18,37 +18,45 @@ export interface FiltroPeriodo {
  * estão em ATIVOS_NAO_PAGOS nem são `pago`). Isolamento por uid em todos os filtros.
  */
 export async function totaisPorPapel(pool: Pool, f: FiltroPeriodo): Promise<PainelResumoResposta> {
+  // E9 H9.6: com período, conta por OCORRÊNCIA (cada ocorrência soma no seu próprio
+  // período), lendo a VIEW combinado_linhas; sem período, conta por COMBINADO lendo
+  // public.avisos (comportamento de sempre; billing.useUsoAtivos chama sem período).
+  const usaPeriodo = Boolean(f.de || f.ate)
+  const fonte = usaPeriodo ? 'public.combinado_linhas' : 'public.avisos'
+  const vlr = usaPeriodo ? 'linha_valor' : 'valor_centavos'
+  const st = usaPeriodo ? 'linha_status' : 'status'
+  const dt = usaPeriodo ? 'linha_data' : 'data_combinada'
   const params: unknown[] = [f.uid]
   const periodo: string[] = []
   if (f.de) {
     params.push(f.de)
-    periodo.push(`and data_combinada >= $${params.length}`)
+    periodo.push(`and ${dt} >= $${params.length}`)
   }
   if (f.ate) {
     params.push(f.ate)
-    periodo.push(`and data_combinada <= $${params.length}`)
+    periodo.push(`and ${dt} <= $${params.length}`)
   }
   const p = periodo.join(' ')
   const { rows } = await pool.query(
     `select
-       coalesce(sum(valor_centavos) filter (
-         where cobrador_id=$1 and status in (${ATIVOS_SQL}) ${p}), 0)::bigint as a_receber_c,
+       coalesce(sum(${vlr}) filter (
+         where cobrador_id=$1 and ${st} in (${ATIVOS_SQL}) ${p}), 0)::bigint as a_receber_c,
        count(*) filter (
-         where cobrador_id=$1 and status in (${ATIVOS_SQL}) ${p})::int as a_receber_q,
-       coalesce(sum(valor_centavos) filter (
-         where cobrador_id=$1 and status='pago' ${p}), 0)::bigint as recebido_c,
-       count(*) filter (where cobrador_id=$1 and status='pago' ${p})::int as recebido_q,
-       coalesce(sum(valor_centavos) filter (
-         where devedor_profile_id=$1 and status in (${ATIVOS_SQL}) ${p}), 0)::bigint as a_pagar_c,
+         where cobrador_id=$1 and ${st} in (${ATIVOS_SQL}) ${p})::int as a_receber_q,
+       coalesce(sum(${vlr}) filter (
+         where cobrador_id=$1 and ${st}='pago' ${p}), 0)::bigint as recebido_c,
+       count(*) filter (where cobrador_id=$1 and ${st}='pago' ${p})::int as recebido_q,
+       coalesce(sum(${vlr}) filter (
+         where devedor_profile_id=$1 and ${st} in (${ATIVOS_SQL}) ${p}), 0)::bigint as a_pagar_c,
        count(*) filter (
-         where devedor_profile_id=$1 and status in (${ATIVOS_SQL}) ${p})::int as a_pagar_q,
-       coalesce(sum(valor_centavos) filter (
-         where devedor_profile_id=$1 and status='pago' ${p}), 0)::bigint as pago_c,
-       count(*) filter (where devedor_profile_id=$1 and status='pago' ${p})::int as pago_q,
+         where devedor_profile_id=$1 and ${st} in (${ATIVOS_SQL}) ${p})::int as a_pagar_q,
+       coalesce(sum(${vlr}) filter (
+         where devedor_profile_id=$1 and ${st}='pago' ${p}), 0)::bigint as pago_c,
+       count(*) filter (where devedor_profile_id=$1 and ${st}='pago' ${p})::int as pago_q,
        -- legado: contagem por estado no papel cobrador (billing.useUsoAtivos).
-       count(*) filter (where cobrador_id=$1 and status='programado' ${p})::int as qtd_prog,
-       count(*) filter (where cobrador_id=$1 and status='aguardando_aceite' ${p})::int as qtd_ag
-     from public.avisos
+       count(*) filter (where cobrador_id=$1 and ${st}='programado' ${p})::int as qtd_prog,
+       count(*) filter (where cobrador_id=$1 and ${st}='aguardando_aceite' ${p})::int as qtd_ag
+     from ${fonte}
      where (cobrador_id=$1 or devedor_profile_id=$1)`,
     params,
   )

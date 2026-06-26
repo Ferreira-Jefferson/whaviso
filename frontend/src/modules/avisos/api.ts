@@ -1,11 +1,6 @@
 // Camada de dados do módulo avisos: chamadas à `api` REST + hooks TanStack Query.
 // Estado de servidor 100% via React Query; dados só pelo api_client (nunca supabase.from).
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  keepPreviousData,
-} from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ApiError } from '@/shared/api_client'
 import {
   avisoSchema,
@@ -18,44 +13,21 @@ import {
   type AtivarAvisoBody,
   type CriarAvisoBody,
   type CriarAvisoResposta,
-  type DirecaoAviso,
   type EditarAvisoBody,
   type Envio,
   type EventoAviso,
   type Ocorrencia,
-  type PapelAviso,
   type StatusAviso,
 } from '@/shared/contracts'
 import { z } from 'zod'
 
-// A listagem do backend é um envelope paginado (não um array nu):
-// { itens: Aviso[], total, page, per_page }.
-const listaAvisosResposta = z.object({
-  itens: z.array(avisoSchema),
-  total: z.number().int(),
-  page: z.number().int(),
-  per_page: z.number().int(),
-})
-export type ListaAvisosResposta = z.infer<typeof listaAvisosResposta>
-
-export interface FiltrosLista {
-  status?: StatusAviso
-  direcao?: DirecaoAviso
-  /** H9.1: papel do usuário (cobre o invertido), não a direção. */
-  papel?: PapelAviso
-  /** H9.3/H9.8: faixa decidida no servidor (ativos/agenda/historico). */
-  grupo?: 'ativos' | 'agenda' | 'historico'
-  /** H9.3: busca por nome da outra ponta OU motivo (server-side). */
-  busca?: string
-  ordenar?: 'data_combinada' | 'criado_em'
-  dir?: 'asc' | 'desc'
-  page?: number
-  per_page?: number
-}
-
+// NOTA: a LISTA de combinados (useAvisos + tipos/filtros) mudou-se para o módulo
+// painel (modules/painel/api.ts), porque a página unificada /app (Painel) renderiza
+// totais + lista juntos e o lint feature-first proíbe o painel importar este módulo.
+// As mutations abaixo invalidam a raiz ['avisos'] (avisosKeys.todos), que é prefixo da
+// chave da lista lá: por isso uma ação aqui refaz a lista sem importação cruzada.
 export const avisosKeys = {
   todos: ['avisos'] as const,
-  lista: (filtros: FiltrosLista) => ['avisos', 'list', filtros] as const,
   detalhe: (id: string) => ['avisos', 'detail', id] as const,
   envios: (id: string) => ['avisos', 'envios', id] as const,
   eventos: (id: string) => ['avisos', 'eventos', id] as const,
@@ -69,30 +41,6 @@ const PAINEL_PREFIXO = ['painel'] as const
 const enviosResposta = z.array(envioSchema)
 const eventosResposta = z.array(eventoAvisoSchema)
 const ocorrenciasResposta = z.array(ocorrenciaSchema)
-
-/** GET /v1/avisos: lista paginada do cobrador (filtros por status/direção). */
-export function useAvisos(filtros: FiltrosLista) {
-  return useQuery({
-    queryKey: avisosKeys.lista(filtros),
-    queryFn: ({ signal }) =>
-      apiClient.get<ListaAvisosResposta>('/avisos', {
-        schema: listaAvisosResposta,
-        query: {
-          status: filtros.status,
-          direcao: filtros.direcao,
-          papel: filtros.papel,
-          grupo: filtros.grupo,
-          busca: filtros.busca,
-          ordenar: filtros.ordenar,
-          dir: filtros.dir,
-          page: filtros.page,
-          per_page: filtros.per_page,
-        },
-        signal,
-      }),
-    placeholderData: keepPreviousData,
-  })
-}
 
 /** POST /v1/avisos: cria um aviso; resposta traz { aviso, link_aceite }. */
 export function useCriarAviso() {

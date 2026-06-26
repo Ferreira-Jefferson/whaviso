@@ -92,6 +92,7 @@ Como **usuário com conta**, quero ver o progresso de um combinado recorrente e 
 - [ ] Cada ocorrência conta nos **totais (H9.2)** do **seu próprio período** (não soma todas no mês de criação).
 - [ ] Na visão **por combinado** (não temporal) e no **detalhe**, ele continua sendo **um único combinado** com suas N ocorrências; o desmembramento "uma linha por ocorrência" vale para as **visões/filtros por período**.
 - [ ] A fonte do progresso e do desmembramento por período é a tabela **`aviso_ocorrencias`** (Épico 8 H8.7 / Épico 6 H6.10): cada ocorrência tem índice, data e status próprios. O painel relê do banco; nada é recalculado no front (H9.8).
+- [ ] **Estado global do combinado manda nas ocorrências futuras ainda não pagas.** Quando o combinado está num estado que vale para o todo (`sem_aviso`, `aguardando_aceite`, `pausado`, `aguardando_aprovacao_aviso_editado`, `desregistrado`, `cancelado`, `recusado`, `expirado`), as ocorrências ainda `programado` aparecem (no filtro por período e nos totais) com **esse** estado: pausar/cancelar/etc. reflete nas parcelas futuras. As ocorrências que já avançaram (`informado_pago` ou `pago`) **mantêm o próprio status** (uma parcela já paga segue contando como recebido mesmo se o combinado for cancelado depois). O status por ocorrência só vale por si quando o combinado está no ciclo normal de pagamento (`programado`/`informado_pago`/`pago`), e nesse caso o `informado_pago`/`pago` da ocorrência **corrente** não contamina as futuras (que seguem `programado`).
 
 ---
 
@@ -136,6 +137,7 @@ Como **sistema (api + front)**, quero que o painel seja um espelho seguro do ban
 - **Linha do tempo** por combinado mostrando todos os eventos (incl. `solicitou_pix`, opt-out, reativação) e o **ator** de cada transição.
 - **Status de entrega** dos avisos visível (enviado/falha/retry), sem dado sensível.
 - **Painel só leitura + solicitação:** nenhuma regra de negócio no front; revalida após ação; free só visualiza; isolamento por usuário.
+- **Desmembramento por período: estado global manda nas ocorrências futuras.** No filtro por período, ocorrência ainda `programado` herda o estado global do combinado (pausado/cancelado/recusado/expirado/sem_aviso/etc.); ocorrência já `informado_pago`/`pago` mantém o próprio (decisão do produto, ver critério em H9.6). Sem filtro de período, o recorrente continua como **um combinado** (uma linha, badge "k de N").
 
 ### Decisões em aberto
 - **Visual/UX do painel** (layout, agrupamentos, como caber "precisa de você" + totais + listas sem poluir): precisa de **estudo de design**, usando a skill **frontend-designer** na fase de implementação e **sempre mantendo o design system** do produto (relacionado ao estudo de cadência da H6.10).
