@@ -118,14 +118,26 @@ Como **sistema (zap/scheduler)**, quero dar a cada combinado um horário própri
 
 ---
 
-### H6.10: Janela e cadência de envio configuráveis pelo criador 🟡 (precisa de estudo de design)
-Como **criador**, quero definir por quanto tempo e com que cadência os lembretes saem (por dia, semana ou mês, ou datas livres), para adaptar o aviso a cada combinado.
+### H6.10: Recorrência e cadência de envio configuráveis pelo criador 🟢 (design decidido; em implementação)
+Como **criador**, quero definir se o combinado se repete (e em quais datas) e quais lembretes saem em cada ocorrência, para adaptar o aviso a cada combinado.
 *Critérios de aceite:*
-- [ ] O **padrão** é o ciclo D-2 a D+1 (H6.2); quem não configurar nada usa esse padrão.
-- [ ] Na ativação/criação posso escolher **por quanto tempo** quero avisar e a **cadência** (ex.: diária, semanal, mensal) ou **datas avulsas**, com **total flexibilidade**.
-- [ ] A quantidade de envios resultante respeita o **limite de envios do plano** (Épico 11).
-- [ ] Etapa e agendamento continuam calculados no **servidor**; cada envio entra na outbox com seu timestamp e o mesmo horário reservado do combinado (H6.9).
-- [ ] **Design clean:** a tela precisa oferecer essa flexibilidade sem ficar poluída; o layout exige **estudo de UX** (dívida de design registrada no README).
+
+> Duas coisas distintas: **recorrência** (quantas vezes o combinado se repete) é um **facilitador disponível para todos** (não é diferencial de plano, Épico 11 H11.5); **cadência configurável** (`cadencia_configuravel`, quais D-avisos saem dentro de cada ocorrência) **é** recurso pago (Prof/Plus). O padrão (sem configurar nada) é **um combinado único** com o ciclo **D-2 a D+1** completo.
+
+**Recorrência (datas das ocorrências):**
+- [ ] O **padrão** é não repetir (combinado único, comportamento atual). Repetir é **opt-in**, atrás de um controle recolhido por padrão; **disponível em todos os planos** (não é gated). É só um atalho para registrar vários avisos do mesmo cliente.
+- [ ] Ligando a recorrência, escolho **por período** (frequência **mensal**, **semanal** ou **diária**, ancorada na "Data combinada", com fim por **N ocorrências** ou por **data limite**) **ou** **datas avulsas** (lista de datas livres, a primeira é a própria "Data combinada").
+- [ ] Cada ocorrência tem seu **próprio mini-ciclo de lembretes** ancorado na **data daquela ocorrência** (Épico 8 H8.7); o combinado só vira terminal `pago` no fim (H8.7).
+- [ ] A **tela mostra ao vivo** quantos avisos a regra gera e quanto isso consome de **vagas** (cada ocorrência reserva 1 vaga, Épico 11 H11.5); a **palavra final é do servidor** (recusa com envelope `{ error: { code, message } }`; no free, ativar/enviar cai na CTA, mas registrar na agenda é permitido).
+
+**Cadência (quais D-avisos):**
+- [ ] O **padrão** é o ciclo D-2, D-1, D, D+1 completo (H6.2); quem não configurar nada usa esse padrão.
+- [ ] Com `cadencia_configuravel`, o criador **escolhe quais etapas** do ciclo saem (um subconjunto de D-2..D+1); o **devedor do fluxo invertido** também pode ajustar como recebe. Sem a alavanca, usa o padrão.
+
+**Sempre:**
+- [ ] A quantidade de envios resultante respeita o **limite/vagas do plano** (Épico 11).
+- [ ] Etapa, ocorrência e agendamento são calculados **no servidor**; cada envio entra na outbox (`envios`) com seu `ocorrencia_id`, timestamp e o **mesmo horário reservado** do combinado (compartilhado entre ocorrências, H6.9/H8.7).
+- [ ] **Design clean:** o controle oferece a flexibilidade sem poluir, via revelação progressiva (recolhido por padrão); o desenho de UX está nas Decisões.
 
 ---
 
@@ -141,7 +153,7 @@ Como **criador**, quero definir por quanto tempo e com que cadência os lembrete
 - **Pausa por estados novos:** o ciclo precisa respeitar `pausado` e `aguardando_aprovacao_aviso_editado` (Épico 2/3), que ainda não existem na máquina de estados.
 - **Horário reservado por segundo (H6.9):** mecanismo novo de alocação de um segundo único por combinado na janela 8-18, com liberação (`null`) ao encerrar. Precisa de campo no `aviso`/`envios` e da lógica de busca de segundo livre. Não existe hoje.
 - **Distância mínima de 10 min por devedor (H6.9):** além da unicidade global de segundo, a busca precisa pular segundos a menos de 10 min de outro aviso ativo do **mesmo devedor**. Lógica nova; soma-se à fila de entrega com cancelamento (Épico 10 H10.9).
-- **Cadência configurável (H6.10):** hoje o ciclo é fixo D-2..D+1. Permitir janela/cadência custom é construção nova + estudo de UX.
+- **Recorrência e cadência configurável (H6.10):** hoje o ciclo é fixo D-2..D+1 num combinado único. Permitir recorrência (N ocorrências) e cadência custom (subconjunto de etapas) é construção nova: schema novo (ver Decisões), expansão lazy no scheduler do zap e seletor no front. A `envios` ganha `ocorrencia_id` e o unique `(aviso_id, etapa)` passa a `(ocorrencia_id, etapa)` para o recorrente (via índices parciais).
 - **Textos editáveis e neutros:** os textos das etapas e o empurrãozinho de D+1 vêm da tabela `templates` (Épico 12), garantidos neutros de gênero, sem travessão e sem palavras proibidas.
 
 ### Decisões tomadas
@@ -154,9 +166,18 @@ Como **criador**, quero definir por quanto tempo e com que cadência os lembrete
 - **Distância mínima de 10 min por devedor (H6.9):** dois avisos do mesmo devedor ficam a pelo menos 10 min; a busca pula segundos perto demais de outro aviso ativo do mesmo devedor (fallback aleatório se não couber).
 - **Retry de envio (H6.8):** 3 tentativas, intervalo aleatório de 20 a 60 segundos.
 - **Texto muda em `informado_pago`:** o único texto possível é o empurrãozinho de D+1.
+- **Recorrência e cadência (H6.10): design e schema decididos (2026-06-25).**
+  - **UX (revelação progressiva, design clean):** a tela de criar continua igual por padrão (combinado único, uma "Data combinada"). Um controle **"Repetir este combinado"** fica recolhido logo abaixo da data, **disponível em todos os planos** (recorrência é facilitador, não diferencial, H11.5; não é bloqueado/CTA). Aberto, oferece duas abas: **Por período** (frequência mensal/semanal/diária ancorada na Data combinada, fim por **N ocorrências** ou **data limite**) e **Datas avulsas** (lista de datas, a 1ª é a Data combinada). Um resumo **ao vivo** mostra quantos avisos a regra gera e quantas **vagas** consome (cada ocorrência = 1 vaga). A **cadência** (quais D-avisos) é um seletor das etapas D-2..D+1, esse sim habilitado só com `cadencia_configuravel` (Prof/Plus).
+  - **Schema `avisos` (colunas novas):** `recorrencia_tipo` (`null` simples | `periodo` | `avulsas`), `recorrencia_freq` (`mensal`|`semanal`|`diaria`, só em `periodo`), `recorrencia_intervalo` (int, default 1, "a cada N"), `ocorrencias_total` (int, N), `ocorrencia_atual` (int, ponteiro 1..N), `cadencia_etapas` (array de `etapa_envio`, `null` = ciclo completo). Sem coluna de billing: recorrência não é gated.
+  - **Tabela nova `aviso_ocorrencias`:** `id`, `aviso_id` (FK avisos), `indice` (1..N), `data_combinada` (date, a data daquela ocorrência), `status` (espelha o subconjunto do ciclo: `programado`/`informado_pago`/`pago`), `confirmado_em`, `confirmado_por`, `criado_em`. `unique (aviso_id, indice)`. Append-only de negócio (sem DELETE; cascade do aviso permitido).
+  - **`envios` ganha `ocorrencia_id` (uuid, null para combinado simples).** O `unique (aviso_id, etapa)` de hoje vira **dois índices parciais**: `(aviso_id, etapa) where ocorrencia_id is null` (preserva o simples) e `(ocorrencia_id, etapa) where ocorrencia_id is not null` (um ciclo por ocorrência).
+  - **Geração lazy:** ao aceitar/ativar, o servidor calcula e grava as **N linhas** de `aviso_ocorrencias` (datas em America/Sao_Paulo), mas gera o **mini-ciclo só da ocorrência 1**. Ao confirmar a ocorrência k (k<N): avança `ocorrencia_atual` para k+1, o aviso volta a `programado` e o scheduler gera o mini-ciclo da k+1 com o **mesmo horário reservado** (não realoca, não vira `null`). A última confirmação leva a `pago` terminal e libera o horário (`null`).
+  - **Por período (cálculo de datas):** a partir da Data combinada, soma freq×intervalo em SP. Mensal mantém o **mesmo dia**; se o mês não tiver aquele dia (ex.: 31), usa o **último dia do mês**. Semanal/diária somam dias corridos. Tudo no servidor.
+  - **Cadência:** `cadencia_etapas` filtra quais etapas o cálculo de agendamentos gera por ocorrência (`null` = todas). Vale também para o devedor do fluxo invertido.
+  - **Servidor é autoridade:** datas, etapas, horário e contagem de vagas no servidor; o front nunca calcula ocorrência (mesma postura de H8.9/H9.8).
 
 ### Decisões em aberto
-- **H6.10 (cadência configurável):** precisa de **estudo de design/UX** para caber flexibilidade total numa tela clean; modelagem de dados da cadência custom a definir.
+- ~~**H6.10 (cadência configurável)**~~ **resolvida (2026-06-25):** design de UX e schema acima (recorrência por período/datas avulsas + cadência por subconjunto de etapas; tabela `aviso_ocorrencias` + `envios.ocorrencia_id`).
 - **Confirmar bloqueio do WhatsApp por "Pix" em rótulo** (H6.2): valida se "Chave de Pag." é mesmo necessário.
 
 ### Fora de escopo deste épico

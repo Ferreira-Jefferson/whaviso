@@ -40,6 +40,11 @@ export type TipoNotificacao =
   | 'status_alterado'
   | 'rejeicao'
   | 'reengajamento'
+  // E8 H8.7 (recorrente): confirmação de uma ocorrência INTERMEDIÁRIA (k < N). Usa o
+  // template `devedor.encerramento` na variante 'revisao' ("pagamento deste mês
+  // confirmado, o próximo lembrete chega perto da próxima data"). O aviso NÃO vira pago
+  // (volta a `programado`), então não compartilha a janela de reversão do `encerramento`.
+  | 'encerramento_recorrente'
 
 type Papel = 'cobrador' | 'devedor'
 
@@ -105,6 +110,9 @@ const EVENTO_FONTE: Partial<Record<TipoNotificacao, string>> = {
   // (a janela é tratada por coalesce_grupo + reconferência de estado no drainer).
   rejeicao: 'rejeitado_cobrador',
   status_alterado: 'reaberto_cobrador',
+  // E8 H8.7: cada ocorrência confirmada grava um `confirmado_cobrador`; a contagem deles
+  // dá a ocorrência da dedupe_key (1 mensagem de "pagamento deste mês" por ocorrência).
+  encerramento_recorrente: 'confirmado_cobrador',
 }
 
 async function ocorrenciaAtual(cli: PoolClient, avisoId: string, tipo: TipoNotificacao): Promise<number> {

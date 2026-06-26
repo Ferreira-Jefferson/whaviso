@@ -12,6 +12,7 @@ import {
   criarAvisoResposta,
   envioSchema,
   eventoAvisoSchema,
+  ocorrenciaSchema,
   statusAviso,
   type Aviso,
   type AtivarAvisoBody,
@@ -21,6 +22,7 @@ import {
   type EditarAvisoBody,
   type Envio,
   type EventoAviso,
+  type Ocorrencia,
   type PapelAviso,
   type StatusAviso,
 } from '@/shared/contracts'
@@ -57,6 +59,7 @@ export const avisosKeys = {
   detalhe: (id: string) => ['avisos', 'detail', id] as const,
   envios: (id: string) => ['avisos', 'envios', id] as const,
   eventos: (id: string) => ['avisos', 'eventos', id] as const,
+  ocorrencias: (id: string) => ['avisos', 'ocorrencias', id] as const,
 }
 
 // Prefixo das queries do painel financeiro. Invalidado após mutações que mudam
@@ -65,6 +68,7 @@ const PAINEL_PREFIXO = ['painel'] as const
 
 const enviosResposta = z.array(envioSchema)
 const eventosResposta = z.array(eventoAvisoSchema)
+const ocorrenciasResposta = z.array(ocorrenciaSchema)
 
 /** GET /v1/avisos: lista paginada do cobrador (filtros por status/direção). */
 export function useAvisos(filtros: FiltrosLista) {
@@ -164,11 +168,27 @@ export function useAvisoEventos(id: string) {
   })
 }
 
-/** Invalida detalhe + envios + eventos + lista + resumo após uma ação. */
+/**
+ * GET /v1/avisos/:id/ocorrencias (E8 H8.7 / E9 H9.6): as ocorrências de um combinado
+ * recorrente (índice, data e status de cada k), para o detalhamento "k de N". Mesma
+ * degradação graciosa quando o endpoint não existe (combinado simples não tem ocorrências
+ * e a api responde lista vazia; um backend antigo daria 404 e a UI só não mostra a lista).
+ */
+export function useAvisoOcorrencias(id: string, habilitado = true) {
+  return useQuery({
+    queryKey: avisosKeys.ocorrencias(id),
+    enabled: habilitado,
+    queryFn: ({ signal }) =>
+      buscarColecaoOpcional<Ocorrencia>(`/avisos/${id}/ocorrencias`, ocorrenciasResposta, signal),
+  })
+}
+
+/** Invalida detalhe + envios + eventos + ocorrências + lista + resumo após uma ação. */
 function invalidarTudo(qc: ReturnType<typeof useQueryClient>, id: string) {
   void qc.invalidateQueries({ queryKey: avisosKeys.detalhe(id) })
   void qc.invalidateQueries({ queryKey: avisosKeys.envios(id) })
   void qc.invalidateQueries({ queryKey: avisosKeys.eventos(id) })
+  void qc.invalidateQueries({ queryKey: avisosKeys.ocorrencias(id) })
   void qc.invalidateQueries({ queryKey: avisosKeys.todos })
   void qc.invalidateQueries({ queryKey: PAINEL_PREFIXO })
 }
@@ -353,4 +373,4 @@ export function useMarcarPagoAgenda(id: string) {
   })
 }
 
-export type { Aviso, Envio, EventoAviso }
+export type { Aviso, Envio, EventoAviso, Ocorrencia }

@@ -82,7 +82,7 @@ export async function aceitarAvisoDireto(avisoId: string, devedorUid?: string): 
     await poolSuper.query(
       `insert into public.envios (aviso_id, etapa, status, agendado_para)
        values ($1,$2,'agendado', now() + interval '1 day')
-       on conflict (aviso_id, etapa) do nothing`,
+       on conflict (aviso_id, etapa) where ocorrencia_id is null do nothing`,
       [avisoId, etapa],
     )
   }

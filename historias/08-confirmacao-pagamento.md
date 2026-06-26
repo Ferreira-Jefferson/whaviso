@@ -82,16 +82,18 @@ Como **cobrador**, quero poder reabrir um combinado que marquei como pago sem qu
 
 ---
 
-### H8.7: Combinados recorrentes: confirmação por ocorrência 🟡 (depende de H6.10)
+### H8.7: Combinados recorrentes: confirmação por ocorrência 🟢 (modelagem decidida; em implementação)
 Como **cobrador** de um combinado recorrente, quero confirmar o pagamento de cada ocorrência sem encerrar o acordo todo, para o combinado seguir vivo até o fim do período.
 *Critérios de aceite:*
 - [ ] Um combinado recorrente tem **N ocorrências** (ex.: todo dia 10 por 5 meses = 5 ocorrências), cada uma com seu próprio mini-ciclo de lembretes ancorado na data daquela ocorrência (Épico 6).
+- [ ] **Modelagem (decidida):** o combinado segue sendo **um aviso** (uma linha em `avisos`, uma anotação de agenda) com uma tabela filha **`aviso_ocorrencias`** (uma linha por ocorrência: índice 1..N, data daquela ocorrência, status e confirmação próprios). O `status` do `aviso` **reflete a ocorrência corrente** (`programado`/`informado_pago`); o aviso só vira `pago` terminal na **última** ocorrência. Os `envios` ganham `ocorrencia_id` e o ciclo é gerado **por ocorrência** (lazy): ao confirmar a ocorrência k, o scheduler gera o mini-ciclo da k+1. Detalhe completo do schema no Épico 6 H6.10 (Decisões).
 - [ ] A cada ocorrência: o devedor pode informar pagamento (`informado_pago`) e o cobrador confirma/rejeita, **sem** levar o combinado a terminal.
 - [ ] Confirmar a ocorrência **k** (k < N) fecha **só aquela ocorrência**; o combinado volta a aguardar a **próxima** ocorrência (`programado`), mantendo o **mesmo horário reservado** (não vira `null` entre ocorrências).
 - [ ] Só a confirmação da **última ocorrência** (ou o fim do período) leva o combinado a **`pago` terminal**; só aí o horário reservado vira `null`.
 - [ ] O painel mostra o **progresso** do recorrente (ex.: "3 de 5 pagamentos confirmados") e o status da ocorrência corrente (Épico 9).
 - [ ] Marcar como pago direto (H8.4) e reabrir (H8.6) valem **por ocorrência**.
-- [ ] 🟡 A própria recorrência (definir "todo dia 10 por 5 meses", por dia/semana/mês ou datas avulsas) depende do **estudo de cadência configurável (Épico 6 H6.10)**, ainda não ligado; a lógica de confirmação por ocorrência descrita aqui pressupõe esse mecanismo.
+- [ ] A própria recorrência (definir "todo dia 10 por 5 meses", por dia/semana/mês ou datas avulsas) é configurada na criação/ativação pelo **seletor de recorrência decidido no Épico 6 H6.10**; a lógica de confirmação por ocorrência descrita aqui se apoia nesse mecanismo.
+- [ ] **Custo de vaga de plano:** cada **ocorrência reserva 1 vaga de aviso ativo** (Épico 11 H11.5), liberada quando a ocorrência vira `pago`. Recorrência **não é diferencial de plano** (é facilitador para registrar vários avisos do mesmo cliente); é só metrificada por ocorrência, como qualquer aviso.
 
 ---
 
@@ -123,7 +125,7 @@ Como **sistema (api)**, quero registrar e validar cada mudança de estado ligada
 
 - **`informado_pago` não dispara o ciclo:** CLAUDE.md/PROJETO.md dizem "não-terminal, lembretes continuam"; pela história os lembretes **param** (só o empurrãozinho de D+1). Mesma divergência do Épico 6 H6.5.
 - **Renomear `pendente` → `programado`:** `informado_pago → pendente` e `pago → pendente` do CLAUDE.md viram `… → programado`. Mesma dívida de varredura no código/docs (README).
-- **Combinados recorrentes (H8.7):** a máquina de estados atual não modela ocorrências múltiplas. Confirmar "por ocorrência" sem encerrar o combinado, e só virar terminal no fim, é **construção nova**, acoplada à cadência configurável (Épico 6 H6.10, 🟡). Pode exigir uma tabela de ocorrências/pagamentos ligada ao `aviso`.
+- **Combinados recorrentes (H8.7):** a máquina de estados atual não modela ocorrências múltiplas. **Decidido:** tabela filha **`aviso_ocorrencias`** ligada ao `aviso` (índice, data, status e confirmação por ocorrência) + `envios.ocorrencia_id`; o `status` do aviso reflete a ocorrência corrente e só vira terminal `pago` na última. Confirmar "por ocorrência" avança o ponteiro para a próxima ocorrência (volta a `programado`) e o scheduler gera o mini-ciclo dela (geração lazy). Schema completo no Épico 6 H6.10 (Decisões). Construção nova, em implementação nesta rodada.
 - **Horário reservado: liberar só no fim + campo recuperável (H8.1/H8.6/H8.7):** o Épico 6 H6.9 dizia liberar (`null`) ao virar `pago`. Refinamento: em recorrentes o horário **só vira `null` no fim**; e em qualquer reabertura o horário **original** precisa ser guardado em um **campo recuperável** para ser **reusado igual** na reabertura, **fora** da regra de escolha de timestamp (aceitando colisão). H6.9 precisa desse campo extra (cross-ref atualizado no Épico 6).
 - **Janela de reversão de 1 minuto na confirmação (H8.1/H8.6):** a mensagem de encerramento ao devedor atrasa ~1 min para o cobrador reverter; reabrir antes cancela a mensagem, reabrir depois manda uma 2ª mensagem de "status alterado". Lógica nova de agendamento de mensagem (paralela à do opt-out, Épico 7).
 - **Confirmar/rejeitar por botão no WhatsApp para qualquer cobrador (H8.5):** não só cobrador sem conta. Precisa de notificação com botões (Confirmar / Ainda não recebi) e roteamento por telefone (profile ou `telefone_cobrador`). Hoje a confirmação é pensada só pelo painel.
@@ -137,13 +139,13 @@ Como **sistema (api)**, quero registrar e validar cada mudança de estado ligada
 - **Cobrador marca como pago direto** (`programado → pago`), sem depender do "Já paguei".
 - **Qualquer cobrador confirma/rejeita por botão no WhatsApp** (não só quem não tem conta); quem tem conta também usa o painel.
 - **Janela de 1 minuto** para o cobrador reverter antes de a mensagem ao devedor sair (confirmar/marcar pago); reabrir antes cancela a mensagem, reabrir depois gera mensagem de "status alterado".
-- **Recorrência:** confirmação por ocorrência; terminal e liberação do horário só no fim do período (H8.7, 🟡 ligado à H6.10).
+- **Recorrência (modelagem decidida 2026-06-25):** confirmação **por ocorrência** via tabela filha **`aviso_ocorrencias`** (índice 1..N, data, status próprio); o aviso continua **uma linha/anotação**, com `status` refletindo a ocorrência corrente e **horário reservado compartilhado**; terminal `pago` e liberação do horário (`null`) só na **última** ocorrência. Marcar pago direto (H8.4) e reabrir (H8.6) agem na **ocorrência corrente**. Ciclo gerado **por ocorrência** (lazy, Épico 6 H6.10). Recorrência é **facilitador, não diferencial de plano**: cada ocorrência reserva 1 vaga de aviso ativo (Épico 11 H11.5).
 - **Reuso de horário na reabertura:** horário original guardado em campo recuperável e reusado igual, fora da regra de timestamp.
 - **Defesa em profundidade:** nenhuma regra de negócio no front; o front exibe o banco e solicita a mudança, a API + o trigger validam e gravam (aberto a refino mantendo idempotência/segurança).
 
 ### Decisões em aberto
-- **Limite de reengajamentos manuais (H8.3)** por plano: a definir no Épico 11.
-- **Modelagem da recorrência (H8.7):** depende do estudo de cadência configurável (Épico 6 H6.10); tabela de ocorrências/pagamentos a definir.
+- **Limite de reengajamentos manuais (H8.3)** por plano: definido no Épico 11 (até 3 por combinado, nunca dois no mesmo dia).
+- ~~**Modelagem da recorrência (H8.7)**~~ **resolvida (2026-06-25):** tabela `aviso_ocorrencias` + `envios.ocorrencia_id`, horário compartilhado, ciclo lazy por ocorrência, terminal só no fim. Schema no Épico 6 H6.10.
 
 ### Fora de escopo deste épico
 - ❌ Texto, canal e janela das notificações ao cobrador (incl. cobrador sem conta) (Épico 10).

@@ -4,7 +4,7 @@
 // vem da API e SOLICITA filtros; nenhuma regra de negócio/cálculo de transição aqui.
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { Inbox, Plus, Search } from 'lucide-react'
+import { Inbox, Plus, Repeat, Search } from 'lucide-react'
 import {
   Button,
   EmptyState,
@@ -143,10 +143,22 @@ export default function ListaAvisosPage() {
       titulo: 'Nome',
       principal: true,
       render: (a) => (
-        <span className="font-medium">
+        <span className="inline-flex items-center gap-2 font-medium">
           {a.criador_papel === 'devedor' && papel === 'devedor'
             ? (a.nome_cobrador ?? a.nome_devedor)
             : a.nome_devedor}
+          {/* E6 H6.10: combinado recorrente. Progresso "k de N" direto do que a api
+              manda (ocorrencia_atual/ocorrencias_total); o front não recalcula. */}
+          {a.ocorrencias_total != null && a.ocorrencias_total > 1 && (
+            <span
+              className="inline-flex items-center gap-1 rounded-pill bg-salvia-claro px-2 py-0.5 text-xs font-normal text-salvia"
+              title="Combinado recorrente"
+            >
+              <Repeat strokeWidth={1.75} className="size-3" />
+              {Math.min(Math.max((a.ocorrencia_atual ?? 1) - 1, 0), a.ocorrencias_total)}/
+              {a.ocorrencias_total}
+            </span>
+          )}
         </span>
       ),
     },

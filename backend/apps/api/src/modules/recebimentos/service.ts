@@ -1,6 +1,11 @@
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
 import { reprogramarCiclo } from '@whaviso/shared/datas/horario'
+import {
+  confirmarOcorrenciaCorrente,
+  reabrirOcorrenciaCorrente,
+  reprogramarOcorrenciaCorrente,
+} from '@whaviso/shared/ocorrencias'
 import { conflito, naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
 import {
   enfileirarNotificacao,
@@ -24,17 +29,28 @@ interface Linha {
   devedor_profile_id: string | null
   telefone_cobrador: string | null
   telefone_devedor: string | null
+  // Recorrência (E8 H8.7): null = combinado simples. ocorrencia_atual/total alimentam a
+  // decisão de mensagem (intermediária = variante recorrente; última = encerramento).
+  recorrencia_tipo: string | null
+  ocorrencia_atual: number | null
+  ocorrencias_total: number | null
 }
 
 async function carregar(cli: PoolClient, id: string): Promise<Linha> {
   const { rows } = await cli.query<Linha>(
     `select id, status, criador_papel, cobrador_id, devedor_profile_id,
-            telefone_cobrador, telefone_devedor
+            telefone_cobrador, telefone_devedor,
+            recorrencia_tipo, ocorrencia_atual, ocorrencias_total
      from public.avisos where id = $1 for update`,
     [id],
   )
   if (!rows[0]) throw naoEncontrado('Aviso não encontrado')
   return rows[0]
+}
+
+/** Combinado recorrente? (tem ocorrências; o status reflete a ocorrência corrente, H8.7). */
+function ehRecorrente(aviso: Linha): boolean {
+  return aviso.recorrencia_tipo != null
 }
 
 function exigirPapel(aviso: Linha, uid: string, papel: Papel): void {
@@ -72,7 +88,12 @@ async function gravarEventoPagamento(
  * encerramento ao devedor é ADIADA ~1min (janela de reversão, H8.1): se o cobrador reabrir
  * dentro do minuto, a reabertura cancela essa mensagem (devedor não recebe nada, C1).
  * M6: a assimetria é proposital (envios param já; só a mensagem ao devedor atrasa).
- * H8.7 recorrência: GATED (não modelada); o caminho simples sempre vira terminal.
+ *
+ * H8.7 RECORRENTE: confirma a OCORRÊNCIA corrente via `confirmarOcorrenciaCorrente`. Se
+ * finalizou (última ocorrência) -> mesmo fluxo do simples (aviso -> pago terminal). Se NÃO
+ * finalizou (k < N) -> o helper já avançou o ponteiro e gerou o mini-ciclo da k+1; aqui o
+ * aviso VOLTA a `programado` (não vai a pago) e a mensagem ao devedor é a variante
+ * recorrente (`encerramento_recorrente`, template devedor.encerramento contexto 'revisao').
  */
 export async function confirmarRecebimento(pool: Pool, uid: string, id: string): Promise<{ status: string }> {
   return comTransacao(pool, async (cli) => {
@@ -84,8 +105,23 @@ export async function confirmarRecebimento(pool: Pool, uid: string, id: string):
     }
     // H8.1 (de informado_pago) vs H8.4 (marcar direto de programado): evento distinto.
     const tipoEvento = aviso.status === 'informado_pago' ? 'confirmado_cobrador' : 'marcado_pago_cobrador'
-    await cli.query(`update public.avisos set status = 'pago' where id = $1`, [id])
+
+    // H8.7: fecha a ocorrência corrente (no-op no simples). finalizou = última (ou simples).
+    const { finalizou } = await confirmarOcorrenciaCorrente(cli, id, uid)
     await gravarEventoPagamento(cli, id, tipoEvento, uid)
+
+    if (!finalizou) {
+      // Recorrente, ocorrência intermediária: o aviso volta a `programado` (aguarda a
+      // próxima ocorrência, cujo mini-ciclo o helper já gerou). NÃO vira pago.
+      await cli.query(`update public.avisos set status = 'programado' where id = $1`, [id])
+      // Mensagem ao devedor: variante recorrente ("pagamento deste mês confirmado..."). Não
+      // usa a janela de reversão do `encerramento` (o aviso não está pago).
+      await enfileirarNotificacaoDevedor(cli, aviso, 'encerramento_recorrente')
+      return { status: 'programado' }
+    }
+
+    // Simples, OU última ocorrência do recorrente: aviso -> pago terminal (libera horário).
+    await cli.query(`update public.avisos set status = 'pago' where id = $1`, [id])
     // H8.1: mensagem de encerramento ao devedor ADIADA ~1min, no grupo de coalescing do
     // par confirmação/reabertura. Reabrir dentro do minuto anula esta linha (C1). O
     // drainer ainda reconfere `aviso.status='pago'` antes de enviar (C1, corrida do claim).
@@ -114,8 +150,14 @@ export async function rejeitarPagamento(pool: Pool, uid: string, id: string): Pr
     await cli.query(`update public.avisos set status = 'programado' where id = $1`, [id])
     await gravarEventoPagamento(cli, id, 'rejeitado_cobrador', uid)
     // H6.5/H6.7: o ciclo retoma a partir da etapa aplicável (re-arma as etapas canceladas
-    // ao informar pagamento, reusando o horário reservado, que não foi liberado).
-    await reprogramarCiclo(cli, { avisoId: id, telefoneDevedor: aviso.telefone_devedor })
+    // ao informar pagamento, reusando o horário reservado, que não foi liberado). No
+    // RECORRENTE a rejeição age na OCORRÊNCIA CORRENTE (ancorada na data dela), não na
+    // âncora do aviso (H8.7); no simples, no ciclo do próprio aviso.
+    if (ehRecorrente(aviso)) {
+      await reprogramarOcorrenciaCorrente(cli, id)
+    } else {
+      await reprogramarCiclo(cli, { avisoId: id, telefoneDevedor: aviso.telefone_devedor })
+    }
     // H8.2: notifica o devedor (neutro, sem acusação). C2: idempotente/coalescível por
     // (aviso_id, tipo, ocorrência) enquanto não enviada (toque-duplo -> 1 notificação).
     await enfileirarNotificacaoDevedor(cli, aviso, 'rejeicao')
@@ -145,8 +187,14 @@ export async function desmarcarRecebimento(pool: Pool, uid: string, id: string):
     await cli.query(`update public.avisos set status = 'programado' where id = $1`, [id])
     await gravarEventoPagamento(cli, id, 'reaberto_cobrador', uid)
     // Reabertura (E8 H8.6): retoma o ciclo reusando o MESMO horário reservado (via `_orig`,
-    // mesmo que o segundo tenha sido tomado por outro aviso enquanto liberado).
-    await reprogramarCiclo(cli, { avisoId: id, telefoneDevedor: aviso.telefone_devedor })
+    // mesmo que o segundo tenha sido tomado por outro aviso enquanto liberado). RECORRENTE:
+    // reabre a OCORRÊNCIA CORRENTE (a que foi confirmada por último) e re-arma o ciclo dela
+    // ancorado na data daquela ocorrência (H8.7); simples: o ciclo do próprio aviso.
+    if (ehRecorrente(aviso)) {
+      await reabrirOcorrenciaCorrente(cli, id)
+    } else {
+      await reprogramarCiclo(cli, { avisoId: id, telefoneDevedor: aviso.telefone_devedor })
+    }
     // Janela de 1min (C1): tenta ANULAR a mensagem de encerramento ainda não enviada. Se
     // anulou (>=1), confirmação+reabertura se anulam e o devedor não recebe nada. Se NÃO
     // havia pendente (já saiu), enfileira a 2a mensagem "status alterado" (H8.6).
@@ -259,6 +307,15 @@ export async function marcarPagoDevedor(pool: Pool, uid: string, id: string): Pr
       throw conflito('estado_invalido', `Aviso em "${aviso.status}" não pode ser informado como pago.`)
     }
     await cli.query(`update public.avisos set status = 'informado_pago' where id = $1`, [id])
+    // RECORRENTE (H8.7): a ocorrência corrente também passa a `informado_pago` (o status do
+    // aviso reflete a ocorrência corrente). No-op no simples (sem aviso_ocorrencias).
+    if (ehRecorrente(aviso)) {
+      await cli.query(
+        `update public.aviso_ocorrencias set status = 'informado_pago'
+          where aviso_id = $1 and indice = $2 and status = 'programado'`,
+        [id, aviso.ocorrencia_atual ?? 1],
+      )
+    }
     await cli.query(
       `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1, 'ja_paguei_devedor', 'devedor')`,
       [id],

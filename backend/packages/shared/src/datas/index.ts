@@ -1,5 +1,5 @@
 import { TZDate } from '@date-fns/tz'
-import { addDays, format } from 'date-fns'
+import { addDays, addMonths, format } from 'date-fns'
 import type { EtapaEnvio } from '../contracts/enums'
 
 /** Todas as datas de negócio do whaviso vivem neste fuso. */
@@ -95,11 +95,16 @@ export function calcularAgendamentos(
   dataCombinada: string,
   horarioSeg: number,
   agora: Date = new Date(),
+  // Cadência configurável (E6 H6.10): subconjunto de etapas a enviar. Default = ciclo
+  // completo. A ordem de envio segue ORDEM_ETAPAS, não a ordem do array recebido.
+  etapas: readonly EtapaEnvio[] = ORDEM_ETAPAS,
 ): Agendamento[] {
   const resultado: Agendamento[] = []
   const hoje = hojeSp(agora)
+  const selecionadas = new Set(etapas)
 
   for (const etapa of ORDEM_ETAPAS) {
+    if (!selecionadas.has(etapa)) continue
     const dia = diaDaEtapa(dataCombinada, etapa)
     const disparo = instanteNoSegundoSp(dia, horarioSeg)
 
@@ -113,6 +118,56 @@ export function calcularAgendamentos(
   }
 
   return resultado
+}
+
+/** Teto duro de ocorrências de um combinado recorrente (trava de outbox; o limite de
+ *  plano é checado à parte, na api). 60 = 5 anos mensais. */
+export const MAX_OCORRENCIAS = 60
+
+/** Configuração de recorrência aceita por `expandirOcorrencias` (espelha recorrenciaInput). */
+export type RecorrenciaCfg =
+  | {
+      tipo: 'periodo'
+      freq: 'mensal' | 'semanal' | 'diaria'
+      intervalo: number
+      ocorrencias?: number
+      ate?: string
+    }
+  | { tipo: 'avulsas'; datas: string[] }
+
+/**
+ * Expande a recorrência em DATAS de ocorrência ('YYYY-MM-DD'), incluindo a 1ª (a própria
+ * data combinada). Servidor é autoridade (E6 H6.10); o cliente nunca calcula ocorrência.
+ *  - periodo: âncora + k*intervalo (mensal: mesmo dia, clampa ao último dia do mês quando
+ *    não existe, ex.: 31 -> 28/30; semanal/diaria somam dias corridos); fim por N
+ *    ocorrências (TOTAL, incluindo a 1ª) OU por data limite (`ate`, inclusiva).
+ *  - avulsas: [dataCombinada, ...datas] deduplicado e ordenado.
+ * A âncora entra SEMPRE (>= 1 ocorrência), mesmo que `ate` seja anterior (a api valida).
+ */
+export function expandirOcorrencias(dataCombinada: string, cfg: RecorrenciaCfg): string[] {
+  if (cfg.tipo === 'avulsas') {
+    const unicas = Array.from(new Set([dataCombinada, ...cfg.datas])).sort()
+    return unicas.slice(0, MAX_OCORRENCIAS)
+  }
+
+  const intervalo = Math.max(1, cfg.intervalo)
+  const ancora = new TZDate(instanteSp(dataCombinada, 12, 0).getTime(), TZ)
+  const limite = cfg.ate ?? null
+  const total = Math.min(cfg.ocorrencias ?? MAX_OCORRENCIAS, MAX_OCORRENCIAS)
+
+  const datas: string[] = [dataCombinada] // âncora sempre presente (ocorrência 1)
+  for (let k = 1; datas.length < total; k++) {
+    const d =
+      cfg.freq === 'mensal'
+        ? addMonths(ancora, k * intervalo)
+        : cfg.freq === 'semanal'
+          ? addDays(ancora, k * intervalo * 7)
+          : addDays(ancora, k * intervalo)
+    const iso = format(d, 'yyyy-MM-dd')
+    if (limite && iso > limite) break
+    datas.push(iso)
+  }
+  return datas
 }
 
 /** Formata data de negócio para exibição nas mensagens (dd/MM/yyyy). */

@@ -3,20 +3,28 @@ import type {
   Aviso,
   DirecaoAviso,
   Envio,
+  EtapaEnvio,
   EventoAviso,
+  Ocorrencia,
   PapelAviso,
   StatusAviso,
 } from '@whaviso/shared/contracts'
 
 type Executor = Pool | PoolClient
 
-// data_combinada como texto (evita Date com fuso); valor como number.
+// data_combinada como texto (evita Date com fuso); valor como number. As colunas de
+// recorrência (E6 H6.10 / E8 H8.7) vêm null no combinado simples; ocorrencia_atual/total
+// alimentam o "k de N" do painel.
 const COLS = `
   id, cobrador_id, devedor_profile_id, direcao, criador_papel, status,
   nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador, motivo,
   valor_centavos::bigint as valor_centavos,
   to_char(data_combinada, 'YYYY-MM-DD') as data_combinada, pix_chave,
   pix_titular, pix_banco,
+  recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
+  ocorrencias_total, ocorrencia_atual,
+  -- node-pg não auto-parseia arrays de ENUM (etapa_envio[]) -> cast p/ text[] (parseado em JS).
+  cadencia_etapas::text[] as cadencia_etapas,
   aceito_em, arquivado_em, criado_em, atualizado_em
 `
 
@@ -37,6 +45,12 @@ interface LinhaAviso {
   pix_chave: string | null
   pix_titular: string | null
   pix_banco: string | null
+  recorrencia_tipo: 'periodo' | 'avulsas' | null
+  recorrencia_freq: 'mensal' | 'semanal' | 'diaria' | null
+  recorrencia_intervalo: number | null
+  ocorrencias_total: number | null
+  ocorrencia_atual: number | null
+  cadencia_etapas: EtapaEnvio[] | null
   aceito_em: Date | null
   arquivado_em: Date | null
   criado_em: Date
@@ -45,6 +59,17 @@ interface LinhaAviso {
 
 function mapear(l: LinhaAviso): Aviso {
   return { ...l, valor_centavos: Number(l.valor_centavos) }
+}
+
+/** Configuração de recorrência/cadência gravada nas colunas do aviso (E6 H6.10 / E8 H8.7).
+ *  Combinado simples = tudo null/undefined; o serviço já expandiu as datas e passa o N. */
+export interface RecorrenciaAviso {
+  recorrencia_tipo: 'periodo' | 'avulsas' | null
+  recorrencia_freq: 'mensal' | 'semanal' | 'diaria' | null
+  recorrencia_intervalo: number | null
+  ocorrencias_total: number | null
+  ocorrencia_atual: number | null
+  cadencia_etapas: EtapaEnvio[] | null
 }
 
 export interface NovoAviso {
@@ -63,6 +88,13 @@ export interface NovoAviso {
   pix_chave: string | null
   pix_titular: string | null
   pix_banco: string | null
+  // Recorrência/cadência (null = combinado simples / ciclo completo).
+  recorrencia_tipo?: 'periodo' | 'avulsas' | null
+  recorrencia_freq?: 'mensal' | 'semanal' | 'diaria' | null
+  recorrencia_intervalo?: number | null
+  ocorrencias_total?: number | null
+  ocorrencia_atual?: number | null
+  cadencia_etapas?: EtapaEnvio[] | null
   aceite_token_hash: string | null
   aceite_token_expira_em: Date | null
   acao_token_hash: string | null
@@ -81,14 +113,20 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
        (cobrador_id, devedor_profile_id, direcao, criador_papel, status,
         nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador, motivo,
         valor_centavos, data_combinada, pix_chave, pix_titular, pix_banco,
+        recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
+        ocorrencias_total, ocorrencia_atual, cadencia_etapas,
         aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_hash, convite_expira_em)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
       novo.nome_devedor, novo.telefone_devedor, novo.nome_cobrador, novo.telefone_cobrador,
       novo.motivo, novo.valor_centavos, novo.data_combinada, novo.pix_chave,
       novo.pix_titular, novo.pix_banco,
+      novo.recorrencia_tipo ?? null, novo.recorrencia_freq ?? null, novo.recorrencia_intervalo ?? null,
+      novo.ocorrencias_total ?? null, novo.ocorrencia_atual ?? null,
+      novo.cadencia_etapas ?? null,
       novo.aceite_token_hash, novo.aceite_token_expira_em, novo.acao_token_hash,
       novo.convite_hash, novo.convite_expira_em,
     ],
@@ -260,6 +298,13 @@ export async function ativarAviso(
     convite_hash: string
     convite_expira_em: Date
   },
+  // Recorrência definida (ou redefinida) na ativação (E6 H6.10). undefined = mantém o que
+  // estava (combinado simples ou recorrência já gravada na criação).
+  recorrencia?: RecorrenciaAviso,
+  // Cadência (subconjunto de etapas) definida na ativação; SEPARADA da recorrência (vale
+  // para simples também). undefined = mantém o que estava. Quando `recorrencia` traz a
+  // própria cadência, o serviço repassa a mesma aqui para o update ficar consistente.
+  cadenciaEtapas?: EtapaEnvio[] | null,
 ): Promise<Aviso> {
   const { rows } = await ex.query<LinhaAviso>(
     `update public.avisos set
@@ -270,6 +315,12 @@ export async function ativarAviso(
        pix_chave = coalesce($5, pix_chave),
        pix_titular = coalesce($6, pix_titular),
        pix_banco = coalesce($7, pix_banco),
+       recorrencia_tipo = case when $13::boolean then $14 else recorrencia_tipo end,
+       recorrencia_freq = case when $13::boolean then $15 else recorrencia_freq end,
+       recorrencia_intervalo = case when $13::boolean then coalesce($16,1) else recorrencia_intervalo end,
+       ocorrencias_total = case when $13::boolean then $17 else ocorrencias_total end,
+       ocorrencia_atual = case when $13::boolean then $18 else ocorrencia_atual end,
+       cadencia_etapas = case when $19::boolean then $20::etapa_envio[] else cadencia_etapas end,
        aceite_token_hash = $8,
        aceite_token_expira_em = $9,
        acao_token_hash = $10,
@@ -290,9 +341,51 @@ export async function ativarAviso(
       convite.acao_token_hash,
       convite.convite_hash,
       convite.convite_expira_em,
+      recorrencia !== undefined,
+      recorrencia?.recorrencia_tipo ?? null,
+      recorrencia?.recorrencia_freq ?? null,
+      recorrencia?.recorrencia_intervalo ?? null,
+      recorrencia?.ocorrencias_total ?? null,
+      recorrencia?.ocorrencia_atual ?? null,
+      cadenciaEtapas !== undefined,
+      cadenciaEtapas ?? null,
     ],
   )
   return mapear(rows[0]!)
+}
+
+// ---- Ocorrências de combinado recorrente (E8 H8.7) -------------------------------------
+
+/**
+ * Materializa as N ocorrências de um combinado recorrente (índice 1..N, status
+ * 'programado'). Idempotente: ON CONFLICT (aviso_id, indice) não duplica. As datas vêm
+ * já expandidas pelo serviço (`expandirOcorrencias`, em America/Sao_Paulo).
+ */
+export async function inserirOcorrencias(
+  ex: Executor,
+  avisoId: string,
+  datas: string[],
+): Promise<void> {
+  for (let i = 0; i < datas.length; i++) {
+    await ex.query(
+      `insert into public.aviso_ocorrencias (aviso_id, indice, data_combinada, status)
+         values ($1, $2, $3, 'programado')
+       on conflict (aviso_id, indice) do nothing`,
+      [avisoId, i + 1, datas[i]],
+    )
+  }
+}
+
+/** Ocorrências do combinado (ordem por índice). Para o "k de N" e o desmembramento no painel. */
+export async function listarOcorrencias(ex: Executor, avisoId: string): Promise<Ocorrencia[]> {
+  const { rows } = await ex.query<Ocorrencia>(
+    `select id, aviso_id, indice,
+            to_char(data_combinada, 'YYYY-MM-DD') as data_combinada,
+            status, confirmado_em, criado_em
+       from public.aviso_ocorrencias where aviso_id = $1 order by indice asc`,
+    [avisoId],
+  )
+  return rows
 }
 
 /**

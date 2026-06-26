@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate } from 'react-router'
@@ -18,11 +18,12 @@ import {
 import { ApiError } from '@/shared/api_client'
 import type { CriarAvisoResposta, DirecaoAviso } from '@/shared/contracts'
 import { usePerfil } from '@/shared/auth'
-import { usePlanoSomenteLeitura } from '@/shared/plano'
+import { usePlanoSomenteLeitura, useAssinaturaVigente } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
 import { useCriarAviso } from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
 import { AvisoCriado } from '../components/AvisoCriado'
+import { RepetirCombinado, type RepetirValor } from '../components/RepetirCombinado'
 
 const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
   { value: 'receber', label: 'Vou receber' },
@@ -36,9 +37,21 @@ export default function NovoAvisoPage() {
   // Plano que só mantém agenda (free, H4): não pode gerar convite (enviar). A UI esconde
   // a ação de envio; a autoridade da restrição é a api. Flag do backend, nunca inferido.
   const { somenteLeitura } = usePlanoSomenteLeitura()
+  // Cadência configurável (recurso PAGO, H11.5) vem da assinatura vigente; recorrência
+  // NÃO é gated. Enquanto carrega, assume false (o RepetirCombinado mostra a CTA, sem
+  // travar a recorrência). Flag do backend, nunca inferido.
+  const assinatura = useAssinaturaVigente()
+  const cadenciaConfiguravel = assinatura.data?.cadencia_configuravel === true
   const [resultado, setResultado] = useState<CriarAvisoResposta | null>(null)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   const [limiteAtingido, setLimiteAtingido] = useState<string | null>(null)
+  // Recorrência + cadência (E6 H6.10): undefined = combinado simples / ciclo completo.
+  const [repetir, setRepetir] = useState<RepetirValor>({
+    recorrencia: undefined,
+    cadenciaEtapas: undefined,
+  })
+  // Estável p/ o efeito do RepetirCombinado não disparar a cada render.
+  const aoMudarRepetir = useCallback((v: RepetirValor) => setRepetir(v), [])
 
   const {
     register,
@@ -111,6 +124,11 @@ export default function NovoAvisoPage() {
         motivo: dados.motivo,
         valor_centavos: dados.valor_centavos,
         data_combinada: dados.data_combinada,
+        // E6 H6.10: recorrência (facilitador, todos os planos) + cadência (gated por plano
+        // no servidor). undefined = combinado simples / ciclo completo. O servidor é a
+        // autoridade: expande as ocorrências e valida vagas/cadência.
+        recorrencia: repetir.recorrencia ?? null,
+        cadencia_etapas: repetir.cadenciaEtapas ?? null,
       })
       setResultado(r)
     } catch (e) {
@@ -273,6 +291,15 @@ export default function NovoAvisoPage() {
               />
             </Field>
           </div>
+
+          {/* E6 H6.10: repetir o combinado (recorrência, todos os planos) + cadência
+              (gated por plano). Recolhido por padrão; o padrão segue sendo o combinado
+              único. A data combinada é a âncora da 1ª repetição. */}
+          <RepetirCombinado
+            dataCombinada={watch('data_combinada')}
+            cadenciaConfiguravel={cadenciaConfiguravel}
+            onChange={aoMudarRepetir}
+          />
 
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-tinta">

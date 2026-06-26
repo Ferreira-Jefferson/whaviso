@@ -18,11 +18,35 @@ import {
   envioSchema,
   eventoAvisoSchema,
   motivoAviso,
+  ocorrenciaSchema,
   perfilSchema,
   telefoneE164,
   templateSchema,
   valorCentavos,
 } from './entidades'
+
+// Configuração de RECORRÊNCIA na criação/ativação (E6 H6.10). Ausente = combinado simples.
+//  - periodo: repete por frequência (mensal/semanal/diaria) ancorada na data_combinada,
+//    com fim por N ocorrências (TOTAL, incluindo a 1ª) OU por data limite (`ate`).
+//  - avulsas: datas ADICIONAIS (ocorrências 2..N); a 1ª é a própria data_combinada.
+// O servidor expande em aviso_ocorrencias (datas em America/Sao_Paulo); o cliente NUNCA
+// calcula ocorrência. A regra "ocorrencias OU ate" é validada no body (refine abaixo),
+// pois discriminatedUnion não aceita membros com refine. `cadencia_etapas` (separado)
+// escolhe quais etapas do ciclo enviar (null = ciclo completo).
+export const recorrenciaInput = z.discriminatedUnion('tipo', [
+  z.object({
+    tipo: z.literal('periodo'),
+    freq: z.enum(['mensal', 'semanal', 'diaria']),
+    intervalo: z.number().int().min(1).max(12).default(1),
+    ocorrencias: z.number().int().min(2).max(60).optional(),
+    ate: dataCombinada.optional(),
+  }),
+  z.object({
+    tipo: z.literal('avulsas'),
+    datas: z.array(dataCombinada).min(1).max(59),
+  }),
+])
+export type RecorrenciaInput = z.infer<typeof recorrenciaInput>
 
 // ---- POST /v1/avisos ----
 // Dois fluxos, mesmo endpoint, discriminados por `direcao`:
@@ -52,6 +76,12 @@ export const criarAvisoBody = z
     // isso aqui são opcionais para o `pagar` (o devedor pode não saber o titular/banco).
     pix_titular: z.string().trim().max(120).nullish(),
     pix_banco: z.string().trim().max(80).nullish(),
+    // Recorrência (E6 H6.10): ausente = combinado simples. Gated por plano (permite_recorrente)
+    // no servidor. O servidor expande em ocorrências; o cliente nunca calcula data de ocorrência.
+    recorrencia: recorrenciaInput.nullish(),
+    // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = ciclo completo.
+    // Gated por plano (cadencia_configuravel) no servidor.
+    cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
   })
   // No modo `agenda` (H4.1) telefone e Pix são OPCIONAIS (cobrados só ao ativar, H4.3):
   // todos os refines abaixo só valem quando o item já vai enviar (modo `enviar`).
@@ -76,6 +106,16 @@ export const criarAvisoBody = z
     message: 'informe o banco da chave Pix',
     path: ['pix_banco'],
   })
+  // Recorrência 'periodo' exige fim: N ocorrências OU data limite (discriminatedUnion não
+  // aceita refine no membro; validamos aqui).
+  .refine(
+    (b) =>
+      b.recorrencia == null ||
+      b.recorrencia.tipo !== 'periodo' ||
+      b.recorrencia.ocorrencias != null ||
+      b.recorrencia.ate != null,
+    { message: 'na recorrência por período, informe o número de ocorrências ou a data limite', path: ['recorrencia'] },
+  )
   // Pix OPCIONAL no invertido (decisão do dono, sobrepõe H3.1): o devedor-criador PODE
   // informar a chave de quem vai RECEBER, mas não é exigido para gerar o convite. O
   // cobrador valida/ajusta ao confirmar (H3.3) e a chave pode ser preenchida depois via
@@ -102,14 +142,27 @@ export type CriarAvisoResposta = z.infer<typeof criarAvisoResposta>
 // ativar); se ainda assim faltarem, o serviço recusa com `dado_obrigatorio_ativacao`.
 // A resposta tem o MESMO formato da criação (aviso + convite), pois o front reaproveita
 // a tela de "convite pronto".
-export const ativarAvisoBody = z.object({
-  telefone_devedor: telefoneE164.nullish(),
-  nome_cobrador: z.string().trim().min(1).max(120).nullish(),
-  telefone_cobrador: telefoneE164.nullish(),
-  pix_chave: z.string().trim().max(140).nullish(),
-  pix_titular: z.string().trim().max(120).nullish(),
-  pix_banco: z.string().trim().max(80).nullish(),
-})
+export const ativarAvisoBody = z
+  .object({
+    telefone_devedor: telefoneE164.nullish(),
+    nome_cobrador: z.string().trim().min(1).max(120).nullish(),
+    telefone_cobrador: telefoneE164.nullish(),
+    pix_chave: z.string().trim().max(140).nullish(),
+    pix_titular: z.string().trim().max(120).nullish(),
+    pix_banco: z.string().trim().max(80).nullish(),
+    // Recorrência/cadência podem ser definidas (ou redefinidas) ao ATIVAR uma anotação da
+    // agenda. Gated por plano no servidor. Ausentes = mantém o que já estava (ou simples).
+    recorrencia: recorrenciaInput.nullish(),
+    cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
+  })
+  .refine(
+    (b) =>
+      b.recorrencia == null ||
+      b.recorrencia.tipo !== 'periodo' ||
+      b.recorrencia.ocorrencias != null ||
+      b.recorrencia.ate != null,
+    { message: 'na recorrência por período, informe o número de ocorrências ou a data limite', path: ['recorrencia'] },
+  )
 export type AtivarAvisoBody = z.infer<typeof ativarAvisoBody>
 
 // ---- PATCH /v1/avisos/:id (editar, H2.5) ----
@@ -298,6 +351,12 @@ export type ListaEnviosResposta = z.infer<typeof listaEnviosResposta>
 export const listaEventosResposta = z.array(eventoAvisoSchema)
 export type ListaEventosResposta = z.infer<typeof listaEventosResposta>
 
+// ---- GET /v1/avisos/:id/ocorrencias (E8 H8.7 / E9 H9.6) ----
+// Ocorrências do combinado recorrente, em ordem de índice (1..N). Combinado simples
+// devolve []. Para o painel mostrar "k de N" e desmembrar por período.
+export const listaOcorrenciasResposta = z.array(ocorrenciaSchema)
+export type ListaOcorrenciasResposta = z.infer<typeof listaOcorrenciasResposta>
+
 // ---- POST /v1/avisos/:id/encerrar-lembretes (opt-out do devedor logado) ----
 export const encerrarLembretesResposta = z.object({ status: statusAviso })
 export type EncerrarLembretesResposta = z.infer<typeof encerrarLembretesResposta>
@@ -342,6 +401,43 @@ export const adminAtualizarUsuarioBody = z
     message: 'informe plano_id e/ou suspenso',
   })
 export type AdminAtualizarUsuarioBody = z.infer<typeof adminAtualizarUsuarioBody>
+
+// ---- PATCH /v1/admin/planos/:id (owner edita o catálogo, H11.11) ----
+// Atualização PARCIAL: todos os campos opcionais. O owner não cria nem apaga planos
+// (as 4 chaves são estáveis; o `id` é validado no handler). Espelha a CHECK
+// `planos_preco_nao_negativo` (preço >= 0) e mantém piso <= topo / envios_min <=
+// envios_max quando os dois vierem juntos (a tela do owner envia o conjunto completo
+// do plano ao salvar), para devolver erro limpo em vez de violar constraint/lógica.
+export const adminAtualizarPlanoBody = z
+  .object({
+    nome: z.string().min(1).max(60).optional(),
+    preco_centavos: z.number().int().min(0).optional(),
+    preco_max_centavos: z.number().int().min(0).nullable().optional(),
+    capacidade_agenda: z.number().int().min(0).optional(),
+    vagas_ativas: z.number().int().min(0).nullable().optional(),
+    envios_min: z.number().int().min(1).nullable().optional(),
+    envios_max: z.number().int().min(1).nullable().optional(),
+    reengajamento_max: z.number().int().min(0).optional(),
+    permite_recorrente: z.boolean().optional(),
+    cadencia_configuravel: z.boolean().optional(),
+    menu_texto_livre: z.boolean().optional(),
+    informado_pago_habilitado: z.boolean().optional(),
+    totais_periodo: z.boolean().optional(),
+    somente_leitura: z.boolean().optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: 'informe ao menos um campo' })
+  .refine(
+    (b) =>
+      b.preco_max_centavos == null ||
+      b.preco_centavos === undefined ||
+      b.preco_max_centavos >= b.preco_centavos,
+    { message: 'o topo do preço não pode ser menor que o piso' },
+  )
+  .refine(
+    (b) => b.envios_min == null || b.envios_max == null || b.envios_max >= b.envios_min,
+    { message: 'envios_max não pode ser menor que envios_min' },
+  )
+export type AdminAtualizarPlanoBody = z.infer<typeof adminAtualizarPlanoBody>
 
 // ---- GET /v1/admin/envios (auditoria, com nome do destinatário) ----
 export const adminEnviosQuery = z.object({

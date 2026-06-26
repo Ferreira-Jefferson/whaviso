@@ -122,6 +122,15 @@ const CONFIG: Record<string, ConfigTipo> = {
     contexto: PADRAO,
     aindaValida: (d) => d.aviso_status === 'pago',
   },
+  // E8 H8.7 (recorrente): confirmação de uma ocorrência intermediária (k < N). Usa a
+  // variante 'revisao' do template ("pagamento deste mês confirmado, o próximo lembrete
+  // chega perto da próxima data"). O aviso volta a `programado` (não vira pago), então a
+  // reconferência aceita os estados ativos do ciclo (programado/informado_pago).
+  encerramento_recorrente: {
+    chave: 'devedor.encerramento',
+    contexto: (): ContextoTemplate => 'revisao',
+    aindaValida: (d) => d.aviso_status === 'programado' || d.aviso_status === 'informado_pago',
+  },
   // H8.6 status alterado: a reabertura tardia (encerramento já saiu) volta a `programado`.
   // Só vale enquanto o aviso segue ativo; se virou terminal de novo, supera.
   status_alterado: {

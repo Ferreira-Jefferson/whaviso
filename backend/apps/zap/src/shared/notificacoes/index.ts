@@ -31,6 +31,9 @@ export type TipoNotificacao =
   | 'status_alterado'
   | 'rejeicao'
   | 'reengajamento'
+  // E8 H8.7 (recorrente): confirmação de ocorrência INTERMEDIÁRIA (k < N). Variante
+  // 'revisao' do template devedor.encerramento; o aviso volta a `programado` (não pago).
+  | 'encerramento_recorrente'
   // E14: chave de pagamento cadastrada pelo cobrador (fluxo invertido), ao DEVEDOR.
   | 'pix_chave_recebida'
 
@@ -74,6 +77,9 @@ const EVENTO_FONTE: Partial<Record<TipoNotificacao, string>> = {
   // pelas reaberturas tardias. `encerramento` usa coalesce_grupo + reconferência no drainer.
   rejeicao: 'rejeitado_cobrador',
   status_alterado: 'reaberto_cobrador',
+  // E8 H8.7: cada ocorrência confirmada grava um `confirmado_cobrador`; a contagem deles
+  // dá a ocorrência da dedupe_key (1 mensagem de "pagamento deste mês" por ocorrência).
+  encerramento_recorrente: 'confirmado_cobrador',
   // E14: a ocorrência avança a cada chave cadastrada (1 por cadastro -> dedupe estável).
   pix_chave_recebida: 'pix_cadastrada',
 }

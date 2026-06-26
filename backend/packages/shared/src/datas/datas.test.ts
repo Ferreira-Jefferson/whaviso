@@ -70,6 +70,21 @@ describe('calcularAgendamentos', () => {
     const agora = new Date('2026-07-17T15:00:00Z')
     expect(calcularAgendamentos(D, SEG_9H, agora)).toEqual([])
   })
+
+  it('E6 H6.10 cadência: o 4º arg filtra as etapas (subconjunto), na ORDEM do ciclo', () => {
+    const agora = new Date('2026-07-10T15:00:00Z') // cedo: todas aplicáveis
+    // Subconjunto {d, d_menos_1} é emitido na ORDEM do ciclo (d_menos_1 antes de d),
+    // não na ordem do array recebido. D-2 e D+1 NÃO saem (fora da cadência).
+    const ags = calcularAgendamentos(D, SEG_9H, agora, ['d', 'd_menos_1'])
+    expect(ags.map((a) => a.etapa)).toEqual(['d_menos_1', 'd'])
+  })
+
+  it('E6 H6.10 cadência: cadência de uma etapa só (ex.: só D) emite um envio', () => {
+    const agora = new Date('2026-07-10T15:00:00Z')
+    const ags = calcularAgendamentos(D, SEG_9H, agora, ['d'])
+    expect(ags.map((a) => a.etapa)).toEqual(['d'])
+    expect(ags[0]!.agendado_para.toISOString()).toBe('2026-07-15T12:00:00.000Z')
+  })
 })
 
 describe('janelas e expiração', () => {

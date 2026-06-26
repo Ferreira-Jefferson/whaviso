@@ -118,10 +118,14 @@ export async function reprogramarCiclo(cli: PoolClient, opts: OpcoesReserva): Pr
 
   const seg = await garantirHorarioReservado(cli, opts)
   for (const a of calcularAgendamentos(aviso.data_combinada, seg, agora)) {
+    // E6 H6.10: o unique (aviso_id, etapa) virou dois índices PARCIAIS (0052). Esta função
+    // (re)programa o ciclo do combinado SIMPLES (ocorrencia_id null), então o ON CONFLICT
+    // mira o índice parcial `where ocorrencia_id is null`. O ciclo POR OCORRÊNCIA do
+    // recorrente é reprogramado por `reprogramarOcorrenciaCorrente` (shared/ocorrencias).
     await cli.query(
       `insert into public.envios (aviso_id, etapa, agendado_para, status)
          values ($1, $2, $3, 'agendado')
-       on conflict (aviso_id, etapa) do update
+       on conflict (aviso_id, etapa) where ocorrencia_id is null do update
          set status = 'agendado', agendado_para = excluded.agendado_para,
              erro = null, tentativas = 0, proxima_tentativa_em = null
        where envios.status = 'cancelado'`,

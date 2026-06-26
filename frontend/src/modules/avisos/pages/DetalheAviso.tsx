@@ -70,6 +70,7 @@ import {
   useRejeitarPagamento,
 } from '../api'
 import { AvisoCriado } from '../components/AvisoCriado'
+import { ProgressoRecorrencia } from '../components/ProgressoRecorrencia'
 
 export default function DetalheAvisoPage() {
   const { id = '' } = useParams()
@@ -193,6 +194,10 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Coluna principal: dados + timeline + eventos */}
         <div className="flex flex-col gap-6 lg:col-span-2">
+          {/* E6 H6.10: progresso "k de N" de um combinado recorrente. Só aparece quando
+              a api manda ocorrencias_total; o front não recalcula nada. */}
+          <ProgressoRecorrencia aviso={aviso} meuPapel={meuPapel} />
+
           {/* H4.x: anotação de agenda (nada enviado ainda). */}
           {ehAgenda && (
             <Card className="flex items-start gap-3 border-linha bg-areia/40">

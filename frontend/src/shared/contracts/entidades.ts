@@ -79,14 +79,41 @@ export const avisoSchema = z.object({
   aceito_em: z.coerce.date().nullable(),
   // Arquivamento da agenda (H11.4): quando preenchido, a anotação saiu da agenda.
   arquivado_em: z.coerce.date().nullable(),
+  // Recorrência (E6 H6.10 / E8 H8.7): combinado SIMPLES = tudo null. Quando recorrente,
+  // o combinado segue UMA linha; as ocorrências vivem em aviso_ocorrencias. `ocorrencia_atual`
+  // é o ponteiro 1..N; o status do aviso reflete a ocorrência corrente (pago só no fim).
+  // O painel usa ocorrencia_atual/ocorrencias_total para o progresso "k de N".
+  recorrencia_tipo: z.enum(['periodo', 'avulsas']).nullish(),
+  recorrencia_freq: z.enum(['mensal', 'semanal', 'diaria']).nullish(),
+  recorrencia_intervalo: z.number().int().min(1).nullish(),
+  ocorrencias_total: z.number().int().nullish(),
+  ocorrencia_atual: z.number().int().nullish(),
+  // Subconjunto de etapas a enviar (cadência configurável); null = ciclo completo.
+  cadencia_etapas: z.array(etapaEnvio).nullish(),
   criado_em: z.coerce.date(),
   atualizado_em: z.coerce.date(),
 })
 export type Aviso = z.infer<typeof avisoSchema>
 
+// Ocorrência de um combinado recorrente (E8 H8.7). O painel usaria para o progresso
+// "k de N" e o desmembramento por período; hoje o front só consome ocorrencia_atual/
+// ocorrencias_total do aviso (a api ainda não expõe a coleção de ocorrências por aviso).
+export const ocorrenciaSchema = z.object({
+  id: z.uuid(),
+  aviso_id: z.uuid(),
+  indice: z.number().int().min(1),
+  data_combinada: dataCombinada,
+  status: statusAviso,
+  confirmado_em: z.coerce.date().nullable(),
+  criado_em: z.coerce.date(),
+})
+export type Ocorrencia = z.infer<typeof ocorrenciaSchema>
+
 export const envioSchema = z.object({
   id: z.uuid(),
   aviso_id: z.uuid(),
+  // Ocorrência à qual o envio pertence (E8 H8.7); null no combinado simples.
+  ocorrencia_id: z.uuid().nullish(),
   etapa: etapaEnvio,
   status: statusEnvio,
   agendado_para: z.coerce.date(),

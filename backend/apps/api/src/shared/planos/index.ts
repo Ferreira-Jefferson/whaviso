@@ -24,6 +24,7 @@ export interface AlavancasPlano {
   vagas_ativas: number
   /** Free: agenda + visualização, sem ATIVAR envio (guarda antes do limite numérico). */
   somente_leitura: boolean
+  /** Recorrência habilitada (Profissional/Plus). Cada ocorrência reserva 1 vaga (H11.5). */
   permite_recorrente: boolean
   cadencia_configuravel: boolean
   menu_texto_livre: boolean
@@ -180,6 +181,9 @@ export async function exigirCapacidadeDeAgenda(cli: PoolClient, uid: string): Pr
  * `sem_aviso` (anotações de agenda; G-M4) nem terminais. Espelho da contagem em SQL,
  * por papel (conta certo no fluxo invertido devedor-criador). Usado pelo gate de
  * ATIVAÇÃO (H4.3): ativar move o item do balde de agenda para o de ativos.
+ *
+ * NOTA: para combinados RECORRENTES esta contagem (1 por combinado) NÃO é o custo de
+ * vaga; use `somarVagasAtivas` (cada ocorrência não-paga reserva 1 vaga, H11.3/H11.5).
  */
 export async function contarAtivos(cli: PoolClient, uid: string): Promise<number> {
   const { rows } = await cli.query<{ n: string }>(
@@ -187,6 +191,32 @@ export async function contarAtivos(cli: PoolClient, uid: string): Promise<number
      where status not in ('sem_aviso','pago','cancelado','recusado','expirado')
        and ((criador_papel = 'cobrador' and cobrador_id = $1)
             or (criador_papel = 'devedor' and devedor_profile_id = $1))`,
+    [uid],
+  )
+  return Number(rows[0]!.n)
+}
+
+/**
+ * SOMA as vagas de aviso ativo consumidas pela conta (H11.3/H11.5, recorrência). A
+ * contagem deixa de ser um count(*) de combinados e passa a SOMAR, por aviso ativo
+ * (status not in sem_aviso/pago/cancelado/recusado/expirado):
+ *   - combinado SIMPLES (recorrencia_tipo null): 1 vaga;
+ *   - combinado RECORRENTE: o número de OCORRÊNCIAS ainda não pagas (cada ocorrência é um
+ *     "envio de aviso", a moeda do plano; conforme cada vira `pago`, a vaga é liberada).
+ * Por papel (conta certo no invertido devedor-criador). Espelha a regra no servidor (H11.8).
+ */
+export async function somarVagasAtivas(cli: PoolClient, uid: string): Promise<number> {
+  const { rows } = await cli.query<{ n: string }>(
+    `select coalesce(sum(
+              case when a.recorrencia_tipo is null then 1
+                   else (select count(*) from public.aviso_ocorrencias o
+                          where o.aviso_id = a.id and o.status <> 'pago')
+              end
+            ), 0) as n
+       from public.avisos a
+      where a.status not in ('sem_aviso','pago','cancelado','recusado','expirado')
+        and ((a.criador_papel = 'cobrador' and a.cobrador_id = $1)
+             or (a.criador_papel = 'devedor' and a.devedor_profile_id = $1))`,
     [uid],
   )
   return Number(rows[0]!.n)
@@ -202,8 +232,18 @@ export async function contarAtivos(cli: PoolClient, uid: string): Promise<number
  * Ordem dos erros (E1-C2): primeiro o guard do FREE (código próprio), depois o limite
  * numérico de vagas. No Start/Profissional `vagas_ativas` = capacidade da agenda, então
  * ativar nunca trava enquanto couber; no Plus é o nº de unidades.
+ *
+ * `custoVaga` (default 1) é o número de vagas que ESTA ativação reserva: 1 para o
+ * combinado simples, N para o recorrente (cada ocorrência = 1 vaga, H11.3/H11.5). A
+ * contagem do já-consumido SOMA (`somarVagasAtivas`): por aviso ativo, 1 (simples) ou as
+ * ocorrências ainda não pagas (recorrente). Recusa se `consumido + custoVaga > vagas`.
+ * Recorrência NUNCA é gated por plano (é facilitador): este gate só mede vagas.
  */
-export async function exigirVagaDeAtivo(cli: PoolClient, uid: string): Promise<AlavancasPlano> {
+export async function exigirVagaDeAtivo(
+  cli: PoolClient,
+  uid: string,
+  custoVaga = 1,
+): Promise<AlavancasPlano> {
   await travarConta(cli, uid)
   const alavancas = await alavancasDoPlano(cli, uid)
 
@@ -215,9 +255,10 @@ export async function exigirVagaDeAtivo(cli: PoolClient, uid: string): Promise<A
     )
   }
 
-  // 2) Vagas de ativo do plano. Ao encher, recusa sem ativar (o item segue na agenda).
-  const ativos = await contarAtivos(cli, uid)
-  if (ativos >= alavancas.vagas_ativas) {
+  // 2) Vagas de ativo do plano (SOMA por ocorrência no recorrente). Ao não caber, recusa
+  //    sem ativar (o item segue na agenda).
+  const consumido = await somarVagasAtivas(cli, uid)
+  if (consumido + custoVaga > alavancas.vagas_ativas) {
     throw regraNegocio(
       'limite_plano_atingido',
       `Seu plano permite ${alavancas.vagas_ativas} avisos ativos ao mesmo tempo. Encerre um ou escolha um plano maior para ativar este.`,

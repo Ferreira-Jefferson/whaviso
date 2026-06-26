@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
-import { aceiteExpiraEm, conviteExpiraEm } from '@whaviso/shared/datas'
+import { aceiteExpiraEm, conviteExpiraEm, expandirOcorrencias } from '@whaviso/shared/datas'
+import type { RecorrenciaCfg } from '@whaviso/shared/datas'
 import { reprogramarCiclo } from '@whaviso/shared/datas/horario'
 import {
   formatarNumeroConvite,
@@ -12,9 +13,12 @@ import type {
   CriarAvisoBody,
   EditarAvisoBody,
   Envio,
+  EtapaEnvio,
   EventoAviso,
   ListarAvisosQuery,
+  Ocorrencia,
   PapelAviso,
+  RecorrenciaInput,
   StatusAviso,
 } from '@whaviso/shared/contracts'
 import { gerarToken, sha256Hex } from '../../shared/tokens'
@@ -23,7 +27,9 @@ import {
   exigirVagaDeAgenda,
   exigirVagaDeAtivo,
   exigirCapacidadeDeAgenda,
+  somarVagasAtivas,
   alavancasDoPlano,
+  type AlavancasPlano,
 } from '../../shared/planos'
 import { enfileirarNotificacaoDevedor, enfileirarNotificacao } from '../../shared/notificacoes'
 import { estadosDoGrupo } from '../../shared/estados'
@@ -106,6 +112,62 @@ async function gerarConviteComRetry(
   throw conflito('convite_indisponivel', 'Não foi possível gerar o convite. Tente novamente.')
 }
 
+/**
+ * GATE de cadência configurável (E6 H6.10 / E11 H11.5): `cadencia_etapas` no corpo é
+ * recurso PAGO (Profissional/Plus). Se vier e a alavanca `cadencia_configuravel` for false,
+ * recusa. Vale para combinado simples E recorrente. A RECORRÊNCIA em si NUNCA é gated
+ * (facilitador, H11.5): nunca cheque `permite_recorrente`.
+ */
+function exigirCadenciaPermitida(
+  alavancas: AlavancasPlano,
+  cadencia: readonly EtapaEnvio[] | null | undefined,
+): void {
+  if (cadencia != null && !alavancas.cadencia_configuravel) {
+    throw regraNegocio('plano_sem_cadencia', 'A cadência personalizada está nos planos Profissional e Plus.')
+  }
+}
+
+/** Mapeia a recorrência do contrato para a config de expansão de datas (shared/datas). */
+function cfgRecorrencia(r: RecorrenciaInput): RecorrenciaCfg {
+  return r.tipo === 'periodo'
+    ? { tipo: 'periodo', freq: r.freq, intervalo: r.intervalo, ocorrencias: r.ocorrencias, ate: r.ate }
+    : { tipo: 'avulsas', datas: r.datas }
+}
+
+/**
+ * Expande a recorrência em datas (a partir da data combinada, em America/Sao_Paulo) e
+ * monta as colunas a gravar no aviso + a lista de datas das ocorrências. Servidor é
+ * autoridade: o cliente nunca calcula data de ocorrência (H6.10).
+ */
+function montarRecorrencia(
+  r: RecorrenciaInput,
+  dataCombinada: string,
+  cadencia: readonly EtapaEnvio[] | null | undefined,
+): {
+  colunas: {
+    recorrencia_tipo: 'periodo' | 'avulsas'
+    recorrencia_freq: 'mensal' | 'semanal' | 'diaria' | null
+    recorrencia_intervalo: number
+    ocorrencias_total: number
+    ocorrencia_atual: number
+    cadencia_etapas: EtapaEnvio[] | null
+  }
+  datas: string[]
+} {
+  const datas = expandirOcorrencias(dataCombinada, cfgRecorrencia(r))
+  return {
+    colunas: {
+      recorrencia_tipo: r.tipo,
+      recorrencia_freq: r.tipo === 'periodo' ? r.freq : null,
+      recorrencia_intervalo: r.tipo === 'periodo' ? r.intervalo : 1,
+      ocorrencias_total: datas.length,
+      ocorrencia_atual: 1,
+      cadencia_etapas: cadencia ? [...cadencia] : null,
+    },
+    datas,
+  }
+}
+
 export async function criarAviso(
   pool: Pool,
   uid: string,
@@ -122,13 +184,32 @@ export async function criarAviso(
     // agenda: o FREE PODE criar anotação (nada é enviado), o que ele não pode é ATIVAR
     // (gate próprio em ativarAviso). Por isso aqui usamos exigirVagaDeAgenda, que para o
     // free só barra quando o modo enviaria de imediato.
+    let alavancas: AlavancasPlano
     if (ehAgenda) {
       // H4.1: anotação de agenda. Free PODE criar até a capacidade (balde único).
       // Não consome vaga de ativo, não gera convite, não checa somente_leitura.
-      await exigirCapacidadeDeAgenda(cli, uid)
+      alavancas = await exigirCapacidadeDeAgenda(cli, uid)
     } else {
       // Modo enviar: o gate atual (guard do free ANTES da capacidade).
-      await exigirVagaDeAgenda(cli, uid)
+      alavancas = await exigirVagaDeAgenda(cli, uid)
+    }
+
+    // GATE de cadência (E6 H6.10 / E11 H11.5): `cadencia_etapas` é recurso pago. A
+    // RECORRÊNCIA em si NUNCA é gated (facilitador): não checamos `permite_recorrente`.
+    exigirCadenciaPermitida(alavancas, body.cadencia_etapas)
+
+    // Recorrência (E6 H6.10): o servidor expande as datas (autoridade). `rec` carrega as
+    // colunas a gravar + a lista de datas das ocorrências (vazio = combinado simples).
+    const rec = body.recorrencia
+      ? montarRecorrencia(body.recorrencia, body.data_combinada, body.cadencia_etapas)
+      : null
+
+    // Colunas de recorrência/cadência a gravar. A CADÊNCIA vale para simples E recorrente
+    // (subconjunto de etapas do ciclo); por isso `cadencia_etapas` entra mesmo sem
+    // recorrência. As colunas de recorrência só entram quando `rec` existe.
+    const colunasRec = {
+      ...(rec?.colunas ?? {}),
+      cadencia_etapas: body.cadencia_etapas ? [...body.cadencia_etapas] : null,
     }
 
     // No modo agenda os campos da outra ponta são OPCIONAIS (H4.1, cobrados só ao
@@ -137,6 +218,19 @@ export async function criarAviso(
     if (!ehAgenda) {
       if (ehReceber && (!body.pix_chave || !body.pix_titular || !body.pix_banco)) {
         throw regraNegocio('pix_obrigatorio', 'A chave Pix, o titular e o banco são obrigatórios.')
+      }
+      // H11.3/H11.5: no modo ENVIAR um recorrente já nasce ativo (aguardando_aceite ->
+      // ciclo), então cada ocorrência reserva 1 vaga JÁ AGORA. Além do guard do free (já
+      // feito acima), cheque a SOMA de vagas: consumido + N <= vagas_ativas. Combinado
+      // simples (rec null) não muda o comportamento (1 vaga, coberta pelo gate de criação).
+      if (rec) {
+        const consumido = await somarVagasAtivas(cli, uid)
+        if (consumido + rec.datas.length > alavancas.vagas_ativas) {
+          throw regraNegocio(
+            'limite_plano_atingido',
+            `Seu plano permite ${alavancas.vagas_ativas} avisos ativos ao mesmo tempo. Encerre um ou escolha um plano maior para ativar este.`,
+          )
+        }
       }
     }
 
@@ -166,6 +260,7 @@ export async function criarAviso(
     if (ehAgenda) {
       const aviso = await repo.inserirAviso(cli, {
         ...camposComuns,
+        ...colunasRec,
         status: 'sem_aviso',
         aceite_token_hash: null,
         aceite_token_expira_em: null,
@@ -173,6 +268,9 @@ export async function criarAviso(
         convite_hash: null,
         convite_expira_em: null,
       })
+      // Materializa as N ocorrências já na agenda (free PODE montar um recorrente na
+      // agenda; o envio é que fica barrado, H11.2). Datas em America/Sao_Paulo.
+      if (rec) await repo.inserirOcorrencias(cli, aviso.id, rec.datas)
       // Preserva direcao E modo na auditoria (G-B3: não perder a direcao).
       await repo.inserirEvento(cli, aviso.id, 'criado', criadorPapel, {
         direcao: body.direcao,
@@ -194,6 +292,7 @@ export async function criarAviso(
     const { aviso, numeroClaro } = await gerarConviteComRetry(cli, (conviteHash) =>
       repo.inserirAviso(cli, {
         ...camposComuns,
+        ...colunasRec,
         status: 'aguardando_aceite',
         aceite_token_hash: aceiteHash,
         aceite_token_expira_em: aceiteExpiraEm(body.data_combinada),
@@ -202,6 +301,10 @@ export async function criarAviso(
         convite_expira_em: conviteExpira,
       }),
     )
+
+    // E8 H8.7: materializa as N ocorrências do recorrente (lazy no ciclo: só a 1ª vira
+    // mini-ciclo, gerado pelo zap no aceite). Datas em America/Sao_Paulo.
+    if (rec) await repo.inserirOcorrencias(cli, aviso.id, rec.datas)
 
     // G4/H5.9: criar um novo combinado DESBLOQUEIA o telefone-alvo (limpa o anti-brute-force).
     await repo.limparBloqueioTelefone(cli, [telefoneDevedor, camposComuns.telefone_cobrador])
@@ -287,8 +390,30 @@ export async function ativarAviso(
       )
     }
 
+    // GATE de cadência (E6 H6.10 / E11 H11.5): só vale quando vem no corpo da ativação.
+    // RECORRÊNCIA nunca é gated (facilitador): não checamos `permite_recorrente`.
+    const alavancas = await alavancasDoPlano(cli, uid)
+    exigirCadenciaPermitida(alavancas, body.cadencia_etapas)
+
+    // Recorrência (E6 H6.10): pode ser (re)definida AO ATIVAR; ausente = mantém o que já
+    // estava (recorrência da agenda, ou simples). Quando redefinida, expandimos as datas
+    // de novo a partir da data combinada do aviso (servidor é autoridade).
+    const rec = body.recorrencia
+      ? montarRecorrencia(body.recorrencia, aviso.data_combinada, body.cadencia_etapas)
+      : null
+
+    // Custo de vaga (H11.3/H11.5): cada ocorrência não-paga reserva 1 vaga. N na ativação
+    // de um recorrente; 1 no simples. Se a recorrência foi redefinida agora, N = datas
+    // expandidas; senão, as ocorrências já materializadas (ou 1 se simples).
+    const custoVaga = rec
+      ? rec.datas.length
+      : aviso.recorrencia_tipo
+        ? (await repo.listarOcorrencias(cli, id)).filter((o) => o.status !== 'pago').length || 1
+        : 1
+
     // Gate de ATIVAÇÃO (consome vaga de ativo; free -> CTA), na MESMA transação/lock.
-    await exigirVagaDeAtivo(cli, uid)
+    // A SOMA de vagas (recorrência por ocorrência) é feita dentro do gate.
+    await exigirVagaDeAtivo(cli, uid, custoVaga)
 
     const aceiteHash = sha256Hex(gerarToken())
     const acaoHash = sha256Hex(gerarToken())
@@ -313,8 +438,14 @@ export async function ativarAviso(
           convite_hash: conviteHash,
           convite_expira_em: conviteExpira,
         },
+        rec?.colunas,
+        // Cadência (vale p/ simples também): grava o que veio no corpo; undefined = mantém.
+        body.cadencia_etapas ? [...body.cadencia_etapas] : undefined,
       ),
     )
+
+    // Recorrência redefinida na ativação: materializa as N ocorrências (idempotente).
+    if (rec) await repo.inserirOcorrencias(cli, id, rec.datas)
 
     // G4/H5.9: ativar um combinado DESBLOQUEIA o telefone-alvo (anti-brute-force).
     await repo.limparBloqueioTelefone(cli, [telefoneDevedorAtivo, telefoneCobradorAtivo])
@@ -376,6 +507,18 @@ export async function listarEventos(pool: Pool, uid: string, id: string): Promis
   const aviso = await repo.buscarAvisoVisivel(pool, id, uid)
   if (!aviso) throw naoEncontrado('Aviso não encontrado')
   return repo.listarEventosDoAviso(pool, id)
+}
+
+/**
+ * E8 H8.7 / E9 H9.6: ocorrências do combinado recorrente (índice 1..N, data, status,
+ * confirmação), para o painel mostrar "k de N" e desmembrar por período. Mesma
+ * visibilidade do detalhe (cobrador dono OU devedor vinculado). Combinado simples
+ * devolve lista vazia (não há linhas em aviso_ocorrencias).
+ */
+export async function listarOcorrencias(pool: Pool, uid: string, id: string): Promise<Ocorrencia[]> {
+  const aviso = await repo.buscarAvisoVisivel(pool, id, uid)
+  if (!aviso) throw naoEncontrado('Aviso não encontrado')
+  return repo.listarOcorrencias(pool, id)
 }
 
 // Estados VIVOS em que o aviso ainda pode ser editado/pausado/cancelado.

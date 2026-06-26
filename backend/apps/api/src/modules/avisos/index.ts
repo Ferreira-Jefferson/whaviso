@@ -8,6 +8,7 @@ import {
   listarAvisosQuery,
   listaEnviosResposta,
   listaEventosResposta,
+  listaOcorrenciasResposta,
 } from '@whaviso/shared/contracts'
 import { z } from 'zod'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -103,5 +104,12 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
     '/avisos/:id/eventos',
     { preHandler: app.autenticar, schema: { params: idParam, response: { 200: listaEventosResposta } } },
     async (req) => service.listarEventos(app.pool, req.userId, req.params.id),
+  )
+
+  // E8 H8.7 / E9 H9.6: ocorrências do recorrente (k de N). Simples devolve [].
+  app.get(
+    '/avisos/:id/ocorrencias',
+    { preHandler: app.autenticar, schema: { params: idParam, response: { 200: listaOcorrenciasResposta } } },
+    async (req) => service.listarOcorrencias(app.pool, req.userId, req.params.id),
   )
 }

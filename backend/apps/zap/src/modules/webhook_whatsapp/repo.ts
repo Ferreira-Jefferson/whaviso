@@ -4,6 +4,10 @@ import { calcularAgendamentos } from '@whaviso/shared/datas'
 import type { EtapaEnvio } from '@whaviso/shared/contracts'
 import { reservarHorario, reprogramarCiclo } from '@whaviso/shared/datas/horario'
 import {
+  confirmarOcorrenciaCorrente,
+  reprogramarOcorrenciaCorrente,
+} from '@whaviso/shared/ocorrencias'
+import {
   enfileirarNotificacao,
   enfileirarNotificacaoDevedor,
   grupoOptoutReativa,
@@ -432,6 +436,11 @@ export async function aplicarAcaoBotao(
       cobrador_id: string | null
       devedor_profile_id: string | null
       data_combinada: string
+      // E6 H6.10 / E8 H8.7: recorrência. null = combinado simples; ocorrencia_atual aponta
+      // a ocorrência corrente cujo mini-ciclo o aceite gera; cadencia_etapas filtra etapas.
+      recorrencia_tipo: string | null
+      ocorrencia_atual: number | null
+      cadencia_etapas: EtapaEnvio[] | null
       // E8 H8.5/C4: telefone verificado do profile do COBRADOR (quando tem conta), para
       // rotear a ação de cobrador por botão. NULL = sem conta OU conta sem telefone.
       cobrador_profile_telefone: string | null
@@ -440,6 +449,8 @@ export async function aplicarAcaoBotao(
               a.nome_devedor, a.nome_cobrador, a.pix_chave, a.pix_titular, a.pix_banco,
               a.entrega_chave_status, a.cobrador_id, a.devedor_profile_id,
               to_char(a.data_combinada,'YYYY-MM-DD') as data_combinada,
+              a.recorrencia_tipo, a.ocorrencia_atual,
+              a.cadencia_etapas::text[] as cadencia_etapas,
               pc.telefone as cobrador_profile_telefone
        from public.avisos a
        left join public.profiles pc on pc.id = a.cobrador_id
@@ -497,12 +508,24 @@ export async function aplicarAcaoBotao(
         if (aviso.status !== 'informado_pago') {
           return { aplicado: false, novoStatus: aviso.status, telefone: alvoCobrador, pixChave: null }
         }
-        await cli.query(`update public.avisos set status='pago' where id=$1`, [avisoId])
+        // H8.7: fecha a ocorrência corrente (no-op no simples). finalizou = última (ou simples).
+        // Ator por TELEFONE (cobrador sem conta): confirmadoPor null; o ator do pagamento
+        // fica no evento de auditoria abaixo (via:telefone).
+        const { finalizou } = await confirmarOcorrenciaCorrente(cli, avisoId, null)
         await cli.query(
           `insert into public.eventos_aviso (aviso_id, tipo, ator, detalhes)
            values ($1,'confirmado_cobrador','cobrador', jsonb_build_object('via','telefone'))`,
           [avisoId],
         )
+        if (!finalizou) {
+          // Recorrente, ocorrência intermediária: o aviso volta a `programado` (o helper já
+          // gerou o mini-ciclo da próxima). Mensagem ao devedor: variante recorrente.
+          await cli.query(`update public.avisos set status='programado' where id=$1`, [avisoId])
+          await enfileirarNotificacaoDevedor(cli, alvoNotif, 'encerramento_recorrente')
+          return { aplicado: true, novoStatus: 'programado', telefone: alvoCobrador, pixChave: null, chaveResposta: 'resposta.confirmado' }
+        }
+        // Simples ou última ocorrência: aviso -> pago terminal (libera o horário, trigger 0038).
+        await cli.query(`update public.avisos set status='pago' where id=$1`, [avisoId])
         // H8.1: encerramento ao devedor ADIADO ~1min (reversível pela reabertura), no grupo
         // de coalescing do par confirmação/reabertura.
         await enfileirarNotificacaoDevedor(cli, alvoNotif, 'encerramento', {
@@ -523,7 +546,13 @@ export async function aplicarAcaoBotao(
         [avisoId],
       )
       // H6.5/H6.7: retoma o ciclo a partir da etapa aplicável, reusando o horário reservado.
-      await reprogramarCiclo(cli, { avisoId, telefoneDevedor: aviso.telefone_devedor })
+      // RECORRENTE: age na OCORRÊNCIA CORRENTE (ancorada na data dela, H8.7); simples: no
+      // ciclo do próprio aviso.
+      if (aviso.recorrencia_tipo != null) {
+        await reprogramarOcorrenciaCorrente(cli, avisoId)
+      } else {
+        await reprogramarCiclo(cli, { avisoId, telefoneDevedor: aviso.telefone_devedor })
+      }
       // H8.2/C2: notifica o devedor (neutro), idempotente/coalescível por (aviso_id, tipo).
       await enfileirarNotificacaoDevedor(cli, alvoNotif, 'rejeicao')
       return { aplicado: true, novoStatus: 'programado', telefone: alvoCobrador, pixChave: null, chaveResposta: 'resposta.rejeitado' }
@@ -573,14 +602,39 @@ export async function aplicarAcaoBotao(
       )
       // H6.9: aloca o segundo reservado (janela 08-18, único global, 10min/devedor) NESTA
       // transação (lock dos ativos serializa aceites concorrentes). Todas as etapas saem
-      // nesse mesmo segundo, cada uma na sua data.
+      // nesse mesmo segundo, cada uma na sua data. A cadência (E6 H6.10) filtra as etapas
+      // (null = ciclo completo); vale para simples e recorrente.
       const { seg } = await reservarHorario(cli, { avisoId, telefoneDevedor: aviso.telefone_devedor })
-      for (const a of calcularAgendamentos(aviso.data_combinada, seg)) {
-        await cli.query(
-          `insert into public.envios (aviso_id, etapa, agendado_para) values ($1,$2,$3)
-           on conflict (aviso_id, etapa) do nothing`,
-          [avisoId, a.etapa, a.agendado_para],
+      const cadencia = aviso.cadencia_etapas ?? undefined
+      if (aviso.recorrencia_tipo != null) {
+        // RECORRENTE (E8 H8.7): gera o mini-ciclo da OCORRÊNCIA CORRENTE (a 1ª no aceite),
+        // ancorado na data DELA, com ocorrencia_id. Geração lazy: as próximas ocorrências
+        // só ganham ciclo ao serem confirmadas (confirmarOcorrenciaCorrente).
+        const k = aviso.ocorrencia_atual ?? 1
+        const { rows: ocRows } = await cli.query<{ id: string; data_combinada: string }>(
+          `select id, to_char(data_combinada,'YYYY-MM-DD') as data_combinada
+             from public.aviso_ocorrencias where aviso_id=$1 and indice=$2`,
+          [avisoId, k],
         )
+        const oc = ocRows[0]
+        if (oc) {
+          for (const a of calcularAgendamentos(oc.data_combinada, seg, new Date(), cadencia)) {
+            await cli.query(
+              `insert into public.envios (aviso_id, ocorrencia_id, etapa, agendado_para) values ($1,$2,$3,$4)
+               on conflict (ocorrencia_id, etapa) where ocorrencia_id is not null do nothing`,
+              [avisoId, oc.id, a.etapa, a.agendado_para],
+            )
+          }
+        }
+      } else {
+        // SIMPLES: ciclo do próprio aviso (ocorrencia_id null), ancorado na data combinada.
+        for (const a of calcularAgendamentos(aviso.data_combinada, seg, new Date(), cadencia)) {
+          await cli.query(
+            `insert into public.envios (aviso_id, etapa, agendado_para) values ($1,$2,$3)
+             on conflict (aviso_id, etapa) where ocorrencia_id is null do nothing`,
+            [avisoId, a.etapa, a.agendado_para],
+          )
+        }
       }
       await cli.query(
         `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'aceite',$2)`,
@@ -701,11 +755,22 @@ export async function aplicarAcaoBotao(
       }
       // Não vai direto para 'pago': fica em revisão até o cobrador confirmar.
       await cli.query(`update public.avisos set status='informado_pago' where id=$1`, [avisoId])
+      // RECORRENTE (H8.7): a ocorrência corrente também passa a `informado_pago` (o status
+      // do aviso reflete a ocorrência corrente). No-op no simples (sem aviso_ocorrencias).
+      if (aviso.recorrencia_tipo != null) {
+        await cli.query(
+          `update public.aviso_ocorrencias set status='informado_pago'
+            where aviso_id=$1 and indice=$2 and status='programado'`,
+          [avisoId, aviso.ocorrencia_atual ?? 1],
+        )
+      }
       // H6.5: o ciclo normal PARA. Cancela as etapas restantes EXCETO d_mais_1 (marcador
       // 'informado_pago' p/ distinguir no painel, G5). A única mensagem possível depois é o
       // empurrãozinho de D+1 (etapa d_mais_1, template variante revisao), se ainda houver
       // d_mais_1 agendado e o cobrador não confirmar. Nada é re-agendado aqui: o d_mais_1
       // que sobrou do ciclo já dispara como empurrãozinho (o drainer escolhe o template).
+      // No recorrente, só a ocorrência corrente tem envios ativos (geração lazy), então
+      // filtrar por aviso_id já atinge apenas a corrente.
       await cli.query(
         `update public.envios set status='cancelado', erro='informado_pago'
           where aviso_id=$1 and status in ('agendado','processando') and etapa <> 'd_mais_1'`,
