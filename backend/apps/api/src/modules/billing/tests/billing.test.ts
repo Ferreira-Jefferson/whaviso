@@ -44,7 +44,7 @@ describe('billing (integração)', () => {
 
     const prof = planos.find((p) => p.id === 'profissional')!
     expect(prof.preco_centavos).toBe(2390) // R$ 23,90 (reprecificação 0052)
-    expect(prof.capacidade_agenda).toBe(150)
+    expect(prof.capacidade_agenda).toBe(250)
     expect(prof.vagas_ativas).toBe(25) // 25 envios de aviso (teto de vagas ativas, 0049)
     expect(prof.cadencia_configuravel).toBe(true)
     expect(prof.totais_periodo).toBe(true)
@@ -56,8 +56,8 @@ describe('billing (integração)', () => {
     expect(plus.envios_max).toBe(200)
     expect(plus.preco_centavos).toBe(2400) // piso (26 envios): R$ 24,00 (contínuo c/ o Profissional, 0052)
     expect(plus.preco_max_centavos).toBe(14000) // topo (200 envios): R$ 140,00 (0,70/envio)
-    // Capacidade escala 1:1 com os envios (agenda/ativável por "unidade" = 1).
-    expect(plus.agenda_por_unidade).toBe(1)
+    // Vagas 1:1 com os envios (ativável por "unidade" = 1); agenda 10x (0056).
+    expect(plus.agenda_por_unidade).toBe(10)
     expect(plus.ativaveis_por_unidade).toBe(1)
   })
 
@@ -89,8 +89,8 @@ describe('billing (integração)', () => {
     await app.close()
     expect(a.json().plano_id).toBe('plus')
     expect(a.json().unidades).toBe(50)
-    // Plus escala 1:1 com os envios → capacidade/vagas = 50.
-    expect(a.json().capacidade_agenda).toBe(50)
+    // Plus: vagas 1:1 (50) e agenda 10x → 500 (0056).
+    expect(a.json().capacidade_agenda).toBe(500)
   })
 
   it('assinar Plus no piso (26) e no topo (200) congela os extremos da curva', async () => {

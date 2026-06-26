@@ -95,6 +95,7 @@ function CartaoPlus({
   const max = p.envios_max ?? 200
   const [envios, setEnvios] = useState(() => Math.min(Math.max(50, min), max))
   const total = precoEnvioCentavos(p, envios)
+  const agenda = envios * (p.agenda_por_unidade ?? 1)
 
   return (
     <Card
@@ -126,14 +127,11 @@ function CartaoPlus({
           style={{ accentColor: 'var(--color-salvia)' }}
           aria-label="Envios por mês"
         />
-        <div className="flex justify-between text-xs text-tinta-2">
-          <span>{min}</span>
-          <span>{max}</span>
-        </div>
       </div>
 
       <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
         <li className="font-medium">{`• Até ${envios} envios de aviso por mês`}</li>
+        <li>{`• Agenda de até ${agenda} itens`}</li>
         <li>• Avisos automáticos no WhatsApp</li>
         {p.cadencia_configuravel && <li>• Cadência configurável</li>}
       </ul>

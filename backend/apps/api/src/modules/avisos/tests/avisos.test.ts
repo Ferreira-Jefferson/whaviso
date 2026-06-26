@@ -105,9 +105,9 @@ describe('avisos (integração com whaviso_dev)', () => {
   })
 
   it('agenda cheia → 422 agenda_cheia (balde único, sem apagar nada)', async () => {
-    // Plus com 10 envios = agenda 10 (balde único, capacidade 1:1). O 11º item falha.
+    // Plus com 1 envio = agenda 10 (10 por envio, 0056; balde único). O 11º item falha.
     const cheio = await criarUsuario('AgendaCheia')
-    await definirPlano(cheio, 'plus', 10)
+    await definirPlano(cheio, 'plus', 1)
     const app = await criarAppTeste(cheio)
     for (let i = 0; i < 10; i++) {
       const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
@@ -134,7 +134,7 @@ describe('avisos (integração com whaviso_dev)', () => {
 
   it('agenda conta certo no fluxo INVERTIDO (devedor-criador) — C1', async () => {
     const inv = await criarUsuario('Invertido')
-    await definirPlano(inv, 'plus', 10) // agenda 10
+    await definirPlano(inv, 'plus', 1) // 1 envio x 10 = agenda 10
     const app = await criarAppTeste(inv)
     // Cria 10 avisos invertidos (criador = devedor). A contagem usa a dupla condição
     // por papel; se contasse só cobrador_id, o invertido escaparia do limite.
@@ -178,7 +178,7 @@ describe('avisos (integração com whaviso_dev)', () => {
 
   it('arquivar libera a vaga da agenda (soft-delete, sem DELETE físico)', async () => {
     const arq = await criarUsuario('Arquivar')
-    await definirPlano(arq, 'plus', 10) // agenda 10
+    await definirPlano(arq, 'plus', 1) // 1 envio x 10 = agenda 10
     const app = await criarAppTeste(arq)
     let ultimoId = ''
     for (let i = 0; i < 10; i++) {
@@ -208,7 +208,7 @@ describe('avisos (integração com whaviso_dev)', () => {
 
   it('corrida: dois POST simultâneos na última vaga, só um passa (H11.8)', async () => {
     const corrida = await criarUsuario('Corrida')
-    await definirPlano(corrida, 'plus', 10) // agenda 10
+    await definirPlano(corrida, 'plus', 1) // 1 envio x 10 = agenda 10
     const app = await criarAppTeste(corrida)
     // Preenche 9 das 10 vagas.
     for (let i = 0; i < 9; i++) {
