@@ -84,7 +84,8 @@ export const avisoSchema = z.object({
   // é o ponteiro 1..N; o status do aviso reflete a ocorrência corrente (pago só no fim).
   // O painel usa ocorrencia_atual/ocorrencias_total para o progresso "k de N".
   recorrencia_tipo: z.enum(['periodo', 'avulsas']).nullish(),
-  recorrencia_freq: z.enum(['mensal', 'semanal', 'diaria']).nullish(),
+  recorrencia_freq: z.enum(['mensal', 'semanal']).nullish(),
+  // Coluna legada (H6.10): a entrada não configura mais "a cada N"; é sempre 1.
   recorrencia_intervalo: z.number().int().min(1).nullish(),
   ocorrencias_total: z.number().int().nullish(),
   ocorrencia_atual: z.number().int().nullish(),

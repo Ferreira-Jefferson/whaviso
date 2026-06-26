@@ -92,7 +92,7 @@ Como **cobrador** de um combinado recorrente, quero confirmar o pagamento de cad
 - [ ] Só a confirmação da **última ocorrência** (ou o fim do período) leva o combinado a **`pago` terminal**; só aí o horário reservado vira `null`.
 - [ ] O painel mostra o **progresso** do recorrente (ex.: "3 de 5 pagamentos confirmados") e o status da ocorrência corrente (Épico 9).
 - [ ] Marcar como pago direto (H8.4) e reabrir (H8.6) valem **por ocorrência**.
-- [ ] A própria recorrência (definir "todo dia 10 por 5 meses", por dia/semana/mês ou datas avulsas) é configurada na criação/ativação pelo **seletor de recorrência decidido no Épico 6 H6.10**; a lógica de confirmação por ocorrência descrita aqui se apoia nesse mecanismo.
+- [ ] A própria recorrência (definir "todo dia 10 por 5 meses", por semana/mês ou datas específicas) é configurada na criação/ativação pelo **seletor de recorrência decidido no Épico 6 H6.10**; a lógica de confirmação por ocorrência descrita aqui se apoia nesse mecanismo.
 - [ ] **Custo de vaga de plano:** cada **ocorrência reserva 1 vaga de aviso ativo** (Épico 11 H11.5), liberada quando a ocorrência vira `pago`. Recorrência **não é diferencial de plano** (é facilitador para registrar vários avisos do mesmo cliente); é só metrificada por ocorrência, como qualquer aviso.
 
 ---

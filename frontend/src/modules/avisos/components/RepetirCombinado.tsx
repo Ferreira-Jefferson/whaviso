@@ -1,7 +1,12 @@
 // "Repetir este combinado" (E6 H6.10): controle RECOLHIDO por padrão, revelação
 // progressiva, design clean. Recorrência é FACILITADOR disponível em TODOS os planos
 // (não gated, H11.5): um atalho para registrar vários avisos do mesmo cliente. Aberto,
-// oferece duas abas: "Por período" e "Datas avulsas".
+// oferece duas abas: "Por período" e "Datas específicas".
+//
+// A aba "Por período" lê como FRASE ("Todo dia 10, por 3 meses"): o dia (mensal) ou o dia
+// da semana (semanal) vem da Data combinada; só o número de vezes é digitado. É sempre
+// intervalo 1 (todo mês ou toda semana) com fim por N ocorrências (H6.10): sem "a cada N",
+// sem "até uma data" e sem frequência diária.
 //
 // A CADÊNCIA (quais D-2..D+1 saem) NÃO mora aqui: é propriedade do próprio combinado,
 // não da repetição. Ver `CadenciaLembretes`, renderizado ao lado deste no formulário.
@@ -12,32 +17,44 @@
 // para enviar: só conta, para exibir. As datas são expandidas no servidor.
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Repeat, X } from 'lucide-react'
-import {
-  Button,
-  DateInput,
-  Field,
-  Input,
-  SegmentedControl,
-  Select,
-} from '@/shared/ui'
-import { dataPtBR } from '@/shared/format'
+import { Button, DateInput, Field, Input, SegmentedControl } from '@/shared/ui'
+import { dataPtBR, hojeIso } from '@/shared/format'
 import type { RecorrenciaInput } from '@/shared/contracts'
 
 type Aba = 'periodo' | 'avulsas'
-type Freq = 'mensal' | 'semanal' | 'diaria'
+type Freq = 'mensal' | 'semanal'
 
 const OPCOES_ABA: ReadonlyArray<{ value: Aba; label: string }> = [
   { value: 'periodo', label: 'Por período' },
-  { value: 'avulsas', label: 'Datas avulsas' },
+  { value: 'avulsas', label: 'Datas específicas' },
 ]
 
 const OPCOES_FREQ: ReadonlyArray<{ value: Freq; label: string }> = [
-  { value: 'mensal', label: 'Por mês' },
-  { value: 'semanal', label: 'Por semana' },
-  { value: 'diaria', label: 'Por dia' },
+  { value: 'mensal', label: 'Mês' },
+  { value: 'semanal', label: 'Semana' },
 ]
 
-type FimPor = 'ocorrencias' | 'ate'
+// Dia da semana (0=domingo) -> nome + artigo com gênero certo ("Toda terça-feira",
+// "Todo domingo"): as -feira são femininas; domingo/sábado, masculinos.
+const DIAS_SEMANA: ReadonlyArray<{ nome: string; artigo: 'Todo' | 'Toda' }> = [
+  { nome: 'domingo', artigo: 'Todo' },
+  { nome: 'segunda-feira', artigo: 'Toda' },
+  { nome: 'terça-feira', artigo: 'Toda' },
+  { nome: 'quarta-feira', artigo: 'Toda' },
+  { nome: 'quinta-feira', artigo: 'Toda' },
+  { nome: 'sexta-feira', artigo: 'Toda' },
+  { nome: 'sábado', artigo: 'Todo' },
+]
+
+const UNIDADE: Record<Freq, string> = { mensal: 'meses', semanal: 'semanas' }
+
+// Dia do mês (1..31) e dia da semana (0..6) a partir de 'YYYY-MM-DD', SEM `new Date(iso)`
+// (que parseia em UTC e poderia escorregar um dia): montamos pelos componentes locais.
+function partesData(iso: string): { dia: number; semana: number } | null {
+  const [a, m, d] = iso.split('-').map(Number)
+  if (!a || !m || !d) return null
+  return { dia: d, semana: new Date(a, m - 1, d).getDay() }
+}
 
 interface RepetirCombinadoProps {
   /** Data combinada atual (YYYY-MM-DD ou ''). Âncora da 1ª ocorrência. */
@@ -46,80 +63,29 @@ interface RepetirCombinadoProps {
   onChange: (recorrencia: RecorrenciaInput | undefined) => void
 }
 
-// Conta as ocorrências de um período por DATA LIMITE (só para a prévia local; o servidor
-// recalcula a data real de cada ocorrência). Mensal mantém o dia (último do mês quando
-// não existe, ex.: 31); semanal/diária somam dias corridos. Cap defensivo em 60.
-function contarPorData(data: string, freq: Freq, intervalo: number, ate: string): number {
-  if (!data || !ate || ate < data) return 0
-  const partes = data.split('-').map(Number)
-  const ay = partes[0]
-  const am = partes[1]
-  const ad = partes[2]
-  if (ay == null || am == null || ad == null) return 0
-  const limite = ate
-  let total = 0
-  for (let k = 0; k < 60; k++) {
-    let y = ay
-    let m = am
-    let d = ad
-    if (freq === 'mensal') {
-      const totalMeses = (am - 1) + k * intervalo
-      y = ay + Math.floor(totalMeses / 12)
-      m = (totalMeses % 12) + 1
-      const ultimoDia = new Date(y, m, 0).getDate()
-      d = Math.min(ad, ultimoDia)
-    } else {
-      const dias = (freq === 'semanal' ? 7 : 1) * intervalo * k
-      const base = new Date(ay, am - 1, ad)
-      base.setDate(base.getDate() + dias)
-      y = base.getFullYear()
-      m = base.getMonth() + 1
-      d = base.getDate()
-    }
-    const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    if (iso > limite) break
-    total++
-  }
-  return total
-}
-
-// Unidade do intervalo conforme a frequência, com plural só quando faz sentido. Deixa o
-// campo "A cada N <unidade>" auto-explicativo: é intervalo entre ocorrências, não pulo.
-function unidadeIntervalo(freq: Freq, intervalo: number): string {
-  const um = intervalo === 1
-  if (freq === 'mensal') return um ? 'mês' : 'meses'
-  if (freq === 'semanal') return um ? 'semana' : 'semanas'
-  return um ? 'dia' : 'dias'
-}
-
 export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoProps) {
   const [aberto, setAberto] = useState(false)
   const [aba, setAba] = useState<Aba>('periodo')
 
-  // Período.
-  const [freq, setFreq] = useState<Freq>('mensal')
-  const [intervalo, setIntervalo] = useState(1)
-  const [fimPor, setFimPor] = useState<FimPor>('ocorrencias')
-  const [ocorrencias, setOcorrencias] = useState(3)
-  const [ate, setAte] = useState('')
+  // Só dá para repetir a partir de uma data: a Data combinada é a âncora da 1ª
+  // ocorrência (a frase "Todo dia X" e a 1ª data avulsa saem dela). Sem data, o
+  // controle não expande; se a data for limpa com ele aberto, recolhe sozinho.
+  const podeRepetir = Boolean(dataCombinada)
 
-  // Datas avulsas (ADICIONAIS; a 1ª ocorrência é sempre a Data combinada).
+  // Período: frequência + quantas vezes no total (inclui a 1ª; sempre intervalo 1).
+  const [freq, setFreq] = useState<Freq>('mensal')
+  const [ocorrencias, setOcorrencias] = useState(3)
+
+  // Datas específicas (ADICIONAIS; a 1ª ocorrência é sempre a Data combinada).
   const [datasAvulsas, setDatasAvulsas] = useState<string[]>([])
 
   // Monta a recorrência efetiva conforme a aba e o estado (ou undefined se não repete).
   const recorrencia = useMemo<RecorrenciaInput | undefined>(() => {
     if (!aberto) return undefined
-    if (aba === 'periodo') {
-      const base = { tipo: 'periodo' as const, freq, intervalo }
-      return fimPor === 'ocorrencias'
-        ? { ...base, ocorrencias }
-        : ate
-          ? { ...base, ate }
-          : undefined // sem data limite ainda: incompleto, não envia recorrência
-    }
+    if (aba === 'periodo') return { tipo: 'periodo', freq, ocorrencias }
     const datas = datasAvulsas.filter(Boolean)
     return datas.length > 0 ? { tipo: 'avulsas', datas } : undefined
-  }, [aberto, aba, freq, intervalo, fimPor, ocorrencias, ate, datasAvulsas])
+  }, [aberto, aba, freq, ocorrencias, datasAvulsas])
 
   // Avisa o pai a cada mudança efetiva.
   useEffect(() => {
@@ -128,16 +94,34 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorrencia])
 
+  // Sem Data combinada não há âncora: recolhe se a data for limpa com o controle aberto.
+  useEffect(() => {
+    if (!podeRepetir) setAberto(false)
+  }, [podeRepetir])
+
   // Quantos avisos a regra gera (prévia local). Combinado simples = 1.
   const totalOcorrencias = useMemo(() => {
     if (!recorrencia) return 1
     if (recorrencia.tipo === 'avulsas') return 1 + recorrencia.datas.length
-    if (recorrencia.ocorrencias != null) return recorrencia.ocorrencias
-    if (recorrencia.ate != null) {
-      return contarPorData(dataCombinada, recorrencia.freq, recorrencia.intervalo, recorrencia.ate)
-    }
-    return 1
-  }, [recorrencia, dataCombinada])
+    return recorrencia.ocorrencias
+  }, [recorrencia])
+
+  // Prefixo da frase da aba "Por período". A ESTRUTURA é estável ("Todo dia X" / "Toda
+  // terça-feira"): só o trecho que vem da Data combinada (o dia do mês, ou o dia da semana)
+  // muda. Sem data ainda, mostra um "X" como espaço reservado (não troca a frase, para não
+  // confundir). O servidor é a autoridade e expande as datas.
+  const partes = dataCombinada ? partesData(dataCombinada) : null
+  const placeholderDia = <span className="text-tinta-2">X</span>
+  const prefixoFrase =
+    freq === 'mensal' ? (
+      <>Todo dia {partes ? partes.dia : placeholderDia}</>
+    ) : partes ? (
+      <>
+        {DIAS_SEMANA[partes.semana]!.artigo} {DIAS_SEMANA[partes.semana]!.nome}
+      </>
+    ) : (
+      <>Toda {placeholderDia}</>
+    )
 
   function adicionarData() {
     setDatasAvulsas((atual) => [...atual, ''])
@@ -151,19 +135,25 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
 
   return (
     <div className="rounded-card border border-linha bg-papel-2/40">
-      {/* Cabeçalho: liga/desliga o recurso (recolhido por padrão). */}
+      {/* Cabeçalho: liga/desliga o recurso (recolhido por padrão). Só expande com uma
+          Data combinada escolhida (a âncora da 1ª ocorrência). */}
       <button
         type="button"
-        onClick={() => setAberto((v) => !v)}
+        onClick={() => podeRepetir && setAberto((v) => !v)}
+        disabled={!podeRepetir}
         aria-expanded={aberto}
-        className="flex w-full items-center justify-between gap-3 rounded-card px-4 py-3 text-left transition-colors hover:bg-papel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia"
+        className="flex w-full items-center justify-between gap-3 rounded-card px-4 py-3 text-left transition-colors hover:bg-papel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
       >
         <span className="flex items-center gap-2.5">
           <Repeat strokeWidth={1.75} className="size-4 text-salvia" />
           <span className="text-sm font-medium text-tinta">Repetir este combinado</span>
         </span>
         <span className="text-xs text-tinta-2">
-          {aberto ? 'Recolher' : 'Para combinados que se repetem'}
+          {!podeRepetir
+            ? 'Escolha a Data combinada primeiro'
+            : aberto
+              ? 'Recolher'
+              : 'Para combinados que se repetem'}
         </span>
       </button>
 
@@ -183,67 +173,46 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
 
           {aba === 'periodo' ? (
             <div className="flex flex-col gap-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Frequência">
-                  <Select<Freq>
-                    ariaLabel="Frequência"
-                    value={freq}
-                    onChange={setFreq}
-                    options={OPCOES_FREQ}
-                  />
-                </Field>
-                {/* Campo montado à mão (não via Field) para mostrar a unidade ao lado do
-                    número: "A cada 2 meses" lê como intervalo, sem texto de exemplo. */}
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="campo-intervalo" className="text-sm font-medium text-tinta">
-                    A cada
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="campo-intervalo"
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={intervalo}
-                      onChange={(e) => setIntervalo(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
-                      className="w-20"
-                    />
-                    <span className="text-sm text-tinta-2">{unidadeIntervalo(freq, intervalo)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <Field label="Terminar">
-                <SegmentedControl<FimPor>
-                  ariaLabel="Quando terminar a repetição"
-                  value={fimPor}
-                  onChange={setFimPor}
-                  options={[
-                    { value: 'ocorrencias', label: 'Após N vezes' },
-                    { value: 'ate', label: 'Até uma data' },
-                  ]}
+              <Field label="Frequência">
+                <SegmentedControl<Freq>
+                  ariaLabel="Frequência"
+                  value={freq}
+                  onChange={setFreq}
+                  options={OPCOES_FREQ}
                 />
               </Field>
 
-              {fimPor === 'ocorrencias' ? (
-                <Field label="Quantas vezes no total" dica="Inclui a primeira (a Data combinada).">
+              {/* Frase: "<prefixo>, por [N] <unidade>". Só o número é digitado; o dia (mensal)
+                  ou o dia da semana (semanal) vem da Data combinada. */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-tinta">
+                  <span className="font-medium">{prefixoFrase},</span>
+                  <span className="text-tinta-2">por</span>
                   <Input
                     type="number"
                     min={2}
                     max={60}
                     value={ocorrencias}
-                    onChange={(e) => setOcorrencias(Math.max(2, Math.min(60, Number(e.target.value) || 2)))}
+                    onChange={(e) =>
+                      setOcorrencias(Math.max(2, Math.min(60, Number(e.target.value) || 2)))
+                    }
+                    aria-label="Quantas vezes no total (inclui a primeira)"
+                    className="w-20"
                   />
-                </Field>
-              ) : (
-                <Field label="Repetir até" dica="A última repetição não passa desta data.">
-                  <DateInput
-                    value={ate}
-                    min={dataCombinada || undefined}
-                    onChange={(e) => setAte(e.target.value)}
-                  />
-                </Field>
-              )}
+                  <span>{UNIDADE[freq]}</span>
+                </div>
+                <p className="text-[11px] text-tinta-2">Conta a primeira (a Data combinada).</p>
+                {!dataCombinada && (
+                  <p className="text-[11px] text-tinta-2">
+                    O dia exato vem da Data combinada (escolha acima).
+                  </p>
+                )}
+                {freq === 'mensal' && partes && partes.dia >= 29 && (
+                  <p className="text-[11px] text-tinta-2">
+                    Meses sem o dia {partes.dia} usam o último dia do mês.
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -257,7 +226,7 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
                 <div key={i} className="flex items-center gap-2">
                   <DateInput
                     value={data}
-                    min={dataCombinada || undefined}
+                    min={dataCombinada || hojeIso()}
                     onChange={(e) => mudarData(i, e.target.value)}
                     aria-label={`Data da repetição ${i + 2}`}
                     className="flex-1"

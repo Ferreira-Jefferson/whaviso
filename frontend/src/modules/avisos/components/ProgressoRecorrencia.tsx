@@ -9,11 +9,10 @@ import { ROTULO_DIRECAO, dataPtBR } from '@/shared/format'
 import type { Aviso, PapelAviso } from '@/shared/contracts'
 import { useAvisoOcorrencias } from '../api'
 
-// Rótulo da frequência (quando o aviso é por período). Datas avulsas não têm freq.
+// Rótulo da frequência (quando o aviso é por período). Datas específicas não têm freq.
 const ROTULO_FREQ: Record<NonNullable<Aviso['recorrencia_freq']>, string> = {
   mensal: 'por mês',
   semanal: 'por semana',
-  diaria: 'por dia',
 }
 
 interface ProgressoRecorrenciaProps {
@@ -45,11 +44,7 @@ export function ProgressoRecorrencia({ aviso, meuPapel }: ProgressoRecorrenciaPr
   // Descrição curta da regra (sem recalcular nada; só rotula o que veio no aviso).
   let regra = 'Combinado que se repete'
   if (aviso.recorrencia_tipo === 'periodo' && aviso.recorrencia_freq) {
-    const cada =
-      aviso.recorrencia_intervalo && aviso.recorrencia_intervalo > 1
-        ? ` (a cada ${aviso.recorrencia_intervalo})`
-        : ''
-    regra = `Repete ${ROTULO_FREQ[aviso.recorrencia_freq]}${cada}`
+    regra = `Repete ${ROTULO_FREQ[aviso.recorrencia_freq]}`
   } else if (aviso.recorrencia_tipo === 'avulsas') {
     regra = 'Repete em datas escolhidas'
   }

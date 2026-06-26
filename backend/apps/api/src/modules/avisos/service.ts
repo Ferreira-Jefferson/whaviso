@@ -130,7 +130,7 @@ function exigirCadenciaPermitida(
 /** Mapeia a recorrência do contrato para a config de expansão de datas (shared/datas). */
 function cfgRecorrencia(r: RecorrenciaInput): RecorrenciaCfg {
   return r.tipo === 'periodo'
-    ? { tipo: 'periodo', freq: r.freq, intervalo: r.intervalo, ocorrencias: r.ocorrencias, ate: r.ate }
+    ? { tipo: 'periodo', freq: r.freq, ocorrencias: r.ocorrencias }
     : { tipo: 'avulsas', datas: r.datas }
 }
 
@@ -146,7 +146,7 @@ function montarRecorrencia(
 ): {
   colunas: {
     recorrencia_tipo: 'periodo' | 'avulsas'
-    recorrencia_freq: 'mensal' | 'semanal' | 'diaria' | null
+    recorrencia_freq: 'mensal' | 'semanal' | null
     recorrencia_intervalo: number
     ocorrencias_total: number
     ocorrencia_atual: number
@@ -159,7 +159,8 @@ function montarRecorrencia(
     colunas: {
       recorrencia_tipo: r.tipo,
       recorrencia_freq: r.tipo === 'periodo' ? r.freq : null,
-      recorrencia_intervalo: r.tipo === 'periodo' ? r.intervalo : 1,
+      // Coluna legada: a entrada não configura mais "a cada N" (sempre 1, H6.10).
+      recorrencia_intervalo: 1,
       ocorrencias_total: datas.length,
       ocorrencia_atual: 1,
       cadencia_etapas: cadencia ? [...cadencia] : null,

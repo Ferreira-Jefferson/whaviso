@@ -24,19 +24,18 @@ import {
 } from './entidades'
 
 // Configuração de RECORRÊNCIA na criação/ativação (E6 H6.10). Ausente = combinado simples.
-//  - periodo: repete por frequência (mensal/semanal/diaria) ancorada na data_combinada,
-//    com fim por N ocorrências (TOTAL, incluindo a 1ª) OU por data limite (`ate`).
-//  - avulsas: datas ADICIONAIS (ocorrências 2..N); a 1ª é a própria data_combinada.
+//  - periodo: repete TODO mês ou toda semana (sempre intervalo 1) ancorado na
+//    data_combinada, por N ocorrências (TOTAL, incluindo a 1ª). Mensal mantém o dia;
+//    semanal mantém o dia da semana. (Sem frequência diária.)
+//  - avulsas (UI: "Datas específicas"): datas ADICIONAIS (ocorrências 2..N); a 1ª é a
+//    própria data_combinada.
 // O servidor expande em ocorrências (datas em America/Sao_Paulo); o cliente NUNCA calcula
-// ocorrência. "ocorrencias OU ate" é validado no body (refine), pois discriminatedUnion
-// não aceita refine no membro. Recorrência NÃO é gated por plano (é facilitador, H11.5).
+// ocorrência. Recorrência NÃO é gated por plano (é facilitador, H11.5).
 export const recorrenciaInput = z.discriminatedUnion('tipo', [
   z.object({
     tipo: z.literal('periodo'),
-    freq: z.enum(['mensal', 'semanal', 'diaria']),
-    intervalo: z.number().int().min(1).max(12).default(1),
-    ocorrencias: z.number().int().min(2).max(60).optional(),
-    ate: dataCombinada.optional(),
+    freq: z.enum(['mensal', 'semanal']),
+    ocorrencias: z.number().int().min(2).max(60),
   }),
   z.object({
     tipo: z.literal('avulsas'),
@@ -92,16 +91,6 @@ export const criarAvisoBody = z
     message: 'informe o banco da chave Pix',
     path: ['pix_banco'],
   })
-  // Recorrência 'periodo' exige fim: N ocorrências OU data limite (discriminatedUnion não
-  // aceita refine no membro; validamos aqui).
-  .refine(
-    (b) =>
-      b.recorrencia == null ||
-      b.recorrencia.tipo !== 'periodo' ||
-      b.recorrencia.ocorrencias != null ||
-      b.recorrencia.ate != null,
-    { message: 'na recorrência por período, informe o número de ocorrências ou a data limite', path: ['recorrencia'] },
-  )
   // No invertido (pagar) a chave Pix é OPCIONAL ao gerar o convite: o cobrador (quem vai
   // receber) pode informar/ajustar depois. Sem refine de Pix aqui (espelha o backend).
 export type CriarAvisoBody = z.infer<typeof criarAvisoBody>
@@ -132,14 +121,6 @@ export const ativarAvisoBody = z
     recorrencia: recorrenciaInput.nullish(),
     cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
   })
-  .refine(
-    (b) =>
-      b.recorrencia == null ||
-      b.recorrencia.tipo !== 'periodo' ||
-      b.recorrencia.ocorrencias != null ||
-      b.recorrencia.ate != null,
-    { message: 'na recorrência por período, informe o número de ocorrências ou a data limite', path: ['recorrencia'] },
-  )
 export type AtivarAvisoBody = z.infer<typeof ativarAvisoBody>
 
 // ---- PATCH /v1/avisos/:id (editar, H2.5) ----

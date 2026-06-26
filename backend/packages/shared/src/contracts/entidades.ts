@@ -86,7 +86,8 @@ export const avisoSchema = z.object({
   // o combinado segue UMA linha; as ocorrências vivem em aviso_ocorrencias. `ocorrencia_atual`
   // é o ponteiro 1..N; o status do aviso reflete a ocorrência corrente (pago só no fim).
   recorrencia_tipo: z.enum(['periodo', 'avulsas']).nullish(),
-  recorrencia_freq: z.enum(['mensal', 'semanal', 'diaria']).nullish(),
+  recorrencia_freq: z.enum(['mensal', 'semanal']).nullish(),
+  // Coluna legada (H6.10): a entrada não configura mais "a cada N"; é sempre 1.
   recorrencia_intervalo: z.number().int().min(1).nullish(),
   ocorrencias_total: z.number().int().nullish(),
   ocorrencia_atual: z.number().int().nullish(),

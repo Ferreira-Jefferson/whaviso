@@ -46,7 +46,7 @@ interface LinhaAviso {
   pix_titular: string | null
   pix_banco: string | null
   recorrencia_tipo: 'periodo' | 'avulsas' | null
-  recorrencia_freq: 'mensal' | 'semanal' | 'diaria' | null
+  recorrencia_freq: 'mensal' | 'semanal' | null
   recorrencia_intervalo: number | null
   ocorrencias_total: number | null
   ocorrencia_atual: number | null
@@ -65,7 +65,7 @@ function mapear(l: LinhaAviso): Aviso {
  *  Combinado simples = tudo null/undefined; o serviço já expandiu as datas e passa o N. */
 export interface RecorrenciaAviso {
   recorrencia_tipo: 'periodo' | 'avulsas' | null
-  recorrencia_freq: 'mensal' | 'semanal' | 'diaria' | null
+  recorrencia_freq: 'mensal' | 'semanal' | null
   recorrencia_intervalo: number | null
   ocorrencias_total: number | null
   ocorrencia_atual: number | null
@@ -90,7 +90,7 @@ export interface NovoAviso {
   pix_banco: string | null
   // Recorrência/cadência (null = combinado simples / ciclo completo).
   recorrencia_tipo?: 'periodo' | 'avulsas' | null
-  recorrencia_freq?: 'mensal' | 'semanal' | 'diaria' | null
+  recorrencia_freq?: 'mensal' | 'semanal' | null
   recorrencia_intervalo?: number | null
   ocorrencias_total?: number | null
   ocorrencia_atual?: number | null

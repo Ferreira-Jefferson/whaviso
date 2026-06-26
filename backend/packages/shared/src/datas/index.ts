@@ -128,21 +128,19 @@ export const MAX_OCORRENCIAS = 60
 export type RecorrenciaCfg =
   | {
       tipo: 'periodo'
-      freq: 'mensal' | 'semanal' | 'diaria'
-      intervalo: number
-      ocorrencias?: number
-      ate?: string
+      freq: 'mensal' | 'semanal'
+      ocorrencias: number
     }
   | { tipo: 'avulsas'; datas: string[] }
 
 /**
  * Expande a recorrência em DATAS de ocorrência ('YYYY-MM-DD'), incluindo a 1ª (a própria
  * data combinada). Servidor é autoridade (E6 H6.10); o cliente nunca calcula ocorrência.
- *  - periodo: âncora + k*intervalo (mensal: mesmo dia, clampa ao último dia do mês quando
- *    não existe, ex.: 31 -> 28/30; semanal/diaria somam dias corridos); fim por N
- *    ocorrências (TOTAL, incluindo a 1ª) OU por data limite (`ate`, inclusiva).
+ *  - periodo: âncora + k (TODO mês ou toda semana, sempre intervalo 1), por N ocorrências
+ *    (TOTAL, incluindo a 1ª). Mensal mantém o mesmo dia, clampando ao último dia do mês
+ *    quando não existe (ex.: 31 -> 28/30); semanal soma 7 dias por ocorrência.
  *  - avulsas: [dataCombinada, ...datas] deduplicado e ordenado.
- * A âncora entra SEMPRE (>= 1 ocorrência), mesmo que `ate` seja anterior (a api valida).
+ * A âncora entra SEMPRE (>= 1 ocorrência).
  */
 export function expandirOcorrencias(dataCombinada: string, cfg: RecorrenciaCfg): string[] {
   if (cfg.tipo === 'avulsas') {
@@ -150,22 +148,13 @@ export function expandirOcorrencias(dataCombinada: string, cfg: RecorrenciaCfg):
     return unicas.slice(0, MAX_OCORRENCIAS)
   }
 
-  const intervalo = Math.max(1, cfg.intervalo)
   const ancora = new TZDate(instanteSp(dataCombinada, 12, 0).getTime(), TZ)
-  const limite = cfg.ate ?? null
-  const total = Math.min(cfg.ocorrencias ?? MAX_OCORRENCIAS, MAX_OCORRENCIAS)
+  const total = Math.min(cfg.ocorrencias, MAX_OCORRENCIAS)
 
   const datas: string[] = [dataCombinada] // âncora sempre presente (ocorrência 1)
   for (let k = 1; datas.length < total; k++) {
-    const d =
-      cfg.freq === 'mensal'
-        ? addMonths(ancora, k * intervalo)
-        : cfg.freq === 'semanal'
-          ? addDays(ancora, k * intervalo * 7)
-          : addDays(ancora, k * intervalo)
-    const iso = format(d, 'yyyy-MM-dd')
-    if (limite && iso > limite) break
-    datas.push(iso)
+    const d = cfg.freq === 'mensal' ? addMonths(ancora, k) : addDays(ancora, k * 7)
+    datas.push(format(d, 'yyyy-MM-dd'))
   }
   return datas
 }

@@ -75,7 +75,7 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
       method: 'POST',
       url: '/v1/avisos',
       headers: AUTH,
-      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', intervalo: 1, ocorrencias: 3 } }),
+      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 3 } }),
     })
     await app.close()
     expect(r.statusCode).toBe(201)
@@ -109,7 +109,7 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
       method: 'POST',
       url: '/v1/avisos',
       headers: AUTH,
-      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', intervalo: 1, ocorrencias: 4 } }),
+      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 4 } }),
     })
     await app.close()
     expect(await somarVagas(uid)).toBe(4) // 4 ocorrências não pagas = 4 vagas
@@ -124,7 +124,7 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
       method: 'POST',
       url: '/v1/avisos',
       headers: AUTH,
-      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', intervalo: 1, ocorrencias: 26 } }),
+      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 26 } }),
     })
     await app.close()
     expect(r.statusCode).toBe(422)
@@ -174,7 +174,7 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
     const app = await criarAppTeste(uid)
     const rec = await app.inject({
       method: 'POST', url: '/v1/avisos', headers: AUTH,
-      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', intervalo: 1, ocorrencias: 2 } }),
+      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 2 } }),
     })
     const simples = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpo() })
 
@@ -193,7 +193,7 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
     const app = await criarAppTeste(free)
     const r = await app.inject({
       method: 'POST', url: '/v1/avisos', headers: AUTH,
-      payload: corpo({ modo: 'agenda', recorrencia: { tipo: 'periodo', freq: 'mensal', intervalo: 1, ocorrencias: 3 } }),
+      payload: corpo({ modo: 'agenda', recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 3 } }),
     })
     await app.close()
     // Free PODE montar recorrente na agenda (sem_aviso): recorrência é facilitador, não gated.

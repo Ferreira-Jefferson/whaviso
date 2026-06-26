@@ -25,7 +25,7 @@ function corpoRecorrente(ocorrencias = 3) {
     pix_chave: 'maria@pix.com',
     pix_titular: 'Maria Silva',
     pix_banco: 'Banco Exemplo',
-    recorrencia: { tipo: 'periodo', freq: 'mensal', intervalo: 1, ocorrencias },
+    recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias },
   }
 }
 
