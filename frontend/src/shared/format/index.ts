@@ -29,6 +29,12 @@ export function brl(centavos: number): string {
   })
 }
 
+/** Hoje em America/Sao_Paulo como 'YYYY-MM-DD' (data de negócio). Para `min` de
+ *  campos de data que só aceitam datas a partir de hoje (combinado futuro). */
+export function hojeIso(): string {
+  return format(new TZDate(new Date(), FUSO), 'yyyy-MM-dd')
+}
+
 /** Formata uma data de negócio (Date ou 'YYYY-MM-DD') em pt-BR, fuso de SP. */
 export function dataPtBR(date: Date | string): string {
   const d =

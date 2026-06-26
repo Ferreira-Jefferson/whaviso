@@ -91,9 +91,6 @@ export function CadenciaLembretes({ cadenciaConfiguravel, onChange }: CadenciaLe
               )
             })}
           </div>
-          {etapasSelecionadas.length === 0 && (
-            <p className="text-[11px] text-tinta-2">Nenhuma marcada: usa o ciclo completo.</p>
-          )}
         </>
       ) : (
         <Banner tom="info">

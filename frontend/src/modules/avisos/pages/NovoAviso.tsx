@@ -25,6 +25,7 @@ import type {
 import { usePerfil } from '@/shared/auth'
 import { usePlanoSomenteLeitura, useAssinaturaVigente } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
+import { hojeIso } from '@/shared/format'
 import { useCriarAviso } from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
 import { AvisoCriado } from '../components/AvisoCriado'
@@ -292,19 +293,23 @@ export default function NovoAvisoPage() {
             </Field>
 
             <Field label="Data combinada" erro={errors.data_combinada?.message}>
-              <DateInput
-                invalido={Boolean(errors.data_combinada)}
-                {...register('data_combinada')}
+              {/* Controlado (como o Valor): o DateInput é um calendário próprio, e o modo
+                  controlado mantém a exibição em sincronia com o react-hook-form. */}
+              <Controller
+                control={control}
+                name="data_combinada"
+                render={({ field }) => (
+                  <DateInput
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    invalido={Boolean(errors.data_combinada)}
+                    min={hojeIso()}
+                  />
+                )}
               />
             </Field>
           </div>
-
-          {/* E6 H6.10: quais lembretes saem é do PRÓPRIO combinado (vale repetindo ou
-              não), por isso fora do "Repetir". Recurso pago: gate por plano dentro. */}
-          <CadenciaLembretes
-            cadenciaConfiguravel={cadenciaConfiguravel}
-            onChange={aoMudarCadencia}
-          />
 
           {/* E6 H6.10: repetir o combinado (recorrência, todos os planos). Recolhido por
               padrão; o padrão segue sendo o combinado único. A data combinada é a âncora
@@ -338,12 +343,14 @@ export default function NovoAvisoPage() {
             />
           </div>
 
+          {/* E6 H6.10: quais lembretes saem é do PRÓPRIO combinado (vale repetindo ou
+              não), por isso fora do "Repetir". Recurso pago: gate por plano dentro. */}
+          <CadenciaLembretes
+            cadenciaConfiguravel={cadenciaConfiguravel}
+            onChange={aoMudarCadencia}
+          />
+
           <div className="flex flex-col gap-2 pt-1">
-            <p className="text-xs text-tinta-2">
-              {somenteLeitura
-                ? 'Guarda o combinado na sua agenda, sem enviar nada. Para gerar o convite e enviar o link, escolha um plano.'
-                : 'Gerar o convite envia o link de confirmação agora. Só salvar guarda o combinado na sua agenda, sem enviar nada.'}
-            </p>
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"

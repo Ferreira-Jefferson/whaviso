@@ -16,9 +16,9 @@
 // NovoAviso (Banner + "Ver meu plano"). O front NUNCA calcula a data de cada ocorrência
 // para enviar: só conta, para exibir. As datas são expandidas no servidor.
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Repeat, X } from 'lucide-react'
+import { Lock, Plus, Repeat, X } from 'lucide-react'
 import { Button, DateInput, Field, Input, SegmentedControl } from '@/shared/ui'
-import { dataPtBR, hojeIso } from '@/shared/format'
+import { dataPtBR } from '@/shared/format'
 import type { RecorrenciaInput } from '@/shared/contracts'
 
 type Aba = 'periodo' | 'avulsas'
@@ -54,6 +54,16 @@ function partesData(iso: string): { dia: number; semana: number } | null {
   const [a, m, d] = iso.split('-').map(Number)
   if (!a || !m || !d) return null
   return { dia: d, semana: new Date(a, m - 1, d).getDay() }
+}
+
+// Dia seguinte a 'YYYY-MM-DD' (piso das datas extras: cada uma vem depois da anterior).
+// new Date(a, m-1, d+1) normaliza a virada de mês/ano; sem `new Date(iso)` (UTC).
+function diaSeguinte(iso: string): string {
+  const [a, m, d] = iso.split('-').map(Number)
+  if (!a || !m || !d) return iso
+  const dt = new Date(a, m - 1, d + 1)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
 }
 
 interface RepetirCombinadoProps {
@@ -111,13 +121,20 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
   // muda. Sem data ainda, mostra um "X" como espaço reservado (não troca a frase, para não
   // confundir). O servidor é a autoridade e expande as datas.
   const partes = dataCombinada ? partesData(dataCombinada) : null
-  const placeholderDia = <span className="text-tinta-2">X</span>
+  // O trecho dinâmico (dia do mês ou dia da semana) ganha destaque: salvia + maior, para
+  // o olho ir direto ao que muda. O resto da frase fica no tom normal.
+  const destaque = 'text-base font-semibold text-salvia'
+  const placeholderDia = <span className="text-base text-tinta-2">X</span>
   const prefixoFrase =
     freq === 'mensal' ? (
-      <>Todo dia {partes ? partes.dia : placeholderDia}</>
+      <>
+        Todo dia{' '}
+        {partes ? <strong className={destaque}>{partes.dia}</strong> : placeholderDia}
+      </>
     ) : partes ? (
       <>
-        {DIAS_SEMANA[partes.semana]!.artigo} {DIAS_SEMANA[partes.semana]!.nome}
+        {DIAS_SEMANA[partes.semana]!.artigo}{' '}
+        <strong className={destaque}>{DIAS_SEMANA[partes.semana]!.nome}</strong>
       </>
     ) : (
       <>Toda {placeholderDia}</>
@@ -185,21 +202,25 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
               {/* Frase: "<prefixo>, por [N] <unidade>". Só o número é digitado; o dia (mensal)
                   ou o dia da semana (semanal) vem da Data combinada. */}
               <div className="flex flex-col gap-1.5">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-tinta">
+                {/* Tudo numa linha só: "<prefixo>, por [N] <unidade>". O Input do design
+                    system é w-full, então constrange a largura por um wrapper fixo. */}
+                <div className="flex items-center gap-2 text-sm text-tinta">
                   <span className="font-medium">{prefixoFrase},</span>
                   <span className="text-tinta-2">por</span>
-                  <Input
-                    type="number"
-                    min={2}
-                    max={60}
-                    value={ocorrencias}
-                    onChange={(e) =>
-                      setOcorrencias(Math.max(2, Math.min(60, Number(e.target.value) || 2)))
-                    }
-                    aria-label="Quantas vezes no total (inclui a primeira)"
-                    className="w-20"
-                  />
-                  <span>{UNIDADE[freq]}</span>
+                  <span className="inline-flex w-20 shrink-0">
+                    <Input
+                      type="number"
+                      min={2}
+                      max={60}
+                      value={ocorrencias}
+                      onChange={(e) =>
+                        setOcorrencias(Math.max(2, Math.min(60, Number(e.target.value) || 2)))
+                      }
+                      aria-label="Quantas vezes no total (inclui a primeira)"
+                      className="text-center"
+                    />
+                  </span>
+                  <span className="shrink-0">{UNIDADE[freq]}</span>
                 </div>
                 <p className="text-[11px] text-tinta-2">Conta a primeira (a Data combinada).</p>
                 {!dataCombinada && (
@@ -216,31 +237,49 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <p className="text-xs text-tinta-2">
-                A primeira repetição é a Data combinada. Adicione as outras datas:
-              </p>
-              {datasAvulsas.length === 0 && (
-                <p className="text-sm text-tinta-2">Nenhuma data extra ainda.</p>
-              )}
-              {datasAvulsas.map((data, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <DateInput
-                    value={data}
-                    min={dataCombinada || hojeIso()}
-                    onChange={(e) => mudarData(i, e.target.value)}
-                    aria-label={`Data da repetição ${i + 2}`}
-                    className="flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removerData(i)}
-                    aria-label={`Remover data da repetição ${i + 2}`}
-                    className="shrink-0 rounded-input border border-linha p-2.5 text-tinta-2 transition-colors hover:border-barro hover:text-barro focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-                  >
-                    <X strokeWidth={1.75} className="size-4" />
-                  </button>
-                </div>
-              ))}
+              {/* 1ª repetição é SEMPRE a Data combinada: mostra o campo já preenchido e
+                  travado (cadeado), sem precisar de texto explicando. As demais datas
+                  são adicionadas abaixo. */}
+              <div className="flex items-center gap-2">
+                <DateInput
+                  value={dataCombinada}
+                  disabled
+                  aria-label="Primeira repetição (a Data combinada)"
+                  className="flex-1"
+                />
+                <span
+                  title="A primeira repetição é a Data combinada"
+                  className="flex shrink-0 items-center justify-center rounded-input border border-transparent p-2.5 text-tinta-2"
+                >
+                  <Lock strokeWidth={1.75} className="size-4" />
+                </span>
+              </div>
+              {datasAvulsas.map((data, i) => {
+                // Sequência crescente: cada data extra é DEPOIS da anterior. O piso é o
+                // dia seguinte à última data preenchida antes desta (a 1ª extra parte da
+                // Data combinada). O servidor segue sendo a autoridade ao expandir.
+                const anterior =
+                  datasAvulsas.slice(0, i).reverse().find(Boolean) ?? dataCombinada
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <DateInput
+                      value={data}
+                      min={diaSeguinte(anterior)}
+                      onChange={(e) => mudarData(i, e.target.value)}
+                      aria-label={`Data da repetição ${i + 2}`}
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removerData(i)}
+                      aria-label={`Remover data da repetição ${i + 2}`}
+                      className="shrink-0 rounded-input border border-linha p-2.5 text-tinta-2 transition-colors hover:border-barro hover:text-barro focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                    >
+                      <X strokeWidth={1.75} className="size-4" />
+                    </button>
+                  </div>
+                )
+              })}
               <Button
                 type="button"
                 variante="secondary"
