@@ -130,10 +130,62 @@ describe('admin (integração)', () => {
     expect(start.preco_centavos).toBe(1299)
     expect(start.capacidade_agenda).toBe(123)
 
-    // Restaura para não afetar billing.test.ts (assertivas de preço/limite fixas).
+    // Restaura para não afetar billing.test.ts (assertivas fixas). Com o versionamento
+    // (0054), o PATCH também avança versao_corrente_id → volta para a v1 (catálogo pristino).
     await poolSuper.query(
-      `update public.planos set preco_centavos=$1, capacidade_agenda=$2, cadencia_configuravel=$3 where id='start'`,
+      `update public.planos set preco_centavos=$1, capacidade_agenda=$2, cadencia_configuravel=$3,
+         versao_corrente_id=(select id from public.plano_versoes where plano_id='start' and versao=1)
+       where id='start'`,
       [precoOrig, capOrig, cadOrig],
+    )
+  })
+
+  it('versionamento: editar plano cria nova versao e NAO afeta quem ja assinou (H11.12)', async () => {
+    // comum assina 'start' → pina a versao corrente do start no momento da contratacao.
+    const appA = await criarAppTeste(comum)
+    const assina = await appA.inject({
+      method: 'POST', url: '/v1/billing/assinar', headers: AUTH, payload: { plano_id: 'start' },
+    })
+    expect(assina.statusCode).toBe(200)
+    const antes = await appA.inject({ method: 'GET', url: '/v1/billing/assinatura', headers: AUTH })
+    await appA.close()
+    const capContratada = antes.json().capacidade_agenda as number
+
+    // owner edita o start: aumenta a capacidade (cria uma nova versao).
+    const appOwner = await criarAppTeste(owner)
+    const patch = await appOwner.inject({
+      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
+      payload: { capacidade_agenda: capContratada + 500 },
+    })
+    expect(patch.statusCode).toBe(200)
+    expect(patch.json().capacidade_agenda).toBe(capContratada + 500) // oferta corrente mudou
+    const cat = await appOwner.inject({ method: 'GET', url: '/v1/billing/planos', headers: AUTH })
+    await appOwner.close()
+    const startCat = cat.json().planos.find((p: { id: string }) => p.id === 'start')
+    expect(startCat.capacidade_agenda).toBe(capContratada + 500)
+
+    // comum (ja assinou) NAO muda: mantem a versao contratada.
+    const appA2 = await criarAppTeste(comum)
+    const depois = await appA2.inject({ method: 'GET', url: '/v1/billing/assinatura', headers: AUTH })
+    await appA2.close()
+    expect(depois.json().capacidade_agenda).toBe(capContratada)
+
+    // ha >= 2 versoes do start (append-only).
+    const v = await poolSuper.query<{ n: number }>(
+      `select count(*)::int as n from public.plano_versoes where plano_id='start'`,
+    )
+    expect(v.rows[0]!.n).toBeGreaterThanOrEqual(2)
+
+    // restaura: catalogo do start volta ao v1 (cols + ponteiro); comum volta a free.
+    await poolSuper.query(
+      `update public.planos set
+         capacidade_agenda=(select capacidade_agenda from public.plano_versoes where plano_id='start' and versao=1),
+         versao_corrente_id=(select id from public.plano_versoes where plano_id='start' and versao=1)
+       where id='start'`,
+    )
+    await poolSuper.query(
+      `update public.assinaturas set plano_id='free', plano_versao_id=null, unidades=null, preco_centavos=null where profile_id=$1`,
+      [comum],
     )
   })
 

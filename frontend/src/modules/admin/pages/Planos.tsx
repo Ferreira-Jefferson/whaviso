@@ -278,8 +278,9 @@ export default function PlanosAdminPage() {
           </div>
 
           <Banner tom="info" className="mt-6">
-            Mudanças valem na hora para novas contratações. Quem já assinou mantém o
-            preço do momento da contratação.
+            Editar cria uma nova versão do plano e vale só para novas contratações.
+            Quem já assinou mantém o plano contratado (preço, limites e recursos) até a
+            renovação.
           </Banner>
         </>
       )}

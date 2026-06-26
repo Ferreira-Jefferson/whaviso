@@ -59,6 +59,32 @@ const COLS_PLANO_RETORNO = `
   ativaveis_por_unidade, reengajamento_max, somente_leitura,
   por_envio, envios_min, envios_max, preco_max_centavos
 `
+// Conjunto COMPLETO de colunas de alavanca/preço que compõem uma VERSÃO do plano
+// (espelha public.plano_versoes, ordem fixa). Inclui as não-editáveis pelo body
+// (max_avisos_ativos, por_unidade, agenda/ativaveis_por_unidade, edicoes_max), que são
+// carregadas do estado atual. Usado para inserir a nova versão e atualizar a corrente.
+const COLS_VERSAO = [
+  'nome',
+  'preco_centavos',
+  'max_avisos_ativos',
+  'permite_recorrente',
+  'capacidade_agenda',
+  'vagas_ativas',
+  'cadencia_configuravel',
+  'menu_texto_livre',
+  'informado_pago_habilitado',
+  'totais_periodo',
+  'por_unidade',
+  'agenda_por_unidade',
+  'ativaveis_por_unidade',
+  'reengajamento_max',
+  'edicoes_max',
+  'somente_leitura',
+  'por_envio',
+  'envios_min',
+  'envios_max',
+  'preco_max_centavos',
+] as const
 
 // Lint de linguagem do conteúdo estruturado: texto + rótulos dos botões.
 // Concatena tudo que é texto editável (texto + rótulos) e aplica as três regras:
@@ -322,34 +348,66 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
     },
   )
 
-  // Edição do CATÁLOGO de planos (H11.11): preço, limites e recursos de cada plano.
-  // Atualização parcial (só os campos enviados). Aplica em runtime: GET /billing/planos
-  // e a função alavancas_do_plano leem a tabela na hora. Assinaturas já contratadas
-  // mantêm o preço congelado (billing/assinar). O owner não cria nem apaga planos.
+  // Edição do CATÁLOGO de planos (H11.11/H11.12): preço, limites e recursos. VERSIONADO:
+  // cada edição cria uma NOVA versão (plano_versoes, append-only) e avança a versão
+  // corrente do plano; assinaturas vigentes NÃO mudam (fixaram a versão contratada, ver
+  // billing/assinar + alavancas_do_plano). Vale só para novas contratações. Atualização
+  // parcial: os campos não enviados são carregados do estado atual. Owner não cria nem
+  // apaga planos. `COLS_EDITAVEIS_PLANO` lista o que o body pode sobrescrever; as demais
+  // colunas da versão (max_avisos_ativos, por_unidade, edicoes_max...) são herdadas.
   app.patch(
     '/admin/planos/:id',
     { preHandler: owner, schema: { params: planoIdParam, body: adminAtualizarPlanoBody } },
     async (req) => {
-      const body = req.body
-      const sets: string[] = []
-      const params: unknown[] = [req.params.id]
-      for (const col of COLS_EDITAVEIS_PLANO) {
-        const valor = body[col]
-        if (valor !== undefined) {
-          params.push(valor)
-          sets.push(`${col} = $${params.length}`)
-        }
-      }
-      // O body já garante ao menos um campo (.refine); defesa em profundidade.
-      if (sets.length === 0) {
-        throw regraNegocio('nada_a_atualizar', 'Informe ao menos um campo para atualizar.')
-      }
-      const { rows } = await app.pool.query(
-        `update public.planos set ${sets.join(', ')} where id = $1 returning ${COLS_PLANO_RETORNO}`,
-        params,
-      )
-      if (!rows[0]) throw naoEncontrado('Plano não encontrado')
-      return rows[0]
+      const id = req.params.id
+      const body = req.body as Record<string, unknown>
+      const editaveis = new Set<string>(COLS_EDITAVEIS_PLANO)
+      return await comTransacao(app.pool, async (cli) => {
+        // 1) Estado atual (lock por linha) de todas as colunas da versão.
+        const { rows: atualRows } = await cli.query<Record<string, unknown>>(
+          `select ${COLS_VERSAO.join(', ')} from public.planos where id = $1 for update`,
+          [id],
+        )
+        const atual = atualRows[0]
+        if (!atual) throw naoEncontrado('Plano não encontrado')
+
+        // 2) Merge: body sobrescreve só os campos editáveis enviados; resto herda.
+        const valores = COLS_VERSAO.map((c) =>
+          editaveis.has(c) && body[c] !== undefined ? body[c] : atual[c],
+        )
+
+        // 3) Próxima versão do plano (append-only).
+        const { rows: vmax } = await cli.query<{ v: number }>(
+          `select coalesce(max(versao), 0) + 1 as v from public.plano_versoes where plano_id = $1`,
+          [id],
+        )
+        const versao = vmax[0]!.v
+
+        // 4) Insere a nova versão (id, plano_id, versao, depois as COLS_VERSAO).
+        const insPh = COLS_VERSAO.map((_, i) => `$${i + 3}`).join(', ')
+        const { rows: vins } = await cli.query<{ id: string }>(
+          `insert into public.plano_versoes (plano_id, versao, ${COLS_VERSAO.join(', ')})
+           values ($1, $2, ${insPh}) returning id`,
+          [id, versao, ...valores],
+        )
+        const novaVersaoId = vins[0]!.id
+
+        // 5) Atualiza a OFERTA CORRENTE (planos) + ponteiro da versão corrente.
+        const setPlanos = COLS_VERSAO.map((c, i) => `${c} = $${i + 2}`).join(', ')
+        await cli.query(
+          `update public.planos
+              set ${setPlanos}, versao_corrente_id = $${COLS_VERSAO.length + 2}
+            where id = $1`,
+          [id, ...valores, novaVersaoId],
+        )
+
+        // 6) Devolve o catálogo corrente (mesmo shape de GET /v1/billing/planos).
+        const { rows } = await cli.query(
+          `select ${COLS_PLANO_RETORNO} from public.planos where id = $1`,
+          [id],
+        )
+        return rows[0]
+      })
     },
   )
 

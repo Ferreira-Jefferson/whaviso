@@ -133,14 +133,22 @@ export const billingRoutes: FastifyPluginAsync = async (raiz) => {
         )
       }
 
+      // Congelamento por assinatura (H11.12): pina a VERSÃO CORRENTE do plano escolhido,
+      // para que edições posteriores do catálogo não afetem esta conta. O FREE NÃO fixa
+      // versão (acompanha a corrente: não paga, não vence). `vigente_ate` fica null no
+      // stub (sem período real); o billing real define e re-pina na renovação.
       const { rows } = await app.pool.query(
-        `insert into public.assinaturas (profile_id, plano_id, status, unidades, preco_centavos)
-         values ($1, $2, 'trial', $3, $4)
+        `insert into public.assinaturas (profile_id, plano_id, status, unidades, preco_centavos, plano_versao_id)
+         values ($1, $2, 'trial', $3, $4,
+                 case when $2 = 'free' then null
+                      else (select versao_corrente_id from public.planos where id = $2) end)
          on conflict (profile_id) do update set
            plano_id = excluded.plano_id,
            status = 'trial',
            unidades = excluded.unidades,
-           preco_centavos = excluded.preco_centavos
+           preco_centavos = excluded.preco_centavos,
+           plano_versao_id = excluded.plano_versao_id,
+           vigente_ate = null
          returning plano_id, status, unidades, preco_centavos`,
         [req.userId, plano_id, unidades, preco_centavos],
       )
