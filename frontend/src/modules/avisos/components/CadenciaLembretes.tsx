@@ -45,6 +45,24 @@ export function CadenciaLembretes({ onChange }: CadenciaLembretesProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cadenciaEtapas])
 
+  // Texto-resumo reflete a seleção atual, em vez de afirmar sempre os 4 (evita
+  // induzir ao erro quando o usuário desmarca chips). Vazio = ciclo completo.
+  const resumo = useMemo(() => {
+    const ativas =
+      etapasSelecionadas.length === 0
+        ? ETAPAS
+        : ETAPAS.filter((e) => etapasSelecionadas.includes(e.value))
+    if (ativas.length === ETAPAS.length) {
+      return 'Saem os 4 lembretes (D-2 a D+1).'
+    }
+    const rotulos = ativas.map((e) => e.rotulo)
+    if (ativas.length === 1) {
+      return `Sai só o lembrete ${ativas[0]!.rotulo} (${ativas[0]!.quando}).`
+    }
+    const lista = `${rotulos.slice(0, -1).join(', ')} e ${rotulos[rotulos.length - 1]}`
+    return `Saem ${ativas.length} lembretes: ${lista}.`
+  }, [etapasSelecionadas])
+
   function alternarEtapa(etapa: EtapaEnvio) {
     setEtapasSelecionadas((atual) =>
       atual.includes(etapa) ? atual.filter((e) => e !== etapa) : [...atual, etapa],
@@ -57,7 +75,7 @@ export function CadenciaLembretes({ onChange }: CadenciaLembretesProps) {
         <CalendarRange strokeWidth={1.75} className="size-4 text-salvia" />
         Quais lembretes enviar
       </span>
-      <p className="text-xs text-tinta-2">Por padrão saem os 4 lembretes (D-2 a D+1).</p>
+      <p className="text-xs text-tinta-2">{resumo}</p>
       <div className="flex flex-wrap gap-2 pt-1">
         {ETAPAS.map((etapa) => {
           const ativo =
