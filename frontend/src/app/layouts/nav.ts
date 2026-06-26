@@ -54,6 +54,7 @@ export const NAV_POR_SECAO: Record<Secao, NavItem[]> = {
     { to: '/app', label: 'Painel', icon: LayoutDashboard, end: true },
     { to: '/app/avisos', label: 'Avisos', icon: Bell },
     { to: '/app/avisos/novo', label: 'Novo', icon: PlusCircle },
+    { to: '/app/plano', label: 'Plano', icon: CreditCard },
     { to: '/app/conta', label: 'Conta', icon: UserCircle },
   ],
   meus: [

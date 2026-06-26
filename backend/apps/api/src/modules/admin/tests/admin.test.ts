@@ -94,6 +94,74 @@ describe('admin (integração)', () => {
     expect(a.rows[0].plano_id).toBe('profissional')
   })
 
+  // ---- Edição do catálogo de planos (owner, H11.11) ----
+
+  it('PATCH /admin/planos é owner-only → 403 para não-owner', async () => {
+    const app = await criarAppTeste(comum)
+    const r = await app.inject({
+      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
+      payload: { preco_centavos: 1234 },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(403)
+  })
+
+  it('owner edita preço/limite/recurso de um plano; reflete no catálogo (runtime); restaura', async () => {
+    const antes = await poolSuper.query(
+      `select preco_centavos, capacidade_agenda, cadencia_configuravel from public.planos where id='start'`,
+    )
+    const { preco_centavos: precoOrig, capacidade_agenda: capOrig, cadencia_configuravel: cadOrig } =
+      antes.rows[0]
+
+    const app = await criarAppTeste(owner)
+    const patch = await app.inject({
+      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
+      payload: { preco_centavos: 1299, capacidade_agenda: 123, cadencia_configuravel: true },
+    })
+    expect(patch.statusCode).toBe(200)
+    expect(patch.json().preco_centavos).toBe(1299)
+    expect(patch.json().capacidade_agenda).toBe(123)
+    expect(patch.json().cadencia_configuravel).toBe(true)
+
+    // Reflete no catálogo lido em runtime (GET /v1/billing/planos).
+    const cat = await app.inject({ method: 'GET', url: '/v1/billing/planos', headers: AUTH })
+    await app.close()
+    const start = cat.json().planos.find((p: { id: string }) => p.id === 'start')
+    expect(start.preco_centavos).toBe(1299)
+    expect(start.capacidade_agenda).toBe(123)
+
+    // Restaura para não afetar billing.test.ts (assertivas de preço/limite fixas).
+    await poolSuper.query(
+      `update public.planos set preco_centavos=$1, capacidade_agenda=$2, cadencia_configuravel=$3 where id='start'`,
+      [precoOrig, capOrig, cadOrig],
+    )
+  })
+
+  it('PATCH /admin/planos: validação recusa preço negativo e faixa de envios invertida (400)', async () => {
+    const app = await criarAppTeste(owner)
+    const negativo = await app.inject({
+      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
+      payload: { preco_centavos: -1 },
+    })
+    const faixa = await app.inject({
+      method: 'PATCH', url: '/v1/admin/planos/plus', headers: AUTH,
+      payload: { envios_min: 100, envios_max: 50 },
+    })
+    await app.close()
+    expect(negativo.statusCode).toBe(400)
+    expect(faixa.statusCode).toBe(400)
+  })
+
+  it('PATCH /admin/planos com id fora do catálogo → 400 (enum recusa)', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'PATCH', url: '/v1/admin/planos/inexistente', headers: AUTH,
+      payload: { preco_centavos: 100 },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(400)
+  })
+
   it('GET /admin/envios e /admin/avisos: envelopes paginados (owner)', async () => {
     const app = await criarAppTeste(owner)
     const envios = await app.inject({ method: 'GET', url: '/v1/admin/envios', headers: AUTH })

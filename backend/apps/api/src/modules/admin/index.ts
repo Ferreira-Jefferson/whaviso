@@ -4,6 +4,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { comTransacao } from '@whaviso/shared/db'
 import {
+  adminAtualizarPlanoBody,
   adminAtualizarUsuarioBody,
   adminAvisosQuery,
   adminAvisosResposta,
@@ -26,6 +27,38 @@ import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import * as repo from './repo'
 
 const idParam = z.object({ id: z.uuid() })
+
+// Catálogo de planos: chaves estáveis. O owner edita VALORES (H11.11), nunca cria
+// nem apaga plano; por isso o `id` do PATCH é um enum, não um uuid.
+const PLANO_IDS = ['free', 'start', 'profissional', 'plus'] as const
+const planoIdParam = z.object({ id: z.enum(PLANO_IDS) })
+// Colunas editáveis pelo PATCH (espelha adminAtualizarPlanoBody).
+const COLS_EDITAVEIS_PLANO = [
+  'nome',
+  'preco_centavos',
+  'preco_max_centavos',
+  'capacidade_agenda',
+  'vagas_ativas',
+  'envios_min',
+  'envios_max',
+  'reengajamento_max',
+  'permite_recorrente',
+  'cadencia_configuravel',
+  'menu_texto_livre',
+  'informado_pago_habilitado',
+  'totais_periodo',
+  'somente_leitura',
+] as const
+// Colunas devolvidas: mesmo shape de GET /v1/billing/planos (planoSchema). O módulo
+// billing tem a sua própria lista; aqui é redeclarada de propósito (módulo nunca
+// importa módulo, ver AGENTS.md).
+const COLS_PLANO_RETORNO = `
+  id, nome, preco_centavos, max_avisos_ativos, permite_recorrente,
+  capacidade_agenda, vagas_ativas, cadencia_configuravel, menu_texto_livre,
+  informado_pago_habilitado, totais_periodo, por_unidade, agenda_por_unidade,
+  ativaveis_por_unidade, reengajamento_max, somente_leitura,
+  por_envio, envios_min, envios_max, preco_max_centavos
+`
 
 // Lint de linguagem do conteúdo estruturado: texto + rótulos dos botões.
 // Concatena tudo que é texto editável (texto + rótulos) e aplica as três regras:
@@ -286,6 +319,37 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
         await repo.definirSuspenso(app.pool, req.params.id, req.body.suspenso)
       }
       return { id: req.params.id, plano_id: req.body.plano_id ?? null, suspenso: req.body.suspenso }
+    },
+  )
+
+  // Edição do CATÁLOGO de planos (H11.11): preço, limites e recursos de cada plano.
+  // Atualização parcial (só os campos enviados). Aplica em runtime: GET /billing/planos
+  // e a função alavancas_do_plano leem a tabela na hora. Assinaturas já contratadas
+  // mantêm o preço congelado (billing/assinar). O owner não cria nem apaga planos.
+  app.patch(
+    '/admin/planos/:id',
+    { preHandler: owner, schema: { params: planoIdParam, body: adminAtualizarPlanoBody } },
+    async (req) => {
+      const body = req.body
+      const sets: string[] = []
+      const params: unknown[] = [req.params.id]
+      for (const col of COLS_EDITAVEIS_PLANO) {
+        const valor = body[col]
+        if (valor !== undefined) {
+          params.push(valor)
+          sets.push(`${col} = $${params.length}`)
+        }
+      }
+      // O body já garante ao menos um campo (.refine); defesa em profundidade.
+      if (sets.length === 0) {
+        throw regraNegocio('nada_a_atualizar', 'Informe ao menos um campo para atualizar.')
+      }
+      const { rows } = await app.pool.query(
+        `update public.planos set ${sets.join(', ')} where id = $1 returning ${COLS_PLANO_RETORNO}`,
+        params,
+      )
+      if (!rows[0]) throw naoEncontrado('Plano não encontrado')
+      return rows[0]
     },
   )
 

@@ -43,9 +43,11 @@ import {
   type AdminUsuariosResposta,
   type Envio,
   type ListaPlanosResposta,
+  planoSchema,
   type NovaMensagemBody,
   type NovaMensagemResposta,
   type Perfil,
+  type Plano,
   type PreviewMensagemBody,
   type PreviewMensagemResposta,
   type Template,
@@ -238,12 +240,48 @@ export function useDesconectarWhatsapp() {
   return useComandoWhatsapp('/admin/whatsapp/desconectar')
 }
 
-// ---- Planos (reusa billing) ----------------------------------------------
+// ---- Planos: leitura reusa billing; edição é do owner (H11.11) -----------
 export function useAdminPlanos() {
   return useQuery({
     queryKey: adminKeys.planos,
     queryFn: ({ signal }) =>
       buscarOpcional<ListaPlanosResposta>('/billing/planos', listaPlanosResposta, undefined, signal),
+  })
+}
+
+// PATCH /v1/admin/planos/:id: preço, limites e recursos de um plano (atualização
+// parcial). O owner não cria/apaga planos: chaves estáveis (free/start/profissional/
+// plus). Invalida o catálogo admin E as chaves de billing (['billing']) para a tela
+// de planos do usuário refletir a mudança na hora.
+export interface AtualizarPlanoBody {
+  nome?: string
+  preco_centavos?: number
+  preco_max_centavos?: number | null
+  capacidade_agenda?: number
+  vagas_ativas?: number | null
+  envios_min?: number | null
+  envios_max?: number | null
+  reengajamento_max?: number
+  permite_recorrente?: boolean
+  cadencia_configuravel?: boolean
+  menu_texto_livre?: boolean
+  informado_pago_habilitado?: boolean
+  totais_periodo?: boolean
+  somente_leitura?: boolean
+}
+
+export function useAtualizarPlano() {
+  const qc = useQueryClient()
+  return useMutation<Plano, Error, { id: string; body: AtualizarPlanoBody }>({
+    mutationFn: ({ id, body }) =>
+      apiClient.patch<Plano>(`/admin/planos/${id}`, { body, schema: planoSchema }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: adminKeys.planos })
+      // Prefixo das queries do billing (catálogo + assinatura), por chave e nunca
+      // por import do módulo billing (fronteira do lint). Faz a tela do usuário
+      // (usePlanos/useAssinatura) refletir a edição do owner na hora.
+      void qc.invalidateQueries({ queryKey: ['billing'] })
+    },
   })
 }
 

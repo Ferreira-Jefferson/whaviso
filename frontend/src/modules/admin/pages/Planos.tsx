@@ -1,140 +1,248 @@
-// /admin/planos: catálogo de planos (GET /v1/billing/planos). Read-only para o
-// owner. Mostra as alavancas de cada plano (agenda balde único, cadência, menu,
-// confirmação, totais, recorrência). No Plus (por_envio) o preço é por VOLUME DE
-// ENVIOS (faixa min..max; total do piso ao topo) e a capacidade escala com os
-// envios. Valores em centavos via MoneyText. Linguagem das Regras de Ouro.
+// /admin/planos: GESTÃO do catálogo pelo owner (H11.11). Edita preço, limites e
+// recursos de cada plano; aplica em runtime (a tela de planos do usuário e as
+// alavancas efetivas leem a tabela na hora, ver billing). O owner NÃO cria nem
+// apaga planos: as 4 chaves são estáveis (free/start/profissional/plus); só os
+// valores mudam. A validação final é do servidor (PATCH /v1/admin/planos/:id);
+// aqui só montamos o formulário. No Plus (por_envio) o preço é por VOLUME DE
+// ENVIOS: edita-se o piso (preco_centavos, em envios_min) e o topo
+// (preco_max_centavos, em envios_max); a capacidade/vagas escalam com os envios.
+// Dinheiro em CENTAVOS via MoneyInput. Linguagem das Regras de Ouro.
 import { useState } from 'react'
 import {
   Banner,
+  Button,
   Card,
   EmptyState,
-  MoneyText,
+  Field,
+  Input,
+  MoneyInput,
   PageHeader,
   Skeleton,
 } from '@/shared/ui'
+import { ApiError } from '@/shared/api_client'
 import { brl } from '@/shared/format'
 import type { Plano } from '@/shared/contracts'
-import { useAdminPlanos } from '../api'
+import { useAdminPlanos, useAtualizarPlano, type AtualizarPlanoBody } from '../api'
 import { Indisponivel } from '../components/Indisponivel'
 
-function LinhaRecurso({ rotulo, ativo }: { rotulo: string; ativo: boolean }) {
+// Inteiro não-negativo (ou nulo, quando o campo aceita vazio). Emite number | null.
+function InteiroInput({
+  value,
+  onChange,
+  min = 0,
+}: {
+  value: number | null
+  onChange: (v: number | null) => void
+  min?: number
+}) {
   return (
-    <li>
-      {rotulo}: <span className="text-tinta">{ativo ? 'sim' : 'não'}</span>
-    </li>
+    <Input
+      type="number"
+      min={min}
+      value={value ?? ''}
+      onChange={(e) => {
+        const raw = e.target.value
+        if (raw === '') return onChange(null)
+        const n = Math.trunc(Number(raw))
+        onChange(Number.isFinite(n) ? Math.max(min, n) : null)
+      }}
+    />
   )
 }
 
-// Preço TOTAL (centavos) do Plus por volume de envios: espelho do backend
-// (shared/planos.precoPorEnvioCentavos). Interpola o total entre piso e topo.
-function precoEnvioCentavos(p: Plano, n: number): number {
-  const lo = p.envios_min ?? 26
-  const hi = p.envios_max ?? lo
-  const pLo = p.preco_centavos
-  const pHi = p.preco_max_centavos ?? pLo
-  const nn = Math.min(Math.max(n, lo), hi)
-  if (hi === lo) return pLo
-  return Math.round(pLo + ((pHi - pLo) * (nn - lo)) / (hi - lo))
+// Recursos liga/desliga do plano. Rótulos nas Regras de Ouro (sem termos proibidos).
+const RECURSOS: { chave: keyof FormPlano & RecursoBool; rotulo: string }[] = [
+  { chave: 'permite_recorrente', rotulo: 'Lembretes recorrentes' },
+  { chave: 'cadencia_configuravel', rotulo: 'Cadência configurável' },
+  { chave: 'menu_texto_livre', rotulo: 'Menu de texto livre' },
+  { chave: 'informado_pago_habilitado', rotulo: 'Confirmação de pagamento' },
+  { chave: 'totais_periodo', rotulo: 'Totais por período' },
+  { chave: 'somente_leitura', rotulo: 'Somente leitura (não envia avisos)' },
+]
+
+type RecursoBool =
+  | 'permite_recorrente'
+  | 'cadencia_configuravel'
+  | 'menu_texto_livre'
+  | 'informado_pago_habilitado'
+  | 'totais_periodo'
+  | 'somente_leitura'
+
+interface FormPlano {
+  nome: string
+  preco_centavos: number | null
+  preco_max_centavos: number | null
+  capacidade_agenda: number | null
+  vagas_ativas: number | null
+  envios_min: number | null
+  envios_max: number | null
+  reengajamento_max: number | null
+  permite_recorrente: boolean
+  cadencia_configuravel: boolean
+  menu_texto_livre: boolean
+  informado_pago_habilitado: boolean
+  totais_periodo: boolean
+  somente_leitura: boolean
 }
 
-// Input range interativo: arraste para ver, ao vivo, o total/mês e o R$/envio em
-// cada volume (a partir de envios_min). Bolha do valor acompanha o thumb.
-function SliderEnvios({ plano }: { plano: Plano }) {
-  const min = plano.envios_min ?? 26
-  const max = plano.envios_max ?? 200
-  const [envios, setEnvios] = useState(min)
-  const total = precoEnvioCentavos(plano, envios)
-  const porEnvio = brl(Math.round(total / envios))
-  const pct = ((envios - min) / (max - min)) * 100
-
-  return (
-    <div className="flex flex-col gap-3 rounded-card bg-papel-2 p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="flex items-baseline gap-1">
-          <MoneyText centavos={total} className="font-display text-2xl text-tinta" />
-          <span className="text-sm text-tinta-2">/mês</span>
-        </span>
-        <span className="text-sm text-tinta-2">{porEnvio} por envio</span>
-      </div>
-
-      <div className="relative pt-8">
-        {/* Bolha do valor sobre o thumb (offset do thumb ~16px de largura). */}
-        <div
-          className="absolute top-0 -translate-x-1/2 rounded-pill bg-salvia px-2 py-0.5 text-xs font-medium text-papel"
-          style={{ left: `calc(${pct}% + ${8 - (pct / 100) * 16}px)` }}
-        >
-          {envios}
-        </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          value={envios}
-          onChange={(e) => setEnvios(Number(e.target.value))}
-          className="w-full cursor-pointer"
-          style={{ accentColor: 'var(--color-salvia)' }}
-          aria-label="Envios por mês"
-        />
-        <div className="mt-1 flex justify-between text-xs text-tinta-2">
-          <span>{min} envios</span>
-          <span>{max} envios</span>
-        </div>
-      </div>
-    </div>
-  )
+function formDoPlano(p: Plano): FormPlano {
+  return {
+    nome: p.nome,
+    preco_centavos: p.preco_centavos,
+    preco_max_centavos: p.preco_max_centavos,
+    capacidade_agenda: p.capacidade_agenda,
+    vagas_ativas: p.vagas_ativas,
+    envios_min: p.envios_min,
+    envios_max: p.envios_max,
+    reengajamento_max: p.reengajamento_max,
+    permite_recorrente: p.permite_recorrente,
+    cadencia_configuravel: p.cadencia_configuravel,
+    menu_texto_livre: p.menu_texto_livre,
+    informado_pago_habilitado: p.informado_pago_habilitado,
+    totais_periodo: p.totais_periodo,
+    somente_leitura: p.somente_leitura,
+  }
 }
 
-function PlanoCard({ plano }: { plano: Plano }) {
+function CartaoPlanoEditavel({ plano }: { plano: Plano }) {
+  const atualizar = useAtualizarPlano()
+  const [form, setForm] = useState<FormPlano>(() => formDoPlano(plano))
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  function set<K extends keyof FormPlano>(k: K, v: FormPlano[K]) {
+    setForm((f) => ({ ...f, [k]: v }))
+    setFeedback(null)
+  }
+
+  async function salvar() {
+    setErro(null)
+    setFeedback(null)
+    // Sempre enviamos preço, reengajamento e os recursos. Os campos de limite
+    // dependem do tipo do plano: Plus usa a faixa de envios (capacidade/vagas
+    // escalam); os demais usam capacidade de agenda + vagas de aviso ativo.
+    const body: AtualizarPlanoBody = {
+      nome: form.nome,
+      preco_centavos: form.preco_centavos ?? 0,
+      reengajamento_max: form.reengajamento_max ?? 0,
+      permite_recorrente: form.permite_recorrente,
+      cadencia_configuravel: form.cadencia_configuravel,
+      menu_texto_livre: form.menu_texto_livre,
+      informado_pago_habilitado: form.informado_pago_habilitado,
+      totais_periodo: form.totais_periodo,
+      somente_leitura: form.somente_leitura,
+    }
+    if (plano.por_envio) {
+      body.preco_max_centavos = form.preco_max_centavos ?? form.preco_centavos ?? 0
+      body.envios_min = form.envios_min ?? 1
+      body.envios_max = form.envios_max ?? form.envios_min ?? 1
+    } else {
+      body.capacidade_agenda = form.capacidade_agenda ?? 0
+      body.vagas_ativas = form.vagas_ativas
+    }
+    try {
+      await atualizar.mutateAsync({ id: plano.id, body })
+      setFeedback('Plano salvo.')
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar o plano.')
+    }
+  }
+
+  // No Plus, dica do R$/envio no topo da faixa (interpolação é do backend).
+  const porEnvioTopo =
+    plano.por_envio && form.preco_max_centavos && form.envios_max
+      ? brl(Math.round(form.preco_max_centavos / form.envios_max))
+      : null
+
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-lg text-salvia">{plano.nome}</h2>
-        {plano.por_envio ? (
-          <span className="flex items-baseline gap-1">
-            <MoneyText centavos={plano.preco_centavos} className="text-xl text-tinta" />
-            <span className="text-xs text-tinta-2">a</span>
-            <MoneyText centavos={plano.preco_max_centavos ?? plano.preco_centavos} className="text-xl text-tinta" />
-          </span>
-        ) : (
-          <MoneyText centavos={plano.preco_centavos} className="text-xl text-tinta" />
-        )}
+        <span className="rounded-pill bg-papel-2 px-2 py-0.5 text-xs text-tinta-2">{plano.id}</span>
       </div>
-      {plano.por_envio && <SliderEnvios plano={plano} />}
-      <ul className="flex flex-col gap-1 text-sm text-tinta-2">
-        {plano.por_envio && (
-          <li>
-            Modelo: <span className="text-tinta">por volume de envios</span>
-          </li>
-        )}
-        <li>
-          Capacidade de agenda:{' '}
-          <span className="text-tinta">
-            {plano.por_envio
-              ? 'escala com os envios'
-              : plano.por_unidade
-                ? `${plano.agenda_por_unidade} por unidade`
-                : plano.capacidade_agenda}
-          </span>
-        </li>
-        <li>
-          Envios de aviso (vagas ativas):{' '}
-          <span className="text-tinta">
-            {plano.somente_leitura
-              ? '0 (somente leitura)'
-              : plano.por_envio
-                ? 'escala com os envios'
-                : plano.por_unidade
-                  ? `${plano.ativaveis_por_unidade} por unidade`
-                  : plano.vagas_ativas != null
-                    ? `${plano.vagas_ativas} ao mesmo tempo`
-                    : 'dentro da agenda'}
-          </span>
-        </li>
-        <LinhaRecurso rotulo="Lembretes recorrentes" ativo={plano.permite_recorrente} />
-        <LinhaRecurso rotulo="Cadência configurável" ativo={plano.cadencia_configuravel} />
-        <LinhaRecurso rotulo="Menu de texto livre" ativo={plano.menu_texto_livre} />
-        <LinhaRecurso rotulo="Confirmação de pagamento" ativo={plano.informado_pago_habilitado} />
-      </ul>
+
+      {feedback && <Banner tom="sucesso">{feedback}</Banner>}
+      {erro && <Banner tom="erro">{erro}</Banner>}
+
+      <Field label="Nome de exibição">
+        <Input value={form.nome} onChange={(e) => set('nome', e.target.value)} />
+      </Field>
+
+      {plano.por_envio ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Preço no piso (menor volume)" dica="Total por mês no menor volume (envios mínimos)." dicaComoIcone>
+              <MoneyInput value={form.preco_centavos} onChange={(v) => set('preco_centavos', v)} />
+            </Field>
+            <Field label="Preço no topo (maior volume)" dica="Total por mês no maior volume (envios máximos)." dicaComoIcone>
+              <MoneyInput
+                value={form.preco_max_centavos}
+                onChange={(v) => set('preco_max_centavos', v)}
+              />
+            </Field>
+            <Field label="Envios mínimos (piso da faixa)">
+              <InteiroInput value={form.envios_min} onChange={(v) => set('envios_min', v)} min={1} />
+            </Field>
+            <Field label="Envios máximos (topo da faixa)">
+              <InteiroInput value={form.envios_max} onChange={(v) => set('envios_max', v)} min={1} />
+            </Field>
+          </div>
+          {porEnvioTopo && (
+            <p className="text-xs text-tinta-2">No topo da faixa: {porEnvioTopo} por envio.</p>
+          )}
+        </>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Preço mensal">
+            <MoneyInput value={form.preco_centavos} onChange={(v) => set('preco_centavos', v)} />
+          </Field>
+          <Field label="Capacidade de agenda" dica="Anotações que a conta mantém na agenda (balde único)." dicaComoIcone>
+            <InteiroInput
+              value={form.capacidade_agenda}
+              onChange={(v) => set('capacidade_agenda', v)}
+            />
+          </Field>
+          <Field label="Vagas de aviso ativo" dica="Envios de aviso ativos ao mesmo tempo. Vazio = usa a capacidade da agenda." dicaComoIcone>
+            <InteiroInput value={form.vagas_ativas} onChange={(v) => set('vagas_ativas', v)} />
+          </Field>
+          <Field label="Reengajamento máximo" dica="Envios manuais pós-ciclo por combinado." dicaComoIcone>
+            <InteiroInput
+              value={form.reengajamento_max}
+              onChange={(v) => set('reengajamento_max', v)}
+            />
+          </Field>
+        </div>
+      )}
+
+      {plano.por_envio && (
+        <Field label="Reengajamento máximo" dica="Envios manuais pós-ciclo por combinado." dicaComoIcone>
+          <InteiroInput
+            value={form.reengajamento_max}
+            onChange={(v) => set('reengajamento_max', v)}
+          />
+        </Field>
+      )}
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-sm font-medium text-tinta">Recursos</legend>
+        {RECURSOS.map(({ chave, rotulo }) => (
+          <label key={chave} className="flex items-center gap-2 text-sm text-tinta-2">
+            <input
+              type="checkbox"
+              className="size-4 accent-salvia"
+              checked={form[chave]}
+              onChange={(e) => set(chave, e.target.checked)}
+            />
+            {rotulo}
+          </label>
+        ))}
+      </fieldset>
+
+      <div className="flex justify-end pt-1">
+        <Button type="button" onClick={salvar} loading={atualizar.isPending}>
+          Salvar plano
+        </Button>
+      </div>
     </Card>
   )
 }
@@ -144,7 +252,7 @@ export default function PlanosAdminPage() {
 
   return (
     <div className="animate-rise">
-      <PageHeader titulo="Planos" descricao="Os planos oferecidos no whaviso." />
+      <PageHeader titulo="Planos" descricao="Edite preço, limites e recursos de cada plano." />
 
       {isError ? (
         <EmptyState
@@ -152,9 +260,9 @@ export default function PlanosAdminPage() {
           descricao="Verifique sua conexão e tente novamente."
         />
       ) : isLoading || !data ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {[0, 1].map((i) => (
-            <Skeleton key={i} className="h-40 w-full rounded-card" />
+            <Skeleton key={i} className="h-96 w-full rounded-card" />
           ))}
         </div>
       ) : data.indisponivel ? (
@@ -163,15 +271,15 @@ export default function PlanosAdminPage() {
         <EmptyState titulo="Nenhum plano cadastrado" descricao="Cadastre planos no backend para que apareçam aqui." />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {data.dados!.planos.map((p) => (
-              <PlanoCard key={p.id} plano={p} />
+              <CartaoPlanoEditavel key={p.id} plano={p} />
             ))}
           </div>
 
           <Banner tom="info" className="mt-6">
-            A edição de planos pelo painel ainda não está disponível na api. Esta
-            visão é somente leitura.
+            Mudanças valem na hora para novas contratações. Quem já assinou mantém o
+            preço do momento da contratação.
           </Banner>
         </>
       )}
