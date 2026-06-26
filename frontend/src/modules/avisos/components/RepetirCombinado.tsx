@@ -3,37 +3,25 @@
 // (não gated, H11.5): um atalho para registrar vários avisos do mesmo cliente. Aberto,
 // oferece duas abas: "Por período" e "Datas avulsas".
 //
-// A CADÊNCIA (escolher quais D-2..D+1 saem) é recurso PAGO: o seletor só habilita com
-// `cadencia_configuravel`; senão fica bloqueado com CTA "Ver planos" (não some).
+// A CADÊNCIA (quais D-2..D+1 saem) NÃO mora aqui: é propriedade do próprio combinado,
+// não da repetição. Ver `CadenciaLembretes`, renderizado ao lado deste no formulário.
 //
 // SERVIDOR É A AUTORIDADE: o resumo "isto gera N avisos" e "consome N vagas" é só uma
 // PRÉVIA local para orientar; a palavra final (limite de plano) é da api, tratada em
 // NovoAviso (Banner + "Ver meu plano"). O front NUNCA calcula a data de cada ocorrência
 // para enviar: só conta, para exibir. As datas são expandidas no servidor.
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
-import { CalendarRange, Lock, Plus, Repeat, X } from 'lucide-react'
+import { Plus, Repeat, X } from 'lucide-react'
 import {
-  Banner,
   Button,
   DateInput,
   Field,
   Input,
   SegmentedControl,
   Select,
-  cn,
 } from '@/shared/ui'
 import { dataPtBR } from '@/shared/format'
-import type { EtapaEnvio, RecorrenciaInput } from '@/shared/contracts'
-
-// As 4 etapas do ciclo, na ordem em que saem (E6 H6.2). O rótulo aqui é curto (chip),
-// distinto dos rótulos longos de ROTULO_ETAPA usados na timeline.
-const ETAPAS: ReadonlyArray<{ value: EtapaEnvio; rotulo: string; quando: string }> = [
-  { value: 'd_menos_2', rotulo: 'D-2', quando: '2 dias antes' },
-  { value: 'd_menos_1', rotulo: 'D-1', quando: '1 dia antes' },
-  { value: 'd', rotulo: 'D', quando: 'no dia' },
-  { value: 'd_mais_1', rotulo: 'D+1', quando: '1 dia depois' },
-]
+import type { RecorrenciaInput } from '@/shared/contracts'
 
 type Aba = 'periodo' | 'avulsas'
 type Freq = 'mensal' | 'semanal' | 'diaria'
@@ -51,20 +39,11 @@ const OPCOES_FREQ: ReadonlyArray<{ value: Freq; label: string }> = [
 
 type FimPor = 'ocorrencias' | 'ate'
 
-export interface RepetirValor {
-  /** undefined = combinado simples (não repete). */
-  recorrencia: RecorrenciaInput | undefined
-  /** undefined = ciclo completo (D-2..D+1); senão, subconjunto escolhido. */
-  cadenciaEtapas: EtapaEnvio[] | undefined
-}
-
 interface RepetirCombinadoProps {
   /** Data combinada atual (YYYY-MM-DD ou ''). Âncora da 1ª ocorrência. */
   dataCombinada: string
-  /** Cadência configurável liberada pelo plano vigente (recurso PAGO). */
-  cadenciaConfiguravel: boolean
-  /** Emite a recorrência + cadência sempre que mudam. */
-  onChange: (valor: RepetirValor) => void
+  /** Emite a recorrência sempre que muda (undefined = combinado simples). */
+  onChange: (recorrencia: RecorrenciaInput | undefined) => void
 }
 
 // Conta as ocorrências de um período por DATA LIMITE (só para a prévia local; o servidor
@@ -104,11 +83,16 @@ function contarPorData(data: string, freq: Freq, intervalo: number, ate: string)
   return total
 }
 
-export function RepetirCombinado({
-  dataCombinada,
-  cadenciaConfiguravel,
-  onChange,
-}: RepetirCombinadoProps) {
+// Unidade do intervalo conforme a frequência, com plural só quando faz sentido. Deixa o
+// campo "A cada N <unidade>" auto-explicativo: é intervalo entre ocorrências, não pulo.
+function unidadeIntervalo(freq: Freq, intervalo: number): string {
+  const um = intervalo === 1
+  if (freq === 'mensal') return um ? 'mês' : 'meses'
+  if (freq === 'semanal') return um ? 'semana' : 'semanas'
+  return um ? 'dia' : 'dias'
+}
+
+export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoProps) {
   const [aberto, setAberto] = useState(false)
   const [aba, setAba] = useState<Aba>('periodo')
 
@@ -121,9 +105,6 @@ export function RepetirCombinado({
 
   // Datas avulsas (ADICIONAIS; a 1ª ocorrência é sempre a Data combinada).
   const [datasAvulsas, setDatasAvulsas] = useState<string[]>([])
-
-  // Cadência (subconjunto das etapas). Vazio enquanto não configura = ciclo completo.
-  const [etapasSelecionadas, setEtapasSelecionadas] = useState<EtapaEnvio[]>([])
 
   // Monta a recorrência efetiva conforme a aba e o estado (ou undefined se não repete).
   const recorrencia = useMemo<RecorrenciaInput | undefined>(() => {
@@ -140,23 +121,12 @@ export function RepetirCombinado({
     return datas.length > 0 ? { tipo: 'avulsas', datas } : undefined
   }, [aberto, aba, freq, intervalo, fimPor, ocorrencias, ate, datasAvulsas])
 
-  // Cadência só conta como configurada quando o plano permite E há subconjunto válido
-  // (1..3 etapas; 4 = ciclo completo, equivalente a não configurar).
-  const cadenciaEtapas = useMemo<EtapaEnvio[] | undefined>(() => {
-    if (!cadenciaConfiguravel) return undefined
-    if (etapasSelecionadas.length === 0 || etapasSelecionadas.length === ETAPAS.length) {
-      return undefined
-    }
-    // Mantém na ordem canônica do ciclo.
-    return ETAPAS.map((e) => e.value).filter((v) => etapasSelecionadas.includes(v))
-  }, [cadenciaConfiguravel, etapasSelecionadas])
-
-  // Avisa o pai a cada mudança efetiva (recorrência + cadência).
+  // Avisa o pai a cada mudança efetiva.
   useEffect(() => {
-    onChange({ recorrencia, cadenciaEtapas })
+    onChange(recorrencia)
     // onChange é estável (definido com useCallback no pai); só reagimos ao valor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorrencia, cadenciaEtapas])
+  }, [recorrencia])
 
   // Quantos avisos a regra gera (prévia local). Combinado simples = 1.
   const totalOcorrencias = useMemo(() => {
@@ -168,15 +138,6 @@ export function RepetirCombinado({
     }
     return 1
   }, [recorrencia, dataCombinada])
-
-  // Quantas etapas saem por ocorrência (para descrever a cadência no resumo).
-  const etapasPorOcorrencia = cadenciaEtapas?.length ?? ETAPAS.length
-
-  function alternarEtapa(etapa: EtapaEnvio) {
-    setEtapasSelecionadas((atual) =>
-      atual.includes(etapa) ? atual.filter((e) => e !== etapa) : [...atual, etapa],
-    )
-  }
 
   function adicionarData() {
     setDatasAvulsas((atual) => [...atual, ''])
@@ -231,15 +192,25 @@ export function RepetirCombinado({
                     options={OPCOES_FREQ}
                   />
                 </Field>
-                <Field label="A cada" dica="Ex.: a cada 2 meses, a cada 1 semana.">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={12}
-                    value={intervalo}
-                    onChange={(e) => setIntervalo(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
-                  />
-                </Field>
+                {/* Campo montado à mão (não via Field) para mostrar a unidade ao lado do
+                    número: "A cada 2 meses" lê como intervalo, sem texto de exemplo. */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="campo-intervalo" className="text-sm font-medium text-tinta">
+                    A cada
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="campo-intervalo"
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={intervalo}
+                      onChange={(e) => setIntervalo(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+                      className="w-20"
+                    />
+                    <span className="text-sm text-tinta-2">{unidadeIntervalo(freq, intervalo)}</span>
+                  </div>
+                </div>
               </div>
 
               <Field label="Terminar">
@@ -314,63 +285,6 @@ export function RepetirCombinado({
             </div>
           )}
 
-          {/* Cadência: quais lembretes saem por ocorrência. Recurso PAGO (gate). */}
-          <div className="flex flex-col gap-2 border-t border-linha pt-4">
-            <span className="flex items-center gap-1.5 text-sm font-medium text-tinta">
-              <CalendarRange strokeWidth={1.75} className="size-4 text-salvia" />
-              Quais lembretes enviar
-            </span>
-            {cadenciaConfiguravel ? (
-              <>
-                <p className="text-xs text-tinta-2">
-                  Por padrão saem os 4 lembretes (D-2 a D+1). Escolha quais quer manter, ou deixe
-                  todos marcados para o ciclo completo.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {ETAPAS.map((etapa) => {
-                    const ativo =
-                      etapasSelecionadas.length === 0 || etapasSelecionadas.includes(etapa.value)
-                    return (
-                      <button
-                        key={etapa.value}
-                        type="button"
-                        role="checkbox"
-                        aria-checked={ativo}
-                        onClick={() => alternarEtapa(etapa.value)}
-                        className={cn(
-                          'flex flex-col items-center rounded-input border px-3 py-2 text-center transition-colors',
-                          'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia',
-                          ativo
-                            ? 'border-salvia bg-salvia-claro text-salvia'
-                            : 'border-linha bg-cartao text-tinta-2 hover:text-tinta',
-                        )}
-                      >
-                        <span className="text-sm font-medium">{etapa.rotulo}</span>
-                        <span className="text-[11px]">{etapa.quando}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-                {etapasSelecionadas.length === 0 && (
-                  <p className="text-[11px] text-tinta-2">Nenhuma marcada: usa o ciclo completo.</p>
-                )}
-              </>
-            ) : (
-              <Banner tom="info">
-                <span className="flex items-start gap-2">
-                  <Lock strokeWidth={1.75} className="mt-0.5 size-4 shrink-0" />
-                  <span>
-                    Escolher quais lembretes saem é um recurso dos planos pagos. No seu plano,
-                    saem os 4 (D-2 a D+1).{' '}
-                    <Link to="/app/plano" className="font-medium underline">
-                      Ver planos
-                    </Link>
-                  </span>
-                </span>
-              </Banner>
-            )}
-          </div>
-
           {/* Resumo AO VIVO: quantos avisos a regra gera e quantas vagas consome. A
               palavra final (limite) é do servidor (CTA em NovoAviso se estourar). */}
           <div className="rounded-input border border-salvia/20 bg-salvia-claro px-3 py-2.5 text-sm text-salvia">
@@ -378,9 +292,6 @@ export function RepetirCombinado({
               <p>
                 Isto gera <strong>{totalOcorrencias} avisos</strong> e reserva{' '}
                 <strong>{totalOcorrencias} vagas</strong> do seu plano (uma por repetição).
-                {etapasPorOcorrencia < ETAPAS.length && (
-                  <> Cada um envia {etapasPorOcorrencia} de 4 lembretes.</>
-                )}
                 {dataCombinada && (
                   <span className="mt-1 block text-xs text-salvia/80">
                     Começa em {dataPtBR(dataCombinada)}. As datas exatas são definidas ao salvar.

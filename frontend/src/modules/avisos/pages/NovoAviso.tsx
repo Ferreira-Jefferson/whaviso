@@ -16,14 +16,20 @@ import {
   SegmentedControl,
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
-import type { CriarAvisoResposta, DirecaoAviso } from '@/shared/contracts'
+import type {
+  CriarAvisoResposta,
+  DirecaoAviso,
+  EtapaEnvio,
+  RecorrenciaInput,
+} from '@/shared/contracts'
 import { usePerfil } from '@/shared/auth'
 import { usePlanoSomenteLeitura, useAssinaturaVigente } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
 import { useCriarAviso } from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
 import { AvisoCriado } from '../components/AvisoCriado'
-import { RepetirCombinado, type RepetirValor } from '../components/RepetirCombinado'
+import { RepetirCombinado } from '../components/RepetirCombinado'
+import { CadenciaLembretes } from '../components/CadenciaLembretes'
 
 const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
   { value: 'receber', label: 'Vou receber' },
@@ -45,13 +51,14 @@ export default function NovoAvisoPage() {
   const [resultado, setResultado] = useState<CriarAvisoResposta | null>(null)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   const [limiteAtingido, setLimiteAtingido] = useState<string | null>(null)
-  // Recorrência + cadência (E6 H6.10): undefined = combinado simples / ciclo completo.
-  const [repetir, setRepetir] = useState<RepetirValor>({
-    recorrencia: undefined,
-    cadenciaEtapas: undefined,
-  })
-  // Estável p/ o efeito do RepetirCombinado não disparar a cada render.
-  const aoMudarRepetir = useCallback((v: RepetirValor) => setRepetir(v), [])
+  // E6 H6.10: recorrência (facilitador, todos os planos) e cadência (recurso pago) são
+  // coisas distintas. A cadência é do PRÓPRIO combinado (vale repetindo ou não); a
+  // recorrência só multiplica as ocorrências. undefined = simples / ciclo completo.
+  const [recorrencia, setRecorrencia] = useState<RecorrenciaInput | undefined>(undefined)
+  const [cadenciaEtapas, setCadenciaEtapas] = useState<EtapaEnvio[] | undefined>(undefined)
+  // Estáveis p/ os efeitos dos filhos não dispararem a cada render.
+  const aoMudarRecorrencia = useCallback((v: RecorrenciaInput | undefined) => setRecorrencia(v), [])
+  const aoMudarCadencia = useCallback((v: EtapaEnvio[] | undefined) => setCadenciaEtapas(v), [])
 
   const {
     register,
@@ -127,8 +134,8 @@ export default function NovoAvisoPage() {
         // E6 H6.10: recorrência (facilitador, todos os planos) + cadência (gated por plano
         // no servidor). undefined = combinado simples / ciclo completo. O servidor é a
         // autoridade: expande as ocorrências e valida vagas/cadência.
-        recorrencia: repetir.recorrencia ?? null,
-        cadencia_etapas: repetir.cadenciaEtapas ?? null,
+        recorrencia: recorrencia ?? null,
+        cadencia_etapas: cadenciaEtapas ?? null,
       })
       setResultado(r)
     } catch (e) {
@@ -292,13 +299,19 @@ export default function NovoAvisoPage() {
             </Field>
           </div>
 
-          {/* E6 H6.10: repetir o combinado (recorrência, todos os planos) + cadência
-              (gated por plano). Recolhido por padrão; o padrão segue sendo o combinado
-              único. A data combinada é a âncora da 1ª repetição. */}
+          {/* E6 H6.10: quais lembretes saem é do PRÓPRIO combinado (vale repetindo ou
+              não), por isso fora do "Repetir". Recurso pago: gate por plano dentro. */}
+          <CadenciaLembretes
+            cadenciaConfiguravel={cadenciaConfiguravel}
+            onChange={aoMudarCadencia}
+          />
+
+          {/* E6 H6.10: repetir o combinado (recorrência, todos os planos). Recolhido por
+              padrão; o padrão segue sendo o combinado único. A data combinada é a âncora
+              da 1ª repetição. */}
           <RepetirCombinado
             dataCombinada={watch('data_combinada')}
-            cadenciaConfiguravel={cadenciaConfiguravel}
-            onChange={aoMudarRepetir}
+            onChange={aoMudarRecorrencia}
           />
 
           <div className="flex flex-col gap-1.5">
