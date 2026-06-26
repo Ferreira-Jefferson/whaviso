@@ -52,7 +52,7 @@ import type { EditarAvisoBody } from '@/shared/contracts'
 import type { AtivarAvisoBody, CriarAvisoResposta } from '@/shared/contracts'
 import { ApiError } from '@/shared/api_client'
 import { usePerfil } from '@/shared/auth'
-import { usePlanoSomenteLeitura } from '@/shared/plano'
+import { useSemSaldo } from '@/shared/plano'
 import {
   useAtivarAviso,
   useAviso,
@@ -109,8 +109,9 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const perfil = usePerfil()
   // H9.4: papel do USUÁRIO neste combinado (cobre o invertido), para rótulos relativos.
   const meuPapel: PapelAviso | null = papelDoUsuario(aviso, perfil?.id)
-  // H9.8: free só visualiza. O flag vem do backend (nunca inferido); a API barra de fato.
-  const { somenteLeitura } = usePlanoSomenteLeitura()
+  // E11 H11.2/H11.4: agir nos combinados é UNIVERSAL; o único limite é o SALDO. Lemos o
+  // saldo só para antecipar a CTA de recarga; a API barra de fato (saldo_insuficiente).
+  const { semSaldo } = useSemSaldo()
   const envios = useAvisoEnvios(id, ehReceber)
   const eventos = useAvisoEventos(id)
 
@@ -164,11 +165,11 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const podePausar = aviso.status === 'programado'
   const podeReativar = aviso.status === 'pausado'
   // H8.3: reengajamento manual disponível em `programado` no fluxo `receber` (o backend
-  // gate o pós-ciclo + limite de plano; defesa em profundidade, o front só solicita).
-  // H9.8: ações de envio (ativar/reengajar) exigem plano; no free viram CTA, não somem
-  // a navegação. A AUTORIDADE é a API (free recebe envelope de erro de qualquer forma).
-  const podeReengajar = ehReceber && aviso.status === 'programado' && !somenteLeitura
-  const podeAtivar = ehAgenda && !somenteLeitura
+  // gate o pós-ciclo + consome 1 crédito; defesa em profundidade, o front só solicita).
+  // E11 H11.2: ativar/reengajar são universais; o que limita é o saldo (a API recusa com
+  // saldo_insuficiente se faltar). O front mostra a CTA de recarga, sem esconder a ação.
+  const podeReengajar = ehReceber && aviso.status === 'programado'
+  const podeAtivar = ehAgenda
 
   // H4.3: tela de "convite pronto" após ativar uma anotação da agenda.
   if (resultadoAtivar) {
@@ -373,12 +374,12 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
               </Button>
             )}
 
-            {/* H9.8: free só visualiza. Ativar exige plano: CTA, sem quebrar a navegação. */}
-            {ehAgenda && somenteLeitura && (
+            {/* E11 H11.9: sem saldo, antecipa a CTA de recarga (a API ainda barra na ativação). */}
+            {ehAgenda && semSaldo && (
               <Banner tom="info">
-                Seu plano mantém a agenda e a visualização. Para ativar e enviar o convite,{' '}
-                <Link to="/app/plano" className="font-medium underline">
-                  escolha um plano
+                Você está sem saldo de envios. Para ativar e enviar o convite,{' '}
+                <Link to="/app/creditos" className="font-medium underline">
+                  recarregue créditos
                 </Link>
                 .
               </Banner>
@@ -505,11 +506,7 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
 
             {!ehAgenda && !podeConfirmar && !podeRejeitar && !podeDesmarcar && !podeCancelar &&
               !podePausar && !podeReativar && !podeReengajar && !podeEditar && !emReaprovacao && (
-              <p className="text-sm text-tinta-2">
-                {somenteLeitura
-                  ? 'Seu plano é de visualização. Para agir nos combinados, escolha um plano.'
-                  : 'Nenhuma ação disponível para este estado.'}
-              </p>
+              <p className="text-sm text-tinta-2">Nenhuma ação disponível para este estado.</p>
             )}
 
             {(confirmar.isError || rejeitar.isError || desmarcar.isError || cancelar.isError ||
@@ -551,7 +548,7 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
           aviso={aviso}
           ativando={ativar.isPending}
           erro={ativar.error instanceof Error ? ativar.error.message : null}
-          ehLimite={ativar.error instanceof ApiError && ativar.error.isLimiteDePlano}
+          ehLimite={ativar.error instanceof ApiError && ativar.error.isLimiteDeSaldo}
           onAtivar={(body) =>
             ativar.mutate(body, {
               onSuccess: (r) => {
@@ -747,8 +744,8 @@ function AtivarModal({
         {ehLimite ? (
           <Banner tom="info">
             {erro}{' '}
-            <Link to="/app/plano" className="font-medium underline">
-              Ver meu plano
+            <Link to="/app/creditos" className="font-medium underline">
+              Recarregar créditos
             </Link>
           </Banner>
         ) : (

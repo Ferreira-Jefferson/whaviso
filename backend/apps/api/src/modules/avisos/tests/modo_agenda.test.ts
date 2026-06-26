@@ -286,20 +286,24 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     await app.close()
   })
 
-  it('H4.3: FREE não ativa → plano_somente_leitura (item segue na agenda)', async () => {
-    const free = await criarUsuario('FreeNaoAtiva')
-    const app = await criarAppTeste(free)
+  it('H11.4: SEM saldo não ativa → saldo_insuficiente (item segue na agenda)', async () => {
+    // Anotação de agenda NÃO reserva; ATIVAR reserva 1 crédito. Sem saldo, a ativação é
+    // recusada (saldo_insuficiente) e o item permanece na agenda (nada se perde).
+    const semSaldo = await criarUsuario('SemSaldoAtiva')
+    // Zera a cortesia para forçar a recusa na ativação.
+    await poolSuper.query(`update public.creditos_carteira set saldo_livre=0 where profile_id=$1`, [semSaldo])
+    const app = await criarAppTeste(semSaldo)
     const criado = await app.inject({
       method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoReceber({ modo: 'agenda' }),
     })
     const id = criado.json().aviso.id
     const ativar = await app.inject({ method: 'POST', url: `/v1/avisos/${id}/ativar`, headers: AUTH, payload: {} })
     expect(ativar.statusCode).toBe(422)
-    expect(ativar.json().error.code).toBe('plano_somente_leitura')
+    expect(ativar.json().error.code).toBe('saldo_insuficiente')
     // Não transitou: continua na agenda.
-    expect(await contarPorStatus(free, 'sem_aviso')).toBe(1)
+    expect(await contarPorStatus(semSaldo, 'sem_aviso')).toBe(1)
     await app.close()
-    await limparUsuario(free)
+    await limparUsuario(semSaldo)
   })
 
   it('H4.4: edição é LIVRE e imediata em sem_aviso (sem reaprovação), evento editado', async () => {

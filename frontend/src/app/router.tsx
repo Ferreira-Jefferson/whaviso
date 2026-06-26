@@ -22,7 +22,7 @@ import { LoginPage, OnboardingPage } from '@/modules/auth'
 import { AcaoAvisoPage, SairLembretesPage } from '@/modules/aceite'
 import { PainelPage } from '@/modules/painel'
 import { ListaAvisosPage, NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
-import { PlanoPage } from '@/modules/billing'
+import { CreditosPage } from '@/modules/billing'
 import { ContaPage } from '@/modules/conta'
 import {
   MeusCombinadosPage,
@@ -37,7 +37,7 @@ import {
   DetalheMensagemPage,
   EnviosPage,
   ConexaoPage,
-  PlanosAdminPage,
+  CreditosAdminPage,
   DesignSystemPage,
 } from '@/modules/admin'
 import NotFound from './NotFound'
@@ -116,7 +116,7 @@ const router = createBrowserRouter([
           { path: 'avisos', element: <ListaAvisosPage /> },
           { path: 'avisos/novo', element: <NovoAvisoPage /> },
           { path: 'avisos/:id', element: <DetalheAvisoPage /> },
-          { path: 'plano', element: <PlanoPage /> },
+          { path: 'creditos', element: <CreditosPage /> },
           { path: 'conta', element: <ContaPage /> },
         ],
       },
@@ -152,7 +152,7 @@ const router = createBrowserRouter([
           { path: 'mensagens/:chave', element: <DetalheMensagemPage /> },
           { path: 'whatsapp', element: <ConexaoPage /> },
           { path: 'envios', element: <EnviosPage /> },
-          { path: 'planos', element: <PlanosAdminPage /> },
+          { path: 'creditos', element: <CreditosAdminPage /> },
           { path: 'design', element: <DesignSystemPage /> },
         ],
       },

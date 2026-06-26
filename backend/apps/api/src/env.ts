@@ -23,9 +23,6 @@ export const envSchema = z.object({
     .string()
     .optional()
     .describe('service role key do Supabase; conta-no-aceite (H1.4)'),
-  // Segredo opcional do webhook de pagamento (header x-webhook-secret). Em prod,
-  // o ideal é validar a assinatura do provedor; isto é o mínimo enquanto stub.
-  BILLING_WEBHOOK_SECRET: z.string().optional(),
 })
 
 export type EnvApi = z.infer<typeof envSchema>

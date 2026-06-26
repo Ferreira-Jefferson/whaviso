@@ -1,100 +1,62 @@
-// Kernel compartilhado de PLANOS (Épico 11). Ponto único que resolve as alavancas
-// do plano vigente de uma conta a partir do CATÁLOGO (nunca fixadas no código) e
-// conta a AGENDA (balde único). Vive em shared/ porque módulo nunca importa módulo:
-// avisos/painel/recebimentos/acoes_devedor chamam estas funções, não umas às outras.
+// Kernel compartilhado de CRÉDITOS (Épico 11, modelo de carteira). Ponto único que lê a
+// curva de preço do CATÁLOGO (creditos_catalogo), conta a AGENDA (balde único) e
+// movimenta a CARTEIRA (reserva, consumo, devolução, crédito) sempre escrevendo no
+// LIVRO-RAZÃO junto. Vive em shared/ porque módulo nunca importa módulo: avisos, billing
+// e admin chamam estas funções, não umas às outras.
 //
-// As alavancas e a contagem vêm das funções SQL `alavancas_do_plano(uid)` e
-// `contar_agenda(uid)` (migration 0026), para que a regra de limite seja a mesma no
-// banco e na api (defesa em profundidade, H11.8).
+// O whaviso é PRÉ-PAGO por crédito de envio: 1 envio = 1 ocorrência de aviso. Tudo é
+// liberado para todos; o que limita é o SALDO. Charge-on-success: a ativação RESERVA
+// (saldo_livre -> reservado), o disparo CONSOME (reservado -> consumido, permanente), o
+// convite não aceito DEVOLVE (reservado -> saldo_livre), opt-out/cancelamento põe o não
+// disparado em HOLD de 24h (reservado -> em_hold) e depois devolve.
 //
-// NOTA DE ESCOPO (E4/F-STATE): o estado `sem_aviso` (modo agenda) ainda não existe.
-// Hoje todo aviso do criador nasce já no ciclo; `contar_agenda` conta esses avisos
-// não-arquivados. Quando E4 ligar `sem_aviso`, a contagem já fica correta por
-// construção (anotações sem_aviso também são linhas em `avisos` do criador).
+// Todas as movimentações de carteira rodam em transação com `select ... for update` na
+// linha da carteira (H11.12, sem janela de corrida) e SEMPRE lançam no livro-razão
+// append-only (creditos_lancamentos) junto da atualização dos baldes.
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { regraNegocio } from '../http_errors'
 
 type Executor = Pool | PoolClient
 
-export interface AlavancasPlano {
-  plano_id: string
-  /** Capacidade total da agenda (balde único): teto de anotações da conta. */
-  capacidade_agenda: number
-  /** Vagas de aviso ATIVO ("envios de aviso"): Free 0, Start 10, Profissional 25,
-   *  Plus = unidades contratadas (migration 0049). É o eixo comercial de envio. */
-  vagas_ativas: number
-  /** Free: agenda + visualização, sem ATIVAR envio (guarda antes do limite numérico). */
-  somente_leitura: boolean
-  /** Recorrência habilitada (Profissional/Plus). Cada ocorrência reserva 1 vaga (H11.5). */
-  permite_recorrente: boolean
-  cadencia_configuravel: boolean
-  menu_texto_livre: boolean
-  informado_pago_habilitado: boolean
-  totais_periodo: boolean
-  /** Teto de reengajamento manual pós-ciclo por combinado (0 = indisponível). */
-  reengajamento_max: number
-  /** Teto de edições com reaprovação por combinado (H2.5/G-C2). */
-  edicoes_max: number
-  /** Plus: nº de ENVIOS/mês contratados (migration 0044; capacidade/vagas 1:1); null nos demais. */
-  unidades: number | null
+/** Tipos de lançamento do livro-razão (espelha o check da migration 0057). */
+export type TipoLancamento =
+  | 'cortesia'
+  | 'compra'
+  | 'credito_owner'
+  | 'reserva'
+  | 'consumo'
+  | 'devolucao'
+  | 'hold'
+  | 'estorno'
+
+/** Quem originou o lançamento (para a auditoria do livro-razão). */
+export type AtorLancamento = 'sistema' | 'owner' | 'usuario'
+
+/** Curva de preço dos créditos (catálogo, 1 linha). Editável pelo owner em runtime. */
+export interface CreditosCatalogo {
+  envios_min: number
+  envios_max: number
+  preco_centavos: number
+  preco_max_centavos: number
+  cortesia_inicial: number
+  agenda_teto_free: number
+  agenda_teto_pago: number
 }
 
-// NOTAS DE ALAVANCA (donos e regras, fechando M2/M3/M5 do relatório de gaps):
-//  - reengajamento_max (M2): DONO é este épico (alavanca de catálogo); a MECÂNICA
-//    (até 3 envios, nunca 2 no mesmo dia) é do E8, que LÊ este teto.
-//  - cadencia_configuravel (M3): vale para AMBOS os lados (o cobrador escolhe quais
-//    D-avisos; o devedor do fluxo invertido configura como recebe). Quem GOVERNA é o
-//    plano do CRIADOR do aviso (no invertido, o criador é o devedor). A mecânica é do
-//    E6; aqui só a alavanca.
-//  - downgrade (M5, H11.9 🟡): a checagem de limite é ">= ao criar/ativar NOVO",
-//    NUNCA retroativa. Baixar de plano não desliga o que já existe (regra de
-//    não-DELETE); só trava criar/ativar novos até voltar abaixo do teto. A UX/billing
-//    da troca de plano fica para o gateway real.
-
-/** Lê as alavancas do plano vigente da conta (default free resolvido no SQL). */
-export async function alavancasDoPlano(ex: Executor, uid: string): Promise<AlavancasPlano> {
-  const { rows } = await ex.query<{
-    plano_id: string
-    capacidade_agenda: number
-    vagas_ativas: number
-    somente_leitura: boolean
-    permite_recorrente: boolean
-    cadencia_configuravel: boolean
-    menu_texto_livre: boolean
-    informado_pago_habilitado: boolean
-    totais_periodo: boolean
-    reengajamento_max: number
-    edicoes_max: number
-    unidades: number | null
-  }>(`select * from public.alavancas_do_plano($1)`, [uid])
-  // A função sempre resolve para um plano (free no pior caso). Defesa: se faltar,
-  // tratamos como free somente-leitura.
-  const r = rows[0]
-  if (!r) {
-    return {
-      plano_id: 'free',
-      capacidade_agenda: 0,
-      vagas_ativas: 0,
-      somente_leitura: true,
-      permite_recorrente: false,
-      cadencia_configuravel: false,
-      menu_texto_livre: false,
-      informado_pago_habilitado: false,
-      totais_periodo: false,
-      reengajamento_max: 0,
-      edicoes_max: 0,
-      unidades: null,
-    }
-  }
-  return r
+/** Estado da carteira de uma conta (baldes de trabalho). */
+export interface CarteiraSaldo {
+  saldo_livre: number
+  reservado: number
+  em_hold: number
+  consumido: number
+  ja_comprou: boolean
 }
 
 /**
- * Preço TOTAL (centavos) do Plus por VOLUME DE ENVIOS (migration 0044). Interpola
- * linearmente o total entre o piso (`envios_min` -> `preco_centavos`) e o topo
- * (`envios_max` -> `preco_max_centavos`); o R$/envio cai conforme o volume sobe.
- * Fonte única: a api usa no `assinar` (preço congelado) e o catálogo publica os
- * params p/ a UI espelhar. `n` é grampeado na faixa.
+ * Preço TOTAL (centavos) de uma compra de `n` envios. Interpola linearmente o total entre
+ * o piso (`envios_min` -> `preco_centavos`) e o topo (`envios_max` -> `preco_max_centavos`);
+ * o R$/envio cai conforme o volume sobe. Fonte única: a UI espelha esta função e o backend
+ * a recomputa quando precisa do total. `n` é grampeado na faixa.
  */
 export function precoPorEnvioCentavos(
   curva: { envios_min: number; envios_max: number; preco_centavos: number; preco_max_centavos: number },
@@ -106,168 +68,342 @@ export function precoPorEnvioCentavos(
   return Math.round(pLo + ((pHi - pLo) * (nn - lo)) / (hi - lo))
 }
 
+/** Lê a curva de preço + tetos do catálogo (1 linha, id=1). Fonte única do preço. */
+export async function lerCatalogo(ex: Executor): Promise<CreditosCatalogo> {
+  const { rows } = await ex.query<CreditosCatalogo>(
+    `select envios_min, envios_max, preco_centavos, preco_max_centavos,
+            cortesia_inicial, agenda_teto_free, agenda_teto_pago
+       from public.creditos_catalogo where id = 1`,
+  )
+  const c = rows[0]
+  if (!c) throw regraNegocio('catalogo_indisponivel', 'O catálogo de créditos não está configurado.')
+  return c
+}
+
+/**
+ * Lê a carteira da conta. Cria a linha (saldo zero) se ainda não existir (defesa: o
+ * trigger handle_new_user cria com cortesia, mas mantemos a leitura idempotente).
+ */
+export async function lerCarteira(ex: Executor, uid: string): Promise<CarteiraSaldo> {
+  const { rows } = await ex.query<CarteiraSaldo>(
+    `select saldo_livre, reservado, em_hold, consumido, ja_comprou
+       from public.creditos_carteira where profile_id = $1`,
+    [uid],
+  )
+  const c = rows[0]
+  if (c) return c
+  await ex.query(
+    `insert into public.creditos_carteira (profile_id) values ($1)
+     on conflict (profile_id) do nothing`,
+    [uid],
+  )
+  return { saldo_livre: 0, reservado: 0, em_hold: 0, consumido: 0, ja_comprou: false }
+}
+
+/**
+ * Trava a carteira da conta (lock por linha) DENTRO da transação que reserva/move, para
+ * fechar a janela de corrida do H11.12: dois requests simultâneos na última unidade de
+ * saldo serializam neste lock e só um passa. Cria a linha se faltar (idempotente).
+ */
+export async function travarCarteira(cli: PoolClient, uid: string): Promise<CarteiraSaldo> {
+  const { rows } = await cli.query<CarteiraSaldo>(
+    `select saldo_livre, reservado, em_hold, consumido, ja_comprou
+       from public.creditos_carteira where profile_id = $1 for update`,
+    [uid],
+  )
+  if (rows[0]) return rows[0]
+  await cli.query(
+    `insert into public.creditos_carteira (profile_id) values ($1)
+     on conflict (profile_id) do nothing`,
+    [uid],
+  )
+  const { rows: r2 } = await cli.query<CarteiraSaldo>(
+    `select saldo_livre, reservado, em_hold, consumido, ja_comprou
+       from public.creditos_carteira where profile_id = $1 for update`,
+    [uid],
+  )
+  return r2[0] ?? { saldo_livre: 0, reservado: 0, em_hold: 0, consumido: 0, ja_comprou: false }
+}
+
+/** Lança um movimento no livro-razão (append-only). Quantidade sempre positiva. */
+export async function lancar(
+  cli: PoolClient,
+  args: {
+    uid: string
+    tipo: TipoLancamento
+    quantidade: number
+    refTipo?: 'aviso' | 'ocorrencia' | 'pagamento' | null
+    refId?: string | null
+    ator?: AtorLancamento
+    atorId?: string | null
+  },
+): Promise<void> {
+  await cli.query(
+    `insert into public.creditos_lancamentos
+       (profile_id, tipo, quantidade, ref_tipo, ref_id, ator, ator_id)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      args.uid,
+      args.tipo,
+      args.quantidade,
+      args.refTipo ?? null,
+      args.refId ?? null,
+      args.ator ?? 'sistema',
+      args.atorId ?? null,
+    ],
+  )
+}
+
+/**
+ * RESERVA `quantidade` créditos para um aviso (ativação, H11.4): exige saldo livre
+ * suficiente, move saldo_livre -> reservado e lança 'reserva'. Roda na transação que
+ * ativa, com lock na carteira (sem corrida). Recusa com `saldo_insuficiente` se faltar.
+ */
+export async function reservarCreditos(
+  cli: PoolClient,
+  uid: string,
+  quantidade: number,
+  avisoId: string,
+): Promise<void> {
+  if (quantidade <= 0) return
+  const carteira = await travarCarteira(cli, uid)
+  if (carteira.saldo_livre < quantidade) {
+    throw regraNegocio(
+      'saldo_insuficiente',
+      `Seu saldo é de ${carteira.saldo_livre} ${carteira.saldo_livre === 1 ? 'envio' : 'envios'} e este combinado precisa de ${quantidade}. Recarregue créditos para ativar.`,
+    )
+  }
+  await cli.query(
+    `update public.creditos_carteira
+        set saldo_livre = saldo_livre - $2, reservado = reservado + $2
+      where profile_id = $1`,
+    [uid, quantidade],
+  )
+  await lancar(cli, { uid, tipo: 'reserva', quantidade, refTipo: 'aviso', refId: avisoId })
+}
+
+/**
+ * CONSOME 1 crédito no disparo de um lembrete (H11.5): move reservado -> consumido e
+ * lança 'consumo'. Consumido é permanente (nunca volta). Defesa: se não houver reservado
+ * (caso raro de dessincronização), não estoura saldo negativo (o check do banco barraria).
+ */
+export async function consumirCredito(
+  cli: PoolClient,
+  uid: string,
+  quantidade: number,
+  ref: { tipo: 'aviso' | 'ocorrencia'; id: string },
+): Promise<void> {
+  if (quantidade <= 0) return
+  await travarCarteira(cli, uid)
+  await cli.query(
+    `update public.creditos_carteira
+        set reservado = greatest(reservado - $2, 0), consumido = consumido + $2
+      where profile_id = $1`,
+    [uid, quantidade],
+  )
+  await lancar(cli, { uid, tipo: 'consumo', quantidade, refTipo: ref.tipo, refId: ref.id })
+}
+
+/**
+ * CONSOME `quantidade` créditos DIRETO do saldo livre (envio avulso fora do ciclo, ex.:
+ * reengajamento manual H8.3, que consome 1 envio do saldo): exige saldo_livre suficiente,
+ * move saldo_livre -> consumido e lança 'consumo'. Roda na transação que dispara o envio
+ * avulso, com lock na carteira. Recusa com `saldo_insuficiente` se faltar.
+ */
+export async function consumirDoSaldoLivre(
+  cli: PoolClient,
+  uid: string,
+  quantidade: number,
+  ref: { tipo: 'aviso' | 'ocorrencia'; id: string },
+): Promise<void> {
+  if (quantidade <= 0) return
+  const carteira = await travarCarteira(cli, uid)
+  if (carteira.saldo_livre < quantidade) {
+    throw regraNegocio(
+      'saldo_insuficiente',
+      `Seu saldo é de ${carteira.saldo_livre} ${carteira.saldo_livre === 1 ? 'envio' : 'envios'}. Recarregue créditos para enviar.`,
+    )
+  }
+  await cli.query(
+    `update public.creditos_carteira
+        set saldo_livre = saldo_livre - $2, consumido = consumido + $2
+      where profile_id = $1`,
+    [uid, quantidade],
+  )
+  await lancar(cli, { uid, tipo: 'consumo', quantidade, refTipo: ref.tipo, refId: ref.id })
+}
+
+/**
+ * DEVOLVE `quantidade` créditos reservados ao saldo livre (convite não aceito, H11.5;
+ * arquivar não disparado, H11.4): move reservado -> saldo_livre e lança 'devolucao'.
+ */
+export async function devolverReserva(
+  cli: PoolClient,
+  uid: string,
+  quantidade: number,
+  avisoId: string,
+): Promise<void> {
+  if (quantidade <= 0) return
+  await travarCarteira(cli, uid)
+  await cli.query(
+    `update public.creditos_carteira
+        set reservado = greatest(reservado - $2, 0), saldo_livre = saldo_livre + $2
+      where profile_id = $1`,
+    [uid, quantidade],
+  )
+  await lancar(cli, { uid, tipo: 'devolucao', quantidade, refTipo: 'aviso', refId: avisoId })
+}
+
+/**
+ * CREDITA `quantidade` envios na conta. Usado por:
+ *  - 'credito_owner': o owner ativa quem pagou via WhatsApp (H11.11);
+ *  - 'compra': compra com gateway (🟡 futuro).
+ * Aditivo (soma em saldo_livre), marca `ja_comprou=true` (libera a agenda generosa, H11.7)
+ * e lança no livro-razão. Roda na transação com lock. `quantidade` deve ser > 0.
+ */
+export async function creditarEnvios(
+  cli: PoolClient,
+  uid: string,
+  quantidade: number,
+  tipo: 'credito_owner' | 'compra',
+  ator: { ator: AtorLancamento; atorId?: string | null },
+): Promise<CarteiraSaldo> {
+  await travarCarteira(cli, uid)
+  await cli.query(
+    `update public.creditos_carteira
+        set saldo_livre = saldo_livre + $2, ja_comprou = true
+      where profile_id = $1`,
+    [uid, quantidade],
+  )
+  await lancar(cli, { uid, tipo, quantidade, ator: ator.ator, atorId: ator.atorId ?? null })
+  return lerCarteira(cli, uid)
+}
+
+/** Resolve o uid do CRIADOR (dono da carteira) de um aviso: cobrador no receber, devedor no invertido. */
+export function donoDoAviso(aviso: {
+  criador_papel: 'cobrador' | 'devedor'
+  cobrador_id: string | null
+  devedor_profile_id: string | null
+}): string | null {
+  return aviso.criador_papel === 'cobrador' ? aviso.cobrador_id : aviso.devedor_profile_id
+}
+
+/**
+ * Créditos AINDA reservados (não disparados) de um aviso: reserva total menos o que já foi
+ * consumido. Soma os lançamentos: reservados pela conta para ESTE aviso (ref aviso) menos
+ * os 'consumo'/'devolucao'/'hold' já lançados para o aviso ou suas ocorrências. Como cada
+ * ocorrência consome 1 e o convite não aceito devolve a reserva inteira, o saldo reservado
+ * de um aviso é (reserva - consumo - devolucao - hold), nunca negativo. Usado para devolver
+ * a reserva (não aceito/arquivar) e para pôr em hold (opt-out/cancelamento de recorrente).
+ */
+export async function reservaPendenteDoAviso(ex: Executor, avisoId: string): Promise<number> {
+  const { rows } = await ex.query<{ n: string }>(
+    `select coalesce(sum(
+              case when l.tipo = 'reserva' then l.quantidade
+                   when l.tipo in ('consumo','devolucao','hold') then -l.quantidade
+                   else 0 end
+            ), 0) as n
+       from public.creditos_lancamentos l
+      where (l.ref_tipo = 'aviso' and l.ref_id = $1)
+         or (l.ref_tipo = 'ocorrencia' and l.ref_id in (
+              select id from public.aviso_ocorrencias where aviso_id = $1))`,
+    [avisoId],
+  )
+  return Math.max(0, Number(rows[0]?.n ?? 0))
+}
+
+/**
+ * Põe `quantidade` créditos reservados de um aviso em HOLD de 24h (opt-out/cancelamento de
+ * recorrente no meio, H11.6): move reservado -> em_hold, lança 'hold' e cria a linha em
+ * creditos_hold (worklist do job de devolução) com vence_em = now()+24h. Idempotente sob a
+ * transação do chamador (lock da carteira). Devolve a quantidade efetivamente posta em hold.
+ */
+export async function holdReserva(
+  cli: PoolClient,
+  uid: string,
+  quantidade: number,
+  avisoId: string,
+): Promise<number> {
+  if (quantidade <= 0) return 0
+  await travarCarteira(cli, uid)
+  await cli.query(
+    `update public.creditos_carteira
+        set reservado = greatest(reservado - $2, 0), em_hold = em_hold + $2
+      where profile_id = $1`,
+    [uid, quantidade],
+  )
+  await lancar(cli, { uid, tipo: 'hold', quantidade, refTipo: 'aviso', refId: avisoId })
+  await cli.query(
+    `insert into public.creditos_hold (profile_id, aviso_id, quantidade, vence_em)
+     values ($1, $2, $3, now() + interval '24 hours')`,
+    [uid, avisoId, quantidade],
+  )
+  return quantidade
+}
+
+/**
+ * Houve algum envio efetivamente disparado (status 'enviado') deste aviso? Decide entre
+ * DEVOLVER a reserva (nada disparou) ou pôr o restante em HOLD (recorrente interrompido no
+ * meio) ao cancelar/encerrar (H11.5/H11.6). Em shared para avisos e recebimentos usarem
+ * sem cross-import de módulo.
+ */
+export async function algumEnvioDisparado(ex: Executor, avisoId: string): Promise<boolean> {
+  const { rows } = await ex.query<{ existe: boolean }>(
+    `select exists (
+       select 1 from public.envios where aviso_id = $1 and status = 'enviado'
+     ) as existe`,
+    [avisoId],
+  )
+  return rows[0]?.existe ?? false
+}
+
+/**
+ * Resolve os créditos AINDA reservados de um aviso ao ele SAIR do ciclo sem disparo total
+ * (cancelamento/opt-out, H11.5/H11.6): se nada disparou, DEVOLVE direto ao saldo livre; se
+ * já houve disparo (recorrente interrompido no meio), põe o restante em HOLD de 24h. No-op
+ * se não há reserva pendente. Roda na transação do chamador (com lock na carteira).
+ */
+export async function resolverReservaAoEncerrar(
+  cli: PoolClient,
+  uid: string,
+  avisoId: string,
+): Promise<{ devolvido: number; emHold: number }> {
+  const reservaPend = await reservaPendenteDoAviso(cli, avisoId)
+  if (reservaPend <= 0) return { devolvido: 0, emHold: 0 }
+  if (await algumEnvioDisparado(cli, avisoId)) {
+    const n = await holdReserva(cli, uid, reservaPend, avisoId)
+    return { devolvido: 0, emHold: n }
+  }
+  await devolverReserva(cli, uid, reservaPend, avisoId)
+  return { devolvido: reservaPend, emHold: 0 }
+}
+
 /** Conta a agenda (balde único): anotações não-arquivadas do criador, por papel. */
 export async function contarAgenda(ex: Executor, uid: string): Promise<number> {
   const { rows } = await ex.query<{ n: number }>(`select public.contar_agenda($1) as n`, [uid])
   return Number(rows[0]?.n ?? 0)
 }
 
-/**
- * Trava a assinatura da conta (lock por conta) DENTRO da transação que cria/ativa,
- * para fechar a janela de corrida do H11.8: dois requests simultâneos na última
- * vaga serializam neste lock e só um passa. Idempotente: se a linha não existir
- * (conta sem assinatura), não trava nada (o default free já barra a criação).
- */
-export async function travarConta(cli: PoolClient, uid: string): Promise<void> {
-  await cli.query(`select 1 from public.assinaturas where profile_id = $1 for update`, [uid])
+/** Teto de agenda da conta (regra de 2 estados, H11.7): Free modesto / generoso após 1a compra. */
+export async function agendaTetoDaConta(ex: Executor, uid: string): Promise<number> {
+  const { rows } = await ex.query<{ n: number }>(`select public.agenda_teto_da_conta($1) as n`, [uid])
+  return Number(rows[0]?.n ?? 0)
 }
 
 /**
- * Guarda de CRIAÇÃO de anotação de agenda, na MESMA transação (com lock por conta).
- * Ordem dos erros (E1-C2 / H11.6): primeiro o guard do FREE (código próprio,
- * mensagem própria, nunca "limite atingido com 0 vagas"), depois a capacidade.
- *
- * NOTA DE ESCOPO: enquanto `sem_aviso` não existe, criar um aviso JÁ é colocá-lo no
- * ciclo (envia). Logo, no estágio atual, o guard do free aqui é o portão do gating:
- * free não pode criar um aviso que envia (resolve C3 por construção, ver abaixo).
- * Quando E4 separar criar (agenda) de ativar (envio), o guard do free migra para a
- * ATIVAÇÃO e a criação de anotação fica liberada para o free dentro da capacidade.
+ * Guarda de CRIAÇÃO de anotação na agenda (H11.7), na MESMA transação que faz o insert
+ * (com lock por conta, fecha a corrida do H11.12): recusa quando a agenda atinge o teto da
+ * conta. NÃO há mais gating por recurso nem somente_leitura: criar anotação é livre, só o
+ * teto de agenda limita. Trava a carteira (serializa) e compara com agenda_teto_da_conta.
  */
-export async function exigirVagaDeAgenda(cli: PoolClient, uid: string): Promise<AlavancasPlano> {
-  await travarConta(cli, uid)
-  const alavancas = await alavancasDoPlano(cli, uid)
-
-  // 1) Guard do free ANTES do limite numérico (nunca cai em limite_plano_atingido
-  //    "até 0 avisos"). Free mantém agenda/visualização, mas não cria aviso que envia.
-  if (alavancas.somente_leitura) {
-    throw regraNegocio(
-      'plano_somente_leitura',
-      'Seu plano mantém a agenda e a visualização, mas não envia avisos. Escolha um plano para ativar os envios.',
-    )
-  }
-
-  // 2) Capacidade da agenda (balde único). Ao encher, recusa sem apagar nada.
+export async function exigirCapacidadeDeAgenda(cli: PoolClient, uid: string): Promise<void> {
+  await travarCarteira(cli, uid)
+  const teto = await agendaTetoDaConta(cli, uid)
   const usado = await contarAgenda(cli, uid)
-  if (usado >= alavancas.capacidade_agenda) {
+  if (usado >= teto) {
     throw regraNegocio(
       'agenda_cheia',
-      `Sua agenda está cheia (${alavancas.capacidade_agenda} itens). Arquive um item ou escolha um plano com mais capacidade.`,
+      `Sua agenda está cheia (${teto} itens). Arquive um item encerrado ou recarregue créditos para liberar uma agenda maior.`,
     )
   }
-
-  return alavancas
-}
-
-/**
- * Guarda de CRIAÇÃO de ANOTAÇÃO DE AGENDA (H4.1, modo agenda): só a CAPACIDADE da
- * agenda (balde único), SEM o guard do free. Divergência do épico: o FREE PODE manter
- * agenda (nada é enviado); o que ele não pode é ATIVAR (gate `exigirVagaDeAtivo`). Roda
- * na MESMA transação (lock por conta) que faz o insert, fechando a corrida (H11.8).
- */
-export async function exigirCapacidadeDeAgenda(cli: PoolClient, uid: string): Promise<AlavancasPlano> {
-  await travarConta(cli, uid)
-  const alavancas = await alavancasDoPlano(cli, uid)
-  const usado = await contarAgenda(cli, uid)
-  if (usado >= alavancas.capacidade_agenda) {
-    throw regraNegocio(
-      'agenda_cheia',
-      `Sua agenda está cheia (${alavancas.capacidade_agenda} itens). Arquive um item ou escolha um plano com mais capacidade.`,
-    )
-  }
-  return alavancas
-}
-
-/**
- * Conta avisos ATIVOS do criador (os que ocupam VAGA DE ATIVO do plano). NÃO conta
- * `sem_aviso` (anotações de agenda; G-M4) nem terminais. Espelho da contagem em SQL,
- * por papel (conta certo no fluxo invertido devedor-criador). Usado pelo gate de
- * ATIVAÇÃO (H4.3): ativar move o item do balde de agenda para o de ativos.
- *
- * NOTA: para combinados RECORRENTES esta contagem (1 por combinado) NÃO é o custo de
- * vaga; use `somarVagasAtivas` (cada ocorrência não-paga reserva 1 vaga, H11.3/H11.5).
- */
-export async function contarAtivos(cli: PoolClient, uid: string): Promise<number> {
-  const { rows } = await cli.query<{ n: string }>(
-    `select count(*) as n from public.avisos
-     where status not in ('sem_aviso','pago','cancelado','recusado','expirado')
-       and ((criador_papel = 'cobrador' and cobrador_id = $1)
-            or (criador_papel = 'devedor' and devedor_profile_id = $1))`,
-    [uid],
-  )
-  return Number(rows[0]!.n)
-}
-
-/**
- * SOMA as vagas de aviso ativo consumidas pela conta (H11.3/H11.5, recorrência). A
- * contagem deixa de ser um count(*) de combinados e passa a SOMAR, por aviso ativo
- * (status not in sem_aviso/pago/cancelado/recusado/expirado):
- *   - combinado SIMPLES (recorrencia_tipo null): 1 vaga;
- *   - combinado RECORRENTE: o número de OCORRÊNCIAS ainda não pagas (cada ocorrência é um
- *     "envio de aviso", a moeda do plano; conforme cada vira `pago`, a vaga é liberada).
- * Por papel (conta certo no invertido devedor-criador). Espelha a regra no servidor (H11.8).
- *
- * Aceita Pool OU PoolClient: no gate de ativação roda dentro da transação (com lock);
- * para LEITURA de uso (ex.: contador da tela de plano) roda direto no pool, sem lock.
- */
-export async function somarVagasAtivas(ex: Executor, uid: string): Promise<number> {
-  const { rows } = await ex.query<{ n: string }>(
-    `select coalesce(sum(
-              case when a.recorrencia_tipo is null then 1
-                   else (select count(*) from public.aviso_ocorrencias o
-                          where o.aviso_id = a.id and o.status <> 'pago')
-              end
-            ), 0) as n
-       from public.avisos a
-      where a.status not in ('sem_aviso','pago','cancelado','recusado','expirado')
-        and ((a.criador_papel = 'cobrador' and a.cobrador_id = $1)
-             or (a.criador_papel = 'devedor' and a.devedor_profile_id = $1))`,
-    [uid],
-  )
-  return Number(rows[0]!.n)
-}
-
-/**
- * Guarda de ATIVAÇÃO de uma anotação (H4.1/H4.3, divergência do épico): distinta do
- * gate de CRIAÇÃO (`exigirVagaDeAgenda`, que o FREE passa). Aqui ATIVAR consome uma
- * VAGA DE ATIVO, e o FREE (somente leitura) NÃO ativa: cai na CTA de plano, sem erro
- * feio e SEM transitar (o item fica na agenda). Roda na MESMA transação que faz o
- * update (com lock por conta), fechando a janela de corrida (H11.8 / S4).
- *
- * Ordem dos erros (E1-C2): primeiro o guard do FREE (código próprio), depois o limite
- * numérico de vagas. No Start/Profissional `vagas_ativas` = capacidade da agenda, então
- * ativar nunca trava enquanto couber; no Plus é o nº de unidades.
- *
- * `custoVaga` (default 1) é o número de vagas que ESTA ativação reserva: 1 para o
- * combinado simples, N para o recorrente (cada ocorrência = 1 vaga, H11.3/H11.5). A
- * contagem do já-consumido SOMA (`somarVagasAtivas`): por aviso ativo, 1 (simples) ou as
- * ocorrências ainda não pagas (recorrente). Recusa se `consumido + custoVaga > vagas`.
- * Recorrência NUNCA é gated por plano (é facilitador): este gate só mede vagas.
- */
-export async function exigirVagaDeAtivo(
-  cli: PoolClient,
-  uid: string,
-  custoVaga = 1,
-): Promise<AlavancasPlano> {
-  await travarConta(cli, uid)
-  const alavancas = await alavancasDoPlano(cli, uid)
-
-  // 1) Free mantém a agenda, mas NÃO ativa (envia). CTA de plano (H1.5/H4.3/E11).
-  if (alavancas.somente_leitura) {
-    throw regraNegocio(
-      'plano_somente_leitura',
-      'Seu plano mantém a agenda e a visualização, mas não ativa os envios. Escolha um plano para ativar este combinado.',
-    )
-  }
-
-  // 2) Vagas de ativo do plano (SOMA por ocorrência no recorrente). Ao não caber, recusa
-  //    sem ativar (o item segue na agenda).
-  const consumido = await somarVagasAtivas(cli, uid)
-  if (consumido + custoVaga > alavancas.vagas_ativas) {
-    throw regraNegocio(
-      'limite_plano_atingido',
-      `Seu plano permite ${alavancas.vagas_ativas} avisos ativos ao mesmo tempo. Encerre um ou escolha um plano maior para ativar este.`,
-    )
-  }
-
-  return alavancas
 }

@@ -1,3 +1,2 @@
-export { useAssinaturaVigente, usePlanoSomenteLeitura, planoKeys } from './usePlano'
-export { CartoesPlanos } from './CartoesPlanos'
+export { useCarteira, useSemSaldo, planoKeys } from './usePlano'
 export { precoEnvioCentavos } from './preco'

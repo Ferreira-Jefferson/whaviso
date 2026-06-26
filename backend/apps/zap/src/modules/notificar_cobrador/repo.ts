@@ -201,19 +201,6 @@ export async function marcarCancelado(pool: Pool, id: string, erro: string): Pro
   await pool.query(`update public.notificacoes_cobrador set status='cancelado', erro=$2 where id=$1`, [id, erro])
 }
 
-/**
- * H10.8: a conta do CRIADOR (dono do plano) pode ENVIAR notificações por WhatsApp?
- * Plano somente-leitura (free) NÃO envia. uid null (criador sem conta) => true (H10.7,
- * sem plano a limitar). Lê via função SECURITY DEFINER (zap não acessa billing direto).
- */
-export async function podeEnviarPeloPlano(pool: Pool, criadorProfileId: string | null): Promise<boolean> {
-  const { rows } = await pool.query<{ ok: boolean }>(
-    `select public.notificacao_pode_enviar($1) as ok`,
-    [criadorProfileId],
-  )
-  return rows[0]?.ok ?? true
-}
-
 export async function marcarFalhou(pool: Pool, id: string, erro: string): Promise<void> {
   await pool.query(
     `update public.notificacoes_cobrador set status='falhou', tentativas=tentativas+1, erro=$2 where id=$1`,

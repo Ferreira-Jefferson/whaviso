@@ -20,17 +20,12 @@ export class ApiError extends Error {
     return this.status === 429
   }
 
-  /** Bloqueio por plano → CTA de upgrade graciosa, sem destruir trabalho (H11.6).
-   * O backend responde 422 (regra de negócio) com um destes codes; a UI decide pelo
-   * code, não pelo status:
-   *   - plano_somente_leitura: free mantém agenda/visualização, mas não envia.
-   *   - agenda_cheia: capacidade da agenda (balde único) atingida.
-   *   - limite_plano_atingido: legado (mantido por compatibilidade). */
-  get isLimiteDePlano(): boolean {
-    return (
-      this.code === 'plano_somente_leitura' ||
-      this.code === 'agenda_cheia' ||
-      this.code === 'limite_plano_atingido'
-    )
+  /** Bloqueio por SALDO/agenda → CTA de recarga graciosa, sem destruir trabalho (E11
+   * H11.9). O backend responde 422 (regra de negócio) com um destes codes; a UI decide
+   * pelo code, não pelo status:
+   *   - saldo_insuficiente: faltam créditos para ativar/enviar (recarregue).
+   *   - agenda_cheia: teto de agenda (balde único) atingido (recarregue ou arquive). */
+  get isLimiteDeSaldo(): boolean {
+    return this.code === 'saldo_insuficiente' || this.code === 'agenda_cheia'
   }
 }

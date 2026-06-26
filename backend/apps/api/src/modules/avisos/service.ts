@@ -24,12 +24,9 @@ import type {
 import { gerarToken, sha256Hex } from '../../shared/tokens'
 import { conflito, naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
 import {
-  exigirVagaDeAgenda,
-  exigirVagaDeAtivo,
   exigirCapacidadeDeAgenda,
-  somarVagasAtivas,
-  alavancasDoPlano,
-  type AlavancasPlano,
+  reservarCreditos,
+  resolverReservaAoEncerrar,
 } from '../../shared/planos'
 import { enfileirarNotificacaoDevedor, enfileirarNotificacao } from '../../shared/notificacoes'
 import { estadosDoGrupo } from '../../shared/estados'
@@ -112,20 +109,9 @@ async function gerarConviteComRetry(
   throw conflito('convite_indisponivel', 'Não foi possível gerar o convite. Tente novamente.')
 }
 
-/**
- * GATE de cadência configurável (E6 H6.10 / E11 H11.5): `cadencia_etapas` no corpo é
- * recurso PAGO (Profissional/Plus). Se vier e a alavanca `cadencia_configuravel` for false,
- * recusa. Vale para combinado simples E recorrente. A RECORRÊNCIA em si NUNCA é gated
- * (facilitador, H11.5): nunca cheque `permite_recorrente`.
- */
-function exigirCadenciaPermitida(
-  alavancas: AlavancasPlano,
-  cadencia: readonly EtapaEnvio[] | null | undefined,
-): void {
-  if (cadencia != null && !alavancas.cadencia_configuravel) {
-    throw regraNegocio('plano_sem_cadencia', 'A cadência personalizada está nos planos Profissional e Plus.')
-  }
-}
+// E11 H11.2: cadência configurável, recorrência, menu e informado_pago são UNIVERSAIS
+// (liberados para todos). Não há mais gating por recurso/plano: o único limite é o saldo
+// de créditos (reserva na ativação). Por isso não existe mais guarda de cadência aqui.
 
 /** Mapeia a recorrência do contrato para a config de expansão de datas (shared/datas). */
 function cfgRecorrencia(r: RecorrenciaInput): RecorrenciaCfg {
@@ -180,27 +166,15 @@ export async function criarAviso(
     const criadorPapel: PapelAviso = ehReceber ? 'cobrador' : 'devedor'
     const ehAgenda = body.modo === 'agenda'
 
-    // Gate de plano (H11.2/H11.3/H11.4/H11.8) na MESMA transação, com lock por conta
-    // (sem janela de corrida). CRIAR (inclui modo agenda) só consome capacidade de
-    // agenda: o FREE PODE criar anotação (nada é enviado), o que ele não pode é ATIVAR
-    // (gate próprio em ativarAviso). Por isso aqui usamos exigirVagaDeAgenda, que para o
-    // free só barra quando o modo enviaria de imediato.
-    let alavancas: AlavancasPlano
-    if (ehAgenda) {
-      // H4.1: anotação de agenda. Free PODE criar até a capacidade (balde único).
-      // Não consome vaga de ativo, não gera convite, não checa somente_leitura.
-      alavancas = await exigirCapacidadeDeAgenda(cli, uid)
-    } else {
-      // Modo enviar: o gate atual (guard do free ANTES da capacidade).
-      alavancas = await exigirVagaDeAgenda(cli, uid)
-    }
-
-    // GATE de cadência (E6 H6.10 / E11 H11.5): `cadencia_etapas` é recurso pago. A
-    // RECORRÊNCIA em si NUNCA é gated (facilitador): não checamos `permite_recorrente`.
-    exigirCadenciaPermitida(alavancas, body.cadencia_etapas)
+    // Capacidade de agenda (H11.7), na MESMA transação, com lock na carteira (sem corrida,
+    // H11.12). Criar uma anotação é livre para todos (não há mais somente_leitura): só o
+    // teto de agenda da conta limita. Vale para agenda E enviar (todo aviso ocupa um item
+    // na agenda). A RESERVA de créditos do modo enviar vem depois (precisa do id do aviso).
+    await exigirCapacidadeDeAgenda(cli, uid)
 
     // Recorrência (E6 H6.10): o servidor expande as datas (autoridade). `rec` carrega as
     // colunas a gravar + a lista de datas das ocorrências (vazio = combinado simples).
+    // Recorrência/cadência são UNIVERSAIS (H11.2): nada é gated por recurso.
     const rec = body.recorrencia
       ? montarRecorrencia(body.recorrencia, body.data_combinada, body.cadencia_etapas)
       : null
@@ -213,25 +187,16 @@ export async function criarAviso(
       cadencia_etapas: body.cadencia_etapas ? [...body.cadencia_etapas] : null,
     }
 
+    // Custo em créditos da ATIVAÇÃO no modo enviar (H11.4): 1 por combinado simples, N por
+    // recorrente (1 por ocorrência). A reserva ocorre após inserir o aviso.
+    const custoCreditos = rec ? rec.datas.length : 1
+
     // No modo agenda os campos da outra ponta são OPCIONAIS (H4.1, cobrados só ao
     // ativar). No modo enviar, valida Pix (H2.1) como defesa do contrato APENAS no
     // receber: no invertido o Pix é OPCIONAL (decisão do dono), pode entrar depois.
     if (!ehAgenda) {
       if (ehReceber && (!body.pix_chave || !body.pix_titular || !body.pix_banco)) {
         throw regraNegocio('pix_obrigatorio', 'A chave Pix, o titular e o banco são obrigatórios.')
-      }
-      // H11.3/H11.5: no modo ENVIAR um recorrente já nasce ativo (aguardando_aceite ->
-      // ciclo), então cada ocorrência reserva 1 vaga JÁ AGORA. Além do guard do free (já
-      // feito acima), cheque a SOMA de vagas: consumido + N <= vagas_ativas. Combinado
-      // simples (rec null) não muda o comportamento (1 vaga, coberta pelo gate de criação).
-      if (rec) {
-        const consumido = await somarVagasAtivas(cli, uid)
-        if (consumido + rec.datas.length > alavancas.vagas_ativas) {
-          throw regraNegocio(
-            'limite_plano_atingido',
-            `Seu plano permite ${alavancas.vagas_ativas} avisos ativos ao mesmo tempo. Encerre um ou escolha um plano maior para ativar este.`,
-          )
-        }
       }
     }
 
@@ -306,6 +271,12 @@ export async function criarAviso(
     // E8 H8.7: materializa as N ocorrências do recorrente (lazy no ciclo: só a 1ª vira
     // mini-ciclo, gerado pelo zap no aceite). Datas em America/Sao_Paulo.
     if (rec) await repo.inserirOcorrencias(cli, aviso.id, rec.datas)
+
+    // H11.4: o modo ENVIAR ATIVA o aviso (nasce aguardando_aceite, entra no ciclo). Reserva
+    // os créditos JÁ AGORA (saldo_livre -> reservado), na MESMA transação/lock. Sem saldo,
+    // recusa com `saldo_insuficiente` (o item NÃO é criado; nada se perde, a UI mostra a CTA
+    // de comprar créditos). O consumo só vem no disparo; o não aceito devolve a reserva.
+    await reservarCreditos(cli, uid, custoCreditos, aviso.id)
 
     // G4/H5.9: criar um novo combinado DESBLOQUEIA o telefone-alvo (limpa o anti-brute-force).
     await repo.limparBloqueioTelefone(cli, [telefoneDevedor, camposComuns.telefone_cobrador])
@@ -391,30 +362,22 @@ export async function ativarAviso(
       )
     }
 
-    // GATE de cadência (E6 H6.10 / E11 H11.5): só vale quando vem no corpo da ativação.
-    // RECORRÊNCIA nunca é gated (facilitador): não checamos `permite_recorrente`.
-    const alavancas = await alavancasDoPlano(cli, uid)
-    exigirCadenciaPermitida(alavancas, body.cadencia_etapas)
-
     // Recorrência (E6 H6.10): pode ser (re)definida AO ATIVAR; ausente = mantém o que já
     // estava (recorrência da agenda, ou simples). Quando redefinida, expandimos as datas
-    // de novo a partir da data combinada do aviso (servidor é autoridade).
+    // de novo a partir da data combinada do aviso (servidor é autoridade). Recorrência e
+    // cadência são UNIVERSAIS (H11.2): nada é gated por recurso/plano.
     const rec = body.recorrencia
       ? montarRecorrencia(body.recorrencia, aviso.data_combinada, body.cadencia_etapas)
       : null
 
-    // Custo de vaga (H11.3/H11.5): cada ocorrência não-paga reserva 1 vaga. N na ativação
-    // de um recorrente; 1 no simples. Se a recorrência foi redefinida agora, N = datas
-    // expandidas; senão, as ocorrências já materializadas (ou 1 se simples).
-    const custoVaga = rec
+    // Custo em créditos da ATIVAÇÃO (H11.4): 1 por combinado simples, N por recorrente (1
+    // por ocorrência). Se a recorrência foi redefinida agora, N = datas expandidas; senão,
+    // as ocorrências já materializadas (ou 1 se simples).
+    const custoCreditos = rec
       ? rec.datas.length
       : aviso.recorrencia_tipo
         ? (await repo.listarOcorrencias(cli, id)).filter((o) => o.status !== 'pago').length || 1
         : 1
-
-    // Gate de ATIVAÇÃO (consome vaga de ativo; free -> CTA), na MESMA transação/lock.
-    // A SOMA de vagas (recorrência por ocorrência) é feita dentro do gate.
-    await exigirVagaDeAtivo(cli, uid, custoVaga)
 
     const aceiteHash = sha256Hex(gerarToken())
     const acaoHash = sha256Hex(gerarToken())
@@ -447,6 +410,12 @@ export async function ativarAviso(
 
     // Recorrência redefinida na ativação: materializa as N ocorrências (idempotente).
     if (rec) await repo.inserirOcorrencias(cli, id, rec.datas)
+
+    // H11.4: ativar uma anotação RESERVA os créditos (saldo_livre -> reservado), na MESMA
+    // transação/lock. Sem saldo, recusa com `saldo_insuficiente` SEM transitar (o item fica
+    // na agenda; a UI mostra a CTA de comprar créditos). Toda a ativação acima já rodou nesta
+    // transação: se a reserva falhar, o rollback desfaz a transição.
+    await reservarCreditos(cli, uid, custoCreditos, id)
 
     // G4/H5.9: ativar um combinado DESBLOQUEIA o telefone-alvo (anti-brute-force).
     await repo.limparBloqueioTelefone(cli, [telefoneDevedorAtivo, telefoneCobradorAtivo])
@@ -562,19 +531,8 @@ export async function editarAviso(
 
     const livre = EDICAO_LIVRE.includes(aviso.status)
 
-    // Limite de edições por plano (G-C2): só conta para a edição-com-reaprovação
-    // (pós-aceite), que é a que consome a alavanca. A edição livre antes do aceite é
-    // ajuste do rascunho, não conta. Checagem no servidor (espelho de H2.3).
-    if (!livre) {
-      const alavancas = await alavancasDoPlano(cli, uid)
-      const feitas = await repo.contarEdicoes(cli, id)
-      if (feitas >= alavancas.edicoes_max) {
-        throw regraNegocio(
-          'limite_edicoes_atingido',
-          `Seu plano permite até ${alavancas.edicoes_max} edições por combinado.`,
-        )
-      }
-    }
+    // E11 H11.2: editar é UNIVERSAL (não há mais teto de edições por plano). O único
+    // limite do produto é o saldo de créditos (consumido só no disparo, não na edição).
 
     const campos = camposEditados(body)
 
@@ -739,6 +697,13 @@ export async function cancelarAviso(pool: Pool, uid: string, id: string): Promis
     // `cancelado_cobrador`, que era semanticamente errado no invertido (a linha do tempo
     // do E9 mostraria "cobrador" cancelando algo que o devedor cancelou).
     await repo.inserirEvento(cli, id, 'cancelado_criador', aviso.criador_papel)
+
+    // E11 H11.4/H11.5/H11.6: trata os créditos AINDA reservados (não disparados) deste
+    // aviso. Disparado nunca volta (já em consumido). O restante reservado: DEVOLVE direto
+    // se nada disparou (igual ao convite não aceito); ou põe em HOLD de 24h se já houve
+    // disparo (recorrente interrompido no meio, o job do zap devolve depois).
+    await resolverReservaAoEncerrar(cli, uid, id)
+
     if (jaAceito) {
       await enfileirarNotificacaoDevedor(cli, aviso, 'aviso_cancelado')
     }

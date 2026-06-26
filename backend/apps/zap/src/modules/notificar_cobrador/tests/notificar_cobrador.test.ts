@@ -480,29 +480,20 @@ describe('notificar_cobrador: E10b fila de saída (H10.5/H10.8/H10.9)', () => {
     await limpar(cobradorId)
   })
 
-  it('E10b/E11: limite de plano registra mas não envia por WhatsApp (H10.8)', async () => {
-    // Dono em plano FREE (somente leitura): a notificação é REGISTRADA mas NÃO sai por
-    // WhatsApp. Vira cancelado + erro 'bloqueado_plano' (visível/auditável), não conta
-    // como falha (não toca tentativas) nem entra em retry.
-    const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: futuro, plano: 'free' })
+  it('E11 H11.2: notificar o criador é UNIVERSAL (sem gate de plano; envia para todos)', async () => {
+    // Não há mais "plano somente leitura": notificar o CRIADOR (cobrador) não é lembrete ao
+    // devedor nem consome crédito. A notificação SAI por WhatsApp para qualquer conta.
+    const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: futuro })
     await poolSuper.query(`update public.avisos set status='informado_pago' where id=$1`, [avisoId])
     await poolSuper.query(`update public.profiles set telefone='+5511988887777' where id=$1`, [cobradorId])
     const notifId = await enfileirar(avisoId, { cobradorId })
-    const whats = clienteWhatsFake(() => ({ wamid: 'nao_deveria_enviar' }))
+    const whats = clienteWhatsFake(() => ({ wamid: 'enviou_ok' }))
 
     const e = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
-    expect(e).toBe(0)
-    expect(whats.enviadas).toHaveLength(0)
+    expect(e).toBe(1)
+    expect(whats.enviadas).toHaveLength(1)
     const notif = await lerNotif(notifId)
-    expect(notif.status).toBe('cancelado')
-    expect(notif.erro).toBe('bloqueado_plano')
-    expect(notif.tentativas).toBe(0) // não conta como falha de entrega
-    // Auditado em eventos_aviso (sem PII).
-    const audit = await poolSuper.query<{ n: string }>(
-      `select count(*)::int as n from public.eventos_aviso where aviso_id=$1 and tipo='notificacao_coalescida'`,
-      [avisoId],
-    )
-    expect(Number(audit.rows[0]!.n)).toBe(1)
+    expect(notif.status).toBe('enviado')
     await limpar(cobradorId)
   })
 })

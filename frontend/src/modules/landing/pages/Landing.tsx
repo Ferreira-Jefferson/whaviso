@@ -10,10 +10,11 @@ import {
   CalendarClock,
   MessageSquare,
   ShieldCheck,
+  Wallet,
+  RefreshCw,
+  Unlock,
 } from 'lucide-react'
 import { Button, Card, WhatsAppPreview, BellLogo, cn } from '@/shared/ui'
-import { CartoesPlanos } from '@/shared/plano'
-import { usePlanos } from '../data'
 
 const MENSAGEM_EXEMPLO =
   'Oi, Maria. João pediu pra te lembrar do combinado: aluguel de junho, R$ 1.200,00 para 10 de junho.'
@@ -66,7 +67,6 @@ export default function LandingPage() {
         <ComoFunciona />
         <Mensagem />
         <Planos />
-        <ChamadaFinal />
       </main>
       <RodapeMarketing />
     </div>
@@ -113,6 +113,10 @@ function Hero() {
             Cadastre o combinado uma vez. O whaviso manda os lembretes pelo
             WhatsApp na hora certa e mostra no painel quem já pagou e quem
             ainda falta.
+          </p>
+          <p className="mt-3 max-w-prose text-sm text-tinta-2">
+            Use também como sua agenda de pedidos e vendas: anote cada
+            combinado e acompanhe o que tem a receber, mesmo sem disparar aviso.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link to="/entrar?modo=cadastro">
@@ -355,82 +359,71 @@ function CarrosselMensagens() {
   )
 }
 
-function Planos() {
-  const planos = usePlanos()
+// Pilares do modelo de carteira de créditos de envio. Seção estática: a landing é
+// pública e não consulta a api. Sem valores fixos de preço aqui (preço e curva de
+// quantidade vivem na carteira, dentro do painel, atrás de login).
+const CREDITOS = [
+  {
+    icone: Wallet,
+    titulo: 'Pague pelo que envia',
+    texto:
+      'Cada envio de aviso usa um crédito de envio. Você só gasta quando um lembrete sai pelo WhatsApp, sem mensalidade obrigatória.',
+  },
+  {
+    icone: RefreshCw,
+    titulo: 'Recarregue quando quiser',
+    texto:
+      'Comprou poucos? Recarregue a qualquer momento, na quantidade que precisar. O saldo fica guardado na sua carteira até você usar.',
+  },
+  {
+    icone: Unlock,
+    titulo: 'Tudo liberado',
+    texto:
+      'Todos os recursos ficam disponíveis para qualquer conta: combinados, lembretes e painel. O único limite é o seu saldo de créditos.',
+  },
+]
 
+function Planos() {
   return (
     <section id="planos" className="border-t border-linha bg-papel-2">
       <div className="mx-auto w-full max-w-5xl px-4 py-16">
-        <h2 className="font-display text-3xl text-salvia">Planos</h2>
+        <h2 className="font-display text-3xl text-salvia">Créditos de envio</h2>
         <p className="mt-2 max-w-prose text-tinta-2">
-          Comece de graça e mude quando precisar de mais combinados ao mesmo tempo.
+          Sem plano e sem mensalidade obrigatória: você compra créditos de envio e
+          paga pelo que usa. 
         </p>
 
-        <div className="mt-8">
-          {planos.data ? (
-            <CartoesPlanos
-              planos={planos.data}
-              renderCta={(p) => (
-                <Link to="/entrar?modo=cadastro" className="block">
-                  <Button
-                    variante={p.id === 'profissional' || p.por_envio ? 'primary' : 'secondary'}
-                    className="w-full"
-                  >
-                    Escolher {p.nome}
-                  </Button>
-                </Link>
-              )}
-            />
-          ) : (
-            // Fallback estático enquanto carrega / se a api estiver fora: os
-            // valores reais vêm de GET /v1/billing/planos. Aqui usamos "x" no lugar
-            // dos números para nunca exibir preço/limite que possa estar defasado.
-            <div className="grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                { nome: 'Whaviso Free', preco: 'Grátis', pago: false, agenda: 'x envios de aviso · agenda até x itens' },
-                { nome: 'Whaviso Start', preco: 'R$ x', pago: true, agenda: 'x envios de aviso · agenda até x itens' },
-                { nome: 'Whaviso Profissional', preco: 'R$ x', pago: true, agenda: 'x envios de aviso · agenda até x itens' },
-                { nome: 'Whaviso Plus', preco: 'R$ x', pago: true, agenda: 'x a x envios de aviso por mês' },
-              ].map((p) => (
-                <Card key={p.nome} className="flex h-full flex-col gap-4 bg-cartao">
-                  <span className="text-xs text-transparent">.</span>
-                  <h3 className="text-lg text-salvia">{p.nome}</h3>
-                  <p>
-                    <span className="font-display text-3xl text-tinta">{p.preco}</span>
-                    {p.pago && <span className="text-sm text-tinta-2">/mês</span>}
-                  </p>
-                  <p className="flex-1 text-sm text-tinta">{p.agenda}</p>
-                  <Link to="/entrar" className="mt-auto">
-                    <Button variante="secondary" className="w-full">
-                      Escolher {p.nome}
-                    </Button>
-                  </Link>
-                </Card>
-              ))}
-            </div>
-          )}
+        <div className="mt-8 grid gap-5 sm:grid-cols-3">
+          {CREDITOS.map((c) => {
+            const Icon = c.icone
+            return (
+              <Card key={c.titulo} className="flex h-full flex-col gap-3 bg-cartao">
+                <span className="flex size-10 items-center justify-center rounded-pill bg-salvia-claro text-salvia">
+                  <Icon strokeWidth={1.75} className="size-5" />
+                </span>
+                <h3 className="text-lg text-tinta">{c.titulo}</h3>
+                <p className="flex-1 text-sm text-tinta-2">{c.texto}</p>
+              </Card>
+            )
+          })}
         </div>
-      </div>
-    </section>
-  )
-}
 
-function ChamadaFinal() {
-  return (
-    <section className="mx-auto w-full max-w-5xl px-4 py-16">
-      <Card className="flex flex-col items-center gap-5 bg-salvia px-6 py-12 text-center text-papel">
-        <h2 className="font-display text-3xl text-papel">
-          Pronto para automatizar seus avisos de pagamento?
-        </h2>
-        <p className="max-w-prose text-papel/85">
-          Crie sua conta em minutos e gere o primeiro combinado hoje mesmo.
-        </p>
-        <Link to="/entrar?modo=cadastro">
-          <Button variante="secondary" className="px-7 py-3 text-base">
-            Criar conta grátis
-          </Button>
-        </Link>
-      </Card>
+        {/* CTA principal: o card verde fecha a seção (substitui o antigo botão
+            discreto e a seção duplicada que existia no fim da página). */}
+        <Card className="mt-10 flex flex-col items-center gap-5 bg-salvia px-6 py-12 text-center text-papel">
+          <h2 className="font-display text-3xl text-papel">
+            Pronto para automatizar seus avisos de pagamento?
+          </h2>
+          <p className="max-w-prose text-papel/85">
+            Crie sua conta em minutos e gere o primeiro combinado hoje mesmo.
+          </p>
+          <Link to="/entrar?modo=cadastro">
+            <Button variante="secondary" className="px-7 py-3 text-base">
+              Criar conta grátis
+            </Button>
+          </Link>
+        </Card>
+      </div>
     </section>
   )
 }

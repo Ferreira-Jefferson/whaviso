@@ -292,12 +292,15 @@ export const adminMetricasResposta = z.object({
 })
 export type AdminMetricasResposta = z.infer<typeof adminMetricasResposta>
 
-// ---- GET /v1/admin/usuarios (owner): perfil + suspensão + plano ----
+// ---- GET /v1/admin/usuarios (owner): perfil + suspensão + SALDO da carteira (E11) ----
 export const adminUsuarioSchema = perfilSchema.extend({
   nome: z.string().max(120),
   suspenso: z.boolean(),
-  plano_id: z.string().nullable().optional(),
-  plano_status: z.string().nullable().optional(),
+  saldo_livre: z.number().int(),
+  reservado: z.number().int(),
+  em_hold: z.number().int(),
+  consumido: z.number().int(),
+  ja_comprou: z.boolean(),
 })
 export type AdminUsuario = z.infer<typeof adminUsuarioSchema>
 
@@ -309,116 +312,111 @@ export const adminUsuariosResposta = z.object({
 })
 export type AdminUsuariosResposta = z.infer<typeof adminUsuariosResposta>
 
-// ---- PATCH /v1/admin/usuarios/:id (owner): troca plano e/ou suspende ----
-export const adminAtualizarUsuarioBody = z
-  .object({
-    plano_id: z.string().min(1).max(40).optional(),
-    suspenso: z.boolean().optional(),
-  })
-  .refine((b) => b.plano_id !== undefined || b.suspenso !== undefined, {
-    message: 'informe plano_id e/ou suspenso',
-  })
+// ---- PATCH /v1/admin/usuarios/:id (owner): suspende/reativa ----
+// E11: a troca de plano saiu (não há planos). Creditar envios é endpoint próprio.
+export const adminAtualizarUsuarioBody = z.object({
+  suspenso: z.boolean(),
+})
 export type AdminAtualizarUsuarioBody = z.infer<typeof adminAtualizarUsuarioBody>
+
+// ---- POST /v1/admin/usuarios/:id/creditar (owner credita envios, H11.11) ----
+export const adminCreditarBody = z.object({
+  quantidade: z.number().int().min(1).max(100000),
+})
+export type AdminCreditarBody = z.infer<typeof adminCreditarBody>
+
+export const adminCarteiraResposta = z.object({
+  id: z.string(),
+  saldo_livre: z.number().int(),
+  reservado: z.number().int(),
+  em_hold: z.number().int(),
+  consumido: z.number().int(),
+  ja_comprou: z.boolean(),
+})
+export type AdminCarteiraResposta = z.infer<typeof adminCarteiraResposta>
 
 // Templates de mensagem: a maquinaria de edição (listar/propor/preview/ativar/
 // aprovar/apagar) vive em /v1/admin/mensagens (templates unificados por chave),
 // mais abaixo neste arquivo. Não há mais /admin/templates.
 
-// ---- GET /v1/billing/planos (reusado pela área admin) ----
-// Catálogo dos 4 planos (Épico 11) com a AGENDA como balde único e as alavancas
-// por plano. No Plus (por_envio=true) o preço é por VOLUME DE ENVIOS (migration
-// 0044): `preco_centavos` é o total no piso (`envios_min`), `preco_max_centavos` o
-// total no topo (`envios_max`); o R$/envio cai conforme o volume sobe. O total
-// intermediário é interpolado (o backend recomputa o congelado no assinar).
-export const planoSchema = z.object({
-  id: z.string(),
-  nome: z.string(),
+// ---- Catálogo de créditos (curva de preço + cortesia + tetos de agenda, E11) ----
+// 1 linha; o owner edita os valores em runtime. A curva interpola o total entre o piso
+// (envios_min -> preco_centavos) e o topo (envios_max -> preco_max_centavos); o R$/envio
+// cai conforme o volume sobe (mesma função no front e no back, fonte única do preço).
+export const creditosCatalogoSchema = z.object({
+  envios_min: z.number().int(),
+  envios_max: z.number().int(),
   preco_centavos: z.number().int(),
-  max_avisos_ativos: z.number().int().nullable(),
-  permite_recorrente: z.boolean(),
-  // Alavancas (lidas do catálogo, nunca fixadas no front).
-  capacidade_agenda: z.number().int(),
-  vagas_ativas: z.number().int().nullable(),
-  cadencia_configuravel: z.boolean(),
-  menu_texto_livre: z.boolean(),
-  informado_pago_habilitado: z.boolean(),
-  totais_periodo: z.boolean(),
-  por_unidade: z.boolean(),
-  agenda_por_unidade: z.number().int(),
-  ativaveis_por_unidade: z.number().int(),
-  reengajamento_max: z.number().int(),
-  somente_leitura: z.boolean(),
-  // Curva de preço por envio (Plus). Nulos nos planos que não são por_envio.
-  por_envio: z.boolean(),
-  envios_min: z.number().int().nullable(),
-  envios_max: z.number().int().nullable(),
-  preco_max_centavos: z.number().int().nullable(),
+  preco_max_centavos: z.number().int(),
+  cortesia_inicial: z.number().int(),
+  agenda_teto_free: z.number().int(),
+  agenda_teto_pago: z.number().int(),
 })
-export type Plano = z.infer<typeof planoSchema>
+export type CreditosCatalogo = z.infer<typeof creditosCatalogoSchema>
 
-export const listaPlanosResposta = z.object({
-  planos: z.array(planoSchema),
-})
-export type ListaPlanosResposta = z.infer<typeof listaPlanosResposta>
-
-// ---- GET /v1/billing/assinatura (JWT) ----
-// A conta NASCE no free (linha real no signup). `status`:
-//   trial = período de cortesia · ativa = vigente · cancelada = encerrada.
-// As alavancas vêm EFETIVAS (capacidade/vagas já resolvidas por unidade no Plus).
-// No Plus, `unidades` e `preco_centavos` (congelado) vêm preenchidos.
-export const statusAssinatura = z.enum(['trial', 'ativa', 'cancelada'])
-export type StatusAssinatura = z.infer<typeof statusAssinatura>
-
-export const assinaturaSchema = z.object({
-  plano_id: z.string(),
-  status: statusAssinatura,
-  nome: z.string().nullable().optional(),
-  preco_centavos: z.number().int().nullable().optional(),
-  unidades: z.number().int().nullable().optional(),
-  // Alavancas efetivas do plano vigente (espelho do backend).
-  capacidade_agenda: z.number().int().optional(),
-  vagas_ativas: z.number().int().nullable().optional(),
-  // Uso atual de vagas de aviso ativo (envios): quantos envios já estão ativos.
-  vagas_usadas: z.number().int().optional(),
-  somente_leitura: z.boolean().optional(),
-  permite_recorrente: z.boolean().optional(),
-  cadencia_configuravel: z.boolean().optional(),
-  menu_texto_livre: z.boolean().optional(),
-  informado_pago_habilitado: z.boolean().optional(),
-  totais_periodo: z.boolean().optional(),
-  reengajamento_max: z.number().int().optional(),
-  implicito: z.boolean().optional(),
-})
-export type Assinatura = z.infer<typeof assinaturaSchema>
-
-// ---- POST /v1/billing/assinar (JWT) ----
-// No Plus, `unidades` carrega o nº de ENVIOS/mês escolhido; os demais a ignoram. A
-// faixa exata (envios_min..envios_max) é validada no backend contra o catálogo.
-export const assinarBody = z
+// ---- PATCH /v1/admin/creditos-catalogo (owner edita a curva, H11.11) ----
+export const adminAtualizarCreditosCatalogoBody = z
   .object({
-    plano_id: z.enum(['free', 'start', 'profissional', 'plus']),
-    unidades: z.number().int().min(1).max(2000).optional(),
+    envios_min: z.number().int().min(1).optional(),
+    envios_max: z.number().int().min(1).optional(),
+    preco_centavos: z.number().int().min(0).optional(),
+    preco_max_centavos: z.number().int().min(0).optional(),
+    cortesia_inicial: z.number().int().min(0).optional(),
+    agenda_teto_free: z.number().int().min(0).optional(),
+    agenda_teto_pago: z.number().int().min(0).optional(),
   })
-  .refine((b) => b.plano_id !== 'plus' || b.unidades !== undefined, {
-    message: 'o plano Plus exige a quantidade de envios',
-  })
-export type AssinarBody = z.infer<typeof assinarBody>
+  .refine((b) => Object.keys(b).length > 0, { message: 'informe ao menos um campo' })
+export type AdminAtualizarCreditosCatalogoBody = z.infer<typeof adminAtualizarCreditosCatalogoBody>
 
-export const assinarResposta = z.object({
-  plano_id: z.string(),
-  status: statusAssinatura,
-  unidades: z.number().int().nullable(),
-  preco_centavos: z.number().int().nullable(),
+// ---- GET /v1/billing/carteira (JWT) ----
+// Saldo (espelho do servidor) + curva do catálogo para o slider de compra (H11.8/H11.3).
+export const carteiraSchema = z.object({
+  saldo_livre: z.number().int(),
+  reservado: z.number().int(),
+  em_hold: z.number().int(),
+  consumido: z.number().int(),
+  ja_comprou: z.boolean(),
 })
-export type AssinarResposta = z.infer<typeof assinarResposta>
+export type Carteira = z.infer<typeof carteiraSchema>
 
-// ---- POST /v1/billing/checkout (JWT) ----
-export const checkoutResposta = z.object({
-  pagamento_id: z.string(),
-  status: z.string(),
-  checkout_url: z.string().nullable(),
+export const carteiraResposta = z.object({
+  carteira: carteiraSchema,
+  catalogo: creditosCatalogoSchema,
 })
-export type CheckoutResposta = z.infer<typeof checkoutResposta>
+export type CarteiraResposta = z.infer<typeof carteiraResposta>
+
+// ---- GET /v1/billing/extrato (JWT) ----
+// Lançamentos da conta (compra/crédito/reserva/consumo/devolução/hold), paginado.
+export const tipoLancamento = z.enum([
+  'cortesia',
+  'compra',
+  'credito_owner',
+  'reserva',
+  'consumo',
+  'devolucao',
+  'hold',
+  'estorno',
+])
+export type TipoLancamento = z.infer<typeof tipoLancamento>
+
+export const lancamentoSchema = z.object({
+  id: z.string(),
+  tipo: tipoLancamento,
+  quantidade: z.number().int(),
+  ref_tipo: z.string().nullable(),
+  ref_id: z.string().nullable(),
+  ator: z.string().nullable(),
+  criado_em: z.coerce.date(),
+})
+export type Lancamento = z.infer<typeof lancamentoSchema>
+
+export const extratoResposta = z.object({
+  itens: z.array(lancamentoSchema),
+  total: z.number().int(),
+  page: z.number().int(),
+  per_page: z.number().int(),
+})
+export type ExtratoResposta = z.infer<typeof extratoResposta>
 
 // ---- /v1/admin/mensagens (templates UNIFICADOS por chave) ----
 // Mesma maquinaria do ciclo (propor versão -> aprovar -> ativar), mas sobre a

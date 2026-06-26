@@ -54,7 +54,7 @@ export const NAV_POR_SECAO: Record<Secao, NavItem[]> = {
     { to: '/app', label: 'Painel', icon: LayoutDashboard, end: true },
     { to: '/app/avisos', label: 'Avisos', icon: Bell },
     { to: '/app/avisos/novo', label: 'Novo', icon: PlusCircle },
-    { to: '/app/plano', label: 'Plano', icon: CreditCard },
+    { to: '/app/creditos', label: 'Créditos', icon: CreditCard },
     { to: '/app/conta', label: 'Conta', icon: UserCircle },
   ],
   meus: [
@@ -67,7 +67,7 @@ export const NAV_POR_SECAO: Record<Secao, NavItem[]> = {
     { to: '/admin/usuarios', label: 'Usuários', icon: Users },
     { to: '/admin/envios', label: 'Envios', icon: Send },
     { to: '/admin/templates', label: 'Templates', icon: FileText },
-    { to: '/admin/planos', label: 'Planos', icon: CreditCard },
+    { to: '/admin/creditos', label: 'Créditos', icon: CreditCard },
     { to: '/admin/whatsapp', label: 'WhatsApp', icon: Smartphone },
     // UI (design system) é referência interna: fica sempre por último.
     { to: '/admin/design', label: 'UI', icon: Palette },

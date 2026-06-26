@@ -21,7 +21,7 @@ Os **critérios de aceite** são o que será conferido contra o código na fase 
 - **Devedor**: quem vai pagar e recebe os lembretes. Em geral sem conta, só interage por botões no WhatsApp.
 - **Criador-devedor**: no fluxo *pagar invertido*, cria o combinado e convida o cobrador.
 - **Convidado**: aceita ou recusa pelo WhatsApp, sem login.
-- **Owner/Admin**: gerencia templates de mensagem e catálogo de planos.
+- **Owner/Admin**: gerencia templates de mensagem, o preço dos créditos de envio e credita contas (ativação manual pós-pagamento).
 - **Sistema (zap/scheduler)**: dispara lembretes e drena filas (histórias "de sistema").
 
 ### Legenda de escopo
@@ -63,7 +63,7 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 | 8 | Confirmação de pagamento (informado_pago) | [08-confirmacao-pagamento.md](08-confirmacao-pagamento.md) | escrito |
 | 9 | Painel de controle | [09-painel.md](09-painel.md) | escrito |
 | 10 | Notificações ao cobrador | [10-notificacoes-cobrador.md](10-notificacoes-cobrador.md) | escrito |
-| 11 | Planos, limites e billing | [11-planos-billing.md](11-planos-billing.md) | escrito |
+| 11 | Créditos de envio (carteira / billing) | [11-planos-billing.md](11-planos-billing.md) | reescrito |
 | 12 | Templates / mensagens (admin) | [12-templates-admin.md](12-templates-admin.md) | escrito |
 | 13 | Linguagem, opt-out e compliance | [13-compliance.md](13-compliance.md) | escrito |
 | 14 | Cadastro da chave de pagamento pelo cobrador (fluxo invertido) | [14-cadastro-chave-pix-cobrador.md](14-cadastro-chave-pix-cobrador.md) | escrito |
@@ -71,7 +71,7 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 ## Dívidas técnicas levantadas durante a escrita
 
 - **Remover aceite via site:** página pública `/aceite/:token` e a rota `POST` pública de aceite devem sair do código. O aceite passa a ser **100% pelo WhatsApp** (ver Épico 5). *Pendente de execução na fase de implementação.*
-- ~~**Estudo de UX da cadência configurável (H6.10)**~~ **resolvido (2026-06-25):** recorrência (por período mensal/semanal ou datas específicas) + cadência (subconjunto de etapas), via revelação progressiva no formulário de criar, gated por plano. Schema decidido (tabela `aviso_ocorrencias` + `envios.ocorrencia_id`, geração lazy). Ver Épico 6 H6.10 (Decisões), Épico 8 H8.7 e Épico 11 H11.5. *Em implementação backend + frontend.*
+- ~~**Estudo de UX da cadência configurável (H6.10)**~~ **resolvido (2026-06-25):** recorrência (por período mensal/semanal ou datas específicas) + cadência (subconjunto de etapas), via revelação progressiva no formulário de criar, **disponível para todos** (sem trava de plano: o modelo virou carteira de créditos, cada ocorrência custa 1 envio, ver Épico 11 reescrito). Schema decidido (tabela `aviso_ocorrencias` + `envios.ocorrencia_id`, geração lazy). Ver Épico 6 H6.10 (Decisões) e Épico 8 H8.7. *Em implementação backend + frontend.*
 - **Renomear estado `pendente` → `programado`:** já aplicado nas histórias (épicos 2, 3, 5 e 6). Falta a varredura no **código** (máquina de estados: trigger no banco + app) e em **PROJETO.md/CLAUDE.md** (ver Épico 6). *Pendente na fase de implementação.*
 - **Fila de saída com espaçamento de 10 min + cancelamento (Épico 10 H10.9):** ponto **crítico**. Espaçar envios ao mesmo destinatário e anular itens superados (par opt-out/reativação, item obsoleto por estado terminal), nas duas outboxes, só com banco (sem Redis). Exige **testes dedicados** de corrida para não cancelar o que não devia. Soma-se à distância de 10 min por devedor no agendamento (Épico 6 H6.9). *Pendente.*
-- **Catálogo de planos diverge do PROJETO.md (Épico 11):** PROJETO.md (seção 8) descreve pessoal/profissional; as histórias decidiram **4 planos (Free/Start/Profissional/Plus)** com **dois eixos**: **capacidade de agenda** (balde único: 50/100/150, Plus 1 por envio) e **vagas de aviso ativo** (vendidas como "envios de aviso": Free 0 / Start 10 / Profissional 25 / Plus 26-200). Preços (definidos 2026-06-25, migration 0049): Free R$ 0, Start R$ 9,90, Profissional R$ 29,90, Plus por volume de envios (R$ 31,10 a R$ 140,00). Falta só reescrever PROJETO.md seção 8. *Pendente só no PROJETO.md.*
+- **Modelo de billing reescrito (Épico 11, 2026-06-26):** de **4 planos** (Free/Start/Profissional/Plus com alavancas por plano) para **carteira de créditos de envio** (Free + compra por quantidade via slider, curva de preço, charge-on-success, hold de 24h, tudo liberado para todos). Como **não há cliente em produção**, o schema é refeito **do zero** (sem migração). Pendências: reescrever **PROJETO.md seção 8** para o modelo de créditos; e **refatorar o código** (tabelas `planos`/`plano_versoes`/`alavancas_do_plano`/`somarVagasAtivas` e o catálogo de 4 planos → carteira + livro-razão + curva de preço). *Pendente na fase de implementação.*

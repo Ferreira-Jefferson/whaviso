@@ -1,8 +1,9 @@
-// /admin/usuarios: gestão de contas (plano, suspensão).
-// O backend expõe GET /v1/admin/usuarios e PATCH /v1/admin/usuarios/:id
-// ({ plano_id?, suspenso? }). Suspender = bloquear a conta na api (toda rota
-// autenticada da pessoa passa a responder 403); reativar volta ao normal. Não
-// apaga dados. Linguagem das Regras de Ouro em toda string.
+// /admin/usuarios: gestão de contas (saldo de créditos, suspensão).
+// O backend expõe GET /v1/admin/usuarios (perfil + saldo da carteira), PATCH
+// /v1/admin/usuarios/:id ({ suspenso }) e POST /v1/admin/usuarios/:id/creditar
+// ({ quantidade }). Creditar = ativar quem pagou via WhatsApp (H11.11), com
+// confirmação antes de aplicar no banco. Suspender = bloquear a conta na api.
+// Linguagem das Regras de Ouro: crédito, envio, saldo, recarga.
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Search } from 'lucide-react'
@@ -19,24 +20,12 @@ import {
   cn,
   type ColunaTabela,
 } from '@/shared/ui'
-import { useAdminUsuarios, useAtualizarUsuario, type UsuarioAdmin } from '../api'
+import { useAdminUsuarios, useAtualizarUsuario, useCreditarUsuario, type UsuarioAdmin } from '../api'
 import { Indisponivel } from '../components/Indisponivel'
 
 const ROTULO_ROLE: Record<string, string> = {
   owner: 'Administração',
   user: 'Cliente',
-}
-
-// Sufixo quando a assinatura não está vigente (status diferente de 'ativa').
-const SUFIXO_STATUS_PLANO: Record<string, string> = {
-  trial: ' (cortesia)',
-  cancelada: ' (cancelada)',
-}
-
-// O catálogo guarda o tipo do plano em minúsculas (free, start, profissional,
-// plus). Na tela mostramos capitalizado (Free, Start, ...).
-function rotuloPlano(planoId: string): string {
-  return planoId.charAt(0).toUpperCase() + planoId.slice(1)
 }
 
 export default function UsuariosPage() {
@@ -45,8 +34,12 @@ export default function UsuariosPage() {
 
   const { data, isLoading, isError } = useAdminUsuarios({ busca: busca || undefined })
   const atualizar = useAtualizarUsuario()
+  const creditar = useCreditarUsuario()
   // Pessoa cuja suspensão está em confirmação (suspender é destrutivo → confirma).
   const [aSuspender, setASuspender] = useState<UsuarioAdmin | null>(null)
+  // Pessoa que está recebendo crédito + a quantidade digitada (confirma antes de aplicar).
+  const [aCreditar, setACreditar] = useState<UsuarioAdmin | null>(null)
+  const [qtdCredito, setQtdCredito] = useState('')
 
   function setBusca(v: string) {
     setParams(
@@ -67,11 +60,28 @@ export default function UsuariosPage() {
   function confirmarSuspensao() {
     if (!aSuspender) return
     const id = aSuspender.id
-    atualizar.mutate(
-      { id, suspenso: true },
-      { onSuccess: () => setASuspender(null) },
+    atualizar.mutate({ id, suspenso: true }, { onSuccess: () => setASuspender(null) })
+  }
+
+  function abrirCreditar(u: UsuarioAdmin) {
+    setQtdCredito('')
+    setACreditar(u)
+  }
+
+  function confirmarCredito() {
+    if (!aCreditar) return
+    const quantidade = Number(qtdCredito)
+    if (!Number.isInteger(quantidade) || quantidade < 1) return
+    creditar.mutate(
+      { id: aCreditar.id, quantidade },
+      { onSuccess: () => setACreditar(null) },
     )
   }
+
+  const quantidadeValida = (() => {
+    const n = Number(qtdCredito)
+    return Number.isInteger(n) && n >= 1
+  })()
 
   const colunas: ReadonlyArray<ColunaTabela<UsuarioAdmin>> = [
     {
@@ -95,18 +105,18 @@ export default function UsuariosPage() {
       render: (u) => ROTULO_ROLE[u.role] ?? u.role,
     },
     {
-      chave: 'plano',
-      titulo: 'Plano',
-      render: (u) => {
-        if (!u.plano_id) return <span className="text-tinta-2">Sem plano</span>
-        const sufixo = (u.plano_status && SUFIXO_STATUS_PLANO[u.plano_status]) ?? ''
-        return (
-          <span>
-            {rotuloPlano(u.plano_id)}
-            {sufixo && <span className="text-tinta-2">{sufixo}</span>}
-          </span>
-        )
-      },
+      chave: 'saldo',
+      titulo: 'Saldo',
+      render: (u) => (
+        <span className="flex flex-col">
+          <span className="tabular text-tinta">{u.saldo_livre} livre</span>
+          {(u.reservado > 0 || u.em_hold > 0) && (
+            <span className="text-xs text-tinta-2">
+              {u.reservado} reservado{u.em_hold > 0 ? ` · ${u.em_hold} em espera` : ''}
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       chave: 'acoes',
@@ -115,6 +125,13 @@ export default function UsuariosPage() {
       ocultarRotuloMobile: true,
       render: (u) => (
         <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            variante="primary"
+            className="px-3 py-1.5 text-xs"
+            onClick={() => abrirCreditar(u)}
+          >
+            Creditar envios
+          </Button>
           {u.suspenso ? (
             <Button
               variante="secondary"
@@ -140,10 +157,7 @@ export default function UsuariosPage() {
 
   return (
     <div className="animate-rise">
-      <PageHeader
-        titulo="Usuários"
-        descricao="Gestão de contas: plano e suspensão."
-      />
+      <PageHeader titulo="Usuários" descricao="Gestão de contas: saldo de créditos e suspensão." />
 
       <Card className="mb-6">
         <label className="flex items-center gap-2 rounded-input border border-linha px-3 py-1">
@@ -158,7 +172,7 @@ export default function UsuariosPage() {
         </label>
       </Card>
 
-      {atualizar.isError && (
+      {(atualizar.isError || creditar.isError) && (
         <Banner tom="erro" className="mb-4">
           Não foi possível concluir a ação. Tente novamente.
         </Banner>
@@ -187,6 +201,35 @@ export default function UsuariosPage() {
           chaveLinha={(u) => u.id}
         />
       )}
+
+      {/* Creditar envios (H11.11): input de quantidade + confirmação antes do banco. */}
+      <ConfirmDialog
+        aberto={aCreditar !== null}
+        titulo="Creditar envios nesta conta"
+        textoConfirmar="Creditar"
+        carregando={creditar.isPending}
+        onConfirmar={confirmarCredito}
+        onCancelar={() => setACreditar(null)}
+      >
+        <div className="flex flex-col gap-3">
+          <p>
+            Quantos envios creditar para <strong>{aCreditar?.nome || 'esta conta'}</strong>? O
+            saldo soma ao que a pessoa já tem (saldo atual: {aCreditar?.saldo_livre ?? 0}).
+          </p>
+          <Input
+            type="number"
+            min={1}
+            inputMode="numeric"
+            value={qtdCredito}
+            onChange={(e) => setQtdCredito(e.target.value)}
+            placeholder="Quantidade de envios"
+            aria-label="Quantidade de envios a creditar"
+          />
+          {!quantidadeValida && qtdCredito !== '' && (
+            <span className="text-xs text-barro">Informe um número inteiro de 1 ou mais.</span>
+          )}
+        </div>
+      </ConfirmDialog>
 
       <ConfirmDialog
         aberto={aSuspender !== null}

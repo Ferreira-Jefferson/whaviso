@@ -14,8 +14,8 @@ Como **devedor**, quero responder com um toque e não ter que digitar nada, para
 - [ ] As únicas ações possíveis para o devedor são os botões **Já paguei**, **Chave de Pag.** e **Desativar lembretes**.
 - [ ] Não há chat humano, IA, nem Pix automático: o Whaviso **não responde livremente** a texto do devedor.
 - [ ] Se o devedor **digita texto livre**:
-  - [ ] **Plano free** (ou sem conta): **não recebe nada** (silêncio, para não gastar envio nem virar conversa).
-  - [ ] **Plano pago:** recebe um **menu de opções** com as ações disponíveis (Já paguei / Chave de Pag. / Desativar lembretes) referente ao(s) combinado(s) ativo(s).
+  - [ ] **Texto livre do devedor:** a conta responde com um **menu de opções** com as ações disponíveis (Já paguei / Chave de Pag. / Desativar lembretes) referente ao(s) combinado(s) ativo(s). **Disponível para todas as contas** (não há distinção de plano; modelo de créditos, Épico 11). O menu é resposta a texto, não um lembrete, e **não consome crédito de envio**.
+  - [ ] O menu é um **conjunto fechado de opções, não um chat**: o Whaviso não conversa (Épico 13 H13.7). Fora dos botões/menu, silêncio.
 - [ ] Cada toque de botão é um evento de webhook **autenticado por HMAC**; o payload traz o **`aviso_id`** e o identificador do aviso/etapa, nunca o token nem dado sensível.
 - [ ] Toda resposta respeita as regras de linguagem (neutra de gênero, sem palavras proibidas).
 
@@ -28,7 +28,7 @@ Como **devedor**, quero avisar que paguei com um toque, para que quem vai recebe
 - [ ] Ao tocar, o combinado vai para **`informado_pago`** e o **ciclo normal de lembretes para** (Épico 6 H6.5).
 - [ ] O **cobrador é notificado** imediatamente de que o devedor informou pagamento (Épico 10).
 - [ ] O devedor recebe uma resposta neutra de confirmação, ex.: *"Combinado, vou avisar quem fez o acordo com você. Obrigado!"*
-- [ ] **Idempotente:** tocar "Já paguei" de novo enquanto já está em `informado_pago` **não faz nada** e **não envia mais mensagem nenhuma** (nem confirmação, nem menu, mesmo no plano pago) e não cria evento/notificação duplicados.
+- [ ] **Idempotente:** tocar "Já paguei" de novo enquanto já está em `informado_pago` **não faz nada** e **não envia mais mensagem nenhuma** (nem confirmação, nem menu) e não cria evento/notificação duplicados.
 - [ ] A transição registra evento de auditoria (append-only).
 - [ ] A confirmação/rejeição pelo cobrador (que tira de `informado_pago`) é tratada no Épico 8.
 
@@ -93,7 +93,7 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 - [ ] Apenas os botões do **último aviso enviado** do combinado têm efeito; tocar um botão de uma mensagem **anterior** do mesmo combinado **não dispara ação de estado**.
 - [ ] Isso vale para os três botões, inclusive **Chave de Pag.** (entrega uma vez por combinado, e só pelo último aviso).
 - [ ] Se o combinado já está em **estado terminal** (`pago`, `cancelado`, `recusado`, `expirado`), tocar qualquer botão **não reabre** o combinado nem dispara ação.
-- [ ] Nesses casos o devedor recebe (respeitando a cortesia free/pago da H7.1) uma resposta neutra, ex.: *"Este combinado já foi encerrado, não há mais nada a fazer por aqui."*
+- [ ] Nesses casos o devedor recebe uma resposta neutra, ex.: *"Este combinado já foi encerrado, não há mais nada a fazer por aqui."*
 - [ ] Se o `aviso_id` for inválido/desconhecido, o toque é ignorado **sem vazar** se o combinado existe ou não.
 
 ---
@@ -107,11 +107,11 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 - **Estado `desregistrado` (opt-out reversível):** hoje o opt-out cai em `cancelado` (PROJETO.md §4) e seria terminal. Passa a ser **estado próprio, reversível** pelo devedor (botão Ativar lembretes), distinto de `pausado` (quem pausa é o criador), `cancelado` (criador cancela) e `recusado` (convidado recusa o convite). Novas transições: `programado → desregistrado` (sair) e `desregistrado → programado` (reativar).
 - **Notificação ao cobrador com atraso de 1 minuto:** o aviso de opt-out ao cobrador espera 1 min para absorver uma reativação rápida; e a reativação pós-notificação gera uma 2ª notificação. Lógica nova de janela/agendamento de notificação (Épico 10).
 - **Só o último aviso age (H7.7):** exige que o payload do botão identifique **o aviso/etapa**, e que o sistema saiba qual é o último envio do combinado, para invalidar botões de mensagens antigas. Não existe hoje.
-- **Menu de opções para texto livre (plano pago):** resposta automática a texto livre só para pagos; free fica em silêncio. Lógica nova condicionada a plano.
+- **Menu de opções para texto livre:** resposta automática ao texto livre do devedor, **disponível para todas as contas** (não há mais distinção de plano; modelo de carteira de créditos, Épico 11). A resposta do menu é uma réplica dentro da janela de atendimento, não um lembrete, então **não consome crédito de envio**. Lógica nova.
 - **Risco do canal (botões via Baileys):** o modelo depende de **botões interativos** funcionando no WhatsApp; via Baileys (não oficial) podem ser instáveis, talvez exigindo **fallback** (respostas numeradas) até a Meta oficial. Validar cedo.
 
 ### Decisões tomadas
-- **Texto livre:** free não recebe nada; pago recebe um menu de opções. Depois de "Já paguei", nem isso (silêncio total para aquele combinado).
+- **Texto livre:** todas as contas recebem um menu de opções (não há distinção de plano; modelo de créditos, Épico 11). Depois de "Já paguei", nem isso (silêncio total para aquele combinado).
 - **"Já paguei" idempotente e silencioso na repetição** (não reenvia nada).
 - **"Chave de Pag." entrega duas mensagens** (chave; depois titular + banco, até 3s de intervalo), **uma vez por combinado**, `solicitou_pix` só no 1º toque, reenvio só em falha de servidor.
 - **Opt-out = estado `desregistrado`, reversível** (botão Ativar lembretes), só o combinado em questão, libera o horário reservado.

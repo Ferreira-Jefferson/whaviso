@@ -24,6 +24,8 @@ O produto tem **dois pilares**:
 
 Variações: *"Cadastrou, agendou, recebeu." · "Seus recebimentos no automático." · "Agende o aviso. Saiba quando recebeu."*
 
+> **Uso secundário (não é a promessa central):** como cada combinado fica anotado na agenda (modo agenda: registrar sem enviar, Épico 4 / Épico 11), o whaviso também serve de **agenda leve de pedidos e de vendas a receber**. É um uso possível, citável na comunicação, mas não o coração do produto: a promessa central segue "avisar + controlar", não "gestão de vendas". Não vender como sistema de gestão de vendas nem prometer recursos de ERP.
+
 ### O problema que resolve
 
 Cobrar manualmente é chato, esquecível e desgastante. O whaviso agenda e dispara os avisos automaticamente, e o painel mostra exatamente o que está pendente, o que foi confirmado e o que já venceu, sem precisar ficar lembrando na mão.

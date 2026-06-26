@@ -5,7 +5,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { sha256ConviteHex } from '@whaviso/shared/contracts'
 import { processarBotao } from '../service'
-import { clienteWhatsFake, encerrarPools, limpar, poolSuper, porPlano } from '../../../../test/harness'
+import { clienteWhatsFake, encerrarPools, limpar, poolSuper } from '../../../../test/harness'
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 const TEL = '+5511955554444'
@@ -37,7 +37,6 @@ async function criarConviteRecorrente(numeroOcorrencias: number): Promise<{ cobr
   usados.push(cobradorId)
   await poolSuper.query(`insert into auth.users (id) values ($1)`, [cobradorId])
   await poolSuper.query(`update public.profiles set nome='Cobrador', telefone=$2 where id=$1`, [cobradorId, '+5511960009999'])
-  await porPlano(cobradorId, 'profissional')
   const { rows } = await poolSuper.query<{ id: string }>(
     `insert into public.avisos
        (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,

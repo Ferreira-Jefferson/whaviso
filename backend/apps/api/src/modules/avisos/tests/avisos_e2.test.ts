@@ -304,27 +304,22 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     expect(r.json().error.code).toBe('edicao_em_aprovacao')
   })
 
-  it('H2.5: limite de edições por plano é respeitado no servidor (G-C2)', async () => {
-    // Plano com teto baixo: start = 3 edições por combinado.
-    const cob = await criarUsuario('Cobrador Limite')
-    await definirPlano(cob, 'start')
-    const dev = await criarUsuario('Devedor Limite')
+  it('E11 H11.2: editar é UNIVERSAL (sem teto de edições por plano)', async () => {
+    // Não há mais alavanca edicoes_max: editar é liberado para todos. 4 ciclos
+    // editar->desfazer (mais que o antigo teto de 3) seguem passando.
+    const cob = await criarUsuario('Cobrador Edicoes')
+    const dev = await criarUsuario('Devedor Edicoes')
     const appC = await criarAppTeste(cob)
     const criado = await appC.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
     const id = criado.json().aviso.id
     await aceitarAvisoDireto(id, dev) // E5: site de aceite removido
 
-    // 3 ciclos editar->desfazer (cada edição consome 1 da alavanca).
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const e = await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 10000 + i } })
       expect(e.statusCode).toBe(200)
       await appC.inject({ method: 'POST', url: `/v1/avisos/${id}/desfazer-edicao`, headers: AUTH })
     }
-    // 4ª edição estoura o teto (3).
-    const quarta = await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 99999 } })
     await appC.close()
-    expect(quarta.statusCode).toBe(422)
-    expect(quarta.json().error.code).toBe('limite_edicoes_atingido')
     await limparUsuario(cob)
     await limparUsuario(dev)
   })

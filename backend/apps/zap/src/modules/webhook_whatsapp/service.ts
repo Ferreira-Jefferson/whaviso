@@ -129,10 +129,10 @@ async function aplicarEResponder(
     etapaClicada: opcoes.etapa,
   })
   if (!r) return
-  // H7.7: combinado encerrado OU botão de aviso antigo (não é o último): responde a
-  // cortesia "já encerrado" SÓ no plano pago do dono (free = silêncio, H7.1/G-C2).
+  // H7.7 / E11 H11.2: combinado encerrado OU botão de aviso antigo (não é o último): responde
+  // a cortesia "já encerrado" (universal, liberada para todos; é réplica, não consome crédito).
   if (r.encerrado) {
-    if (r.telefone && r.menuLiberado) {
+    if (r.telefone) {
       await responder(deps, r.telefone, 'resposta.encerrado')
     }
     return
@@ -276,17 +276,16 @@ export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Pr
 
   const numero = extrairNumeroConvite(evento.texto)
   if (!numero) {
-    // H7.1: texto LIVRE de um DEVEDOR (sem chat/IA). Se o telefone tem combinado(s)
-    // ATIVO(s) que ainda aceitam ação (programado) E o dono é PAGO -> menu de opções
-    // (G-C1: nunca lista informado_pago/desregistrado/terminais; silêncio quando não
-    // sobra nenhum, ou quando o dono é free). Só se NÃO houver combinado é que caímos no
-    // fluxo de convite (pedir o número, E5).
+    // H7.1 / E11 H11.2: texto LIVRE de um DEVEDOR (sem chat/IA). Se o telefone tem
+    // combinado(s) ATIVO(s) que ainda aceitam ação (programado) -> menu de opções (G-C1:
+    // nunca lista informado_pago/desregistrado/terminais). O menu é UNIVERSAL (a resposta é
+    // réplica, não lembrete: NÃO consome crédito). Só se NÃO houver combinado é que caímos
+    // no fluxo de convite (pedir o número, E5).
     const combinados = await repo.listarCombinadosParaMenu(deps.pool, telefone)
     if (combinados.length > 0) {
-      // É um DEVEDOR com combinado(s) acionável(is). Menu só se ALGUM dono é pago
-      // (G-C1); senão SILÊNCIO (free não recebe nada). Botões amarrados ao 1o acionável.
-      const pago = combinados.find((c) => c.menuLiberado)
-      if (pago) await responder(deps, telefone, 'resposta.menu_opcoes', { refId: pago.id })
+      // É um DEVEDOR com combinado(s) acionável(is). Menu liberado para todos; botões
+      // amarrados ao 1o acionável.
+      await responder(deps, telefone, 'resposta.menu_opcoes', { refId: combinados[0]!.id })
       return
     }
     // Sem combinado acionável. Pede o número quando há convite PENDENTE para o telefone

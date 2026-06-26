@@ -1,194 +1,186 @@
-# Épico 11: Planos, limites e billing
+# Épico 11: Créditos de envio e carteira (billing)
 
-> O Whaviso é um SaaS: o que cada conta pode fazer depende do **plano**. O plano é um conjunto de **alavancas** (quantos avisos ativos, tamanho da agenda, recorrência, cadência configurável, confirmação de pagamento, menu de texto livre) e um **preço**.
-> No MVP o pagamento ainda **não tem gateway**: o billing é um **stub trial** (a conta nasce num plano e o limite é aplicado de verdade, mas a cobrança em dinheiro fica para depois). O que **já vale no MVP** é a aplicação dos limites; o que é **gated** é a cobrança real e a troca de plano com dinheiro.
-> Regra-mãe deste épico (já decidida em vários outros): **free mantém agenda e visualiza, mas não ativa envio**. Tudo que dispara mensagem passa por uma vaga de plano.
-> **A agenda é literalmente uma agenda, um balde único.** Todo combinado é uma **anotação na agenda**, não importa como nasceu: criado como cobrador (fluxo receber), cadastrado como pagador (fluxo invertido), ou só anotado sem nunca virar aviso. Ativo, pausado ou só anotação, **tudo conta igual** para o limite de agenda do plano. O que o plano define é **quantas anotações** a conta mantém (e quais recursos ela libera).
-> Catálogo é **dado de catálogo**, não auditoria. A **migration semeia** os valores iniciais (e o schema); a partir daí o **owner edita preço/limites/recursos pela tela de admin** (ver H11.11). O catálogo é **versionado**: cada edição cria uma **nova versão** do plano (as anteriores são preservadas). Como o produto **já está em produção com clientes pagantes**, editar o catálogo **não muda quem já paga**: cada assinatura fixa a **versão contratada** (preço, limites e recursos) e edições só valem para **novas contratações**; no vencimento a assinatura adota a versão corrente (ver H11.12). O free acompanha a versão corrente.
+> O Whaviso é **pré-pago por crédito de envio**. Não há planos com recursos diferentes: **todo recurso é liberado para todos** (recorrência, cadência, menu de texto livre, confirmação de pagamento, totais, histórico). O que limita o uso é o **saldo de envios** da conta, nada mais.
+> **Unidade = 1 envio = 1 ocorrência de aviso.** Um combinado simples vale 1 envio; um combinado recorrente de N ocorrências vale N envios (1 por ocorrência). O envio é a mesma unidade que, no futuro, custa dinheiro na Meta (1 mensagem de template entregue), então a conta revende exatamente a unidade que compra.
+> A conta nasce **Free** com um **saldo inicial de cortesia** (poucos envios) para experimentar. Sem saldo, a conta vira agenda: anota e visualiza, mas não dispara.
+> **Comprar = escolher a quantidade num seletor (slider) e pagar.** O preço total segue uma **curva**: o R$/envio cai conforme a quantidade sobe. O saldo comprado é **aditivo** (10 que sobraram + 25 comprados = 35) e **nunca expira** (regra de confiança: o que a pessoa pagou não se perde).
+> **Cobra só o que foi de fato usado (charge-on-success).** Ativar um aviso **reserva** o crédito; o crédito só é **consumido de vez quando o lembrete dispara**. Convite **não aceito** (recusado/expirado) **devolve** o crédito. Opt-out/cancelamento no meio de um recorrente põe os envios não disparados em **hold de 24h** e depois devolve ao saldo, com aviso claro à pessoa.
+> No MVP **não há gateway**: a compra de crédito é **manual** (a pessoa fala no WhatsApp, paga via Pix, e o **owner credita** os envios na conta). Gateway de pagamento e recarga automática/assinatura mensal são **futuro** (🟡).
+> **Não há cliente em produção ainda:** o schema e as regras são feitos do zero, sem compatibilidade com o modelo antigo de 4 planos (Free/Start/Profissional/Plus), que fica revogado (ver Divergências).
 
 ---
 
-### H11.1: Catálogo de planos 🟢
-Como **owner/admin**, quero um catálogo de planos versionado, para que cada conta seja associada a um plano com limites e recursos bem definidos.
+### H11.1: Carteira de créditos e saldo 🟢
+Como **sistema**, quero que cada conta tenha uma carteira de créditos de envio, para controlar o que a conta pode disparar com base no saldo, e não em planos.
 *Critérios de aceite:*
-- [ ] Existe um catálogo de planos com, no mínimo, estas **alavancas** por plano: **vagas de aviso ativo**, **capacidade de agenda**, **recorrência habilitada (sim/não)**, **cadência configurável (sim/não)**, **menu de texto livre (sim/não)**, **confirmação de pagamento / `informado_pago` (sim/não)**, **histórico completo (sim/não)**. (**Totais por período**, a consolidação do painel, **não** é alavanca: é base em todos os planos, ver H11.5.) A recorrência **não** acrescenta alavanca de cota: cada **ocorrência** reserva **1 vaga de aviso ativo** (ver H11.3/H11.5).
-- [ ] São **4 planos**: **Free**, **Start**, **Profissional** e **Plus** (chaves estáveis ex.: `free`, `start`, `profissional`, `plus`).
-- [ ] Cada plano tem **chave estável**, **nome de exibição** e **preço** (em centavos; pode ser 0): **Free R$ 0**, **Start R$ 9,90/mês**, **Profissional R$ 23,90/mês**, **Plus** vendido por **volume de envios** (de 26 a 200 envios de aviso, total de **R$ 24,00 a R$ 140,00**; o R$/envio cai conforme o volume sobe, ver H11.3 e a curva nas Decisões).
-- [ ] O **schema e o seed inicial** do catálogo vivem em **migration** (upsert idempotente, nunca no seed que não roda no cloud; `supabase db push`, ver CLAUDE.md / memória `whaviso-dev-db`). Depois disso, **mudar valor de plano é edição do owner em runtime** (cria nova versão, H11.11/H11.12), não exige migration; só mudança de **schema** ou **plano novo** exige `db push`.
-- [ ] Toda conta referencia **um** plano vigente (default na criação = **free**, ver Épico 1).
-- [ ] A linguagem do catálogo respeita as regras de ouro (sem "dívida/cobrança/atraso") e gênero neutro.
+- [ ] Cada conta tem uma **carteira** com quatro grandezas derivadas de um livro-razão (append-only, regra de não-DELETE):
+  - **saldo livre**: créditos prontos para usar.
+  - **reservado**: créditos presos a avisos ativos ainda não disparados.
+  - **em hold**: créditos a caminho de volta (janela de 24h após opt-out/cancelamento, H11.6).
+  - **consumido**: créditos já disparados (permanente, nunca voltam).
+- [ ] A conta nasce **Free** com um **saldo inicial de cortesia** (valor pequeno, parametrizável; sugestão inicial: poucos envios) para experimentar de ponta a ponta.
+- [ ] O saldo comprado **não expira**. O saldo inicial de cortesia também não expira (é só pequeno).
+- [ ] Toda mudança de saldo é um **lançamento no livro-razão** (compra, crédito do owner, reserva, consumo, devolução, hold), com tipo, quantidade, referência (aviso/ocorrência ou pagamento) e timestamp. A carteira é a soma dos lançamentos (fonte única; nunca um número solto editável à mão).
 
 ---
 
-### H11.2: Plano free, visualizar e agendar sem ativar 🟢
-Como **pessoa no plano free**, quero usar o Whaviso como agenda e visualizar tudo, mesmo sem poder enviar, para conhecer o produto antes de pagar.
+### H11.2: Tudo liberado, sem trava de recurso 🟢
+Como **pessoa usuária**, quero acesso a todos os recursos desde o Free, para o limite ser só quanto eu envio, não o que eu posso usar.
 *Critérios de aceite:*
-- [ ] No free consigo **criar itens de agenda** (`sem_aviso`) até o limite do free (ver H11.4) e **visualizar** o painel inteiro (ver Épico 9).
-- [ ] No free **não consigo ativar** nenhum combinado (não gera convite, não dispara lembrete): a ação **ativar** leva à **CTA de upgrade** (H11.6), sem erro feio.
-- [ ] O menu de **texto livre** do devedor, no free, é **silêncio** (sem resposta automática a mensagem fora dos botões), ver Épico 7 H7.1.
-- [ ] Free **não tem cadência configurável** (recurso pago); aparece como **bloqueada/CTA**, não some. **Recorrência NÃO é recurso pago** (é facilitador, ver H11.5): o free pode montar um combinado recorrente **na agenda** (não envia, como tudo no free); ativar/enviar segue barrado pela regra do free. (**Totais por período** é base: o free também consolida o painel, ver H11.5.)
-- [ ] Nada no free dispara mensagem ao devedor ou ao cobrador: free é estado **sem custo de envio**.
+- [ ] **Recorrência, cadência configurável, menu de texto livre, confirmação de pagamento (`informado_pago`), totais por período e histórico completo** estão disponíveis para **todas as contas**. Não há recurso "só de pago".
+- [ ] O único limite é o **saldo de envios**: sem saldo, a conta anota na agenda e visualiza o painel, mas **não ativa nem dispara** (ver H11.4).
+- [ ] A recorrência é, de propósito, um **acelerador de consumo** (cada ocorrência é 1 envio): por isso é livre para todos (bom para o usuário e para a empresa), nunca um diferencial pago.
+- [ ] Some o conceito de **alavanca por plano**: o catálogo não tem mais colunas de "cadência sim/não", "menu sim/não" etc. (ver Divergências; refatorar `alavancas_do_plano`).
 
 ---
 
-### H11.3: Ativação de envio por plano 🟢
-Como **sistema**, quero controlar quem pode ativar envio e quanto, conforme o plano, para que ninguém envie além do que contratou.
+### H11.3: Comprar créditos por quantidade (slider + curva) 🟢
+Como **pessoa usuária**, quero escolher exatamente quantos créditos comprar num seletor de quantidade, para pagar pelo que preciso (não "ou 10 ou 100").
 *Critérios de aceite:*
-- [ ] Ativar = um combinado **sai da agenda e passa a enviar** (`sem_aviso → aguardando_aceite` e os estados seguintes do ciclo), ver Épico 4 H4.3.
-- [ ] **Free não ativa nada**: pode manter anotações na agenda, mas qualquer ativação leva à CTA de upgrade (H11.6).
-- [ ] Cada plano tem um teto de **vagas de aviso ativo**, vendido ao cliente como **"envios de aviso"**: **Free 0**, **Start 10**, **Profissional 25**, **Plus de 26 a 200** (o cliente escolhe o volume). Esse teto é **separado** da capacidade de agenda (H11.4): a conta pode **anotar** mais do que **ativa e envia**.
-- [ ] **Start e Profissional** ativam até o seu teto de vagas (10 e 25). Ao atingir o teto, ativar é recusado com CTA de upgrade (H11.6), sem desativar nada do que já está ativo.
-- [ ] **Plus** é vendido por **volume de envios**: cada envio contratado vale **1 vaga de aviso ativo** e **10 anotações de agenda** (ver H11.4). A conta pode ter no máximo tantos combinados ativos quantos envios contratou.
-- [ ] **`pausado` ocupa vaga** e continua contando (o combinado segue "vivo", só não dispara no momento). `sem_aviso` é anotação (não envia, mas conta na agenda).
-- [ ] **Combinado recorrente e vagas (ver H11.5):** cada **ocorrência** de um recorrente reserva **1 vaga de aviso ativo**, porque cada ocorrência é um envio (a moeda do plano, "envios de aviso"). Um recorrente de N ocorrências reserva **N vagas** na ativação; conforme cada ocorrência é confirmada (`pago`), sua vaga é **liberada** (a contagem usa as ocorrências **ainda não pagas**). Por isso a contagem de vagas deixa de ser um `count(*)` de combinados ativos e passa a **somar**, por combinado ativo, **1** (simples) ou o **número de ocorrências ainda não pagas** (recorrente). A capacidade de **agenda** (H11.4) **não** muda: o combinado recorrente é **uma anotação só** (uma linha de combinado). Isso mantém o custo de envio limitado por construção (vagas × custo por envio fica abaixo do preço do plano).
-- [ ] Ao tentar ativar **além do permitido** (free, ou plano sem vaga de aviso ativo livre), a API recusa com envelope `{ error: { code, message } }` e o front mostra a **CTA de upgrade** (H11.6), mantendo o item na agenda.
-- [ ] A contagem é **por conta** (isolamento por usuário, ver Épico 9 H9.8) e validada **no servidor** (H11.8), nunca só no front.
+- [ ] A compra é por **quantidade livre** num **seletor (slider/range)**, de um **mínimo** a um **máximo** parametrizáveis (sugestão inicial: de 10 a 500 envios). Não há pacotes fixos como produtos separados.
+- [ ] O **preço total** segue uma **curva**: o R$/envio **cai** conforme a quantidade sobe. O total é **interpolado** entre o total no piso (quantidade mínima) e o total no topo (quantidade máxima); o cálculo é uma **função única** (espelhada front/back, fonte única do preço), a mesma ideia da antiga curva do Plus.
+- [ ] O preço (piso, topo, quantidades mín/máx) é **dado de catálogo** editável pelo owner em runtime (H11.11), não fixado em código.
+- [ ] O seletor pode ter **marcas de atalho** (ex.: 25/50/100) só como conveniência visual; não são SKUs distintos.
+- [ ] No MVP a compra é **manual** (sem gateway): o seletor leva à finalização **pelo WhatsApp** (a pessoa escolhe a quantidade, vê o preço, e é direcionada para pagar via Pix; o owner credita depois, H11.11). A mecânica de pagamento real é 🟡 (H11.13).
+- [ ] Comprar **soma ao saldo** (aditivo); nunca substitui nem zera o que já existe.
+- [ ] A linguagem respeita as Regras de Ouro (sem "dívida/cobrança/atraso", gênero neutro, sem travessão); vocabulário: **crédito, envio, saldo, recarga**.
 
 ---
 
-### H11.4: Limite de capacidade de agenda 🟢
-Como **sistema**, quero limitar quantas anotações cada conta mantém na agenda, conforme o plano, para a agenda não virar um depósito infinito.
+### H11.4: Reserva na ativação (não ativa sem saldo) 🟢
+Como **sistema**, quero reservar o crédito quando um aviso é ativado, para a conta nunca disparar além do que tem.
 *Critérios de aceite:*
-- [ ] A **capacidade de agenda é um balde único**: **toda** anotação conta igual para esse teto (ativa, pausada ou só anotação `sem_aviso`); não há sub-balde de "agenda" vs "ativos" na contagem de **capacidade**. (O teto de **vagas de aviso ativo** da H11.3 é uma alavanca **à parte**: limita quantas dessas anotações ficam **ativas enviando ao mesmo tempo**, não a capacidade total. A conta pode anotar mais do que envia.)
-- [ ] **Um item ativado continua ocupando seu lugar na agenda** (ativar não libera o slot, é a mesma anotação).
-- [ ] Valores por plano (capacidade de agenda): **Free 25**, **Start 100**, **Profissional 250**, **Plus 10 por envio contratado** (ex.: 50 envios → 500 anotações; 26 → 260, acima do Profissional).
-- [ ] Ao atingir a capacidade, criar nova anotação é recusado no servidor com CTA de upgrade, sem apagar nada do que já existe.
-- [ ] **Anotações em estado terminal** (`pago`/`cancelado`/`recusado`/`expirado`) **continuam contando**: a agenda registra o que aconteceu, como uma agenda de verdade. O **sistema nunca remove sozinho**.
-- [ ] **Só o usuário** pode tirar algo da agenda, por ação manual. Como há a regra de não-DELETE de negócio (auditoria append-only), "excluir da agenda" é **arquivamento** (sai da contagem/visão da agenda), **não** um DELETE físico do registro. *Ver divergência.*
-- [ ] A contagem é por conta e validada no servidor (H11.8).
+- [ ] **Ativar** um aviso (sai da agenda e entra no ciclo de envio) **reserva** créditos: **1** para combinado simples, **N** para recorrente de N ocorrências (1 por ocorrência).
+- [ ] Ativar exige **saldo livre suficiente**. Sem saldo, a ativação é **recusada no servidor** com envelope `{ error: { code, message } }` e o front mostra a **CTA de comprar créditos** (H11.9), mantendo o item na agenda (nada se perde).
+- [ ] A reserva **move** créditos de "saldo livre" para "reservado" (lançamento no livro-razão). Reservar **não** é consumir: o crédito ainda pode voltar (H11.5/H11.6).
+- [ ] **Pausar** um aviso ativo **mantém a reserva** (ele segue vivo, só não dispara no momento). **Arquivar/tirar da agenda** um aviso ainda não disparado **devolve** a reserva.
+- [ ] A validação é **no servidor**, na transação que ativa, sem janela de corrida que permita furar o saldo (H11.12).
 
 ---
 
-### H11.5: Recursos por plano (recorrência, cadência, menu, confirmação, totais) 🟢 / 🟡
-Como **sistema**, quero ligar/desligar recursos conforme o plano, para diferenciar o free e o pago e sustentar a monetização.
+### H11.5: Cobra só o que foi usado (charge-on-success) 🟢
+Como **pessoa usuária**, quero pagar só pelos envios que de fato saíram para combinados aceitos, para não ser penalizada por marcar coisas que não viraram aviso.
 *Critérios de aceite:*
-- [ ] **Recorrência** (combinado com N ocorrências, Épico 6 H6.10 / Épico 8 H8.7) **NÃO é recurso/diferencial de plano**: é um **facilitador** para registrar de uma vez vários avisos do mesmo cliente. Disponível para **todos** os planos; não é gated nem entra como vantagem nos cartões. O que limita é o **custo por ocorrência** (cada ocorrência reserva 1 vaga, abaixo) e a regra geral do free (free monta na agenda, mas não envia).
-- [ ] **Custo de vaga da recorrência (cada ocorrência reserva 1 vaga):** um combinado recorrente de **N ocorrências reserva N vagas de aviso ativo** no momento da ativação (cada ocorrência é um "envio de aviso", a moeda do plano). Conforme cada ocorrência é confirmada (`pago`), a vaga é **liberada**; a contagem soma as ocorrências **ainda não pagas**. **Não há cota de "recorrentes inclusos"**: a recorrência é metrificada por ocorrência, o que mantém o custo de envio **limitado por construção** (vagas × custo por envio < preço do plano: ex.: Profissional 25 × R$0,53 = R$13,25 < R$23,90; Plus topo 200 × R$0,53 = R$106 < R$140). O teto duro de ocorrências por combinado é técnico (trava de outbox), não comercial.
-- [ ] **Cadência configurável** (Épico 6 H6.10): o **cobrador escolhe quais D-avisos** do ciclo são enviados (quais dias do D-2 a D+1); o **devedor do fluxo invertido** também pode configurar como quer receber as notificações. **Free e Start NÃO têm** essa opção (usam a cadência padrão); **Profissional e Plus** têm.
-- [ ] **Menu de texto livre** ao devedor (Épico 7 H7.1): habilitado nos planos pagos, **silêncio** no free.
-- [ ] **Confirmação de pagamento / `informado_pago`** (Épico 8): como o **free não ativa avisos**, ele **não recebe `informado_pago`** (não há devedor confirmando pagamento de um aviso que ele nem disparou). Como **devedor** de um aviso de outra conta, um usuário free só recebe o que decorre de ser devedor (lembretes, aviso de "pagamento informado/confirmado pelo cobrador"). O ciclo de confirmação como cobrador exige plano que ative envio.
-- [ ] **Totais por período** (consolidação do painel: somar a receber / recebido / a pagar / pago num intervalo de datas) é **base, em TODOS os planos** (Free incluso). É table-stakes, não diferencial, e não entra na lista de vantagens dos planos.
-- [ ] **Histórico completo / múltiplos clientes** (Épico 9) seguem como recurso de plano pago; no free o painel mostra o básico fora a consolidação por período.
-- [ ] **Reengajamento manual pós-ciclo** (Épico 8 H8.3, "ainda não localizei o pagamento"): **até 3 envios por combinado**, **nunca dois no mesmo dia**.
-- [ ] Cada recurso bloqueado aparece como **CTA**, não some da interface (H11.6).
+- [ ] O crédito só é **consumido de vez** quando o **lembrete dispara** (a ocorrência entra no ciclo e a primeira mensagem é enviada). Consumido = sai de "reservado" para "consumido" (permanente).
+- [ ] **Convite não aceito** (recusado ou expirado sem aceite) **não consome**: a reserva volta para "saldo livre" (devolução total). Só o que foi **aceito** chega a disparar e a ser cobrado.
+- [ ] Depois de disparado, o envio **não volta** por nenhum motivo: cancelar, pausar, o devedor silenciar (`desregistrado`) ou marcar pago **não estornam** um envio já disparado. Enviou, foi.
+- [ ] **Recorrente**: cada ocorrência é cobrada **no seu disparo**; ocorrências futuras ainda não disparadas seguem reservadas (e podem voltar por H11.6).
+- [ ] Exemplo (deve valer): a pessoa marca 10 envios; 3 combinados **não** são aceitos; só os **7 aceitos** chegam a disparar e a ser cobrados; os 3 voltam ao saldo.
 
 ---
 
-### H11.6: CTA de upgrade nos pontos de bloqueio 🟢
-Como **pessoa num plano que não cobre a ação**, quero ser avisado de forma clara e levada ao upgrade no momento do bloqueio, para entender o porquê e decidir pagar.
+### H11.6: Devolução com hold de 24h 🟢
+Como **pessoa usuária**, quero recuperar os envios que não chegaram a sair quando alguém pede para parar, mas com uma janela curta, para refletir uma possível volta antes de devolver.
 *Critérios de aceite:*
-- [ ] Toda recusa por limite/recurso (ativar sem vaga, agenda cheia, recurso só de pago) mostra uma **CTA discreta e clara** explicando o limite e oferecendo upgrade.
-- [ ] A CTA **nunca** destrói trabalho: o item fica na agenda, os dados ficam salvos, nada é enviado.
-- [ ] A CTA usa linguagem das regras de ouro (sem "dívida/cobrança", gênero neutro, sem travessão) e tom direto (PROJETO.md: tom de produto = prático).
-- [ ] A CTA aparece tanto na ação de **ativar** (H4.3) quanto nas ações de recurso (H11.5).
+- [ ] Quando um recorrente é interrompido no meio (a pessoa que recebe faz **opt-out**/`desregistrado`, ou o criador **cancela**), as ocorrências **ainda não disparadas** saem de "reservado" e entram em **hold por 24h**.
+- [ ] Passadas as 24h **sem reativação**, os créditos em hold **voltam para o saldo livre** (lançamento de devolução).
+- [ ] Se houver **reativação dentro das 24h** (a pessoa volta a receber, `desregistrado → programado`), os créditos saem do hold e **voltam para reservado** (seguem o ciclo normalmente), sem devolução.
+- [ ] A pessoa usuária é **avisada com clareza** (in-app/notificação), com texto do tipo: *"[nome] pediu para parar os lembretes do combinado [combinado]. Foram enviados 2 de 5. Os 3 envios que não saíram voltam ao seu saldo em 24h, a menos que volte a receber."* (linguagem das Regras de Ouro: gênero neutro, sem "cobrança/dívida", sem travessão).
+- [ ] Envios **já disparados** nunca entram em hold nem voltam (H11.5).
+- [ ] O hold é resolvido por um **processo do servidor** (varredura/agendamento), não pelo cliente; idempotente (não devolve duas vezes).
 
 ---
 
-### H11.7: Billing como stub trial no MVP 🟢 / gateway real 🟡
-Como **owner**, quero que no MVP os limites valham de verdade mas a cobrança em dinheiro seja um stub, para validar o produto antes de integrar pagamento.
+### H11.7: Agenda (balde de anotações) 🟢
+Como **sistema**, quero limitar quantas anotações uma conta mantém na agenda, para a agenda não virar depósito infinito, sem voltar a ter planos.
 *Critérios de aceite:*
-- [ ] No MVP, associar uma conta a um plano pago é **manual/stub** (sem gateway): o limite passa a valer, mas **nenhum pagamento real** é processado.
-- [ ] A conta nasce em **free** e os limites do free valem desde o primeiro acesso.
-- [ ] 🟡 **Gateway de pagamento** (assinatura recorrente, faturas, falha de pagamento, dunning) é **futuro**: não existe no MVP.
-- [ ] 🟡 **Estado de assinatura** (ativa / em atraso de pagamento / cancelada) e o que acontece com avisos ativos quando a assinatura cai ficam para a fase de billing real (ver H11.9).
-- [ ] Não logar dado sensível de pagamento (quando existir gateway); seguir a regra de nunca logar telefone/Pix/token.
+- [ ] A agenda é um **balde único**: toda anotação conta igual (ativa, pausada, só anotação `sem_aviso`, ou em estado terminal). O sistema **nunca remove sozinho**; só o usuário, por **arquivamento** (não DELETE físico).
+- [ ] **Regra de 2 estados** (substitui capacidade por plano): a conta **Free que nunca comprou crédito** tem um **teto modesto** de anotações (anti-abuso, sugestão inicial: 25); a conta que **já comprou qualquer crédito** ganha agenda **generosa** (sugestão inicial: alta o suficiente para não incomodar, ex.: 1000, ou sem teto prático). *Decisão a confirmar/ajustar (ver Decisões em aberto).*
+- [ ] Atingir o teto recusa criar nova anotação no servidor, com CTA (comprar créditos ou arquivar item encerrado), sem apagar nada.
+- [ ] A contagem é **por conta** e validada no servidor (H11.12).
 
 ---
 
-### H11.8: Validação do limite no servidor (defesa em profundidade) 🟢
-Como **sistema**, quero validar todo limite de plano na API e no banco, para que o front nunca seja a fonte da verdade sobre o que a conta pode fazer.
+### H11.8: Saldo visível e transparência 🟢
+Como **pessoa usuária**, quero ver meu saldo e o que está reservado/em hold em tempo real, para nunca ser pega de surpresa.
 *Critérios de aceite:*
-- [ ] O front pode **antecipar** o bloqueio (esconder/cinzar botão), mas a decisão final é **sempre** da API + banco (mesma postura do Épico 8 H8.9 e Épico 9 H9.8).
-- [ ] Tentativa de burlar pelo front (chamar a API direto) é recusada no servidor com envelope `{ error: { code, message } }`.
-- [ ] A contagem de vagas/agenda é feita no servidor com a transação que ativa/cria (sem janela de corrida que permita ultrapassar o limite). *Ponto de teste dedicado.*
-- [ ] Os limites do plano vigente da conta são lidos do catálogo (H11.1), não fixados em código.
+- [ ] A UI mostra, em tempo real (espelho do servidor, nunca recalculado no cliente): **saldo livre**, **reservado**, **em hold** e, se útil, **consumido no período**.
+- [ ] Alerta de **saldo baixo** (ex.: faltam poucos envios) antes de a pessoa esbarrar no limite ao ativar.
+- [ ] A pessoa consegue ver um **extrato** simples dos lançamentos (compra, crédito, reserva, consumo, devolução), para entender para onde foi cada envio (confiança = transparência).
+- [ ] Nada de dado sensível em log (telefone/Pix/token; regra do Épico 13).
 
 ---
 
-### H11.9: Mudar de plano (upgrade / downgrade) 🟡
-Como **pessoa assinante**, quero trocar de plano, para subir quando preciso de mais e descer quando uso menos, sem perder meus combinados.
+### H11.9: CTA de saldo insuficiente 🟢
+Como **pessoa sem saldo para a ação**, quero ser avisada com clareza e levada à compra no momento do bloqueio, para entender o porquê e decidir comprar.
 *Critérios de aceite:*
-- [ ] 🟡 Upgrade aplica os novos limites **imediatamente** (mais vagas/agenda/recursos liberados).
-- [ ] 🟡 Downgrade com **excedente** (mais avisos/anotações do que o plano novo permite) **mantém ativo** o que já existe: nada é apagado nem desligado, os combinados ativos seguem até virarem terminais, mas a conta fica **sem poder criar/ativar novos** até voltar abaixo do limite.
-- [ ] 🟡 Nenhuma troca de plano dispara DELETE de negócio; tudo é mudança de estado/associação (regra de não-DELETE).
-- [ ] 🟡 Trocar de plano **fixa a versão corrente** do plano novo (congelamento por assinatura, H11.12); o vínculo anterior não é alterado retroativamente.
-- [ ] 🟡 Depende do billing real (H11.7); fora do MVP.
+- [ ] Toda recusa por saldo (ativar sem crédito, agenda cheia no Free) mostra uma **CTA clara**: explica o limite e oferece **comprar créditos** (leva à tela de créditos, H11.10).
+- [ ] A CTA **nunca** destrói trabalho: o item fica na agenda, os dados ficam salvos, nada é disparado.
+- [ ] Linguagem das Regras de Ouro (sem "dívida/cobrança", gênero neutro, sem travessão), tom direto.
 
 ---
 
-### H11.10: Tela de planos do usuário (ver, escolher, trocar) 🟢
-Como **pessoa usuária**, quero uma área "Plano" no menu (fora da Conta) onde vejo os planos e meu uso, para escolher ou trocar de plano quando quiser.
+### H11.10: Tela de créditos do usuário 🟢
+Como **pessoa usuária**, quero uma área "Créditos" onde vejo meu saldo e compro mais, para recarregar quando quiser.
 *Critérios de aceite:*
-- [ ] Existe um item **"Plano"** no menu do usuário, **separado da Conta**, que abre a tela de planos.
-- [ ] A tela mostra os **4 planos** (Free, Start, Profissional, Plus) com preço, limites e recursos, e o **uso atual da agenda** vs a capacidade do plano vigente (espelho do backend, H11.8).
-- [ ] Posso **escolher/trocar** de plano por ali; no Plus, escolho o **volume de envios** (H11.3). No MVP a troca é **stub trial** (cortesia, sem dinheiro); a mecânica de billing real (upgrade/downgrade pagos) segue na **H11.9 (🟡)**.
-- [ ] O plano vigente aparece marcado como **"plano atual"**; a tela nunca destrói trabalho (nada é apagado ao trocar).
-- [ ] A área também é alcançável pelas CTAs de upgrade (H11.6) e pelo banner de assinatura.
+- [ ] Há um item **"Créditos"** no menu do usuário (separado da Conta) que abre a tela.
+- [ ] A tela mostra **saldo/reservado/em hold** (H11.8) e o **seletor de quantidade (slider)** com o **preço calculado ao vivo** conforme a quantidade (H11.3).
+- [ ] A compra no MVP é **manual via WhatsApp**: ao escolher a quantidade, abre um **popup** com a quantidade e o preço e um **botão para finalizar no WhatsApp** (recebe o Pix por lá; o owner credita após o pagamento). O número fica em config (env), nunca hardcode.
+- [ ] A tela nunca destrói saldo; comprar só **soma**.
 
 ---
 
-### H11.11: Gestão do catálogo pelo owner 🟢
-Como **owner**, quero editar cada plano pela tela de admin, para ajustar preço, limites e recursos sem precisar de migration a cada mudança comercial.
+### H11.11: Owner credita envios e edita a curva de preço 🟢
+Como **owner**, quero creditar envios numa conta e ajustar o preço dos créditos pela tela de admin, para ativar quem pagou e ajustar a precificação sem migration.
 *Critérios de aceite:*
-- [ ] Em `/admin/planos`, o owner edita por plano: **preço** (e, no Plus, piso/topo da curva), **limites** (capacidade de agenda, vagas de aviso ativo, faixa de envios do Plus, reengajamento) e os **liga/desliga de recurso** (recorrência, cadência, menu, confirmação, totais, somente leitura).
-- [ ] A edição **cria uma nova versão** do plano e vale **só para novas contratações**: o catálogo mostrado a quem ainda vai assinar (H11.1/H11.10) passa a refletir a nova versão, mas **assinaturas vigentes não mudam** (mantêm a versão contratada, ver H11.12).
-- [ ] A edição é **validada no servidor** e restrita ao **owner**; outra pessoa recebe recusa com envelope `{ error: { code, message } }`. Valores inválidos (preço negativo, topo menor que o piso, faixa de envios invertida) são recusados.
-- [ ] O owner **não cria nem apaga** planos: as 4 chaves (`free`/`start`/`profissional`/`plus`) são estáveis; só os valores mudam.
-- [ ] **Assinaturas já contratadas mantêm a versão contratada**: preço, **limites E recursos** congelados no momento da contratação (não só o preço, ver H11.12). A edição do owner **nunca** as altera retroativamente.
-- [ ] A linguagem da tela respeita as Regras de Ouro (sem "dívida/cobrança", gênero neutro, sem travessão).
+- [ ] Na tela de admin de **Usuários**, o owner **credita uma quantidade de envios** numa conta (ativação manual pós-pagamento via WhatsApp). **Cada crédito exige confirmação** antes de aplicar no banco.
+- [ ] Creditar é um **lançamento no livro-razão** (tipo "crédito do owner", com quantidade e quem creditou), **aditivo**, **append-only** (nunca apaga; estornar é outro lançamento negativo explícito, se um dia for preciso).
+- [ ] Só o **owner** credita (authz `requireRole('owner')` no servidor); qualquer outra pessoa recebe recusa `{ error: { code, message } }`. O usuário **nunca** se credita (fecha a brecha de se dar saldo de graça).
+- [ ] O owner edita a **curva de preço** dos créditos (piso, topo, quantidades mín/máx) pela tela de admin; validado no servidor (piso <= topo, mín <= máx, preço >= 0).
+- [ ] O owner **não** mexe no saldo "na unha" fora do livro-razão (sem update direto que quebre a auditoria).
 
 ---
 
-### H11.12: Versionamento do catálogo e congelamento por assinatura 🟢
-Como **pessoa que paga por um plano**, quero manter o preço, os limites e os recursos que contratei, para que mudanças no catálogo não me afetem retroativamente (o produto já está em produção, com clientes pagantes).
+### H11.12: Validação no servidor (defesa em profundidade) 🟢
+Como **sistema**, quero validar todo limite (saldo, reserva, agenda) na api e no banco, para o front nunca ser a fonte da verdade.
 *Critérios de aceite:*
-- [ ] O catálogo é **versionado**: cada edição do owner (H11.11) gera uma **nova versão** do plano; as versões anteriores são **preservadas** (append-only, regra de não-DELETE).
-- [ ] Cada assinatura **fixa a versão contratada** (preço + todos os limites + todos os recursos). Enquanto a assinatura vigora, as alavancas efetivas vêm **dessa versão**, nunca do catálogo corrente.
-- [ ] Editar o catálogo vale **só para novas contratações**: quem já assinou não muda; quem assinar depois pega a **versão corrente**.
-- [ ] **No vencimento** do período contratado, a assinatura passa a apontar para a **versão corrente** do mesmo plano (o cliente entra no plano novo na renovação). 🟡 O disparo automático da renovação depende do **billing real** (H11.7); a regra "no vencimento adota a corrente" já fica modelada (a chave da assinatura aponta para o plano corrente).
-- [ ] **Trocar de plano** (H11.10 / H11.9) fixa a **versão corrente** do plano escolhido no momento da troca (novo congelamento).
-- [ ] O **free acompanha a versão corrente** (não fixa versão): não é pago e não tem vencimento, então melhorias do free chegam a todos. O congelamento por versão protege os **planos pagos**.
-- [ ] A resolução das alavancas é **no servidor** (H11.8), a partir da **versão fixada** da assinatura (ponto único), nunca do catálogo ao vivo para uma conta paga vigente.
+- [ ] O front **antecipa** (esconde/cinza botão, mostra saldo), mas a decisão final é **sempre** da api + banco.
+- [ ] A reserva/consumo é feita na **transação** que ativa/dispara, com trava adequada (sem corrida que permita furar o saldo). *Ponto de teste dedicado.*
+- [ ] Tentativa de burlar pelo front (chamar a api direto, ativar sem saldo, se autocreditar) é **recusada no servidor**.
+- [ ] Os valores de preço/curva e o saldo vêm do **catálogo/livro-razão**, não fixados em código.
 
 ---
 
-### Divergências com a definição atual (precisam de refatoração)
+### H11.13: Recarga automática, assinatura e gateway 🟡
+Como **owner**, quero, no futuro, recorrência sem parecer pegadinha, para ter receita previsível sem penalizar quem usa.
+*Critérios de aceite:*
+- [ ] 🟡 **Gateway de pagamento** (Pix automático/cartão) para a compra de crédito deixar de ser manual.
+- [ ] 🟡 **Recarga automática** (auto-recharge): quando o saldo cai abaixo de X, recompra Y automaticamente (com aviso claro e teto, para não virar susto).
+- [ ] 🟡 **Assinatura mensal opcional**: dá um **bônus mensal de envios + desconto** na curva. Regra de confiança: **só o bônus mensal reseta** (use-ou-perca); o **saldo comprado avulso nunca expira**. Nunca uma trava de recurso.
+- [ ] 🟡 Tudo isso entra **depois** da carteira pré-paga manual (fase 1).
 
-> O catálogo de planos do **PROJETO.md** (seção 8) e o que os épicos foram decidindo **não batem**. As histórias são a fonte de verdade: o catálogo precisa ser reescrito para o modelo abaixo.
+---
 
-- **Modelo de planos:** PROJETO.md descreve "pessoal R$ 9,90 (até 5 avisos)" e "profissional R$ 29/49". As histórias decidiram **4 planos: Free, Start, Profissional, Plus**, com **dois eixos**: a **capacidade de agenda como balde único** (Free 25 / Start 100 / Profissional 250 / Plus 10 por envio) e o teto de **vagas de aviso ativo** (vendido como "envios de aviso": Free 0 / Start 10 / Profissional 25 / Plus 26 a 200). PROJETO.md seção 8 precisa ser reescrito para este modelo. **Preços decididos** (ver Decisões).
-- **Free passa a manter agenda:** hoje o free "só visualiza" (Épico 1 H1.5 / Épico 2). Com o modo agenda (Épico 4), o free **cria item de agenda** mas **não ativa**. Refatorar a regra de plano para distinguir "criar agenda" de "ativar/enviar".
-- **Limites no servidor a partir do catálogo:** se hoje há limite fixado em código, mover para leitura do catálogo (H11.1) em migration.
-- **`informado_pago` / cadência / recorrência como recurso de plano:** amarrar esses recursos ao plano exige um ponto único que consulta as alavancas do catálogo; verificar se a checagem hoje existe e onde.
-- **"Excluir da agenda" manual = arquivar, não DELETE:** o usuário pode tirar uma anotação da agenda (libera o slot do limite), mas pela regra de não-DELETE de negócio (Épico 4 H4.4 / CLAUDE.md) isso é um **arquivamento** (estado/flag que some da visão e da contagem), nunca um DELETE físico. Precisa de um estado/flag de "arquivado na agenda" a modelar; verificar se hoje existe.
+### Divergências com a definição anterior (revogadas)
+
+> O modelo antigo deste épico (4 planos Free/Start/Profissional/Plus com alavancas por plano, versionamento e congelamento por assinatura) está **revogado**. Como **não há cliente em produção**, não há migração: o schema é refeito do zero para a carteira de créditos.
+
+- **De 4 planos para Free + carteira:** caem `start`/`profissional`/`plus` como planos com recursos; entra a **carteira de créditos** e a **compra por quantidade** (slider).
+- **Alavancas por plano caem:** `cadencia_configuravel`, `menu_texto_livre`, `informado_pago_habilitado`, `totais_periodo`, `permite_recorrente`, capacidade/vagas por plano deixam de existir como colunas de plano. Recursos são **universais** (H11.2). Refatorar/remover `alavancas_do_plano` e a tabela `planos`/`plano_versoes` para o modelo novo (catálogo passa a guardar só a **curva de preço dos créditos**).
+- **Versionamento e congelamento por assinatura (antigas H11.11/H11.12) caem:** não há plano por assinatura para congelar; o que existe é **saldo comprado** (que por natureza não muda retroativamente). O catálogo guarda só preço de crédito, editável pelo owner.
+- **`vagas de aviso ativo` (slot concorrente, liberado no pagamento) caem:** o conceito vira **crédito consumível** (reserva na ativação, consumo no disparo, sem retorno após disparo). É o oposto do modelo antigo (que liberava a vaga quando o aviso era confirmado pago). Refatorar `somarVagasAtivas` e tudo que contava vagas.
+- **Capacidade de agenda por plano cai:** vira a **regra de 2 estados** (Free modesto / generosa após 1ª compra), H11.7.
+- **Ajustes em outros épicos:** referências a "recurso só de pago" viram "disponível para todos": **cadência** (Épico 6), **menu de texto livre** (Épico 7 H7.1), **confirmação `informado_pago`** (Épico 8). A **CTA de upgrade** vira **CTA de comprar créditos**.
 
 ### Decisões tomadas
-- **Quatro planos:** **Free, Start, Profissional, Plus** (este vendido por volume de envios).
-- **Dois eixos por plano:** **capacidade de agenda** (quantas anotações a conta mantém) e **vagas de aviso ativo** (quantos combinados ficam ativos enviando ao mesmo tempo, vendidas como "envios de aviso"). Os dois são alavancas separadas: a conta pode anotar mais do que envia.
-- **Vagas de aviso ativo ("envios de aviso") = eixo comercial:** **Free 0, Start 10, Profissional 25, Plus 26 a 200** (contínuo: o Plus começa onde o Profissional termina). Imposto no servidor (`exigirVagaDeAtivo`, H11.8).
-- **Agenda é balde único:** tudo é anotação (ativo, pausado ou só anotação contam igual). Capacidade: **Free 25, Start 100, Profissional 250, Plus 10 por envio contratado**. Item ativado **continua ocupando** seu lugar na agenda.
-- **Free = agenda + visualização, sem ativar.** Free não dispara nada e, por isso, **não recebe `informado_pago`** como cobrador.
-- **Plus por volume de envios:** cada envio contratado vale **1 vaga de aviso ativo** e **10 anotações de agenda** (vagas 1:1 com os envios; agenda 10x). Profissional: agenda **250** (decisão 2026-06-25, migration 0056).
-- **`pausado` ocupa vaga** (segue vivo, só não dispara).
-- **Cadência configurável** (escolher quais D-avisos / como o devedor invertido recebe): só **Profissional e Plus**; Free e Start usam a padrão.
-- **Recorrência = facilitador, não diferencial (decisão 2026-06-25):** recorrência **não é vendida por plano** nem gated; é um atalho para registrar vários avisos do mesmo cliente, disponível para **todos**. **Cada ocorrência reserva 1 vaga de aviso ativo** (cada ocorrência é um "envio de aviso"); um recorrente de N reserva N vagas, liberadas conforme cada ocorrência vira `pago`. **Sem cota de "recorrentes inclusos"** (a ideia inicial de inclusos com N livre foi descartada: subfaturava, pois "vaga" mede carga simultânea e o custo de envio é cumulativo, ex.: 5 inclusos × 12 ocorrências = 60 envios > preço do plano). A contagem de vagas passa a **somar** 1 (simples) ou ocorrências-não-pagas (recorrente). **Não usa `permite_recorrente` como porteiro** (o catálogo passa a ter `permite_recorrente = true` em todos os planos); o que limita é a vaga por ocorrência e a regra geral do free (agenda sim, envio não). Mantém custo < preço por construção. **Cadência configurável continua diferencial pago** (Prof/Plus), é outra alavanca.
-- **Reengajamento manual pós-ciclo** (H8.3): até **3 envios por combinado**, nunca dois no mesmo dia.
-- **`informado_pago` e dados do free persistem:** os dados ficam no banco normalmente (mesmo sem conta criada), pois são base para a agenda/combinados do cobrador; se a conta vier a ativar depois, nada se perde.
-- **Downgrade com excedente: mantém ativo** o que existe; só trava criar/ativar novos até voltar abaixo do limite.
-- **Preços (reprecificação 2026-06-25, migration 0052):** Free R$ 0, Start R$ 9,90 (10 envios, R$ 0,990/envio), Profissional **R$ 23,90** (25 envios, R$ 0,956/envio), Plus por volume de envios (curva linear no total): piso **26 envios = R$ 24,00** (R$ 0,923/envio) ao topo **200 envios = R$ 140,00** (R$ 0,70/envio). **A escada do R$/envio só cai** conforme se sobe de plano (0,990 > 0,956 > 0,923 ... 0,700), corrigindo a inversão anterior em que o Profissional custava mais por envio que o Start. Regra de margem: cobrar **no mínimo R$ 0,70/envio** (custo R$ 0,53 no pior caso; lucro mínimo R$ 0,17/envio com a conta cheia); o piso da tabela é exatamente R$ 0,70 no topo do Plus. O Plus é parametrizado no catálogo por piso e topo, e o total intermediário é calculado por uma função única (`precoPorEnvioCentavos`). Seed inicial: migrations 0026/0049; reprecificação deliberada do owner: **0052** (aplicada in place, pré-versionamento da H11.12; assinaturas pagas mantêm o preço congelado, não tocadas; o free acompanha a versão corrente).
-- **Totais por período é base (não diferencial):** a consolidação do painel por intervalo de datas está em **todos** os planos (Free incluso); saiu da lista de vantagens dos cartões (landing e painel do dono). A coluna `totais_periodo` segue no catálogo, agora uniforme = true (migration 0050). Decisão 2026-06-25.
-- **Anotações em estado terminal continuam contando** na agenda (a agenda registra o que aconteceu). O sistema nunca remove sozinho; só o usuário, manualmente (arquivamento, não DELETE físico).
-- **Validação no servidor** (defesa em profundidade): o front só antecipa; API+banco decidem.
-- **MVP = stub trial:** limites valem, cobrança em dinheiro é futura.
-- **Catálogo versionado + congelamento por assinatura (decisão 2026-06-25, produção):** o owner edita o catálogo pela tela (H11.11), mas como há **clientes pagantes em produção**, editar **não pode** alterar quem já paga. Por isso o catálogo é **versionado**: cada edição cria uma **nova versão** do plano (append-only, regra de não-DELETE); cada assinatura **fixa a versão contratada** (preço + limites + recursos). Edições valem **só para novas contratações**; **no vencimento** a assinatura adota a versão corrente; o **free acompanha a corrente** (não paga, não vence). Substitui a decisão anterior ("owner é fonte da verdade em runtime, aplica para todos"), que afetaria clientes existentes. Detalhe em H11.12.
-- **Duas telas de plano (decisão 2026-06-25):** o **usuário** tem uma área "Plano" no menu (fora da Conta) para ver/escolher/trocar (H11.10); o **owner** tem `/admin/planos` como tela de **gestão** editável (H11.11). São telas distintas com propósitos distintos.
-- **Expiração de convite (7 dias) é fixa** e **não** é alavanca de plano (Épico 5 H5.7): não entra no catálogo.
+- **Modelo = carteira de créditos pré-paga.** Free + compra de envios; sem planos com recursos.
+- **Unidade = 1 envio = 1 ocorrência de aviso** (simples = 1; recorrente de N = N).
+- **Tudo liberado para todos;** o limite é só o saldo (H11.2). Recorrência é livre (acelera consumo, bom para os dois lados).
+- **Compra por quantidade livre (slider) com curva de preço** (R$/envio cai com o volume); preço editável pelo owner (H11.3/H11.11).
+- **Saldo aditivo e que não expira** (regra de confiança: o pago não se perde).
+- **Charge-on-success:** reserva na ativação, consumo no disparo, devolução do não aceito; envio disparado nunca volta (H11.4/H11.5).
+- **Hold de 24h** na interrupção de recorrente, com aviso claro (H11.6).
+- **Saldo/reservado/em hold visíveis em tempo real** + extrato (H11.8).
+- **Owner credita (com confirmação) e edita a curva;** usuário nunca se credita (H11.11).
+- **Sem cliente em produção:** schema do zero, sem compatibilidade com o modelo de 4 planos (revogado).
+- **MVP manual:** compra via WhatsApp + crédito do owner; gateway/recarga/assinatura são 🟡 (H11.13).
 
 ### Decisões em aberto
-- Nenhuma pendente neste épico.
+- **Valores iniciais a calibrar:** saldo de cortesia do Free; teto de agenda do Free e da conta com crédito; mínimo/máximo do slider; piso/topo da curva de preço.
+- **Confirmar a regra de agenda** (2 estados como proposto, ou agenda generosa para todos desde o Free).
 
 ### Fora de escopo deste épico
-- ❌ Gateway de pagamento, faturas, assinatura recorrente, dunning (billing real, 🟡).
-- ❌ Textos finais das CTAs de upgrade (entram com o épico de Templates/mensagens e o design do painel).
-- ❌ Mecânica de cada recurso em si (recorrência, cadência, menu): definida nos épicos 6, 7 e 8; aqui só o **liga/desliga por plano**.
-- ❌ Limites de envio do WhatsApp/Baileys que afetam a operação (capacidade do canal): é restrição operacional do transporte (Épico 10), não alavanca comercial de plano.
+- ❌ Gateway de pagamento, recarga automática, assinatura mensal, dunning (🟡, H11.13).
+- ❌ Textos finais das CTAs e da tela de créditos (entram com Templates/design).
+- ❌ Mecânica de cada recurso em si (recorrência, cadência, menu): definida nos Épicos 6, 7 e 8; aqui só o fato de serem universais e de cada ocorrência custar 1 envio.
+- ❌ Limites operacionais do canal WhatsApp/Baileys (capacidade de envio): restrição de transporte (Épico 10), não regra de crédito.

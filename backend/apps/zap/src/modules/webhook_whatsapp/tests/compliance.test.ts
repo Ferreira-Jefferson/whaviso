@@ -63,7 +63,6 @@ describe('compliance: estado terminal não reabre no inbound (H13.6)', () => {
       const { cobradorId, avisoId } = await criarAvisoPendente({
         dataCombinada: '2026-12-15',
         pixChave: '11999990000',
-        plano: 'free', // dono free: terminal = silêncio TOTAL (sem cortesia "encerrado", G-C2).
       })
       // Leva ao terminal por caminho permitido pelo trigger (programado -> terminal).
       await poolSuper.query(`update public.avisos set status=$2 where id=$1`, [avisoId, terminal])
@@ -77,10 +76,12 @@ describe('compliance: estado terminal não reabre no inbound (H13.6)', () => {
         })
       }
 
+      // H13.6: o estado terminal NÃO reabre nem dispara AÇÃO (sem mudança de estado, sem
+      // novos eventos). E11 H11.2: a cortesia "encerrado" é universal (réplica, não ação),
+      // então uma resposta informativa PODE sair; o que importa é que nada muda de estado.
       const aviso = await poolSuper.query(`select status from public.avisos where id=$1`, [avisoId])
       expect(aviso.rows[0].status).toBe(terminal) // não reabre
       expect((await contar(avisoId)).eventos).toBe(antes.eventos) // sem novos eventos
-      expect(whats.enviadas).toHaveLength(0) // sem resposta/ação
       await limpar(cobradorId)
     })
   }
@@ -89,7 +90,6 @@ describe('compliance: estado terminal não reabre no inbound (H13.6)', () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({
       dataCombinada: '2026-12-15',
       pixChave: '11999990000',
-      plano: 'free', // dono free: terminal = silêncio TOTAL (sem cortesia "encerrado", G-C2).
     })
     // 'recusado' só vem de aguardando_aceite (o trigger proíbe programado->aguardando_aceite),
     // então recriamos o aviso direto em aguardando_aceite e fazemos aguardando_aceite->recusado.
@@ -112,8 +112,7 @@ describe('compliance: estado terminal não reabre no inbound (H13.6)', () => {
 
     const aviso = await poolSuper.query(`select status from public.avisos where id=$1`, [avisoId])
     expect(aviso.rows[0].status).toBe('recusado') // não reabre
-    expect((await contar(avisoId)).eventos).toBe(antes.eventos) // sem novos eventos
-    expect(whats.enviadas).toHaveLength(0) // sem resposta/ação
+    expect((await contar(avisoId)).eventos).toBe(antes.eventos) // sem novos eventos (sem AÇÃO)
     await limpar(cobradorId)
   })
 })

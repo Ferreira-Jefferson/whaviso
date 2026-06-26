@@ -1,15 +1,15 @@
-// Preço TOTAL (centavos) do Plus por volume de envios: espelho do backend
-// (shared/planos.precoPorEnvioCentavos). Interpola o total entre o piso (envios_min)
-// e o topo (envios_max) publicados no catálogo; aqui é só exibição (o backend congela
-// o valor ao assinar, fonte única). `n` é grampeado na faixa. Em módulo próprio (não
-// no .tsx dos cartões) para o react-refresh ficar feliz (só componentes no .tsx).
-import type { Plano } from '../contracts'
+// Preço TOTAL (centavos) de uma compra de N envios: espelho do backend
+// (shared/planos.precoPorEnvioCentavos). Interpola o total entre o piso (envios_min ->
+// preco_centavos) e o topo (envios_max -> preco_max_centavos) da curva do catálogo; o
+// R$/envio cai conforme o volume sobe. Fonte única do preço (front e back idênticos). `n`
+// é grampeado na faixa. Em módulo próprio (não no .tsx) para o react-refresh ficar feliz.
+import type { CreditosCatalogo } from '../contracts'
 
-export function precoEnvioCentavos(p: Plano, n: number): number {
-  const lo = p.envios_min ?? 26
-  const hi = p.envios_max ?? lo
-  const pLo = p.preco_centavos
-  const pHi = p.preco_max_centavos ?? pLo
+export function precoEnvioCentavos(curva: CreditosCatalogo, n: number): number {
+  const lo = curva.envios_min
+  const hi = curva.envios_max
+  const pLo = curva.preco_centavos
+  const pHi = curva.preco_max_centavos
   const nn = Math.min(Math.max(n, lo), hi)
   if (hi === lo) return pLo
   return Math.round(pLo + ((pHi - pLo) * (nn - lo)) / (hi - lo))

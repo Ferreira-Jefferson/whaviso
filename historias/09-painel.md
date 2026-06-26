@@ -4,7 +4,7 @@
 > **Organizado por papel, não por direção:** uma aba/visão **"A receber"** (sou o cobrador) e outra **"A pagar"** (sou o devedor). Um combinado aparece em "A receber" para quem recebe e em "A pagar" para quem paga, independentemente de quem criou (receber x pagar invertido).
 > O painel é **só leitura do banco + solicitação de ações**: nenhuma regra de negócio roda no front (Épico 8 H8.9). Toda mudança de estado é pedida à API, validada e gravada, e o painel relê.
 > Convenções de sempre: sem travessão, sem palavras proibidas (nada de "dívida/cobrança/atraso/inadimplência", **inclusive nos rótulos e resumos**), **neutras quanto a gênero**; dinheiro vem de **centavos** e é exibido em reais; datas em **America/Sao_Paulo**.
-> Este épico cobre **o que o painel mostra e quais ações oferece**. O efeito de cada ação está nos épicos de origem (criar 2/3, agenda 4, aceite 5, lembretes 6, interação 7, confirmação 8); as notificações ao cobrador, no Épico 10; limites por plano, no Épico 11.
+> Este épico cobre **o que o painel mostra e quais ações oferece**. O efeito de cada ação está nos épicos de origem (criar 2/3, agenda 4, aceite 5, lembretes 6, interação 7, confirmação 8); as notificações ao cobrador, no Épico 10; saldo de créditos de envio, no Épico 11.
 
 ---
 
@@ -144,6 +144,6 @@ Como **sistema (api + front)**, quero que o painel seja um espelho seguro do ban
 ### Fora de escopo deste épico
 - ❌ Efeito de cada ação (criar/ativar/editar/cancelar/pausar/confirmar/rejeitar/reabrir): definidos nos Épicos 2 a 8.
 - ❌ Conteúdo, canal e janelas das notificações ao cobrador (Épico 10).
-- ❌ Nomes/valores e regras de limite dos planos e a CTA de upgrade (Épico 11).
+- ❌ Preço dos créditos de envio e a CTA de comprar créditos (Épico 11).
 - ❌ Edição dos textos/rótulos pelo owner (Épico 12).
 - ❌ Telas de login/conta (Épico 1).

@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
 import {
+  creditarConta,
   criarAppTeste,
   criarUsuario,
-  definirPlano,
   encerrarPools,
   limparUsuario,
   poolSuper,
@@ -85,9 +85,10 @@ describe('auth: status-telefone (H1.2/H1.3)', () => {
   })
 })
 
-// H1.5: o plano FREE LÊ (200) mas não CRIA (403/422 plano_somente_leitura). H1.6/H1.7
-// confirmam 401 sem token. A conta NASCE free (handle_new_user), sem subir o plano.
-describe('auth: plano free é só-leitura (H1.5) + sessão (H1.6)', () => {
+// E11 H11.2/H11.4: o Free LÊ (200) e CRIA dentro do saldo (cortesia 5 envios); sem saldo,
+// a ativação é recusada (saldo_insuficiente), não por plano. H1.6/H1.7 confirmam 401 sem
+// token. A conta NASCE Free com a cortesia (handle_new_user + creditos_carteira).
+describe('auth: Free cria dentro do saldo (E11) + sessão (H1.6)', () => {
   let free: string
 
   function corpoAviso(over: Record<string, unknown> = {}) {
@@ -129,43 +130,10 @@ describe('auth: plano free é só-leitura (H1.5) + sessão (H1.6)', () => {
     expect(Array.isArray(r.json().itens)).toBe(true)
   })
 
-  it('H1.5: free NÃO cria (receber) → 422 plano_somente_leitura', async () => {
-    const app = await criarAppTeste(free)
-    const r = await app.inject({
-      method: 'POST',
-      url: '/v1/avisos',
-      headers: AUTH,
-      payload: corpoAviso(),
-    })
-    await app.close()
-    expect(r.statusCode).toBe(422)
-    expect(r.json().error.code).toBe('plano_somente_leitura')
-  })
-
-  it('H1.5: free NÃO cria (pagar invertido) → 422 plano_somente_leitura', async () => {
-    const app = await criarAppTeste(free)
-    const r = await app.inject({
-      method: 'POST',
-      url: '/v1/avisos',
-      headers: AUTH,
-      payload: corpoAviso({
-        direcao: 'pagar',
-        nome_devedor: 'Eu Mesmo',
-        telefone_devedor: null,
-        nome_cobrador: 'João',
-        telefone_cobrador: '+5511988887777',
-        // Pix de quem recebe é obrigatório no invertido (H3.1); a guarda de plano vem depois.
-        pix_chave: 'joao@pix.com',
-      }),
-    })
-    await app.close()
-    expect(r.statusCode).toBe(422)
-    expect(r.json().error.code).toBe('plano_somente_leitura')
-  })
-
-  it('H1.5: ao subir de plano, a MESMA conta passa a criar (200/201)', async () => {
-    await definirPlano(free, 'profissional')
-    const app = await criarAppTeste(free)
+  it('E11: Free CRIA dentro do saldo de cortesia (receber) → 201', async () => {
+    // Conta nasce com cortesia 5; o primeiro aviso (modo enviar) reserva 1 e passa.
+    const novo = await criarUsuario('Free Cria')
+    const app = await criarAppTeste(novo)
     const r = await app.inject({
       method: 'POST',
       url: '/v1/avisos',
@@ -174,8 +142,38 @@ describe('auth: plano free é só-leitura (H1.5) + sessão (H1.6)', () => {
     })
     await app.close()
     expect(r.statusCode).toBe(201)
-    // volta ao free para não vazar estado entre arquivos.
-    await definirPlano(free, 'free')
-    await poolSuper.query(`delete from public.avisos where cobrador_id = $1`, [free])
+    await limparUsuario(novo)
+  })
+
+  it('E11: Free sem saldo NÃO ativa → 422 saldo_insuficiente (não por plano)', async () => {
+    // Zera a cortesia (5) reservando 5 avisos; o 6º falha por saldo, não por plano.
+    const semSaldo = await criarUsuario('Free Sem Saldo')
+    const app = await criarAppTeste(semSaldo)
+    for (let i = 0; i < 5; i++) {
+      const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+      expect(r.statusCode).toBe(201)
+    }
+    const r6 = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    await app.close()
+    expect(r6.statusCode).toBe(422)
+    expect(r6.json().error.code).toBe('saldo_insuficiente')
+    await limparUsuario(semSaldo)
+  })
+
+  it('E11: ao receber crédito, a MESMA conta volta a criar (201)', async () => {
+    const conta = await criarUsuario('Free Recarrega')
+    const app = await criarAppTeste(conta)
+    // Esgota a cortesia.
+    for (let i = 0; i < 5; i++) {
+      await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    }
+    const semSaldo = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    expect(semSaldo.statusCode).toBe(422)
+    // Owner credita; agora cria de novo.
+    await creditarConta(conta, 3)
+    const ok = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    await app.close()
+    expect(ok.statusCode).toBe(201)
+    await limparUsuario(conta)
   })
 })

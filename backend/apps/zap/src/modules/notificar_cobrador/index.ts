@@ -216,15 +216,9 @@ async function processarUma(deps: DepsNotificarCobrador, notif: NotificacaoClaim
     await repo.marcarCancelado(pool, notif.id, 'alvo_sem_telefone')
     return 'cancelada'
   }
-  // H10.8 limite de plano: se o CRIADOR (dono do plano) está em plano somente-leitura
-  // (free), a notificação NÃO sai por WhatsApp, mas FICA REGISTRADA/visível (cancelado
-  // com motivo 'bloqueado_plano') e auditada. Não conta como falha de entrega nem entra
-  // em retry (não toca tentativas, não reagenda).
-  if (!(await repo.podeEnviarPeloPlano(pool, dados.criador_profile_id))) {
-    await repo.marcarCanceladoAuditado(pool, notif.id, notif.aviso_id, notif.tipo, 'bloqueado_plano')
-    logger.info({ notifId: notif.id, tipo: notif.tipo }, 'notificacao bloqueada pelo limite de plano')
-    return 'cancelada'
-  }
+  // E11 H11.2: notificar o CRIADOR (cobrador) é UNIVERSAL (não é lembrete ao devedor, não
+  // consome crédito). `podeEnviarPeloPlano` agora é sempre true (a função SQL foi reescrita
+  // na migration 0057); o caminho de bloqueio por plano deixa de existir.
 
   const contexto = config.contexto(dados)
   const template = await carregarTemplateAtivo(pool, config.chave, contexto)

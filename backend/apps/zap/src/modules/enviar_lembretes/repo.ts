@@ -6,6 +6,9 @@ import { decidirReagendamento } from '../../shared/retry'
 export interface EnvioClaim {
   id: string
   aviso_id: string
+  // E11: ocorrência à qual o envio pertence (null = combinado simples). A unidade de
+  // consumo de crédito é a ocorrência (recorrente) ou o aviso (simples).
+  ocorrencia_id: string | null
   etapa: EtapaEnvio
   tentativas: number
 }
@@ -82,7 +85,7 @@ export async function reivindicar(pool: Pool): Promise<EnvioClaim[]> {
        limit ${LIMITE_CLAIM}
        for update of e skip locked
      )
-     returning id, aviso_id, etapa, tentativas`,
+     returning id, aviso_id, ocorrencia_id, etapa, tentativas`,
   )
   return rows
 }

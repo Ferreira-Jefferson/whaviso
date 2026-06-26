@@ -3,6 +3,7 @@ import type { Logger } from '@whaviso/shared/logger'
 import { janelaPerdida } from '@whaviso/shared/datas'
 import { ErroEnvio, type ClienteWhats, type MensagemWhats } from '../../shared/baileys_client'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
+import { consumirNoDisparo } from '../../shared/creditos'
 import * as repo from './repo'
 import { valoresCiclo } from './render'
 
@@ -82,6 +83,10 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
       }
       const { wamid } = await whats.enviarMensagem(mensagem)
       await repo.marcarEnviado(pool, envio.id, wamid)
+      // E11 H11.5: o lembrete saiu -> CONSOME 1 crédito (reservado -> consumido),
+      // idempotente por UNIDADE (ocorrência no recorrente, aviso no simples): as 4 etapas
+      // de uma mesma ocorrência consomem 1 só vez (no 1º envio). Disparado nunca volta.
+      await consumirNoDisparo(pool, envio.aviso_id, envio.ocorrencia_id)
       enviados++
     } catch (erro) {
       if (erro instanceof ErroEnvio && erro.permanente) {

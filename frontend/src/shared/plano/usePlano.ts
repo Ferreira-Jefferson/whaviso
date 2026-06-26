@@ -1,34 +1,36 @@
-// Kernel `shared` do PLANO vigente: lê GET /v1/billing/assinatura e expõe o flag de
-// "somente leitura" (free só visualiza, H9.8). Consumido por `painel`/`avisos` SEM que
-// os módulos importem `billing` (fronteira do lint). A AUTORIDADE da restrição é a API
-// (ação proibida retorna envelope de erro); o front só esconde/CTA. NUNCA inferimos
-// "free" no cliente: o flag vem do backend (alavancas_do_plano.somente_leitura).
+// Kernel `shared` da CARTEIRA de créditos (Épico 11): lê GET /v1/billing/carteira e expõe
+// o saldo + a curva do catálogo. Consumido por `painel`/`avisos` SEM que os módulos
+// importem `billing` (fronteira do lint). A AUTORIDADE da restrição é a API (ativar sem
+// saldo retorna envelope de erro `saldo_insuficiente`); o front só antecipa (esconde/CTA).
+// NUNCA recalculamos saldo no cliente: os números vêm do backend.
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../api_client'
-import { assinaturaSchema, type Assinatura } from '../contracts'
+import { carteiraResposta, type CarteiraResposta } from '../contracts'
 
 export const planoKeys = {
-  assinatura: ['billing', 'assinatura'] as const,
+  carteira: ['billing', 'carteira'] as const,
 }
 
-/** GET /v1/billing/assinatura: plano vigente + alavancas efetivas da conta. */
-export function useAssinaturaVigente() {
+/** GET /v1/billing/carteira: saldo da carteira + curva do catálogo (para o slider). */
+export function useCarteira() {
   return useQuery({
-    queryKey: planoKeys.assinatura,
+    queryKey: planoKeys.carteira,
     queryFn: ({ signal }) =>
-      apiClient.get<Assinatura>('/billing/assinatura', {
-        schema: assinaturaSchema,
+      apiClient.get<CarteiraResposta>('/billing/carteira', {
+        schema: carteiraResposta,
         signal,
       }),
   })
 }
 
 /**
- * `somenteLeitura` = o plano só visualiza (free): ações que exigem plano levam à CTA,
- * a navegação não quebra (H9.8). Enquanto carrega, assume `false` (não bloqueia a UI à
- * toa; a API barra de fato se for o caso). Flag vindo do backend, nunca inferido.
+ * `semSaldo` = a conta não tem crédito livre para ativar um novo envio: ações de ENVIAR
+ * levam à CTA de comprar créditos, sem quebrar a navegação. Enquanto carrega, assume
+ * `false` (não bloqueia a UI à toa; a API barra de fato se faltar saldo). Espelho do
+ * backend (saldo_livre), nunca inferido no cliente.
  */
-export function usePlanoSomenteLeitura(): { somenteLeitura: boolean; isLoading: boolean } {
-  const q = useAssinaturaVigente()
-  return { somenteLeitura: q.data?.somente_leitura === true, isLoading: q.isLoading }
+export function useSemSaldo(): { semSaldo: boolean; saldoLivre: number; isLoading: boolean } {
+  const q = useCarteira()
+  const saldoLivre = q.data?.carteira.saldo_livre ?? 0
+  return { semSaldo: q.data !== undefined && saldoLivre <= 0, saldoLivre, isLoading: q.isLoading }
 }

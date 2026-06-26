@@ -34,16 +34,12 @@ export async function criarAvisoPendente(opts: {
   dataCombinada: string
   telefone?: string | null
   pixChave?: string | null
-  /** Plano do criador (dono do combinado). Default 'start' (envia notificações, H10.8).
-   *  'free' = somente leitura: não envia notificação nem cortesia (terminal = silêncio). */
-  plano?: 'free' | 'start' | 'profissional' | 'plus'
 }): Promise<FixtureAviso> {
   const cobradorId = randomUUID()
   await poolSuper.query(`insert into auth.users (id) values ($1)`, [cobradorId])
   await poolSuper.query(`update public.profiles set nome='Cobrador' where id=$1`, [cobradorId])
-  // O criador de um combinado ATIVO está num plano que ENVIA (free é somente leitura e
-  // nem cria aviso ativo). Sem isso, a notificação cai no bloqueio de plano (H10.8).
-  await porPlano(cobradorId, opts.plano ?? 'start')
+  // E11: a carteira + cortesia são criadas pelo trigger handle_new_user; notificar o
+  // criador é universal (não há mais gate de plano), então nada a configurar aqui.
   const { rows } = await poolSuper.query<{ id: string }>(
     `insert into public.avisos
        (cobrador_id, direcao, status, nome_devedor, telefone_devedor, motivo, valor_centavos, data_combinada, pix_chave)
@@ -71,8 +67,6 @@ export async function criarAvisoInvertido(opts: {
     devedorId,
     opts.telefoneDevedor ?? '+5511970001111',
   ])
-  // Criador (devedor no invertido) num plano que ENVIA notificações (H10.8).
-  await porPlano(devedorId, 'start')
   const { rows } = await poolSuper.query<{ id: string }>(
     `insert into public.avisos
        (cobrador_id, devedor_profile_id, direcao, criador_papel, status,
@@ -163,15 +157,16 @@ export async function lerEnvio(id: string): Promise<{
   return rows[0]
 }
 
-/**
- * Coloca a conta num plano do catálogo (upsert da assinatura). Usado para alternar entre
- * plano que ENVIA (start) e plano somente-leitura (free) no teste de limite (H10.8).
- */
-export async function porPlano(profileId: string, planoId: 'free' | 'start' | 'profissional' | 'plus'): Promise<void> {
+/** E11: credita N envios na carteira da conta (modelo de créditos). Aditivo + lançamento. */
+export async function creditarConta(profileId: string, quantidade: number): Promise<void> {
   await poolSuper.query(
-    `insert into public.assinaturas (profile_id, plano_id, status) values ($1,$2,'trial')
-     on conflict (profile_id) do update set plano_id=excluded.plano_id`,
-    [profileId, planoId],
+    `update public.creditos_carteira set saldo_livre = saldo_livre + $2, ja_comprou = true where profile_id = $1`,
+    [profileId, quantidade],
+  )
+  await poolSuper.query(
+    `insert into public.creditos_lancamentos (profile_id, tipo, quantidade, ator, ator_id)
+     values ($1, 'credito_owner', $2, 'owner', $1)`,
+    [profileId, quantidade],
   )
 }
 

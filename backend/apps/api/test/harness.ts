@@ -42,21 +42,40 @@ export async function limparUsuario(id: string): Promise<void> {
 }
 
 /**
- * Define o plano da conta no teste. A conta NASCE no free (somente leitura), que
- * não cria avisos; os testes que precisam criar/ativar avisos chamam isto para
- * subir a um plano com vaga (default 'profissional'). No Plus, informe `unidades`.
+ * E11: credita N envios na carteira da conta (modelo de créditos). A conta nasce com a
+ * cortesia (5 envios); os testes que precisam de mais saldo para ativar avisos chamam
+ * isto. Aditivo + lançamento 'credito_owner', espelhando o crédito do owner. Marca
+ * ja_comprou=true (agenda generosa).
+ */
+export async function creditarConta(id: string, quantidade: number): Promise<void> {
+  await poolSuper.query(
+    `update public.creditos_carteira
+        set saldo_livre = saldo_livre + $2, ja_comprou = true
+      where profile_id = $1`,
+    [id, quantidade],
+  )
+  await poolSuper.query(
+    `insert into public.creditos_lancamentos (profile_id, tipo, quantidade, ator, ator_id)
+     values ($1, 'credito_owner', $2, 'owner', $1)`,
+    [id, quantidade],
+  )
+}
+
+/**
+ * Define o SALDO da conta no teste (compat com a antiga `definirPlano`). A conta nasce
+ * Free com cortesia (5 envios), que basta para combinados simples; testes que ativam
+ * recorrentes/vários avisos sobem o saldo aqui. O 2o/3o args (antigo planoId/unidades) são
+ * ignorados (não há mais planos); este shim apenas credita um saldo GENEROSO o suficiente
+ * para os cenários antigos não esbarrarem em `saldo_insuficiente`.
  */
 export async function definirPlano(
   id: string,
-  planoId = 'profissional',
-  unidades: number | null = null,
+  _planoId = 'profissional',
+  _unidades: number | null = null,
 ): Promise<void> {
-  await poolSuper.query(
-    `insert into public.assinaturas (profile_id, plano_id, status, unidades)
-     values ($1, $2, 'trial', $3)
-     on conflict (profile_id) do update set plano_id = excluded.plano_id, unidades = excluded.unidades`,
-    [id, planoId, unidades],
-  )
+  void _planoId
+  void _unidades
+  await creditarConta(id, 1000)
 }
 
 /** Remove todos os avisos do usuário (isolamento entre testes). */

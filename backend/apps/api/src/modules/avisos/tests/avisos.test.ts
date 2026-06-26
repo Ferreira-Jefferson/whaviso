@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   aceitarAvisoDireto,
+  creditarConta,
   criarAppTeste,
   criarUsuario,
   definirPlano,
@@ -25,6 +26,20 @@ function corpoAviso(over: Record<string, unknown> = {}) {
     pix_chave: 'maria@pix.com',
     pix_titular: 'Maria Silva',
     pix_banco: 'Banco Exemplo',
+    ...over,
+  }
+}
+
+// E11: anotação de AGENDA (modo agenda) NÃO reserva crédito; serve para exercitar o teto
+// de agenda (balde único) sem esbarrar em saldo. Telefone/Pix são opcionais na agenda.
+function corpoAvisoAgenda(over: Record<string, unknown> = {}) {
+  return {
+    direcao: 'receber',
+    modo: 'agenda',
+    nome_devedor: 'Maria',
+    motivo: 'mensalidade',
+    valor_centavos: 9900,
+    data_combinada: '2026-12-15',
     ...over,
   }
 }
@@ -104,97 +119,88 @@ describe('avisos (integração com whaviso_dev)', () => {
     await app.close()
   })
 
-  it('agenda cheia → 422 agenda_cheia (balde único, sem apagar nada)', async () => {
-    // Plus com 1 envio = agenda 10 (10 por envio, 0056; balde único). O 11º item falha.
+  it('agenda cheia → 422 agenda_cheia (balde único, teto do free = 25, sem apagar nada)', async () => {
+    // E11 H11.7: a conta Free que NUNCA comprou tem teto modesto (25). Anotações de agenda
+    // (modo agenda) não reservam crédito; o 26º item falha por agenda cheia.
     const cheio = await criarUsuario('AgendaCheia')
-    await definirPlano(cheio, 'plus', 1)
     const app = await criarAppTeste(cheio)
-    for (let i = 0; i < 10; i++) {
-      const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    for (let i = 0; i < 25; i++) {
+      const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAvisoAgenda() })
       expect(r.statusCode).toBe(201)
     }
-    const r11 = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
-    expect(r11.statusCode).toBe(422)
-    expect(r11.json().error.code).toBe('agenda_cheia')
+    const r26 = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAvisoAgenda() })
+    expect(r26.statusCode).toBe(422)
+    expect(r26.json().error.code).toBe('agenda_cheia')
     await app.close()
     await limparUsuario(cheio)
   })
 
-  it('FREE não cria aviso que envia → 422 plano_somente_leitura (guard antes do limite)', async () => {
-    // Conta nasce free; não muda o plano.
+  it('FREE sem saldo não ativa envio → 422 saldo_insuficiente (item não criado, agenda intacta)', async () => {
+    // E11 H11.4: conta nasce Free com cortesia 5. Criar 5 avisos no modo enviar consome o
+    // saldo (reserva 1 cada); o 6º falha com saldo_insuficiente (a UI mostra a CTA de comprar).
     const free = await criarUsuario('Free')
     const app = await criarAppTeste(free)
-    const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    for (let i = 0; i < 5; i++) {
+      const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+      expect(r.statusCode).toBe(201)
+    }
+    const sexto = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
     await app.close()
-    expect(r.statusCode).toBe(422)
-    // Código próprio do free, NUNCA "limite atingido com 0 vagas".
-    expect(r.json().error.code).toBe('plano_somente_leitura')
+    expect(sexto.statusCode).toBe(422)
+    expect(sexto.json().error.code).toBe('saldo_insuficiente')
+    // Nada criado além dos 5 (a transação reverteu o 6º).
+    const total = await poolSuper.query<{ n: string }>(
+      `select count(*) as n from public.avisos where cobrador_id = $1`,
+      [free],
+    )
+    expect(Number(total.rows[0]!.n)).toBe(5)
     await limparUsuario(free)
   })
 
   it('agenda conta certo no fluxo INVERTIDO (devedor-criador) — C1', async () => {
+    // Teto do free = 25; anotações de agenda invertidas (criador = devedor) contam por papel.
     const inv = await criarUsuario('Invertido')
-    await definirPlano(inv, 'plus', 1) // 1 envio x 10 = agenda 10
     const app = await criarAppTeste(inv)
-    // Cria 10 avisos invertidos (criador = devedor). A contagem usa a dupla condição
-    // por papel; se contasse só cobrador_id, o invertido escaparia do limite.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 25; i++) {
       const r = await app.inject({
         method: 'POST',
         url: '/v1/avisos',
         headers: AUTH,
-        payload: corpoAviso({
-          direcao: 'pagar',
-          nome_devedor: 'Eu Mesmo',
-          telefone_devedor: null,
-          nome_cobrador: 'João',
-          telefone_cobrador: '+5511988887777',
-          // Pix OPCIONAL no invertido (decisão do dono): aqui só informamos a chave
-          // porque queremos exercitar a contagem de agenda, não a exigência de Pix.
-          pix_chave: 'joao@pix.com',
-        }),
+        payload: corpoAvisoAgenda({ direcao: 'pagar', nome_devedor: 'Eu Mesmo' }),
       })
       expect(r.statusCode).toBe(201)
     }
-    // 11º invertido deve bater no limite (a contagem viu os 10 do devedor-criador).
-    const r11 = await app.inject({
+    // 26º invertido bate no teto (a contagem viu os 25 do devedor-criador, por papel).
+    const r26 = await app.inject({
       method: 'POST',
       url: '/v1/avisos',
       headers: AUTH,
-      payload: corpoAviso({
-        direcao: 'pagar',
-        nome_devedor: 'Eu Mesmo',
-        telefone_devedor: null,
-        nome_cobrador: 'João',
-        telefone_cobrador: '+5511988887777',
-        pix_chave: 'joao@pix.com',
-      }),
+      payload: corpoAvisoAgenda({ direcao: 'pagar', nome_devedor: 'Eu Mesmo' }),
     })
-    expect(r11.statusCode).toBe(422)
-    expect(r11.json().error.code).toBe('agenda_cheia')
+    expect(r26.statusCode).toBe(422)
+    expect(r26.json().error.code).toBe('agenda_cheia')
     await app.close()
     await limparUsuario(inv)
   })
 
   it('arquivar libera a vaga da agenda (soft-delete, sem DELETE físico)', async () => {
     const arq = await criarUsuario('Arquivar')
-    await definirPlano(arq, 'plus', 1) // 1 envio x 10 = agenda 10
     const app = await criarAppTeste(arq)
     let ultimoId = ''
-    for (let i = 0; i < 10; i++) {
-      const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    for (let i = 0; i < 25; i++) {
+      const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAvisoAgenda() })
       expect(r.statusCode).toBe(201)
       ultimoId = r.json().aviso.id
     }
-    // Cheia: o 11º falha.
-    const cheio = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    // Cheia: o 26º falha.
+    const cheio = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAvisoAgenda() })
     expect(cheio.statusCode).toBe(422)
     // Arquiva um item → libera vaga.
     const arquivar = await app.inject({ method: 'POST', url: `/v1/avisos/${ultimoId}/arquivar`, headers: AUTH })
     expect(arquivar.statusCode).toBe(200)
     expect(arquivar.json().arquivado_em).not.toBeNull()
     // Agora cria de novo (vaga liberada).
-    const ok = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+    const ok = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAvisoAgenda() })
     expect(ok.statusCode).toBe(201)
     // O registro arquivado NÃO foi apagado (regra de não-DELETE).
     const ainda = await poolSuper.query<{ n: string }>(
@@ -206,29 +212,30 @@ describe('avisos (integração com whaviso_dev)', () => {
     await limparUsuario(arq)
   })
 
-  it('corrida: dois POST simultâneos na última vaga, só um passa (H11.8)', async () => {
+  it('corrida: dois POST simultâneos no último crédito, só um passa (H11.12)', async () => {
+    // E11: o lock por conta na carteira serializa a reserva; sobra exatamente 1 crédito,
+    // dois requests concorrentes ativam ao mesmo tempo: só 1 reserva, o outro recusa.
     const corrida = await criarUsuario('Corrida')
-    await definirPlano(corrida, 'plus', 1) // 1 envio x 10 = agenda 10
+    await creditarConta(corrida, 4) // 5 de cortesia + 4 = 9; uso 9, sobra 0 antes da corrida
     const app = await criarAppTeste(corrida)
-    // Preenche 9 das 10 vagas.
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 8; i++) {
       const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
       expect(r.statusCode).toBe(201)
     }
-    // Dois requests concorrentes pela 10ª (última) vaga: o lock por conta serializa,
-    // ambos cabem? Não: só 1 fica na vaga 10; o outro tenta a 11 → recusado.
+    // Resta 1 crédito; dois requests concorrentes: só 1 reserva, o outro -> saldo_insuficiente.
     const [a, b] = await Promise.all([
       app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() }),
       app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() }),
     ])
     const status = [a.statusCode, b.statusCode].sort()
     expect(status).toEqual([201, 422])
-    // Nunca ultrapassa a capacidade.
-    const total = await poolSuper.query<{ n: string }>(
-      `select count(*) as n from public.avisos where cobrador_id = $1 and arquivado_em is null`,
+    // Nunca fura o saldo: 9 avisos criados, saldo livre = 0, reservado = 9.
+    const carteira = await poolSuper.query<{ saldo_livre: number; reservado: number }>(
+      `select saldo_livre, reservado from public.creditos_carteira where profile_id = $1`,
       [corrida],
     )
-    expect(Number(total.rows[0]!.n)).toBe(10)
+    expect(carteira.rows[0]!.saldo_livre).toBe(0)
+    expect(carteira.rows[0]!.reservado).toBe(9)
     await app.close()
     await limparUsuario(corrida)
   })

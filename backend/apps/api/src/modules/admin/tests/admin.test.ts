@@ -75,143 +75,143 @@ describe('admin (integração)', () => {
     expect(r.json().itens.every((u: { nome: string }) => u.nome.includes('Owner'))).toBe(true)
   })
 
-  it('PATCH /admin/usuarios/:id troca o plano; plano inválido → 422', async () => {
+  it('GET /admin/usuarios mostra o SALDO da carteira (E11)', async () => {
     const app = await criarAppTeste(owner)
-    const ok = await app.inject({
-      method: 'PATCH', url: `/v1/admin/usuarios/${comum}`, headers: AUTH,
-      payload: { plano_id: 'profissional' },
-    })
-    const ruim = await app.inject({
-      method: 'PATCH', url: `/v1/admin/usuarios/${comum}`, headers: AUTH,
-      payload: { plano_id: 'inexistente' },
-    })
+    const r = await app.inject({ method: 'GET', url: `/v1/admin/usuarios?busca=Comum`, headers: AUTH })
     await app.close()
-    expect(ok.statusCode).toBe(200)
-    expect(ok.json().plano_id).toBe('profissional')
-    expect(ruim.statusCode).toBe(422)
-    expect(ruim.json().error.code).toBe('plano_invalido')
-    const a = await poolSuper.query(`select plano_id from public.assinaturas where profile_id=$1`, [comum])
-    expect(a.rows[0].plano_id).toBe('profissional')
+    expect(r.statusCode).toBe(200)
+    const linha = r.json().itens.find((u: { id: string }) => u.id === comum)
+    // Conta nasce com a cortesia (5 envios); baldes começam zerados.
+    expect(linha.saldo_livre).toBe(5)
+    expect(linha.reservado).toBe(0)
+    expect(linha.em_hold).toBe(0)
+    expect(linha.consumido).toBe(0)
+    expect(linha.ja_comprou).toBe(false)
   })
 
-  // ---- Edição do catálogo de planos (owner, H11.11) ----
+  // ---- Crédito do owner + edição da curva (H11.11) ----
 
-  it('PATCH /admin/planos é owner-only → 403 para não-owner', async () => {
+  it('POST /admin/usuarios/:id/creditar é owner-only → 403 para não-owner', async () => {
     const app = await criarAppTeste(comum)
     const r = await app.inject({
-      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
+      method: 'POST', url: `/v1/admin/usuarios/${comum}/creditar`, headers: AUTH,
+      payload: { quantidade: 100 },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(403)
+  })
+
+  it('owner credita envios: aditivo, marca ja_comprou, lança no livro-razão', async () => {
+    const app = await criarAppTeste(owner)
+    const c1 = await app.inject({
+      method: 'POST', url: `/v1/admin/usuarios/${comum}/creditar`, headers: AUTH,
+      payload: { quantidade: 100 },
+    })
+    expect(c1.statusCode).toBe(200)
+    expect(c1.json().saldo_livre).toBe(105) // 5 de cortesia + 100
+    expect(c1.json().ja_comprou).toBe(true)
+
+    // Aditivo: creditar de novo SOMA, nunca substitui.
+    const c2 = await app.inject({
+      method: 'POST', url: `/v1/admin/usuarios/${comum}/creditar`, headers: AUTH,
+      payload: { quantidade: 25 },
+    })
+    await app.close()
+    expect(c2.json().saldo_livre).toBe(130)
+
+    // Livro-razão: 2 lançamentos 'credito_owner' com ator 'owner'.
+    const lanc = await poolSuper.query<{ n: number }>(
+      `select count(*)::int as n from public.creditos_lancamentos
+        where profile_id=$1 and tipo='credito_owner' and ator='owner'`,
+      [comum],
+    )
+    expect(lanc.rows[0]!.n).toBe(2)
+  })
+
+  it('creditar quantidade <= 0 → 400 (contrato recusa)', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: `/v1/admin/usuarios/${comum}/creditar`, headers: AUTH,
+      payload: { quantidade: 0 },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(400)
+  })
+
+  it('creditar conta inexistente → 404', async () => {
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'POST', url: `/v1/admin/usuarios/00000000-0000-0000-0000-000000000000/creditar`,
+      headers: AUTH, payload: { quantidade: 10 },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(404)
+  })
+
+  it('PATCH /admin/creditos-catalogo é owner-only → 403 para não-owner', async () => {
+    const app = await criarAppTeste(comum)
+    const r = await app.inject({
+      method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
       payload: { preco_centavos: 1234 },
     })
     await app.close()
     expect(r.statusCode).toBe(403)
   })
 
-  it('owner edita preço/limite/recurso de um plano; reflete no catálogo (runtime); restaura', async () => {
+  it('owner edita a curva de créditos; reflete na carteira (runtime); restaura', async () => {
     const antes = await poolSuper.query(
-      `select preco_centavos, capacidade_agenda, cadencia_configuravel from public.planos where id='start'`,
+      `select preco_centavos, preco_max_centavos, cortesia_inicial from public.creditos_catalogo where id=1`,
     )
-    const { preco_centavos: precoOrig, capacidade_agenda: capOrig, cadencia_configuravel: cadOrig } =
+    const { preco_centavos: precoOrig, preco_max_centavos: precoMaxOrig, cortesia_inicial: cortOrig } =
       antes.rows[0]
 
     const app = await criarAppTeste(owner)
     const patch = await app.inject({
-      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
-      payload: { preco_centavos: 1299, capacidade_agenda: 123, cadencia_configuravel: true },
+      method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
+      payload: { preco_centavos: 1290, preco_max_centavos: 40000, cortesia_inicial: 3 },
     })
     expect(patch.statusCode).toBe(200)
-    expect(patch.json().preco_centavos).toBe(1299)
-    expect(patch.json().capacidade_agenda).toBe(123)
-    expect(patch.json().cadencia_configuravel).toBe(true)
+    expect(patch.json().preco_centavos).toBe(1290)
+    expect(patch.json().preco_max_centavos).toBe(40000)
+    expect(patch.json().cortesia_inicial).toBe(3)
 
-    // Reflete no catálogo lido em runtime (GET /v1/billing/planos).
-    const cat = await app.inject({ method: 'GET', url: '/v1/billing/planos', headers: AUTH })
+    // Reflete no que a tela de créditos lê (GET /v1/billing/carteira -> catalogo).
+    const cat = await app.inject({ method: 'GET', url: '/v1/billing/carteira', headers: AUTH })
     await app.close()
-    const start = cat.json().planos.find((p: { id: string }) => p.id === 'start')
-    expect(start.preco_centavos).toBe(1299)
-    expect(start.capacidade_agenda).toBe(123)
+    expect(cat.json().catalogo.preco_centavos).toBe(1290)
 
-    // Restaura para não afetar billing.test.ts (assertivas fixas). Com o versionamento
-    // (0054), o PATCH também avança versao_corrente_id → volta para a v1 (catálogo pristino).
+    // Restaura para não afetar billing.test.ts (assertivas fixas na curva original).
     await poolSuper.query(
-      `update public.planos set preco_centavos=$1, capacidade_agenda=$2, cadencia_configuravel=$3,
-         versao_corrente_id=(select id from public.plano_versoes where plano_id='start' and versao=1)
-       where id='start'`,
-      [precoOrig, capOrig, cadOrig],
+      `update public.creditos_catalogo set preco_centavos=$1, preco_max_centavos=$2, cortesia_inicial=$3 where id=1`,
+      [precoOrig, precoMaxOrig, cortOrig],
     )
   })
 
-  it('versionamento: editar plano cria nova versao e NAO afeta quem ja assinou (H11.12)', async () => {
-    // comum assina 'start' → pina a versao corrente do start no momento da contratacao.
-    const appA = await criarAppTeste(comum)
-    const assina = await appA.inject({
-      method: 'POST', url: '/v1/billing/assinar', headers: AUTH, payload: { plano_id: 'start' },
-    })
-    expect(assina.statusCode).toBe(200)
-    const antes = await appA.inject({ method: 'GET', url: '/v1/billing/assinatura', headers: AUTH })
-    await appA.close()
-    const capContratada = antes.json().capacidade_agenda as number
-
-    // owner edita o start: aumenta a capacidade (cria uma nova versao).
-    const appOwner = await criarAppTeste(owner)
-    const patch = await appOwner.inject({
-      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
-      payload: { capacidade_agenda: capContratada + 500 },
-    })
-    expect(patch.statusCode).toBe(200)
-    expect(patch.json().capacidade_agenda).toBe(capContratada + 500) // oferta corrente mudou
-    const cat = await appOwner.inject({ method: 'GET', url: '/v1/billing/planos', headers: AUTH })
-    await appOwner.close()
-    const startCat = cat.json().planos.find((p: { id: string }) => p.id === 'start')
-    expect(startCat.capacidade_agenda).toBe(capContratada + 500)
-
-    // comum (ja assinou) NAO muda: mantem a versao contratada.
-    const appA2 = await criarAppTeste(comum)
-    const depois = await appA2.inject({ method: 'GET', url: '/v1/billing/assinatura', headers: AUTH })
-    await appA2.close()
-    expect(depois.json().capacidade_agenda).toBe(capContratada)
-
-    // ha >= 2 versoes do start (append-only).
-    const v = await poolSuper.query<{ n: number }>(
-      `select count(*)::int as n from public.plano_versoes where plano_id='start'`,
-    )
-    expect(v.rows[0]!.n).toBeGreaterThanOrEqual(2)
-
-    // restaura: catalogo do start volta ao v1 (cols + ponteiro); comum volta a free.
-    await poolSuper.query(
-      `update public.planos set
-         capacidade_agenda=(select capacidade_agenda from public.plano_versoes where plano_id='start' and versao=1),
-         versao_corrente_id=(select id from public.plano_versoes where plano_id='start' and versao=1)
-       where id='start'`,
-    )
-    await poolSuper.query(
-      `update public.assinaturas set plano_id='free', plano_versao_id=null, unidades=null, preco_centavos=null where profile_id=$1`,
-      [comum],
-    )
-  })
-
-  it('PATCH /admin/planos: validação recusa preço negativo e faixa de envios invertida (400)', async () => {
+  it('PATCH /admin/creditos-catalogo: faixa/preço invertidos no body → 400', async () => {
     const app = await criarAppTeste(owner)
-    const negativo = await app.inject({
-      method: 'PATCH', url: '/v1/admin/planos/start', headers: AUTH,
-      payload: { preco_centavos: -1 },
-    })
     const faixa = await app.inject({
-      method: 'PATCH', url: '/v1/admin/planos/plus', headers: AUTH,
+      method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
       payload: { envios_min: 100, envios_max: 50 },
     })
-    await app.close()
-    expect(negativo.statusCode).toBe(400)
-    expect(faixa.statusCode).toBe(400)
-  })
-
-  it('PATCH /admin/planos com id fora do catálogo → 400 (enum recusa)', async () => {
-    const app = await criarAppTeste(owner)
-    const r = await app.inject({
-      method: 'PATCH', url: '/v1/admin/planos/inexistente', headers: AUTH,
-      payload: { preco_centavos: 100 },
+    const preco = await app.inject({
+      method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
+      payload: { preco_centavos: 5000, preco_max_centavos: 1000 },
     })
     await app.close()
-    expect(r.statusCode).toBe(400)
+    expect(faixa.statusCode).toBe(400)
+    expect(preco.statusCode).toBe(400)
+  })
+
+  it('PATCH /admin/creditos-catalogo: estado MERGEADO inválido → 422 catalogo_invalido', async () => {
+    // Só envia preco_max menor que o piso atual (990): o merge com o estado fica inválido.
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
+      payload: { preco_max_centavos: 100 },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(422)
+    expect(r.json().error.code).toBe('catalogo_invalido')
   })
 
   it('GET /admin/envios e /admin/avisos: envelopes paginados (owner)', async () => {

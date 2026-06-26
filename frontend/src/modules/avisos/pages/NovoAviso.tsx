@@ -23,7 +23,7 @@ import type {
   RecorrenciaInput,
 } from '@/shared/contracts'
 import { usePerfil } from '@/shared/auth'
-import { usePlanoSomenteLeitura, useAssinaturaVigente } from '@/shared/plano'
+import { useSemSaldo } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
 import { hojeIso } from '@/shared/format'
 import { useCriarAviso } from '../api'
@@ -41,20 +41,20 @@ export default function NovoAvisoPage() {
   const navigate = useNavigate()
   const criar = useCriarAviso()
   const perfil = usePerfil()
-  // Plano que só mantém agenda (free, H4): não pode gerar convite (enviar). A UI esconde
-  // a ação de envio; a autoridade da restrição é a api. Flag do backend, nunca inferido.
-  const { somenteLeitura } = usePlanoSomenteLeitura()
-  // Cadência configurável (recurso PAGO, H11.5) vem da assinatura vigente; recorrência
-  // NÃO é gated. Enquanto carrega, assume false (o RepetirCombinado mostra a CTA, sem
-  // travar a recorrência). Flag do backend, nunca inferido.
-  const assinatura = useAssinaturaVigente()
-  const cadenciaConfiguravel = assinatura.data?.cadencia_configuravel === true
+  // E11 H11.2: recorrência, cadência e o envio são UNIVERSAIS (liberados para todos); o
+  // único limite é o SALDO de créditos. Lemos o saldo livre só para antecipar o teto do
+  // seletor de repetições (cada ocorrência reserva 1 crédito). A AUTORIDADE é o servidor:
+  // sem saldo, a ativação volta `saldo_insuficiente` e o form mostra o Banner.
+  const { semSaldo, saldoLivre } = useSemSaldo()
+  // Teto do nº de repetições = créditos livres da conta (cada ocorrência reserva 1). Quando
+  // 0, deixamos undefined (sem teto numérico no seletor; o servidor barra na ativação).
+  const enviosDisponiveis = saldoLivre > 0 ? saldoLivre : undefined
   const [resultado, setResultado] = useState<CriarAvisoResposta | null>(null)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   const [limiteAtingido, setLimiteAtingido] = useState<string | null>(null)
-  // E6 H6.10: recorrência (facilitador, todos os planos) e cadência (recurso pago) são
-  // coisas distintas. A cadência é do PRÓPRIO combinado (vale repetindo ou não); a
-  // recorrência só multiplica as ocorrências. undefined = simples / ciclo completo.
+  // E6 H6.10 / E11 H11.2: recorrência e cadência são UNIVERSAIS (liberadas para todos). A
+  // cadência é do PRÓPRIO combinado (vale repetindo ou não); a recorrência só multiplica as
+  // ocorrências (cada uma reserva 1 crédito). undefined = simples / ciclo completo.
   const [recorrencia, setRecorrencia] = useState<RecorrenciaInput | undefined>(undefined)
   const [cadenciaEtapas, setCadenciaEtapas] = useState<EtapaEnvio[] | undefined>(undefined)
   // Estáveis p/ os efeitos dos filhos não dispararem a cada render.
@@ -140,7 +140,7 @@ export default function NovoAvisoPage() {
       })
       setResultado(r)
     } catch (e) {
-      if (e instanceof ApiError && e.isLimiteDePlano) {
+      if (e instanceof ApiError && e.isLimiteDeSaldo) {
         setLimiteAtingido(e.message)
         return
       }
@@ -182,8 +182,8 @@ export default function NovoAvisoPage() {
           {limiteAtingido && (
             <Banner tom="info">
               {limiteAtingido}{' '}
-              <Link to="/app/plano" className="font-medium underline">
-                Ver meu plano
+              <Link to="/app/creditos" className="font-medium underline">
+                Recarregar créditos
               </Link>
             </Banner>
           )}
@@ -316,6 +316,7 @@ export default function NovoAvisoPage() {
               da 1ª repetição. */}
           <RepetirCombinado
             dataCombinada={watch('data_combinada')}
+            maxOcorrencias={enviosDisponiveis}
             onChange={aoMudarRecorrencia}
           />
 
@@ -344,13 +345,22 @@ export default function NovoAvisoPage() {
           </div>
 
           {/* E6 H6.10: quais lembretes saem é do PRÓPRIO combinado (vale repetindo ou
-              não), por isso fora do "Repetir". Recurso pago: gate por plano dentro. */}
-          <CadenciaLembretes
-            cadenciaConfiguravel={cadenciaConfiguravel}
-            onChange={aoMudarCadencia}
-          />
+              não), por isso fora do "Repetir". Universal (E11 H11.2): liberado para todos. */}
+          <CadenciaLembretes onChange={aoMudarCadencia} />
 
           <div className="flex flex-col gap-2 pt-1">
+            {/* E11 H11.9: sem saldo, antecipa a CTA de comprar créditos (a api ainda
+                barra de fato na ativação; nada do que foi digitado se perde). */}
+            {semSaldo && (
+              <Banner tom="info">
+                Você está sem saldo de envios. Pode salvar na agenda agora e ativar depois;
+                para gerar o convite e enviar lembretes,{' '}
+                <Link to="/app/creditos" className="font-medium underline">
+                  recarregue créditos
+                </Link>
+                .
+              </Banner>
+            )}
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
@@ -361,24 +371,22 @@ export default function NovoAvisoPage() {
               </Button>
               <Button
                 type="button"
-                variante={somenteLeitura ? 'primary' : 'secondary'}
+                variante="secondary"
                 loading={isSubmitting && modo === 'agenda'}
                 onClick={() => salvar('agenda')}
               >
-                {somenteLeitura ? 'Salvar' : 'Apenas salvar'}
+                Apenas salvar
               </Button>
-              {/* H4: o plano que só mantém agenda (free) não gera convite; a ação de envio
-                  some e "Apenas salvar" vira o "Salvar" primário. */}
-              {!somenteLeitura && (
-                <Button
-                  type="button"
-                  variante="primary"
-                  loading={isSubmitting && modo === 'enviar'}
-                  onClick={() => salvar('enviar')}
-                >
-                  Salvar e gerar convite
-                </Button>
-              )}
+              {/* Envio é universal (liberado para todos); o que limita é o saldo. A api
+                  recusa com saldo_insuficiente se faltar crédito. */}
+              <Button
+                type="button"
+                variante="primary"
+                loading={isSubmitting && modo === 'enviar'}
+                onClick={() => salvar('enviar')}
+              >
+                Salvar e gerar convite
+              </Button>
             </div>
           </div>
         </form>

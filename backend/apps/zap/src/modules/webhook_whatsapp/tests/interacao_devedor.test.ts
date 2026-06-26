@@ -24,11 +24,6 @@ function botao(acao: string, avisoId: string, etapa?: string, telefone = TEL) {
   return { wamid: 'w_' + acao, telefone, buttonId: etapa ? `${acao}:${avisoId}:${etapa}` : `${acao}:${avisoId}` }
 }
 
-/** Marca o plano da conta dona como pago (start: menu_texto_livre=true) ou free. */
-async function definirPlano(uid: string, plano: 'free' | 'start'): Promise<void> {
-  await poolSuper.query(`update public.assinaturas set plano_id=$2 where profile_id=$1`, [uid, plano])
-}
-
 /** Marca um envio como ENVIADO numa data (para o teste de "último aviso"). */
 async function marcarEnviado(envioId: string, quando: Date): Promise<void> {
   await poolSuper.query(
@@ -227,9 +222,9 @@ describe('E7 interação do devedor', () => {
     await limpar(cobradorId)
   })
 
-  // --- H7.7 / G-C2: terminais não reabrem ---------------------------------------------
+  // --- H7.7 / E11 H11.2: terminais não reabrem; cortesia "encerrado" é universal --------
   for (const terminal of ['pago', 'cancelado', 'recusado', 'expirado'] as const) {
-    it(`G-C2: terminal ${terminal} não reabre; pago → cortesia, free → silêncio`, async () => {
+    it(`G-C2: terminal ${terminal} não reabre; cortesia "encerrado" para todos`, async () => {
       const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
       // `recusado` não é alcançável a partir de `programado` (trigger); recria a linha
       // direto nesse status (INSERT não passa pelo trigger de transição). Os demais são
@@ -244,19 +239,13 @@ describe('E7 interação do devedor', () => {
       } else {
         await poolSuper.query(`update public.avisos set status=$2 where id=$1`, [avisoId, terminal])
       }
-      // Dono FREE: silêncio.
-      await definirPlano(cobradorId, 'free')
-      const wFree = clienteWhatsFake()
-      await processarBotao({ pool: poolSuper, logger, whats: wFree }, botao('ja_paguei', avisoId))
-      expect(wFree.enviadas).toHaveLength(0)
+      // E11 H11.2: a cortesia "encerrado" é universal (réplica, não consome crédito).
+      const w = clienteWhatsFake()
+      await processarBotao({ pool: poolSuper, logger, whats: w }, botao('ja_paguei', avisoId))
+      expect(w.enviadas).toHaveLength(1)
+      expect(w.enviadas[0]!.texto.toLowerCase()).toContain('encerrado')
       const a1 = await poolSuper.query(`select status from public.avisos where id=$1`, [avisoId])
       expect(a1.rows[0].status).toBe(terminal) // não reabriu
-      // Dono PAGO: cortesia "encerrado".
-      await definirPlano(cobradorId, 'start')
-      const wPago = clienteWhatsFake()
-      await processarBotao({ pool: poolSuper, logger, whats: wPago }, botao('ja_paguei', avisoId))
-      expect(wPago.enviadas).toHaveLength(1)
-      expect(wPago.enviadas[0]!.texto.toLowerCase()).toContain('encerrado')
       await limpar(cobradorId)
     })
   }
@@ -279,7 +268,6 @@ describe('E7 interação do devedor', () => {
        values ($1,'receber','informado_pago','Maria',$2,'mensalidade',1000,'2026-12-20','x@pix.com')`,
       [cobradorId, TEL],
     )
-    await definirPlano(cobradorId, 'start') // pago
     const whats = clienteWhatsFake()
     await processarTexto({ pool: poolSuper, logger, whats }, { wamid: 'w', telefone: TEL, texto: 'oi tudo bem?' })
     expect(whats.enviadas).toHaveLength(1)
@@ -288,19 +276,21 @@ describe('E7 interação do devedor', () => {
     await limpar(cobradorId)
   })
 
-  it('H7.1: texto livre, dono FREE → silêncio (nada enviado)', async () => {
-    const { cobradorId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
-    await definirPlano(cobradorId, 'free')
+  it('E11 H11.2: texto livre com combinado acionável → menu (universal, para todos)', async () => {
+    // Menu de texto livre é liberado para todos (não há mais gating por plano): havendo um
+    // combinado acionável (programado), o menu sai. A resposta é réplica (não consome crédito).
+    const { cobradorId, avisoId: prog } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
     await processarTexto({ pool: poolSuper, logger, whats }, { wamid: 'w', telefone: TEL, texto: 'alguma coisa' })
-    expect(whats.enviadas).toHaveLength(0)
+    expect(whats.enviadas).toHaveLength(1)
+    expect(whats.enviadas[0]!.botoes?.[0]?.id).toContain(prog)
     await limpar(cobradorId)
   })
 
-  it('H7.1: texto livre, único combinado em informado_pago → silêncio total (mesmo pago)', async () => {
+  it('H7.1: texto livre, único combinado em informado_pago → silêncio total', async () => {
+    // Sem combinado ACIONÁVEL (informado_pago não conta): silêncio, independe de saldo.
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     await poolSuper.query(`update public.avisos set status='informado_pago' where id=$1`, [avisoId])
-    await definirPlano(cobradorId, 'start')
     const whats = clienteWhatsFake()
     await processarTexto({ pool: poolSuper, logger, whats }, { wamid: 'w', telefone: TEL, texto: 'oi' })
     expect(whats.enviadas).toHaveLength(0)

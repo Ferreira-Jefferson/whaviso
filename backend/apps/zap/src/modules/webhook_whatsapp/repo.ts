@@ -14,6 +14,7 @@ import {
   grupoEncerramento,
   cancelarOptoutPendente,
 } from '../../shared/notificacoes'
+import { devolverReservaNaoAceito, reativarHold } from '../../shared/creditos'
 import { criarSessaoOferta } from './wizard_pix'
 
 /** Janela de 1min do opt-out (H10.5): a notificação ao cobrador só sai após esse adiamento. */
@@ -76,12 +77,10 @@ export interface ResultadoBotao {
   entregarPix?: boolean
   /**
    * H7.7: combinado em estado terminal/desregistrado OU botão de aviso ANTIGO (não é o
-   * último enviado). O service responde a cortesia "encerrado" conforme o plano (free=
-   * silêncio, pago=mensagem). Não dispara ação de estado.
+   * último enviado). O service responde a cortesia "encerrado" (universal, E11 H11.2: a
+   * resposta é réplica e não consome crédito). Não dispara ação de estado.
    */
   encerrado?: boolean
-  /** H7.1/H7.7: o dono (criador) do combinado tem o menu/cortesia liberado (plano pago)? */
-  menuLiberado?: boolean
   /**
    * E14: o service deve enviar a oferta de cadastro de chave (resposta.pix_oferecer) ao
    * COBRADOR (`para`), com o nome de quem vai pagar. Gatilho A (aceite invertido sem chave)
@@ -134,21 +133,6 @@ async function reengajamentoSuperaUltimoEnvio(cli: PoolClient, avisoId: string):
   return rows[0]?.supera ?? false
 }
 
-/** O dono (criador) do combinado tem `menu_texto_livre` (plano pago)? Para a cortesia/menu. */
-async function donoTemMenuLiberado(
-  cli: PoolClient,
-  cobradorId: string | null,
-  devedorProfileId: string | null,
-  criadorPapel: 'cobrador' | 'devedor',
-): Promise<boolean> {
-  const uid = criadorPapel === 'cobrador' ? cobradorId : devedorProfileId
-  if (!uid) return false
-  const { rows } = await cli.query<{ menu: boolean }>(
-    `select menu_texto_livre as menu from public.alavancas_do_plano($1) limit 1`,
-    [uid],
-  )
-  return rows[0]?.menu ?? false
-}
 
 /** Linha de aviso usada na localização pelo número e nos ramos do aceite. */
 export interface AvisoConvite {
@@ -578,6 +562,8 @@ export async function aplicarAcaoBotao(
           `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'recusado',$2)`,
           [avisoId, papelConv],
         )
+        // E11 H11.5: convite recusado DEVOLVE a reserva (nada disparou; só o aceito é cobrado).
+        await devolverReservaNaoAceito(cli, avisoId)
         await enfileirarNotificacao(cli, alvoNotif, 'convite_recusado')
         return { aplicado: true, novoStatus: 'recusado', telefone: telConvidado, pixChave: null, chaveResposta: 'resposta.recusa' }
       }
@@ -688,7 +674,6 @@ export async function aplicarAcaoBotao(
         telefone: aviso.telefone_devedor,
         pixChave: null,
         encerrado: true,
-        menuLiberado: await donoTemMenuLiberado(cli, aviso.cobrador_id, aviso.devedor_profile_id, aviso.criador_papel),
       }
     }
 
@@ -710,7 +695,6 @@ export async function aplicarAcaoBotao(
           telefone: aviso.telefone_devedor,
           pixChave: null,
           encerrado: true,
-          menuLiberado: await donoTemMenuLiberado(cli, aviso.cobrador_id, aviso.devedor_profile_id, aviso.criador_papel),
         }
       }
     }
@@ -845,6 +829,9 @@ export async function aplicarAcaoBotao(
       // o sweep do ciclo o expira pela regra normal). Não envia lembrete imediato.
       await cli.query(`update public.avisos set status='programado' where id=$1`, [avisoId])
       await reprogramarCiclo(cli, { avisoId, telefoneDevedor: aviso.telefone_devedor })
+      // E11 H11.6: reativar dentro das 24h CANCELA o hold e devolve os créditos a reservado
+      // (em_hold -> reservado), em vez de devolvê-los ao saldo. No-op se não havia hold.
+      await reativarHold(cli, avisoId)
       await cli.query(
         `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'reregistrado','devedor')`,
         [avisoId],
@@ -927,36 +914,29 @@ export async function vincularProfileConvidado(
 export interface CombinadoMenu {
   /** Combinado ACIONÁVEL cujo alvo é o telefone (estado `programado`). */
   id: string
-  /** O dono (criador) deste combinado tem o menu de texto livre liberado (plano pago)? */
-  menuLiberado: boolean
 }
 
 /**
- * H7.1/G-C1: combinados que ainda ACEITAM ação ("programado") cujo alvo dos lembretes é
- * este telefone, com a flag `menu_texto_livre` do plano da conta DONA de cada um. "Aceita
- * ação" exclui `informado_pago` (já informou -> silêncio), `desregistrado` (sem lembretes)
- * e os terminais. Se a lista vier vazia, o telefone NÃO é um devedor com combinado ativo
- * (cai no fluxo de convite). O service decide menu (algum dono pago) vs silêncio (nenhum).
- * Não loga telefone.
+ * H7.1/G-C1 / E11 H11.2: combinados que ainda ACEITAM ação ("programado") cujo alvo dos
+ * lembretes é este telefone. "Aceita ação" exclui `informado_pago` (já informou -> silêncio),
+ * `desregistrado` (sem lembretes) e os terminais. O menu de texto livre é UNIVERSAL (não há
+ * mais gating por plano): havendo algum combinado acionável, o menu aparece. Se a lista vier
+ * vazia, o telefone NÃO é um devedor com combinado ativo (cai no fluxo de convite). Não loga
+ * telefone.
  */
 export async function listarCombinadosParaMenu(
   pool: Pool,
   telefone: string,
 ): Promise<CombinadoMenu[]> {
-  const { rows } = await pool.query<{ id: string; menu_liberado: boolean }>(
-    `select a.id,
-            coalesce((
-              select al.menu_texto_livre from public.alavancas_do_plano(
-                case when a.criador_papel = 'cobrador' then a.cobrador_id else a.devedor_profile_id end
-              ) al
-            ), false) as menu_liberado
+  const { rows } = await pool.query<{ id: string }>(
+    `select a.id
        from public.avisos a
       where a.telefone_devedor = $1
         and a.status = 'programado'
       order by a.criado_em desc`,
     [telefone],
   )
-  return rows.map((r) => ({ id: r.id, menuLiberado: r.menu_liberado }))
+  return rows.map((r) => ({ id: r.id }))
 }
 
 /** Atualiza o status de entrega de um envio pelo wamid. Ignora wamid desconhecido. */

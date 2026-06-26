@@ -13,7 +13,6 @@ import {
   encerrarPools,
   limpar,
   poolSuper,
-  porPlano,
 } from '../../../../test/harness'
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never
@@ -61,7 +60,7 @@ async function criarInvertido(opts: {
   usados.push(devedorId)
   await poolSuper.query(`insert into auth.users (id) values ($1)`, [devedorId])
   await poolSuper.query(`update public.profiles set nome='Devedor', telefone=$2 where id=$1`, [devedorId, TEL_DEVEDOR])
-  await porPlano(devedorId, 'start') // criador do invertido (dono do plano) envia notificações
+  // E11: notificar o criador é universal (sem gate de plano); a carteira/cortesia vem do trigger.
 
   let cobradorId: string | null = null
   if (opts.comContaCobrador) {

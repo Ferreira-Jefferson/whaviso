@@ -122,20 +122,20 @@ Como **sistema (zap/scheduler)**, quero dar a cada combinado um horário própri
 Como **criador**, quero definir se o combinado se repete (e em quais datas) e quais lembretes saem em cada ocorrência, para adaptar o aviso a cada combinado.
 *Critérios de aceite:*
 
-> Duas coisas distintas: **recorrência** (quantas vezes o combinado se repete) é um **facilitador disponível para todos** (não é diferencial de plano, Épico 11 H11.5); **cadência configurável** (`cadencia_configuravel`, quais D-avisos saem dentro de cada ocorrência) **é** recurso pago (Prof/Plus). O padrão (sem configurar nada) é **um combinado único** com o ciclo **D-2 a D+1** completo.
+> Duas coisas distintas: **recorrência** (quantas vezes o combinado se repete) e **cadência configurável** (quais D-avisos saem dentro de cada ocorrência) são **ambas disponíveis para todos** (não há recurso por plano: o modelo é carteira de créditos, Épico 11). O padrão (sem configurar nada) é **um combinado único** com o ciclo **D-2 a D+1** completo.
 
 **Recorrência (datas das ocorrências):**
 - [ ] O **padrão** é não repetir (combinado único, comportamento atual). Repetir é **opt-in**, atrás de um controle recolhido por padrão; **disponível em todos os planos** (não é gated). É só um atalho para registrar vários avisos do mesmo cliente.
 - [ ] Ligando a recorrência, escolho **por período** (frequência **mensal** ou **semanal** — todo mês ou toda semana, **sempre intervalo 1** — ancorada na "Data combinada", com fim por **N ocorrências**) **ou** **datas específicas** (lista de datas livres, a primeira é a própria "Data combinada").
 - [ ] Cada ocorrência tem seu **próprio mini-ciclo de lembretes** ancorado na **data daquela ocorrência** (Épico 8 H8.7); o combinado só vira terminal `pago` no fim (H8.7).
-- [ ] A **tela mostra ao vivo** quantos avisos a regra gera e quanto isso consome de **vagas** (cada ocorrência reserva 1 vaga, Épico 11 H11.5); a **palavra final é do servidor** (recusa com envelope `{ error: { code, message } }`; no free, ativar/enviar cai na CTA, mas registrar na agenda é permitido).
+- [ ] A **tela mostra ao vivo** quantos avisos a regra gera e quanto isso consome de **créditos de envio** (cada ocorrência reserva 1 envio, Épico 11 H11.4); a **palavra final é do servidor** (recusa com envelope `{ error: { code, message } }`; sem saldo, ativar/enviar cai na CTA de comprar créditos, mas registrar na agenda é permitido).
 
 **Cadência (quais D-avisos):**
 - [ ] O **padrão** é o ciclo D-2, D-1, D, D+1 completo (H6.2); quem não configurar nada usa esse padrão.
-- [ ] Com `cadencia_configuravel`, o criador **escolhe quais etapas** do ciclo saem (um subconjunto de D-2..D+1); o **devedor do fluxo invertido** também pode ajustar como recebe. Sem a alavanca, usa o padrão.
+- [ ] O criador **escolhe quais etapas** do ciclo saem (um subconjunto de D-2..D+1); o **devedor do fluxo invertido** também pode ajustar como recebe. Sem configurar, usa o padrão. Disponível para todos (não é recurso de plano).
 
 **Sempre:**
-- [ ] A quantidade de envios resultante respeita o **limite/vagas do plano** (Épico 11).
+- [ ] A quantidade de envios resultante respeita o **saldo de créditos de envio** da conta (Épico 11).
 - [ ] Etapa, ocorrência e agendamento são calculados **no servidor**; cada envio entra na outbox (`envios`) com seu `ocorrencia_id`, timestamp e o **mesmo horário reservado** do combinado (compartilhado entre ocorrências, H6.9/H8.7).
 - [ ] **Design clean:** o controle oferece a flexibilidade sem poluir, via revelação progressiva (recolhido por padrão); o desenho de UX está nas Decisões.
 
@@ -187,5 +187,5 @@ Como **criador**, quero definir se o combinado se repete (e em quais datas) e qu
 - ❌ Notificações ao cobrador (Épico 10).
 - ❌ Layout do painel e estado dos envios na tela (Épico 9).
 - ❌ Mecânica e textos do opt-out (Épico 13).
-- ❌ Limites de envios por plano que restringem a cadência (Épico 11).
+- ❌ Saldo de créditos de envio que limita a recorrência/cadência (Épico 11).
 - ❌ Botão "Solicitar chave Pix" no lembrete do devedor quando o invertido está sem chave (Épico 14).

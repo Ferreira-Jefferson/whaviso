@@ -13,9 +13,14 @@ import {
   grupoEncerramento,
   cancelarEncerramentoPendente,
 } from '../../shared/notificacoes'
-import { alavancasDoPlano, travarConta } from '../../shared/planos'
+import { consumirDoSaldoLivre, resolverReservaAoEncerrar } from '../../shared/planos'
 
 type Papel = 'cobrador' | 'devedor'
+
+// E8 H8.3 / E11: cap técnico UNIVERSAL de reengajamentos manuais por combinado (nunca 2 no
+// mesmo dia). Antes era alavanca de plano; agora é um teto fixo (recurso liberado para todos,
+// limitado só pelo saldo: cada reengajamento consome 1 envio).
+const REENGAJAMENTO_MAX = 3
 
 /** Janela de reversão de ~1min (H8.1/H8.6): a mensagem de encerramento ao devedor só sai
  *  ~60s depois da confirmação, para o cobrador reverter (reabrir) sem o devedor ver nada. */
@@ -238,12 +243,9 @@ export async function reengajar(pool: Pool, uid: string, id: string): Promise<{ 
     if (!cic[0]?.pos_ciclo) {
       throw conflito('ciclo_em_andamento', 'O reengajamento só fica disponível depois que o ciclo de avisos terminou.')
     }
-    // C5/E11: limite por combinado SEM corrida (lock da conta + contagem na mesma tx).
-    await travarConta(cli, uid)
-    const alavancas = await alavancasDoPlano(cli, uid)
-    if (alavancas.reengajamento_max <= 0) {
-      throw regraNegocio('reengajamento_indisponivel', 'Seu plano não inclui reengajamento manual.')
-    }
+    // E8 H8.3 / E11 H11.2: reengajamento é UNIVERSAL (sem gating por plano); o cap é o teto
+    // técnico fixo por combinado (REENGAJAMENTO_MAX, nunca 2 no mesmo dia). Contagem na
+    // mesma tx (o consumo de crédito abaixo trava a carteira e serializa a corrida).
     const { rows: lim } = await cli.query<{ total: number; hoje: number }>(
       `select count(*)::int as total,
               count(*) filter (
@@ -254,12 +256,16 @@ export async function reengajar(pool: Pool, uid: string, id: string): Promise<{ 
         where aviso_id = $1 and tipo = 'reengajamento_cobrador'`,
       [id],
     )
-    if ((lim[0]?.total ?? 0) >= alavancas.reengajamento_max) {
-      throw regraNegocio('reengajamento_limite', `Você já usou os ${alavancas.reengajamento_max} reengajamentos deste combinado.`)
+    if ((lim[0]?.total ?? 0) >= REENGAJAMENTO_MAX) {
+      throw regraNegocio('reengajamento_limite', `Você já usou os ${REENGAJAMENTO_MAX} reengajamentos deste combinado.`)
     }
     if ((lim[0]?.hoje ?? 0) >= 1) {
       throw regraNegocio('reengajamento_hoje', 'Você já reengajou este combinado hoje. Tente novamente amanhã.')
     }
+    // E11 H8.3: cada reengajamento manual consome 1 envio do saldo (é uma mensagem extra
+    // fora do ciclo reservado). Sem saldo, recusa com `saldo_insuficiente` (a UI mostra a
+    // CTA de comprar créditos) e NADA é enfileirado.
+    await consumirDoSaldoLivre(cli, uid, 1, { tipo: 'aviso', id })
     await gravarEventoPagamento(cli, id, 'reengajamento_cobrador', uid)
     // Enfileira a mensagem com os 3 botões ao devedor (não muda estado). O drainer entrega
     // respeitando o espaçamento/limite; a janela 8-18 é do agendamento do ciclo (a mensagem
@@ -289,6 +295,12 @@ export async function encerrarLembretes(pool: Pool, uid: string, id: string): Pr
       `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1, 'optout', 'devedor')`,
       [id],
     )
+    // E11 H11.5/H11.6: opt-out trata os créditos reservados não disparados deste aviso. A
+    // carteira é a do CRIADOR (cobrador no receber, devedor-criador no invertido); aqui o
+    // criador é sempre o cobrador (o devedor logado encerra um combinado que recebeu). Se
+    // nada disparou, devolve; se já houve disparo (recorrente no meio), põe em hold de 24h.
+    const criadorId = aviso.criador_papel === 'cobrador' ? aviso.cobrador_id : aviso.devedor_profile_id
+    if (criadorId) await resolverReservaAoEncerrar(cli, criadorId, id)
     return { status: 'cancelado' }
   })
 }

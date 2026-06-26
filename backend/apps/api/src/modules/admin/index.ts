@@ -4,10 +4,11 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { comTransacao } from '@whaviso/shared/db'
 import {
-  adminAtualizarPlanoBody,
+  adminAtualizarCreditosCatalogoBody,
   adminAtualizarUsuarioBody,
   adminAvisosQuery,
   adminAvisosResposta,
+  adminCreditarBody,
   adminEnviosQuery,
   adminEnviosResposta,
   adminMetricasQuery,
@@ -24,67 +25,23 @@ import {
   renderizarTexto,
 } from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
+import { creditarEnvios } from '../../shared/planos'
 import * as repo from './repo'
 
 const idParam = z.object({ id: z.uuid() })
 
-// Catálogo de planos: chaves estáveis. O owner edita VALORES (H11.11), nunca cria
-// nem apaga plano; por isso o `id` do PATCH é um enum, não um uuid.
-const PLANO_IDS = ['free', 'start', 'profissional', 'plus'] as const
-const planoIdParam = z.object({ id: z.enum(PLANO_IDS) })
-// Colunas editáveis pelo PATCH (espelha adminAtualizarPlanoBody).
-const COLS_EDITAVEIS_PLANO = [
-  'nome',
-  'preco_centavos',
-  'preco_max_centavos',
-  'capacidade_agenda',
-  'vagas_ativas',
+// Colunas editáveis da curva de créditos (espelha adminAtualizarCreditosCatalogoBody e a
+// migration 0057). O owner edita VALORES em runtime; nunca cria nem apaga (1 linha, id=1).
+const COLS_EDITAVEIS_CATALOGO = [
   'envios_min',
   'envios_max',
-  'reengajamento_max',
-  'permite_recorrente',
-  'cadencia_configuravel',
-  'menu_texto_livre',
-  'informado_pago_habilitado',
-  'totais_periodo',
-  'somente_leitura',
-] as const
-// Colunas devolvidas: mesmo shape de GET /v1/billing/planos (planoSchema). O módulo
-// billing tem a sua própria lista; aqui é redeclarada de propósito (módulo nunca
-// importa módulo, ver AGENTS.md).
-const COLS_PLANO_RETORNO = `
-  id, nome, preco_centavos, max_avisos_ativos, permite_recorrente,
-  capacidade_agenda, vagas_ativas, cadencia_configuravel, menu_texto_livre,
-  informado_pago_habilitado, totais_periodo, por_unidade, agenda_por_unidade,
-  ativaveis_por_unidade, reengajamento_max, somente_leitura,
-  por_envio, envios_min, envios_max, preco_max_centavos
-`
-// Conjunto COMPLETO de colunas de alavanca/preço que compõem uma VERSÃO do plano
-// (espelha public.plano_versoes, ordem fixa). Inclui as não-editáveis pelo body
-// (max_avisos_ativos, por_unidade, agenda/ativaveis_por_unidade, edicoes_max), que são
-// carregadas do estado atual. Usado para inserir a nova versão e atualizar a corrente.
-const COLS_VERSAO = [
-  'nome',
   'preco_centavos',
-  'max_avisos_ativos',
-  'permite_recorrente',
-  'capacidade_agenda',
-  'vagas_ativas',
-  'cadencia_configuravel',
-  'menu_texto_livre',
-  'informado_pago_habilitado',
-  'totais_periodo',
-  'por_unidade',
-  'agenda_por_unidade',
-  'ativaveis_por_unidade',
-  'reengajamento_max',
-  'edicoes_max',
-  'somente_leitura',
-  'por_envio',
-  'envios_min',
-  'envios_max',
   'preco_max_centavos',
+  'cortesia_inicial',
+  'agenda_teto_free',
+  'agenda_teto_pago',
 ] as const
+const COLS_CATALOGO_RETORNO = COLS_EDITAVEIS_CATALOGO.join(', ')
 
 // Lint de linguagem do conteúdo estruturado: texto + rótulos dos botões.
 // Concatena tudo que é texto editável (texto + rótulos) e aplica as três regras:
@@ -322,8 +279,9 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
     },
   )
 
-  // Troca de plano e/ou suspensão da conta. Suspenso = bloqueado na api (403 em toda
-  // rota autenticada; ver shared/auth). Não apaga dados; reativar volta ao normal.
+  // Suspensão/reativação da conta. Suspenso = bloqueado na api (403 em toda rota
+  // autenticada; ver shared/auth). Não apaga dados; reativar volta ao normal. E11: a troca
+  // de plano saiu (não há planos); creditar envios é endpoint próprio (POST .../creditar).
   app.patch(
     '/admin/usuarios/:id',
     { preHandler: owner, schema: { params: idParam, body: adminAtualizarUsuarioBody } },
@@ -331,80 +289,98 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
       if (!(await repo.usuarioExiste(app.pool, req.params.id))) {
         throw naoEncontrado('Usuário não encontrado')
       }
-      if (req.body.plano_id !== undefined) {
-        if (!(await repo.planoExiste(app.pool, req.body.plano_id))) {
-          throw regraNegocio('plano_invalido', `Plano "${req.body.plano_id}" não existe.`)
-        }
-        await repo.definirPlano(app.pool, req.params.id, req.body.plano_id)
+      // Owner não pode se auto-suspender (evita se trancar para fora).
+      if (req.body.suspenso && req.params.id === req.userId) {
+        throw regraNegocio('auto_suspensao', 'Não é possível suspender a própria conta.')
       }
-      if (req.body.suspenso !== undefined) {
-        // Owner não pode se auto-suspender (evita se trancar para fora).
-        if (req.body.suspenso && req.params.id === req.userId) {
-          throw regraNegocio('auto_suspensao', 'Não é possível suspender a própria conta.')
-        }
-        await repo.definirSuspenso(app.pool, req.params.id, req.body.suspenso)
-      }
-      return { id: req.params.id, plano_id: req.body.plano_id ?? null, suspenso: req.body.suspenso }
+      await repo.definirSuspenso(app.pool, req.params.id, req.body.suspenso)
+      return { id: req.params.id, suspenso: req.body.suspenso }
     },
   )
 
-  // Edição do CATÁLOGO de planos (H11.11/H11.12): preço, limites e recursos. VERSIONADO:
-  // cada edição cria uma NOVA versão (plano_versoes, append-only) e avança a versão
-  // corrente do plano; assinaturas vigentes NÃO mudam (fixaram a versão contratada, ver
-  // billing/assinar + alavancas_do_plano). Vale só para novas contratações. Atualização
-  // parcial: os campos não enviados são carregados do estado atual. Owner não cria nem
-  // apaga planos. `COLS_EDITAVEIS_PLANO` lista o que o body pode sobrescrever; as demais
-  // colunas da versão (max_avisos_ativos, por_unidade, edicoes_max...) são herdadas.
-  app.patch(
-    '/admin/planos/:id',
-    { preHandler: owner, schema: { params: planoIdParam, body: adminAtualizarPlanoBody } },
+  // E11 H11.11: o owner CREDITA envios numa conta (ativação manual pós-pagamento via
+  // WhatsApp). Aditivo, lançamento 'credito_owner' (append-only), marca ja_comprou=true
+  // (libera a agenda generosa). Owner-only; o usuário NUNCA se credita. Cada crédito é uma
+  // transação com lock na carteira. Devolve o saldo atualizado.
+  app.post(
+    '/admin/usuarios/:id/creditar',
+    { preHandler: owner, schema: { params: idParam, body: adminCreditarBody } },
     async (req) => {
-      const id = req.params.id
-      const body = req.body as Record<string, unknown>
-      const editaveis = new Set<string>(COLS_EDITAVEIS_PLANO)
+      if (!(await repo.usuarioExiste(app.pool, req.params.id))) {
+        throw naoEncontrado('Usuário não encontrado')
+      }
+      const carteira = await comTransacao(app.pool, (cli) =>
+        creditarEnvios(cli, req.params.id, req.body.quantidade, 'credito_owner', {
+          ator: 'owner',
+          atorId: req.userId,
+        }),
+      )
+      return { id: req.params.id, ...carteira }
+    },
+  )
+
+  // Edição da CURVA de créditos (H11.11/H11.12): preço (piso/topo), faixa de envios
+  // (min/max), cortesia inicial e tetos de agenda (free/após compra). Atualização PARCIAL:
+  // os campos não enviados ficam como estão. 1 linha só (id=1); o owner não cria nem apaga.
+  // As CHECKs da migration 0057 (preço >= 0, piso <= topo, min <= max, free <= pago) são
+  // espelhadas no contrato e revalidadas aqui contra o estado MERGEADO (defesa em
+  // profundidade), para erro limpo em vez de violar constraint.
+  app.patch(
+    '/admin/creditos-catalogo',
+    { preHandler: owner, schema: { body: adminAtualizarCreditosCatalogoBody } },
+    async (req) => {
+      const body = req.body as Record<string, number>
       return await comTransacao(app.pool, async (cli) => {
-        // 1) Estado atual (lock por linha) de todas as colunas da versão.
-        const { rows: atualRows } = await cli.query<Record<string, unknown>>(
-          `select ${COLS_VERSAO.join(', ')} from public.planos where id = $1 for update`,
-          [id],
+        // 1) Estado atual (lock por linha) das colunas editáveis.
+        const { rows: atualRows } = await cli.query<Record<string, number>>(
+          `select ${COLS_CATALOGO_RETORNO} from public.creditos_catalogo where id = 1 for update`,
         )
         const atual = atualRows[0]
-        if (!atual) throw naoEncontrado('Plano não encontrado')
+        if (!atual) throw naoEncontrado('Catálogo de créditos não encontrado')
 
-        // 2) Merge: body sobrescreve só os campos editáveis enviados; resto herda.
-        const valores = COLS_VERSAO.map((c) =>
-          editaveis.has(c) && body[c] !== undefined ? body[c] : atual[c],
-        )
+        // 2) Merge: o body sobrescreve só os campos enviados; o resto fica.
+        const m = (c: (typeof COLS_EDITAVEIS_CATALOGO)[number]) =>
+          body[c] !== undefined ? body[c]! : atual[c]!
+        const valores = {
+          envios_min: m('envios_min'),
+          envios_max: m('envios_max'),
+          preco_centavos: m('preco_centavos'),
+          preco_max_centavos: m('preco_max_centavos'),
+          cortesia_inicial: m('cortesia_inicial'),
+          agenda_teto_free: m('agenda_teto_free'),
+          agenda_teto_pago: m('agenda_teto_pago'),
+        }
 
-        // 3) Próxima versão do plano (append-only).
-        const { rows: vmax } = await cli.query<{ v: number }>(
-          `select coalesce(max(versao), 0) + 1 as v from public.plano_versoes where plano_id = $1`,
-          [id],
-        )
-        const versao = vmax[0]!.v
+        // 3) Revalida o estado mergeado (defesa antes da constraint).
+        if (valores.envios_max < valores.envios_min) {
+          throw regraNegocio('catalogo_invalido', 'envios_max não pode ser menor que envios_min.')
+        }
+        if (valores.preco_max_centavos < valores.preco_centavos) {
+          throw regraNegocio('catalogo_invalido', 'O topo do preço não pode ser menor que o piso.')
+        }
+        if (valores.agenda_teto_pago < valores.agenda_teto_free) {
+          throw regraNegocio(
+            'catalogo_invalido',
+            'O teto de agenda após a compra não pode ser menor que o do free.',
+          )
+        }
 
-        // 4) Insere a nova versão (id, plano_id, versao, depois as COLS_VERSAO).
-        const insPh = COLS_VERSAO.map((_, i) => `$${i + 3}`).join(', ')
-        const { rows: vins } = await cli.query<{ id: string }>(
-          `insert into public.plano_versoes (plano_id, versao, ${COLS_VERSAO.join(', ')})
-           values ($1, $2, ${insPh}) returning id`,
-          [id, versao, ...valores],
-        )
-        const novaVersaoId = vins[0]!.id
-
-        // 5) Atualiza a OFERTA CORRENTE (planos) + ponteiro da versão corrente.
-        const setPlanos = COLS_VERSAO.map((c, i) => `${c} = $${i + 2}`).join(', ')
-        await cli.query(
-          `update public.planos
-              set ${setPlanos}, versao_corrente_id = $${COLS_VERSAO.length + 2}
-            where id = $1`,
-          [id, ...valores, novaVersaoId],
-        )
-
-        // 6) Devolve o catálogo corrente (mesmo shape de GET /v1/billing/planos).
+        // 4) Atualiza a linha única e devolve a curva corrente.
         const { rows } = await cli.query(
-          `select ${COLS_PLANO_RETORNO} from public.planos where id = $1`,
-          [id],
+          `update public.creditos_catalogo
+              set envios_min = $1, envios_max = $2, preco_centavos = $3, preco_max_centavos = $4,
+                  cortesia_inicial = $5, agenda_teto_free = $6, agenda_teto_pago = $7
+            where id = 1
+          returning ${COLS_CATALOGO_RETORNO}`,
+          [
+            valores.envios_min,
+            valores.envios_max,
+            valores.preco_centavos,
+            valores.preco_max_centavos,
+            valores.cortesia_inicial,
+            valores.agenda_teto_free,
+            valores.agenda_teto_pago,
+          ],
         )
         return rows[0]
       })

@@ -1,42 +1,44 @@
-// Banner discreto de status da assinatura do usuário (polish da Fase 7).
-// Mostra-se só para `user` (não owner) e só quando a api indica que a assinatura precisa
-// de atenção. O backend (billing/assinatura) expõe status 'trial'|'ativa'|
-// 'cancelada'. NÃO há conceito de pagamento vencido/pendente no MVP (stub sem
-// gateway). Tratamos 'cancelada' como "precisa de atenção". Linguagem das Regras
-// de Ouro: é sobre a assinatura DELE no whaviso, frase neutra, nunca termos de
-// pagamento agressivo.
+// Banner discreto de SALDO BAIXO/ZERO da carteira do usuário (Épico 11, H11.8/H11.9):
+// alerta a pessoa antes de esbarrar no limite ao ativar. Mostra-se só para `user` (não
+// owner) e só quando o saldo livre está baixo (<= 3) ou zerado. Linguagem das Regras de
+// Ouro: crédito, envio, saldo, recarga (nunca termos de pagamento agressivo).
 import { Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api_client'
-import { assinaturaSchema, type Assinatura } from '@/shared/contracts'
+import { carteiraResposta, type CarteiraResposta } from '@/shared/contracts'
 import { useRole } from '@/shared/auth'
+
+const LIMITE_BAIXO = 3
 
 export function AssinaturaBanner() {
   const role = useRole()
   const habilitado = role === 'user'
 
   const { data } = useQuery({
-    queryKey: ['billing', 'assinatura'],
+    queryKey: ['billing', 'carteira'],
     enabled: habilitado,
     staleTime: 60_000,
     retry: 0,
     queryFn: ({ signal }) =>
-      apiClient.get<Assinatura>('/billing/assinatura', {
-        schema: assinaturaSchema,
+      apiClient.get<CarteiraResposta>('/billing/carteira', {
+        schema: carteiraResposta,
         signal,
       }),
   })
 
-  if (!habilitado || data?.status !== 'cancelada') return null
+  const saldo = data?.carteira.saldo_livre
+  if (!habilitado || saldo === undefined || saldo > LIMITE_BAIXO) return null
 
   return (
     <div
       role="status"
       className="border-b border-ambar/30 bg-ambar-claro px-4 py-2 text-center text-sm text-barro"
     >
-      Sua assinatura precisa de atenção.{' '}
-      <Link to="/app/plano" className="font-medium underline">
-        Ver meu plano
+      {saldo === 0
+        ? 'Você está sem saldo de envios. '
+        : `Seu saldo está baixo (${saldo} ${saldo === 1 ? 'envio' : 'envios'}). `}
+      <Link to="/app/creditos" className="font-medium underline">
+        Recarregar créditos
       </Link>
     </div>
   )

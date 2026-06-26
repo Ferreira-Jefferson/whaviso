@@ -13,9 +13,11 @@
 //   GET  /v1/admin/whatsapp                  ✔ { status, numero, qr_img(dataURL), comando_pendente }
 //   POST /v1/admin/whatsapp/conectar        ✔ enfileira comando p/ o zap abrir o socket (gera QR)
 //   POST /v1/admin/whatsapp/desconectar     ✔ enfileira comando p/ o zap deslogar (exige QR novo)
-//   GET  /v1/billing/planos                 ✔ (módulo billing, reusado aqui)
-//   GET   /v1/admin/usuarios                ✔ { itens:[perfil+suspenso+plano], total, page, per_page }
-//   PATCH /v1/admin/usuarios/:id            ✔ { plano_id?, suspenso? }: troca plano / suspende-reativa
+//   GET  /v1/billing/carteira               ✔ (catálogo de créditos reusado aqui via .catalogo)
+//   PATCH /v1/admin/creditos-catalogo       ✔ edita a curva (owner, H11.11)
+//   GET   /v1/admin/usuarios                ✔ { itens:[perfil+suspenso+saldo da carteira], total, page, per_page }
+//   PATCH /v1/admin/usuarios/:id            ✔ { suspenso }: suspende/reativa
+//   POST  /v1/admin/usuarios/:id/creditar   ✔ { quantidade }: owner credita envios (H11.11)
 // LACUNAS (endpoints que o backend ainda NÃO expõe; degradação graciosa 404):
 //   GET  /v1/admin/envios                   ✘ (auditoria de envios)
 // Por decisão de privacidade, o owner NÃO acessa avisos individuais de outros
@@ -30,24 +32,24 @@ import {
 import { z } from 'zod'
 import { apiClient, ApiError } from '@/shared/api_client'
 import {
+  adminCarteiraResposta,
   adminMensagensResposta,
   adminMetricasResposta,
   adminUsuariosResposta,
+  creditosCatalogoSchema,
   envioSchema,
-  listaPlanosResposta,
   novaMensagemResposta,
   previewMensagemResposta,
+  type AdminCarteiraResposta,
   type AdminMensagensResposta,
   type AdminMetricasResposta,
   type AdminUsuario,
   type AdminUsuariosResposta,
+  type CreditosCatalogo,
   type Envio,
-  type ListaPlanosResposta,
-  planoSchema,
   type NovaMensagemBody,
   type NovaMensagemResposta,
   type Perfil,
-  type Plano,
   type PreviewMensagemBody,
   type PreviewMensagemResposta,
   type Template,
@@ -58,7 +60,7 @@ export const adminKeys = {
   metricas: ['admin', 'metricas'] as const,
   usuarios: (filtros: unknown) => ['admin', 'usuarios', filtros] as const,
   envios: (filtros: unknown) => ['admin', 'envios', filtros] as const,
-  planos: ['admin', 'planos'] as const,
+  catalogo: ['admin', 'creditos-catalogo'] as const,
   whatsapp: ['admin', 'whatsapp'] as const,
   mensagens: ['admin', 'mensagens'] as const,
 }
@@ -240,46 +242,46 @@ export function useDesconectarWhatsapp() {
   return useComandoWhatsapp('/admin/whatsapp/desconectar')
 }
 
-// ---- Planos: leitura reusa billing; edição é do owner (H11.11) -----------
-export function useAdminPlanos() {
+// ---- Créditos: curva de preço (catálogo). Leitura reusa GET /billing/carteira ----
+// (que devolve { carteira, catalogo }); a edição é do owner (PATCH /admin/creditos-catalogo).
+// O owner é também um usuário com carteira, então lê o catálogo pela mesma rota.
+const carteiraComCatalogo = z.object({
+  carteira: z.object({}).passthrough(),
+  catalogo: creditosCatalogoSchema,
+})
+
+export function useCreditosCatalogo() {
   return useQuery({
-    queryKey: adminKeys.planos,
+    queryKey: adminKeys.catalogo,
     queryFn: ({ signal }) =>
-      buscarOpcional<ListaPlanosResposta>('/billing/planos', listaPlanosResposta, undefined, signal),
+      apiClient
+        .get<{ catalogo: CreditosCatalogo }>('/billing/carteira', { schema: carteiraComCatalogo, signal })
+        .then((r) => r.catalogo),
   })
 }
 
-// PATCH /v1/admin/planos/:id: preço, limites e recursos de um plano (atualização
-// parcial). O owner não cria/apaga planos: chaves estáveis (free/start/profissional/
-// plus). Invalida o catálogo admin E as chaves de billing (['billing']) para a tela
-// de planos do usuário refletir a mudança na hora.
-export interface AtualizarPlanoBody {
-  nome?: string
+// PATCH /v1/admin/creditos-catalogo: edita a curva (piso/topo, faixa de envios, cortesia,
+// tetos de agenda). Atualização parcial. Invalida o catálogo admin E as chaves de billing
+// (['billing']) para a tela de Créditos do usuário refletir a mudança na hora.
+export interface AtualizarCatalogoBody {
+  envios_min?: number
+  envios_max?: number
   preco_centavos?: number
-  preco_max_centavos?: number | null
-  capacidade_agenda?: number
-  vagas_ativas?: number | null
-  envios_min?: number | null
-  envios_max?: number | null
-  reengajamento_max?: number
-  permite_recorrente?: boolean
-  cadencia_configuravel?: boolean
-  menu_texto_livre?: boolean
-  informado_pago_habilitado?: boolean
-  totais_periodo?: boolean
-  somente_leitura?: boolean
+  preco_max_centavos?: number
+  cortesia_inicial?: number
+  agenda_teto_free?: number
+  agenda_teto_pago?: number
 }
 
-export function useAtualizarPlano() {
+export function useAtualizarCatalogo() {
   const qc = useQueryClient()
-  return useMutation<Plano, Error, { id: string; body: AtualizarPlanoBody }>({
-    mutationFn: ({ id, body }) =>
-      apiClient.patch<Plano>(`/admin/planos/${id}`, { body, schema: planoSchema }),
+  return useMutation<CreditosCatalogo, Error, AtualizarCatalogoBody>({
+    mutationFn: (body) =>
+      apiClient.patch<CreditosCatalogo>('/admin/creditos-catalogo', { body, schema: creditosCatalogoSchema }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: adminKeys.planos })
-      // Prefixo das queries do billing (catálogo + assinatura), por chave e nunca
-      // por import do módulo billing (fronteira do lint). Faz a tela do usuário
-      // (usePlanos/useAssinatura) refletir a edição do owner na hora.
+      void qc.invalidateQueries({ queryKey: adminKeys.catalogo })
+      // Prefixo das queries do billing (carteira/catálogo), por chave e nunca por import
+      // do módulo billing (fronteira do lint). Reflete a edição do owner na hora.
       void qc.invalidateQueries({ queryKey: ['billing'] })
     },
   })
@@ -312,19 +314,17 @@ export function useAdminUsuarios(filtros: FiltrosUsuarios) {
   })
 }
 
-// PATCH /v1/admin/usuarios/:id: troca de plano e/ou suspensão da conta.
-// Suspenso = bloqueado na api (403 conta_suspensa em toda rota autenticada).
+// PATCH /v1/admin/usuarios/:id: suspensão/reativação da conta (E11: a troca de plano
+// saiu). Suspenso = bloqueado na api (403 conta_suspensa em toda rota autenticada).
 const atualizarUsuarioResposta = z.object({
   id: z.uuid(),
-  plano_id: z.string().nullable(),
-  suspenso: z.boolean().optional(),
+  suspenso: z.boolean(),
 })
 export type AtualizarUsuarioResposta = z.infer<typeof atualizarUsuarioResposta>
 
 export interface AtualizarUsuarioVars {
   id: string
-  suspenso?: boolean
-  plano_id?: string
+  suspenso: boolean
 }
 
 export function useAtualizarUsuario() {
@@ -334,6 +334,27 @@ export function useAtualizarUsuario() {
       apiClient.patch<AtualizarUsuarioResposta>(`/admin/usuarios/${id}`, {
         body,
         schema: atualizarUsuarioResposta,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: adminKeys.todos })
+    },
+  })
+}
+
+// POST /v1/admin/usuarios/:id/creditar: o owner CREDITA N envios na carteira da conta
+// (H11.11, ativação manual pós-pagamento via WhatsApp). Aditivo + lançamento append-only.
+export interface CreditarVars {
+  id: string
+  quantidade: number
+}
+
+export function useCreditarUsuario() {
+  const qc = useQueryClient()
+  return useMutation<AdminCarteiraResposta, Error, CreditarVars>({
+    mutationFn: ({ id, quantidade }) =>
+      apiClient.post<AdminCarteiraResposta>(`/admin/usuarios/${id}/creditar`, {
+        body: { quantidade },
+        schema: adminCarteiraResposta,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: adminKeys.todos })

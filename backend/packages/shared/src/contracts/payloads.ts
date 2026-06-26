@@ -359,8 +359,12 @@ export const adminUsuarioSchema = perfilSchema.extend({
   // perfis nascem com nome '' (trigger) até o onboarding; a listagem admin tolera vazio
   nome: z.string().max(120),
   suspenso: z.boolean(),
-  plano_id: z.string().nullable(),
-  plano_status: z.string().nullable(),
+  // E11: o que se mostra agora é o SALDO da carteira de créditos (não mais o plano).
+  saldo_livre: z.number().int(),
+  reservado: z.number().int(),
+  em_hold: z.number().int(),
+  consumido: z.number().int(),
+  ja_comprou: z.boolean(),
 })
 export type AdminUsuario = z.infer<typeof adminUsuarioSchema>
 
@@ -372,53 +376,78 @@ export const adminUsuariosResposta = z.object({
 })
 export type AdminUsuariosResposta = z.infer<typeof adminUsuariosResposta>
 
-// ---- PATCH /v1/admin/usuarios/:id (mudar plano e/ou suspender) ----
+// ---- PATCH /v1/admin/usuarios/:id (suspender/reativar) ----
+// E11: a troca de plano saiu (não há planos). Creditar envios é endpoint próprio
+// (POST /admin/usuarios/:id/creditar). Aqui só a suspensão da conta.
 export const adminAtualizarUsuarioBody = z
   .object({
-    plano_id: z.string().min(1).max(40).optional(),
-    suspenso: z.boolean().optional(),
-  })
-  .refine((b) => b.plano_id !== undefined || b.suspenso !== undefined, {
-    message: 'informe plano_id e/ou suspenso',
+    suspenso: z.boolean(),
   })
 export type AdminAtualizarUsuarioBody = z.infer<typeof adminAtualizarUsuarioBody>
 
-// ---- PATCH /v1/admin/planos/:id (owner edita o catálogo, H11.11) ----
-// Atualização PARCIAL: todos os campos opcionais. O owner não cria nem apaga planos
-// (as 4 chaves são estáveis; o `id` é validado no handler). Espelha a CHECK
-// `planos_preco_nao_negativo` (preço >= 0) e mantém piso <= topo / envios_min <=
-// envios_max quando os dois vierem juntos (a tela do owner envia o conjunto completo
-// do plano ao salvar), para devolver erro limpo em vez de violar constraint/lógica.
-export const adminAtualizarPlanoBody = z
+// ---- POST /v1/admin/usuarios/:id/creditar (owner credita envios, H11.11) ----
+// O owner ATIVA quem pagou via WhatsApp creditando N envios na carteira (aditivo,
+// lançamento 'credito_owner', append-only). Quantidade > 0; teto generoso de defesa.
+export const adminCreditarBody = z.object({
+  quantidade: z.number().int().min(1).max(100000),
+})
+export type AdminCreditarBody = z.infer<typeof adminCreditarBody>
+
+export const adminCarteiraResposta = z.object({
+  saldo_livre: z.number().int(),
+  reservado: z.number().int(),
+  em_hold: z.number().int(),
+  consumido: z.number().int(),
+  ja_comprou: z.boolean(),
+})
+export type AdminCarteiraResposta = z.infer<typeof adminCarteiraResposta>
+
+// ---- Catálogo de créditos (curva de preço + cortesia + tetos de agenda) ----
+export const creditosCatalogoSchema = z.object({
+  envios_min: z.number().int().min(1),
+  envios_max: z.number().int().min(1),
+  preco_centavos: z.number().int().min(0),
+  preco_max_centavos: z.number().int().min(0),
+  cortesia_inicial: z.number().int().min(0),
+  agenda_teto_free: z.number().int().min(0),
+  agenda_teto_pago: z.number().int().min(0),
+})
+export type CreditosCatalogo = z.infer<typeof creditosCatalogoSchema>
+
+// ---- PATCH /v1/admin/creditos-catalogo (owner edita a curva, H11.11) ----
+// Atualização PARCIAL: todos os campos opcionais (ao menos um). Espelha as CHECKs da
+// migration 0057 (preço >= 0, piso <= topo, envios_min <= envios_max, agenda free <=
+// pago) quando os dois lados vierem juntos, para erro limpo em vez de violar constraint.
+export const adminAtualizarCreditosCatalogoBody = z
   .object({
-    nome: z.string().min(1).max(60).optional(),
+    envios_min: z.number().int().min(1).optional(),
+    envios_max: z.number().int().min(1).optional(),
     preco_centavos: z.number().int().min(0).optional(),
-    preco_max_centavos: z.number().int().min(0).nullable().optional(),
-    capacidade_agenda: z.number().int().min(0).optional(),
-    vagas_ativas: z.number().int().min(0).nullable().optional(),
-    envios_min: z.number().int().min(1).nullable().optional(),
-    envios_max: z.number().int().min(1).nullable().optional(),
-    reengajamento_max: z.number().int().min(0).optional(),
-    permite_recorrente: z.boolean().optional(),
-    cadencia_configuravel: z.boolean().optional(),
-    menu_texto_livre: z.boolean().optional(),
-    informado_pago_habilitado: z.boolean().optional(),
-    totais_periodo: z.boolean().optional(),
-    somente_leitura: z.boolean().optional(),
+    preco_max_centavos: z.number().int().min(0).optional(),
+    cortesia_inicial: z.number().int().min(0).optional(),
+    agenda_teto_free: z.number().int().min(0).optional(),
+    agenda_teto_pago: z.number().int().min(0).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'informe ao menos um campo' })
   .refine(
+    (b) => b.envios_min === undefined || b.envios_max === undefined || b.envios_max >= b.envios_min,
+    { message: 'envios_max não pode ser menor que envios_min' },
+  )
+  .refine(
     (b) =>
-      b.preco_max_centavos == null ||
       b.preco_centavos === undefined ||
+      b.preco_max_centavos === undefined ||
       b.preco_max_centavos >= b.preco_centavos,
     { message: 'o topo do preço não pode ser menor que o piso' },
   )
   .refine(
-    (b) => b.envios_min == null || b.envios_max == null || b.envios_max >= b.envios_min,
-    { message: 'envios_max não pode ser menor que envios_min' },
+    (b) =>
+      b.agenda_teto_free === undefined ||
+      b.agenda_teto_pago === undefined ||
+      b.agenda_teto_pago >= b.agenda_teto_free,
+    { message: 'o teto de agenda após a compra não pode ser menor que o do free' },
   )
-export type AdminAtualizarPlanoBody = z.infer<typeof adminAtualizarPlanoBody>
+export type AdminAtualizarCreditosCatalogoBody = z.infer<typeof adminAtualizarCreditosCatalogoBody>
 
 // ---- GET /v1/admin/envios (auditoria, com nome do destinatário) ----
 export const adminEnviosQuery = z.object({

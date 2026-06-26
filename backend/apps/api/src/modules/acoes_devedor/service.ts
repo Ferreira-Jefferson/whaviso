@@ -4,6 +4,7 @@ import type { AcaoDevedor } from '@whaviso/shared/contracts'
 import { sha256Hex } from '../../shared/tokens'
 import { naoEncontrado } from '../../shared/http_errors'
 import { enfileirarNotificacao, grupoOptoutReativa } from '../../shared/notificacoes'
+import { resolverReservaAoEncerrar } from '../../shared/planos'
 
 /** Janela de 1min do opt-out (H10.5): a notificação ao cobrador só sai após esse adiamento. */
 const OPTOUT_ADIAMENTO_SEG = 60
@@ -79,6 +80,11 @@ export async function registrarAcao(
       agendarAposSeg: OPTOUT_ADIAMENTO_SEG,
       coalesceGrupo: grupoOptoutReativa(aviso.id),
     })
+    // E11 H11.6: opt-out põe os créditos reservados NÃO disparados em hold de 24h (ou
+    // devolve direto, se nada disparou). Carteira do CRIADOR. Se reativar dentro de 24h
+    // (desregistrado -> programado, no zap), o hold é cancelado e os créditos voltam.
+    const criadorId = aviso.criador_papel === 'cobrador' ? aviso.cobrador_id : aviso.devedor_profile_id
+    if (criadorId) await resolverReservaAoEncerrar(cli, criadorId, aviso.id)
     return { status: 'desregistrado', aplicado: true }
   })
 }

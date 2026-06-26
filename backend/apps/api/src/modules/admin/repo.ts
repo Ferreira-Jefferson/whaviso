@@ -68,11 +68,17 @@ export async function listarUsuarios(
     params,
   )
   params.push(q.per_page, offset(q.page, q.per_page))
+  // E11: mostra o SALDO da carteira de créditos (não mais o plano). coalesce cobre a
+  // conta sem linha de carteira (defesa: o trigger cria com cortesia, mas é idempotente).
   const { rows } = await pool.query<AdminUsuario & { criado_em: Date; atualizado_em: Date }>(
     `select p.id, p.nome, p.telefone, p.role, p.suspenso, p.criado_em, p.atualizado_em,
-            s.plano_id, s.status as plano_status
+            coalesce(c.saldo_livre, 0) as saldo_livre,
+            coalesce(c.reservado, 0) as reservado,
+            coalesce(c.em_hold, 0) as em_hold,
+            coalesce(c.consumido, 0) as consumido,
+            coalesce(c.ja_comprou, false) as ja_comprou
      from public.profiles p
-     left join public.assinaturas s on s.profile_id = p.id
+     left join public.creditos_carteira c on c.profile_id = p.id
      ${where}
      order by p.criado_em desc
      limit $${params.length - 1} offset $${params.length}`,
@@ -184,25 +190,9 @@ export async function listarAvisos(
   return { itens: rows.map(mapearAviso), total: Number(total.rows[0]!.n) }
 }
 
-// ---- Troca de plano (assinaturas) ----
-export async function planoExiste(pool: Pool, planoId: string): Promise<boolean> {
-  const { rows } = await pool.query(`select 1 from public.planos where id = $1`, [planoId])
-  return rows.length > 0
-}
-
 export async function usuarioExiste(pool: Pool, id: string): Promise<boolean> {
   const { rows } = await pool.query(`select 1 from public.profiles where id = $1`, [id])
   return rows.length > 0
-}
-
-/** Define o plano do usuário (upsert na assinatura). Status 'ativa'. */
-export async function definirPlano(pool: Pool, id: string, planoId: string): Promise<void> {
-  await pool.query(
-    `insert into public.assinaturas (profile_id, plano_id, status)
-     values ($1, $2, 'ativa')
-     on conflict (profile_id) do update set plano_id = excluded.plano_id, status = 'ativa'`,
-    [id, planoId],
-  )
 }
 
 /** Suspende/reativa a conta. Não apaga dados; o bloqueio é no caminho de autenticação. */

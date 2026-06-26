@@ -12,9 +12,14 @@
 // não da repetição. Ver `CadenciaLembretes`, renderizado ao lado deste no formulário.
 //
 // SERVIDOR É A AUTORIDADE: o resumo "isto gera N avisos" e "consome N vagas" é só uma
-// PRÉVIA local para orientar; a palavra final (limite de plano) é da api, tratada em
-// NovoAviso (Banner + "Ver meu plano"). O front NUNCA calcula a data de cada ocorrência
-// para enviar: só conta, para exibir. As datas são expandidas no servidor.
+// PRÉVIA local para orientar; a palavra final (saldo) é da api, tratada em NovoAviso
+// (Banner + "Recarregar créditos"). O front NUNCA calcula a data de cada ocorrência para
+// enviar: só conta, para exibir. As datas são expandidas no servidor.
+//
+// TETO do nº de repetições (`maxOcorrencias`): cada repetição reserva 1 crédito, então o
+// limite espelha o saldo livre da conta (vem de NovoAviso). É só um guard de UX; sem ele
+// cai no teto absoluto (LIMITE_ABSOLUTO). O servidor segue decidindo de fato (recusa com
+// Banner saldo_insuficiente).
 import { useEffect, useMemo, useState } from 'react'
 import { Lock, Plus, Repeat, X } from 'lucide-react'
 import { Button, DateInput, Field, Input, SegmentedControl } from '@/shared/ui'
@@ -48,6 +53,13 @@ const DIAS_SEMANA: ReadonlyArray<{ nome: string; artigo: 'Todo' | 'Toda' }> = [
 
 const UNIDADE: Record<Freq, string> = { mensal: 'meses', semanal: 'semanas' }
 
+// Mínimo de repetições (a 1ª é a Data combinada; repetir só faz sentido com 2+).
+const MIN_OCORRENCIAS = 2
+// Teto absoluto do nº de repetições, independente do plano: o input numérico nunca vira
+// campo livre. Planos grandes (envios >> 60) continuam limitados aqui; o teto do plano
+// (`maxOcorrencias`) só morde quando os envios disponíveis ficam abaixo deste valor.
+const LIMITE_ABSOLUTO = 60
+
 // Dia do mês (1..31) e dia da semana (0..6) a partir de 'YYYY-MM-DD', SEM `new Date(iso)`
 // (que parseia em UTC e poderia escorregar um dia): montamos pelos componentes locais.
 function partesData(iso: string): { dia: number; semana: number } | null {
@@ -69,11 +81,21 @@ function diaSeguinte(iso: string): string {
 interface RepetirCombinadoProps {
   /** Data combinada atual (YYYY-MM-DD ou ''). Âncora da 1ª ocorrência. */
   dataCombinada: string
+  /**
+   * Teto do nº de repetições = envios que a conta ainda pode ativar (1 por repetição).
+   * undefined quando não há teto numérico do plano (ex.: free, que só salva na agenda):
+   * cai no LIMITE_ABSOLUTO. O servidor é a autoridade final.
+   */
+  maxOcorrencias?: number
   /** Emite a recorrência sempre que muda (undefined = combinado simples). */
   onChange: (recorrencia: RecorrenciaInput | undefined) => void
 }
 
-export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoProps) {
+export function RepetirCombinado({
+  dataCombinada,
+  maxOcorrencias,
+  onChange,
+}: RepetirCombinadoProps) {
   const [aberto, setAberto] = useState(false)
   const [aba, setAba] = useState<Aba>('periodo')
 
@@ -85,6 +107,15 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
   // Período: frequência + quantas vezes no total (inclui a 1ª; sempre intervalo 1).
   const [freq, setFreq] = useState<Freq>('mensal')
   const [ocorrencias, setOcorrencias] = useState(3)
+
+  // Teto efetivo do nº de repetições: o limite do plano (envios disponíveis), preso entre
+  // o mínimo (input sempre válido) e o absoluto. Sem teto do plano, vale o absoluto.
+  const teto = Math.max(
+    MIN_OCORRENCIAS,
+    Math.min(LIMITE_ABSOLUTO, maxOcorrencias ?? LIMITE_ABSOLUTO),
+  )
+  // O saldo limita de fato quando os créditos livres ficam abaixo do teto absoluto.
+  const limitadoPorSaldo = maxOcorrencias != null && maxOcorrencias < LIMITE_ABSOLUTO
 
   // Datas específicas (ADICIONAIS; a 1ª ocorrência é sempre a Data combinada).
   const [datasAvulsas, setDatasAvulsas] = useState<string[]>([])
@@ -108,6 +139,12 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
   useEffect(() => {
     if (!podeRepetir) setAberto(false)
   }, [podeRepetir])
+
+  // Se o teto encolher (plano carregou / envios disponíveis caíram) abaixo do valor atual,
+  // ajusta para não deixar o input acima do máximo permitido.
+  useEffect(() => {
+    setOcorrencias((n) => Math.min(n, teto))
+  }, [teto])
 
   // Quantos avisos a regra gera (prévia local). Combinado simples = 1.
   const totalOcorrencias = useMemo(() => {
@@ -210,11 +247,16 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
                   <span className="inline-flex w-20 shrink-0">
                     <Input
                       type="number"
-                      min={2}
-                      max={60}
+                      min={MIN_OCORRENCIAS}
+                      max={teto}
                       value={ocorrencias}
                       onChange={(e) =>
-                        setOcorrencias(Math.max(2, Math.min(60, Number(e.target.value) || 2)))
+                        setOcorrencias(
+                          Math.max(
+                            MIN_OCORRENCIAS,
+                            Math.min(teto, Number(e.target.value) || MIN_OCORRENCIAS),
+                          ),
+                        )
                       }
                       aria-label="Quantas vezes no total (inclui a primeira)"
                       className="text-center"
@@ -223,6 +265,12 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
                   <span className="shrink-0">{UNIDADE[freq]}</span>
                 </div>
                 <p className="text-[11px] text-tinta-2">Conta a primeira (a Data combinada).</p>
+                {limitadoPorSaldo && (
+                  <p className="text-[11px] text-tinta-2">
+                    Cada repetição reserva 1 envio. Você tem {maxOcorrencias} no saldo
+                    {maxOcorrencias === 1 ? '' : ''}.
+                  </p>
+                )}
                 {!dataCombinada && (
                   <p className="text-[11px] text-tinta-2">
                     O dia exato vem da Data combinada (escolha acima).
@@ -284,7 +332,7 @@ export function RepetirCombinado({ dataCombinada, onChange }: RepetirCombinadoPr
                 type="button"
                 variante="secondary"
                 onClick={adicionarData}
-                disabled={datasAvulsas.length >= 59}
+                disabled={datasAvulsas.length >= teto - 1}
                 className="self-start"
               >
                 <Plus strokeWidth={1.75} className="size-4" />

@@ -93,7 +93,7 @@ Como **cobrador** de um combinado recorrente, quero confirmar o pagamento de cad
 - [ ] O painel mostra o **progresso** do recorrente (ex.: "3 de 5 pagamentos confirmados") e o status da ocorrência corrente (Épico 9).
 - [ ] Marcar como pago direto (H8.4) e reabrir (H8.6) valem **por ocorrência**.
 - [ ] A própria recorrência (definir "todo dia 10 por 5 meses", por semana/mês ou datas específicas) é configurada na criação/ativação pelo **seletor de recorrência decidido no Épico 6 H6.10**; a lógica de confirmação por ocorrência descrita aqui se apoia nesse mecanismo.
-- [ ] **Custo de vaga de plano:** cada **ocorrência reserva 1 vaga de aviso ativo** (Épico 11 H11.5), liberada quando a ocorrência vira `pago`. Recorrência **não é diferencial de plano** (é facilitador para registrar vários avisos do mesmo cliente); é só metrificada por ocorrência, como qualquer aviso.
+- [ ] **Custo de crédito:** cada **ocorrência reserva 1 envio** na ativação (Épico 11 H11.4) e **consome de vez no disparo** do lembrete (charge-on-success, Épico 11 H11.5); confirmar como `pago` **não devolve** um envio já disparado. Recorrência **não é diferencial de plano** (é facilitador para registrar vários avisos do mesmo cliente); é só metrificada por ocorrência, como qualquer aviso.
 
 ---
 
@@ -129,7 +129,7 @@ Como **sistema (api)**, quero registrar e validar cada mudança de estado ligada
 - **Horário reservado: liberar só no fim + campo recuperável (H8.1/H8.6/H8.7):** o Épico 6 H6.9 dizia liberar (`null`) ao virar `pago`. Refinamento: em recorrentes o horário **só vira `null` no fim**; e em qualquer reabertura o horário **original** precisa ser guardado em um **campo recuperável** para ser **reusado igual** na reabertura, **fora** da regra de escolha de timestamp (aceitando colisão). H6.9 precisa desse campo extra (cross-ref atualizado no Épico 6).
 - **Janela de reversão de 1 minuto na confirmação (H8.1/H8.6):** a mensagem de encerramento ao devedor atrasa ~1 min para o cobrador reverter; reabrir antes cancela a mensagem, reabrir depois manda uma 2ª mensagem de "status alterado". Lógica nova de agendamento de mensagem (paralela à do opt-out, Épico 7).
 - **Confirmar/rejeitar por botão no WhatsApp para qualquer cobrador (H8.5):** não só cobrador sem conta. Precisa de notificação com botões (Confirmar / Ainda não recebi) e roteamento por telefone (profile ou `telefone_cobrador`). Hoje a confirmação é pensada só pelo painel.
-- **Reengajamento pós-ciclo (H8.3):** mensagem manual do cobrador ("ainda não localizei o pagamento") com os 3 botões padrão, virando o último aviso do combinado, sem mudar de estado. Não existe hoje; depende de limite por plano (Épico 11).
+- **Reengajamento pós-ciclo (H8.3):** mensagem manual do cobrador ("ainda não localizei o pagamento") com os 3 botões padrão, virando o último aviso do combinado, sem mudar de estado. Não existe hoje; cada reengajamento consome 1 envio do saldo (Épico 11), com cap técnico em H8.3.
 - **Marcar/reabrir registram o ator:** o painel precisa distinguir devedor-informou x cobrador-marcou/confirmou (Épico 9).
 
 ### Decisões tomadas
@@ -144,7 +144,7 @@ Como **sistema (api)**, quero registrar e validar cada mudança de estado ligada
 - **Defesa em profundidade:** nenhuma regra de negócio no front; o front exibe o banco e solicita a mudança, a API + o trigger validam e gravam (aberto a refino mantendo idempotência/segurança).
 
 ### Decisões em aberto
-- **Limite de reengajamentos manuais (H8.3)** por plano: definido no Épico 11 (até 3 por combinado, nunca dois no mesmo dia).
+- **Limite de reengajamentos manuais (H8.3):** até 3 por combinado, nunca dois no mesmo dia (cap técnico universal); cada reengajamento consome 1 envio do saldo (Épico 11).
 - ~~**Modelagem da recorrência (H8.7)**~~ **resolvida (2026-06-25):** tabela `aviso_ocorrencias` + `envios.ocorrencia_id`, horário compartilhado, ciclo lazy por ocorrência, terminal só no fim. Schema no Épico 6 H6.10.
 
 ### Fora de escopo deste épico
@@ -152,5 +152,5 @@ Como **sistema (api)**, quero registrar e validar cada mudança de estado ligada
 - ❌ Como `informado_pago`, `pago`, a fila de "aguardando confirmação" e o progresso do recorrente aparecem no painel (Épico 9).
 - ❌ O empurrãozinho de D+1 e a parada do ciclo em `informado_pago` em si (Épico 6).
 - ❌ O botão "Já paguei" do devedor que origina o `informado_pago` (Épico 7).
-- ❌ Cadência/recorrência configurável em si (Épico 6 H6.10) e limites por plano (Épico 11).
+- ❌ Cadência/recorrência configurável em si (Épico 6 H6.10) e saldo/créditos de envio (Épico 11).
 - ❌ Estados terminais `cancelado`/`expirado` e suas regras (Épicos 2/3 e 5).

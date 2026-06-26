@@ -1,23 +1,9 @@
-// Camada de dados do módulo landing: planos públicos para a seção de preços.
-// GET /v1/billing/planos é público no backend (sem preHandler de auth), então a
-// landing pode buscá-lo sem sessão. Estado de servidor via TanStack Query; dados
-// só pelo api_client. Este módulo NUNCA importa outro módulo.
-import { useQuery } from '@tanstack/react-query'
-import { apiClient } from '@/shared/api_client'
-import { listaPlanosResposta, type ListaPlanosResposta } from '@/shared/contracts'
-
-/** GET /v1/billing/planos: catálogo público (preços em centavos). */
-export function usePlanos() {
-  return useQuery({
-    queryKey: ['landing', 'planos'],
-    staleTime: 5 * 60_000,
-    retry: 0,
-    queryFn: ({ signal }) =>
-      apiClient
-        .get<ListaPlanosResposta>('/billing/planos', {
-          schema: listaPlanosResposta,
-          signal,
-        })
-        .then((r) => r.planos),
-  })
-}
+// Camada de dados do módulo landing.
+//
+// A landing é pública e, no modelo de carteira de créditos de envio, não há mais
+// catálogo público de planos para buscar: a seção de preços passou a ser estática
+// (explica o modelo de créditos, sem chamar a api). Por isso este módulo não tem,
+// por enquanto, nenhum acesso a dado de servidor. Mantido como ponto de extensão
+// caso a landing volte a precisar de estado de servidor (sempre via api_client,
+// nunca importando outro módulo).
+export {}

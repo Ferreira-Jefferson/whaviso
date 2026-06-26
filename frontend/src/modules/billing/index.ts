@@ -1,3 +1,3 @@
 import { lazy } from 'react'
 
-export const PlanoPage = lazy(() => import('./pages/Plano'))
+export const CreditosPage = lazy(() => import('./pages/Creditos'))

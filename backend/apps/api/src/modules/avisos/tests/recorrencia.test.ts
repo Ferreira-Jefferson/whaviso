@@ -1,12 +1,13 @@
-// E6 H6.10 / E8 H8.7 / E11 H11.3/H11.5: recorrência e cadência. Cobre: criar recorrente
-// materializa N ocorrências; cada ocorrência reserva 1 vaga (SOMA, não count); cadência
-// sem plano é recusada; cadência filtra etapas no ciclo; gate de vaga no enviar; a rota
-// /ocorrencias expõe o "k de N". (A confirmação por ocorrência fica em recebimentos.)
+// E6 H6.10 / E8 H8.7 / E11 H11.3/H11.4/H11.5: recorrência e cadência. Cobre: criar
+// recorrente materializa N ocorrências; cada ocorrência RESERVA 1 crédito (SOMA = N, não 1
+// por combinado); recorrente além do saldo é recusado (saldo_insuficiente); cadência é
+// UNIVERSAL (liberada para todos); cadência filtra etapas no ciclo; a rota /ocorrencias
+// expõe o "k de N". (A confirmação por ocorrência fica em recebimentos.)
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  creditarConta,
   criarAppTeste,
   criarUsuario,
-  definirPlano,
   encerrarPools,
   limparUsuario,
   poolSuper,
@@ -38,20 +39,22 @@ async function ocorrencias(avisoId: string) {
   return r.rows
 }
 
-async function somarVagas(uid: string): Promise<number> {
-  // Espelha somarVagasAtivas: por aviso ativo, 1 (simples) ou ocorrências não pagas.
-  const r = await poolSuper.query<{ n: string }>(
-    `select coalesce(sum(
-              case when a.recorrencia_tipo is null then 1
-                   else (select count(*) from public.aviso_ocorrencias o
-                          where o.aviso_id=a.id and o.status<>'pago') end
-            ),0) as n
-       from public.avisos a
-      where a.status not in ('sem_aviso','pago','cancelado','recusado','expirado')
-        and a.cobrador_id=$1`,
+/** Lê o balde RESERVADO da carteira (créditos presos a avisos ativos não disparados). */
+async function reservado(uid: string): Promise<number> {
+  const r = await poolSuper.query<{ reservado: number }>(
+    `select reservado from public.creditos_carteira where profile_id=$1`,
     [uid],
   )
-  return Number(r.rows[0]!.n)
+  return r.rows[0]?.reservado ?? 0
+}
+
+/** Reseta a carteira para um saldo conhecido entre testes (saldo alto, baldes zerados). */
+async function resetarCarteira(uid: string, saldo: number): Promise<void> {
+  await poolSuper.query(
+    `update public.creditos_carteira
+        set saldo_livre=$2, reservado=0, em_hold=0, consumido=0, ja_comprou=true where profile_id=$1`,
+    [uid, saldo],
+  )
 }
 
 describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
@@ -59,10 +62,13 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
 
   beforeAll(async () => {
     uid = await criarUsuario('Recorrencia Teste')
-    await definirPlano(uid, 'profissional') // tem cadencia_configuravel + vagas
+    await creditarConta(uid, 1000)
   })
   beforeEach(async () => {
     await poolSuper.query(`delete from public.avisos where cobrador_id=$1`, [uid])
+    // Reseta a carteira: os avisos foram deletados, mas o livro-razão é append-only; para o
+    // saldo refletir "começar limpo", zera os baldes e devolve um saldo generoso.
+    await resetarCarteira(uid, 1000)
   })
   afterAll(async () => {
     await limparUsuario(uid)
@@ -103,7 +109,7 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
     expect(ocs.map((o) => o.data_combinada)).toEqual(['2026-12-10', '2026-12-20', '2026-12-25'])
   })
 
-  it('H11.5: cada ocorrência reserva 1 vaga (SOMA = N, não 1 por combinado)', async () => {
+  it('H11.4: cada ocorrência reserva 1 crédito (SOMA = N, não 1 por combinado)', async () => {
     const app = await criarAppTeste(uid)
     await app.inject({
       method: 'POST',
@@ -112,35 +118,36 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
       payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 4 } }),
     })
     await app.close()
-    expect(await somarVagas(uid)).toBe(4) // 4 ocorrências não pagas = 4 vagas
+    expect(await reservado(uid)).toBe(4) // 4 ocorrências = 4 créditos reservados
   })
 
-  it('H11.3: enviar recorrente além das vagas do plano → limite_plano_atingido (item não criado)', async () => {
-    // Plano com poucas vagas: Start tem vagas = capacidade (100); para forçar o limite,
-    // usamos um plano free? Free é somente_leitura. Usamos profissional (25 vagas) e um N
-    // grande para estourar de uma vez.
+  it('H11.4: enviar recorrente além do saldo → saldo_insuficiente (item não criado)', async () => {
+    // Saldo exatamente 3; um recorrente de 4 ocorrências precisa de 4 -> recusa.
+    await resetarCarteira(uid, 3)
     const app = await criarAppTeste(uid)
     const r = await app.inject({
       method: 'POST',
       url: '/v1/avisos',
       headers: AUTH,
-      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 26 } }),
+      payload: corpo({ recorrencia: { tipo: 'periodo', freq: 'mensal', ocorrencias: 4 } }),
     })
     await app.close()
     expect(r.statusCode).toBe(422)
-    expect(r.json().error.code).toBe('limite_plano_atingido')
-    // Nada criado (a transação reverteu).
+    expect(r.json().error.code).toBe('saldo_insuficiente')
+    // Nada criado (a transação reverteu) e o saldo intacto.
     const n = await poolSuper.query<{ n: string }>(
       `select count(*) as n from public.avisos where cobrador_id=$1`,
       [uid],
     )
     expect(Number(n.rows[0]!.n)).toBe(0)
+    expect(await reservado(uid)).toBe(0)
   })
 
-  it('H6.10: cadência personalizada SEM plano (start) → plano_sem_cadencia', async () => {
-    const semCadencia = await criarUsuario('SemCadencia')
-    await definirPlano(semCadencia, 'start') // start NÃO tem cadencia_configuravel
-    const app = await criarAppTeste(semCadencia)
+  it('H11.2: cadência personalizada é UNIVERSAL (liberada para todos, qualquer saldo)', async () => {
+    // Conta nova (só cortesia, nunca "comprou"): cadência personalizada passa (não há
+    // gating por recurso); o único limite é o saldo (1 crédito reservado, cabe na cortesia).
+    const qualquer = await criarUsuario('CadenciaUniversal')
+    const app = await criarAppTeste(qualquer)
     const r = await app.inject({
       method: 'POST',
       url: '/v1/avisos',
@@ -148,9 +155,8 @@ describe('E6/E8 recorrência (integração com whaviso_dev)', () => {
       payload: corpo({ cadencia_etapas: ['d', 'd_mais_1'] }),
     })
     await app.close()
-    expect(r.statusCode).toBe(422)
-    expect(r.json().error.code).toBe('plano_sem_cadencia')
-    await limparUsuario(semCadencia)
+    expect(r.statusCode).toBe(201)
+    await limparUsuario(qualquer)
   })
 
   it('H6.10: cadência personalizada (Profissional) é gravada no aviso', async () => {
