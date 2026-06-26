@@ -109,7 +109,7 @@ Rode as três checagens da seção "Regras de linguagem" no arquivo salvo. Corri
 
 - Salve o lote em `business/marketing/criativos/<slug-do-pilar>-NN.md`, onde `NN` é o próximo número livre para aquele pilar (01, 02, ...). Use a ferramenta Glob para descobrir o próximo número.
 - Atualize (ou crie) `business/marketing/criativos/_indice.md`: uma linha por ideia, no formato `- <pilar-slug> · <título do ângulo> · arquivo`. É o ledger que evita repetição.
-- Apresente as ideias ao usuário no chat também, não só no arquivo.
+- Apresente as ideias ao usuário no chat também, não só no arquivo. **Inclua sempre o prompt de imagem completo (bloco pronto para copiar) junto de cada ideia no chat**, esse é o entregável que o usuário leva para o gerador. Deixe claro que o "Texto a sobrepor" é uma sugestão de headline editável, não parte do prompt (entra por cima depois, no editor).
 
 ## Template de saída (use exatamente esta estrutura por ideia)
 

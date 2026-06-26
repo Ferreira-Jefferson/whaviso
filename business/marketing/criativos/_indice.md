@@ -13,3 +13,6 @@ Pilares (slug): financa-leve · dor-de-lembrar · parcelar-com-seguranca · bast
 - financa-leve · Quanto do seu mês está na mão dos outros · financa-leve-01.md
 - financa-leve · O mês fecha pelo que entrou, não pelo que você vendeu · financa-leve-01.md
 - financa-leve · Anotar quem combinou de te pagar não é desconfiança · financa-leve-01.md
+- financa-leve · "Quando der" não é data · financa-leve-02.md
+- financa-leve · Todo combinado cabe em três palavras · financa-leve-02.md
+- financa-leve · Quanto vai entrar essa semana · financa-leve-03.md

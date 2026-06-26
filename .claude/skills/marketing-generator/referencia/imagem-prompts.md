@@ -20,6 +20,8 @@ Como escrever um único prompt que gera uma imagem com cara profissional, sem bu
 
 Por padrão, cada ideia gera UMA imagem única, proporção 4:5. Só monte carrossel se o usuário pedir. Quanto mais completo e concreto o prompt de uma imagem só, menos a IA inventa.
 
+**Padrão fixo de composição:** toda imagem reserva um canto ou faixa vazia para o texto entrar depois (topo, base ou um dos lados), e o texto NUNCA é gerado dentro da arte por padrão. Sobrepõe-se a legenda no Canva/editor. Isso vale para todo prompt, sem exceção.
+
 ## A fórmula do prompt (ordem que funciona)
 
 Monte nesta ordem. Cada bloco fecha uma porta para erro:
@@ -27,7 +29,7 @@ Monte nesta ordem. Cada bloco fecha uma porta para erro:
 1. **Meio + gatilho de realismo:** o que é a imagem. Ex.: "Candid editorial photograph, photorealistic".
 2. **Sujeito (concreto):** quem, fazendo o quê, **para onde olha**, com qual expressão, faixa de idade, roupa simples. A direção do olhar muda a leitura inteira da cena, então seja explícito. Ex.: "a single adult small-business seller in their 30s, looking down at the phone screen, hesitant expression". Quanto mais específico, menos a IA improvisa.
 3. **Cenário e objetos do segmento:** onde, com props concretos, e **nomeie os produtos do segmento do público** (a IA não sabe o que a pessoa vende e inventa: "products" sozinho pode virar frasco de remédio). Ex.: "at a home table, a paper notebook and a few cosmetic products (a lipstick, a perfume bottle, a cream jar), blurred shelves behind".
-4. **Composição e enquadramento:** tipo de plano, ângulo, regra dos terços e o espaço negativo para o texto. Ex.: "medium shot, eye level, subject on the right third, clean empty space on the left for a headline".
+4. **Composição e enquadramento:** tipo de plano, ângulo, regra dos terços e, **sempre por padrão, um canto ou faixa vazia para o texto entrar depois** (topo, base ou um dos lados). Toda imagem reserva esse espaço, sem exceção. Ex.: "medium shot, eye level, subject on the right third, clean empty space on the left for a headline".
 5. **Iluminação:** direção, qualidade, hora, clima. É o que mais define "profissional". Ex.: "soft diffused window light from the upper left, warm morning glow".
 6. **Câmera e lente:** força profundidade e desfoque reais. Ex.: "shot on a 50mm lens, f/2.0, shallow depth of field".
 7. **Estilo e cor:** paleta e tratamento. Ex.: "warm neutral tones with a soft green accent, natural color grading, authentic and human, not staged".
@@ -162,10 +164,11 @@ Para criativos do painel, prefira compor um print real do app sobre um fundo fot
 ```
 Candid editorial photograph, photorealistic. A single hand holding a smartphone
 at a cozy home table, the phone screen left intentionally blank for a real
-screenshot to be composited later, catalog products softly blurred in the
-background. Medium close-up, 50mm lens, f/2.2, soft natural daylight, warm
-neutral tones with a soft green accent, authentic and human. 4:5 aspect ratio,
-high detail.
+screenshot to be composited later, a few cosmetic products (a lipstick, a cream
+jar) softly blurred in the background. Medium close-up, 50mm lens, f/2.2, soft
+natural daylight, warm neutral tones with a soft green accent, authentic and
+human. Clean empty space at the top for a headline. 4:5 aspect ratio, high
+detail.
 Avoid: fake user interface, garbled text on screen, extra fingers, deformed
 hand, watermark, stock-photo look.
 ```
