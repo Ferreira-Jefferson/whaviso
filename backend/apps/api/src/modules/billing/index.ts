@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { naoAutorizado, regraNegocio } from '../../shared/http_errors'
-import { precoPorEnvioCentavos } from '../../shared/planos'
+import { precoPorEnvioCentavos, somarVagasAtivas } from '../../shared/planos'
 import { provedorAtivo } from './provedor'
 
 // Billing do Épico 11: catálogo de 4 planos (free/start/profissional/plus) com
@@ -71,6 +71,9 @@ export const billingRoutes: FastifyPluginAsync = async (raiz) => {
       [req.userId],
     )
     const a = alav[0]!
+    // Uso atual de VAGAS de aviso ativo (envios): soma 1 por combinado simples e as
+    // ocorrências não pagas por recorrente (H11.3/H11.5). Leitura sem lock (pool).
+    const vagas_usadas = await somarVagasAtivas(app.pool, req.userId)
     return {
       plano_id: a.plano_id,
       status: assi[0]?.status ?? 'trial',
@@ -80,6 +83,7 @@ export const billingRoutes: FastifyPluginAsync = async (raiz) => {
       // Alavancas efetivas (lidas do catálogo, resolvidas por unidade).
       capacidade_agenda: a.capacidade_agenda,
       vagas_ativas: a.vagas_ativas,
+      vagas_usadas,
       somente_leitura: a.somente_leitura,
       permite_recorrente: a.permite_recorrente,
       cadencia_configuravel: a.cadencia_configuravel,

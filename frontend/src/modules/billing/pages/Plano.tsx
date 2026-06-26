@@ -91,22 +91,38 @@ export default function PlanoPage() {
         </Banner>
       )}
 
-      {/* Uso da agenda vs capacidade (espelho do backend) */}
-      <ContadorUso
-        carregando={uso.isLoading || assinatura.isLoading || planos.isLoading}
-        erro={uso.isError}
-        uso={usoAgenda}
-        capacidade={capacidadeAtual}
-        somenteLeitura={assinatura.data?.somente_leitura ?? false}
-        statusAssinatura={assinatura.data?.status}
-        temPlanoMaior={Boolean(
-          planos.data?.some(
-            (p) =>
-              p.id !== planoAtualId &&
-              (p.por_envio || p.capacidade_agenda > (capacidadeAtual ?? 0)),
-          ),
-        )}
-      />
+      <div className="flex flex-col gap-4">
+        {/* Envios de aviso ATIVOS (vagas) vs o teto do plano: quantos envios ainda
+            restam. Vem ANTES da agenda (é o eixo comercial). Espelho do backend
+            (vagas_usadas/vagas_ativas), nunca recalculado. */}
+        <ContadorEnvios
+          carregando={assinatura.isLoading || planos.isLoading}
+          erro={assinatura.isError}
+          usados={assinatura.data?.vagas_usadas ?? 0}
+          vagas={assinatura.data?.vagas_ativas ?? 0}
+          somenteLeitura={assinatura.data?.somente_leitura ?? false}
+          temPlanoMaior={Boolean(
+            planos.data?.some((p) => p.id !== planoAtualId && p.por_envio),
+          )}
+        />
+
+        {/* Uso da agenda vs capacidade (espelho do backend) */}
+        <ContadorUso
+          carregando={uso.isLoading || assinatura.isLoading || planos.isLoading}
+          erro={uso.isError}
+          uso={usoAgenda}
+          capacidade={capacidadeAtual}
+          somenteLeitura={assinatura.data?.somente_leitura ?? false}
+          statusAssinatura={assinatura.data?.status}
+          temPlanoMaior={Boolean(
+            planos.data?.some(
+              (p) =>
+                p.id !== planoAtualId &&
+                (p.por_envio || p.capacidade_agenda > (capacidadeAtual ?? 0)),
+            ),
+          )}
+        />
+      </div>
 
       {/* Catálogo de planos: MESMOS cartões da landing */}
       <h2 className="mt-8 mb-4 text-lg text-salvia">Planos</h2>
@@ -133,7 +149,13 @@ export default function PlanoPage() {
           planoAtualId={planoAtualId}
           renderCta={(p, envios) =>
             p.id === planoAtualId ? (
-              <Button variante="secondary" disabled className="w-full">
+              // Plano vigente: contorno salvia para destacar (ghost não traz borda
+              // própria, então não briga com a cor; secondary fixaria border-linha).
+              <Button
+                variante="ghost"
+                disabled
+                className="w-full border border-salvia text-salvia"
+              >
                 Seu plano atual
               </Button>
             ) : (
@@ -277,6 +299,92 @@ function ContadorUso({
         <Banner tom="erro">
           Sua assinatura está encerrada. Escolha um plano abaixo para retomar.
         </Banner>
+      )}
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+// Contador de ENVIOS DE AVISO ATIVOS (vagas): quantos envios já estão ativos vs o teto
+// do plano, e quantos ainda restam. No Free (não envia) mostra só a explicação. Espelho
+// do backend (vagas_usadas/vagas_ativas), nunca recalcula a regra (risco nº 7).
+function ContadorEnvios({
+  carregando,
+  erro,
+  usados,
+  vagas,
+  somenteLeitura,
+  temPlanoMaior,
+}: {
+  carregando: boolean
+  erro: boolean
+  usados: number
+  vagas: number
+  somenteLeitura: boolean
+  temPlanoMaior: boolean
+}) {
+  if (carregando) return <Skeleton className="h-24 w-full rounded-card" />
+
+  // Free / somente leitura: o plano não envia, então não há vagas a consumir.
+  if (!erro && (somenteLeitura || vagas <= 0)) {
+    return (
+      <Card className="flex flex-col gap-1">
+        <span className="text-sm text-tinta-2">Envios de aviso ativos</span>
+        <span className="text-sm text-tinta">
+          Seu plano não envia avisos. Escolha um plano abaixo para ativar os envios.
+        </span>
+      </Card>
+    )
+  }
+
+  const restantes = Math.max(0, vagas - usados)
+  const noLimite = usados >= vagas
+  const perto = !noLimite && restantes <= Math.max(1, Math.round(vagas * 0.1))
+  const pct = vagas > 0 ? Math.min(100, Math.round((usados / vagas) * 100)) : 0
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm text-tinta-2">Envios de aviso ativos</span>
+        <span className="tabular text-lg text-tinta">
+          {erro ? '' : `${usados} de ${vagas}`}
+        </span>
+      </div>
+
+      {/* Barra de uso (CSS puro, tom suave; nunca vermelho-alerta) */}
+      <div
+        className="h-2 w-full overflow-hidden rounded-pill bg-papel-2"
+        role="progressbar"
+        aria-valuenow={usados}
+        aria-valuemin={0}
+        aria-valuemax={vagas}
+        aria-label="Envios de aviso ativos no plano"
+      >
+        <div
+          className={
+            noLimite
+              ? 'h-full rounded-pill bg-barro/70'
+              : perto
+                ? 'h-full rounded-pill bg-ambar'
+                : 'h-full rounded-pill bg-folha'
+          }
+          style={{ width: `${erro ? 0 : pct}%` }}
+        />
+      </div>
+
+      {!erro && noLimite && temPlanoMaior && (
+        <Banner tom="info">
+          Você está usando todos os envios do seu plano. Para ativar mais combinados,
+          escolha um plano maior abaixo, ou encerre um que já recebeu.
+        </Banner>
+      )}
+      {!erro && !noLimite && (
+        <p className="text-xs text-tinta-2">
+          {restantes === 1
+            ? 'Resta 1 envio disponível.'
+            : `Restam ${restantes} envios disponíveis.`}
+        </p>
       )}
     </Card>
   )

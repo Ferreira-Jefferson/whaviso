@@ -378,6 +378,8 @@ export const assinaturaSchema = z.object({
   // Alavancas efetivas do plano vigente (espelho do backend).
   capacidade_agenda: z.number().int().optional(),
   vagas_ativas: z.number().int().nullable().optional(),
+  // Uso atual de vagas de aviso ativo (envios): quantos envios já estão ativos.
+  vagas_usadas: z.number().int().optional(),
   somente_leitura: z.boolean().optional(),
   permite_recorrente: z.boolean().optional(),
   cadencia_configuravel: z.boolean().optional(),

@@ -101,7 +101,9 @@ function CartaoPlus({
     <Card
       className={`flex h-full flex-col gap-4 border-salvia bg-cartao ${ehAtual ? 'ring-1 ring-salvia/30' : 'ring-2 ring-salvia/40'}`}
     >
-      <span className="self-start rounded-pill bg-salvia px-3 py-1 text-xs font-medium text-papel">
+      {/* Badge no dourado da marca (acento ouro velho do design system), distinto do
+          "Mais popular" (salvia) do cartão Profissional. */}
+      <span className="self-start rounded-pill bg-dourado px-3 py-1 text-xs font-medium text-papel">
         Para quem cresce
       </span>
       <div>

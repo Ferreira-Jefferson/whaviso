@@ -11,7 +11,7 @@ import {
   MessageSquare,
   ShieldCheck,
 } from 'lucide-react'
-import { Button, Card, MoneyText, WhatsAppPreview, BellLogo, cn } from '@/shared/ui'
+import { Button, Card, WhatsAppPreview, BellLogo, cn } from '@/shared/ui'
 import { CartoesPlanos } from '@/shared/plano'
 import { usePlanos } from '../data'
 
@@ -382,21 +382,22 @@ function Planos() {
               )}
             />
           ) : (
-            // Fallback estático enquanto carrega / se a api estiver fora: os preços
-            // reais vêm de GET /v1/billing/planos; aqui só ilustramos.
+            // Fallback estático enquanto carrega / se a api estiver fora: os
+            // valores reais vêm de GET /v1/billing/planos. Aqui usamos "x" no lugar
+            // dos números para nunca exibir preço/limite que possa estar defasado.
             <div className="grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                { nome: 'Whaviso Free', preco: 0, agenda: '0 envios de aviso · agenda até 50 itens' },
-                { nome: 'Whaviso Start', preco: 990, agenda: '10 envios de aviso · agenda até 100 itens' },
-                { nome: 'Whaviso Profissional', preco: 2990, agenda: '25 envios de aviso · agenda até 150 itens' },
-                { nome: 'Whaviso Plus', preco: 3110, agenda: '26 a 200 envios de aviso por mês' },
+                { nome: 'Whaviso Free', preco: 'Grátis', pago: false, agenda: 'x envios de aviso · agenda até x itens' },
+                { nome: 'Whaviso Start', preco: 'R$ x', pago: true, agenda: 'x envios de aviso · agenda até x itens' },
+                { nome: 'Whaviso Profissional', preco: 'R$ x', pago: true, agenda: 'x envios de aviso · agenda até x itens' },
+                { nome: 'Whaviso Plus', preco: 'R$ x', pago: true, agenda: 'x a x envios de aviso por mês' },
               ].map((p) => (
                 <Card key={p.nome} className="flex h-full flex-col gap-4 bg-cartao">
                   <span className="text-xs text-transparent">.</span>
                   <h3 className="text-lg text-salvia">{p.nome}</h3>
                   <p>
-                    <MoneyText centavos={p.preco} className="font-display text-3xl text-tinta" />
-                    {p.preco > 0 && <span className="text-sm text-tinta-2">/mês</span>}
+                    <span className="font-display text-3xl text-tinta">{p.preco}</span>
+                    {p.pago && <span className="text-sm text-tinta-2">/mês</span>}
                   </p>
                   <p className="flex-1 text-sm text-tinta">{p.agenda}</p>
                   <Link to="/entrar" className="mt-auto">

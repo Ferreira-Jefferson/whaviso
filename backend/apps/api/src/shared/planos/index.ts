@@ -20,7 +20,8 @@ export interface AlavancasPlano {
   plano_id: string
   /** Capacidade total da agenda (balde único): teto de anotações da conta. */
   capacidade_agenda: number
-  /** Vagas de aviso ATIVO. No Start/Profissional = capacidade da agenda (nunca trava). */
+  /** Vagas de aviso ATIVO ("envios de aviso"): Free 0, Start 10, Profissional 25,
+   *  Plus = unidades contratadas (migration 0049). É o eixo comercial de envio. */
   vagas_ativas: number
   /** Free: agenda + visualização, sem ATIVAR envio (guarda antes do limite numérico). */
   somente_leitura: boolean
@@ -204,9 +205,12 @@ export async function contarAtivos(cli: PoolClient, uid: string): Promise<number
  *   - combinado RECORRENTE: o número de OCORRÊNCIAS ainda não pagas (cada ocorrência é um
  *     "envio de aviso", a moeda do plano; conforme cada vira `pago`, a vaga é liberada).
  * Por papel (conta certo no invertido devedor-criador). Espelha a regra no servidor (H11.8).
+ *
+ * Aceita Pool OU PoolClient: no gate de ativação roda dentro da transação (com lock);
+ * para LEITURA de uso (ex.: contador da tela de plano) roda direto no pool, sem lock.
  */
-export async function somarVagasAtivas(cli: PoolClient, uid: string): Promise<number> {
-  const { rows } = await cli.query<{ n: string }>(
+export async function somarVagasAtivas(ex: Executor, uid: string): Promise<number> {
+  const { rows } = await ex.query<{ n: string }>(
     `select coalesce(sum(
               case when a.recorrencia_tipo is null then 1
                    else (select count(*) from public.aviso_ocorrencias o
