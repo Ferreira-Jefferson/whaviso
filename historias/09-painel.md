@@ -126,11 +126,12 @@ Como **sistema (api + front)**, quero que o painel seja um espelho seguro do ban
 - **"Precisa de você" (H9.2):** agregar combinados que aguardam ação do usuário (informado_pago, dado incorreto, telefone divergente, edição a aprovar) é uma visão nova de pendências.
 - **Linha do tempo com eventos novos (H9.4):** exibir `solicitou_pix`, opt-out/reativação (`desregistrado`), "já paguei", confirmação/rejeição com **ator**, e distinguir "informado pelo devedor" x "marcado pelo cobrador" exige que esses eventos sejam gravados com ator (Épicos 7/8) e expostos pela API.
 - **Status de entrega na tela (H9.7):** expor enviado/falha/retry por etapa depende de a outbox (`envios`) registrar esses estados (Épico 6 H6.8) e de a API servi-los.
-- **Recorrência no painel (H9.6):** progresso "k de N" e ações por ocorrência usam a tabela **`aviso_ocorrencias`** (decidida no Épico 8 H8.7 / Épico 6 H6.10). O backend serve o progresso (índice atual / total) e, nos filtros por período, desmembra o recorrente **uma linha por ocorrência** daquele período (com valor e data da ocorrência). Construção nova, em implementação nesta rodada.
+- **Recorrência no painel (H9.6):** progresso "k de N" e ações por ocorrência usam a tabela **`aviso_ocorrencias`** (decidida no Épico 8 H8.7 / Épico 6 H6.10). O backend serve o progresso (índice atual / total) e, nos filtros por período, desmembra o recorrente **uma linha por ocorrência** daquele período (com valor e data da ocorrência). **Implementado (2026-06-26)** via a view `combinado_linhas`.
 - **Free visualiza tudo, inclusive agenda:** alinhar com a mudança do Épico 4 (free mantém agenda) e Épico 1 (free só visualiza); o painel não pode oferecer ações de envio ao free.
 
 ### Decisões tomadas
 - **Painel por papel** ("A receber" / "A pagar"), não por direção/fluxo.
+- **Painel é uma PÁGINA ÚNICA** (`/app`): reúne, numa só tela, os totais, o "precisa de você" e a **lista de combinados** por papel (faixas Ativos/Sem aviso/Encerrados, busca e filtro de situação). Não há tela separada de "Avisos" nem card-atalho "Ver combinados": a lista vive no próprio painel. **Um único filtro de período (De/Até) rege os totais E a lista juntos** (com período: o recorrente desmembra por ocorrência, H9.6; sem período: totais gerais e um combinado por linha). A criação (`/app/avisos/novo`) e o detalhe (`/app/avisos/:id`) seguem em rotas próprias.
 - **Visão geral com totais** de a receber/recebido e a pagar/pago, calculados no backend, sem termos proibidos.
 - **Bloco "precisa de você"** reunindo pendências de ação (com destaque para `informado_pago`).
 - **Filtro/faixa "Sem aviso"** separado dos ativos; terminais não-pagos no histórico.
@@ -140,8 +141,9 @@ Como **sistema (api + front)**, quero que o painel seja um espelho seguro do ban
 - **Desmembramento por período: estado global manda nas ocorrências futuras.** No filtro por período, ocorrência ainda `programado` herda o estado global do combinado (pausado/cancelado/recusado/expirado/sem_aviso/etc.); ocorrência já `informado_pago`/`pago` mantém o próprio (decisão do produto, ver critério em H9.6). Sem filtro de período, o recorrente continua como **um combinado** (uma linha, badge "k de N").
 
 ### Decisões em aberto
-- **Visual/UX do painel** (layout, agrupamentos, como caber "precisa de você" + totais + listas sem poluir): precisa de **estudo de design**, usando a skill **frontend-designer** na fase de implementação e **sempre mantendo o design system** do produto (relacionado ao estudo de cadência da H6.10).
-- **Recorrência no painel (H9.6):** depende da modelagem de recorrência (Épico 8 H8.7 / Épico 6 H6.10); o desmembramento por ocorrência nos filtros temporais precisa de uma fonte de dados de ocorrências (cross-ref Épico 8 H8.7).
+- Nenhuma pendente. As duas anteriores foram resolvidas em 2026-06-26:
+  - **Visual/UX do painel** resolvido: estudo de design feito com a skill **frontend-design**, mantendo o design system; resultou na **página única** (totais + "precisa de você" + lista) descrita em Decisões tomadas.
+  - **Recorrência no painel (H9.6)** resolvida: desmembramento por ocorrência implementado via a view **`combinado_linhas`** sobre `aviso_ocorrencias` (rege totais e lista no filtro por período).
 
 ### Fora de escopo deste épico
 - ❌ Efeito de cada ação (criar/ativar/editar/cancelar/pausar/confirmar/rejeitar/reabrir): definidos nos Épicos 2 a 8.
