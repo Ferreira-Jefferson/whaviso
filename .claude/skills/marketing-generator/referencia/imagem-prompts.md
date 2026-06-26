@@ -25,8 +25,8 @@ Por padrão, cada ideia gera UMA imagem única, proporção 4:5. Só monte carro
 Monte nesta ordem. Cada bloco fecha uma porta para erro:
 
 1. **Meio + gatilho de realismo:** o que é a imagem. Ex.: "Candid editorial photograph, photorealistic".
-2. **Sujeito (concreto):** quem, fazendo o quê, com qual expressão, faixa de idade, roupa simples. Ex.: "a single adult small-business seller in their 30s, focused, wearing a simple apron". Quanto mais específico, menos a IA improvisa.
-3. **Cenário e objetos:** onde, com props concretos. Ex.: "at a small neighborhood shop counter, a paper notebook and a basket of products on the table, blurred shelves behind".
+2. **Sujeito (concreto):** quem, fazendo o quê, **para onde olha**, com qual expressão, faixa de idade, roupa simples. A direção do olhar muda a leitura inteira da cena, então seja explícito. Ex.: "a single adult small-business seller in their 30s, looking down at the phone screen, hesitant expression". Quanto mais específico, menos a IA improvisa.
+3. **Cenário e objetos do segmento:** onde, com props concretos, e **nomeie os produtos do segmento do público** (a IA não sabe o que a pessoa vende e inventa: "products" sozinho pode virar frasco de remédio). Ex.: "at a home table, a paper notebook and a few cosmetic products (a lipstick, a perfume bottle, a cream jar), blurred shelves behind".
 4. **Composição e enquadramento:** tipo de plano, ângulo, regra dos terços e o espaço negativo para o texto. Ex.: "medium shot, eye level, subject on the right third, clean empty space on the left for a headline".
 5. **Iluminação:** direção, qualidade, hora, clima. É o que mais define "profissional". Ex.: "soft diffused window light from the upper left, warm morning glow".
 6. **Câmera e lente:** força profundidade e desfoque reais. Ex.: "shot on a 50mm lens, f/2.0, shallow depth of field".
@@ -35,11 +35,28 @@ Monte nesta ordem. Cada bloco fecha uma porta para erro:
 9. **Proporção e qualidade:** Ex.: "4:5 aspect ratio, high detail, sharp focus on the subject".
 10. **Negativos:** o que NÃO quer (lista abaixo).
 
+## Olhar e objetos: os dois que mais mudam a imagem
+
+Dois ajustes pequenos resolvem a maioria dos resultados "quase certos":
+
+- **Direção do olhar.** Diga sempre para onde a pessoa olha, isso muda o sentido inteiro da cena. "looking down at the phone screen" passa concentração ou hesitação; "looking away into the distance" passa distração ou preocupação; "looking at the camera" cria conexão direta. Escolha conforme a mensagem do post.
+- **Objetos do segmento, nomeados.** O gerador não conhece o catálogo do seu público e preenche o vazio sozinho: se você escrever só "products", pode sair frasco de remédio em vez de cosmético. Nomeie os produtos e faça eles baterem com a área de trabalho da persona do criativo.
+
+Produtos por segmento (use no bloco de objetos):
+- Cosmético: batom, frasco de perfume, pote de creme, paleta de maquiagem.
+- Roupa e catálogo: peças dobradas, cabides, sacola de boutique.
+- Semijoia: brincos e colares num expositor.
+- Doces sob encomenda: brigadeiros, um bolo, embalagens de festa.
+- Beleza autônoma: esmaltes, materiais de manicure, secador.
+
+Regra de coerência: a imagem combina com o público do criativo. Persona confeiteira leva objetos de confeitaria, não cosméticos.
+
 ## Template pronto
 
 ```
-[Medium + realism trigger], [single subject: who, doing what, expression, age,
-simple clothing], [environment with concrete props, blurred background], [shot
+[Medium + realism trigger], [single subject: who, doing what, where they look,
+expression, age, simple clothing], [environment with named segment products,
+blurred background], [shot
 type + angle + subject placement + empty space for headline], [lighting:
 direction, quality, time of day, mood], [camera + lens + aperture + depth of
 field], [color palette: warm neutral tones with a soft green accent, natural
@@ -124,9 +141,10 @@ Quando o usuário pedir carrossel: defina um estilo único (mesma luz, paleta, l
 ```
 Candid editorial photograph, photorealistic. A single adult small-business
 seller in their 30s sitting at a cozy home table, holding a smartphone and
-looking at it with a hesitant, thoughtful expression, one relaxed hand resting
-on the table. A paper notebook and a few catalog products softly blurred in the
-background. Medium shot, eye level, subject on the right third, clean empty space
+looking down at the phone screen with a hesitant, thoughtful expression, one relaxed hand resting
+on the table. A paper notebook and a few cosmetic products (a lipstick, a small perfume bottle,
+a cream jar) softly blurred in the background. Medium shot, eye level, subject on
+the right third, clean empty space
 on the upper left for a headline. Soft diffused window light from the upper left,
 warm morning glow. Shot on a 50mm lens, f/2.0, shallow depth of field. Warm
 neutral tones with a soft green accent, natural color grading, authentic and
