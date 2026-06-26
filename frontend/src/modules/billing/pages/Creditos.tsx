@@ -1,11 +1,13 @@
 // /app/creditos: tela de CRÉDITOS do usuário (Épico 11, carteira pré-paga). Mostra o saldo
 // (livre/reservado/em hold/consumido), um SLIDER de quantidade (de envios_min a envios_max
 // do catálogo) com o PREÇO calculado AO VIVO pela curva (mesma função do backend, fonte
-// única), e um POPUP com o botão "Continuar no WhatsApp" (compra manual do MVP: o owner
-// credita após o pagamento via Pix). Abaixo, o EXTRATO dos lançamentos.
-// O limite é DECIDIDO PELO BACKEND: aqui só espelhamos o saldo (nunca recalculado).
+// única), e um POPUP de confirmação que dispara POST /billing/recarga: o servidor EMPURRA a
+// mensagem de compra (template + chave Pix da plataforma) para o WhatsApp do usuário; ele
+// paga via Pix e manda o comprovante na conversa, e o owner credita depois. Abaixo, o
+// EXTRATO dos lançamentos. O limite é DECIDIDO PELO BACKEND: aqui só espelhamos o saldo.
 // Linguagem das Regras de Ouro: crédito, envio, saldo, recarga.
 import { useState } from 'react'
+import { Link } from 'react-router'
 import {
   Banner,
   Button,
@@ -17,11 +19,10 @@ import {
   Skeleton,
 } from '@/shared/ui'
 import { precoEnvioCentavos } from '@/shared/plano'
-import { useSession } from '@/shared/auth'
-import { brl } from '@/shared/format'
+import { ApiError } from '@/shared/api_client'
 import type { Lancamento } from '@/shared/contracts'
-import { useCarteira, useExtrato } from '../api'
-import { linkComprarCreditosWhatsApp } from '../whatsapp'
+import { useCarteira, useExtrato, useRecarga } from '../api'
+import { linkConversaWhatsApp } from '../whatsapp'
 
 // Rótulo amigável de cada tipo de lançamento do extrato (sem termos proibidos).
 const ROTULO_LANCAMENTO: Record<Lancamento['tipo'], string> = {
@@ -41,7 +42,7 @@ const ENTRA: Lancamento['tipo'][] = ['cortesia', 'compra', 'credito_owner', 'dev
 export default function CreditosPage() {
   const carteira = useCarteira()
   const extrato = useExtrato(1)
-  const email = useSession()?.user.email ?? null
+  const recarga = useRecarga()
 
   const catalogo = carteira.data?.catalogo
   const saldo = carteira.data?.carteira
@@ -49,16 +50,24 @@ export default function CreditosPage() {
   // Quantidade do slider (entre envios_min e envios_max). Default: ponto médio arredondado.
   const [qtd, setQtd] = useState<number | null>(null)
   const [aConfirmar, setAConfirmar] = useState(false)
+  // Vira true quando a recarga foi confirmada e a mensagem foi enfileirada ao WhatsApp.
+  const [enviado, setEnviado] = useState(false)
 
   const min = catalogo?.envios_min ?? 10
-  const max = catalogo?.envios_max ?? 500
+  const max = catalogo?.envios_max ?? 250
   const quantidade = qtd ?? Math.min(Math.max(Math.round((min + max) / 2), min), max)
   const total = catalogo ? precoEnvioCentavos(catalogo, quantidade) : 0
-  const porEnvio = quantidade > 0 ? Math.round(total / quantidade) : 0
 
-  const linkWhats = catalogo
-    ? linkComprarCreditosWhatsApp({ envios: quantidade, precoCentavos: total, email })
-    : null
+  // Link só para ABRIR a conversa (a mensagem é empurrada pelo servidor). null se não
+  // houver número de vendas configurado.
+  const linkConversa = linkConversaWhatsApp()
+
+  // Mudar a quantidade reseta o resultado/erro anterior (nova intenção de recarga).
+  function aoMudarQuantidade(n: number) {
+    setQtd(n)
+    setEnviado(false)
+    recarga.reset()
+  }
 
   return (
     <div className="animate-rise">
@@ -119,7 +128,7 @@ export default function CreditosPage() {
             min={min}
             max={max}
             value={quantidade}
-            onChange={(e) => setQtd(Number(e.target.value))}
+            onChange={(e) => aoMudarQuantidade(Number(e.target.value))}
             className="w-full cursor-pointer"
             style={{ accentColor: 'var(--color-salvia)' }}
             aria-label="Quantidade de envios para recarregar"
@@ -134,7 +143,6 @@ export default function CreditosPage() {
               <span className="text-sm text-tinta-2">Total</span>
               <p className="flex items-baseline gap-2">
                 <MoneyText centavos={total} className="font-display text-3xl text-tinta" />
-                <span className="text-sm text-tinta-2">({brl(porEnvio)} por envio)</span>
               </p>
             </div>
             <Button variante="primary" onClick={() => setAConfirmar(true)}>
@@ -142,10 +150,48 @@ export default function CreditosPage() {
             </Button>
           </div>
           <p className="text-xs text-tinta-2">
-            O saldo comprado soma ao que você já tem e não expira. No MVP a recarga é feita
-            pelo WhatsApp: você combina o Pix por lá e o saldo entra após o pagamento.
+            O saldo comprado soma ao que você já tem e não expira. Ao recarregar, enviamos as
+            instruções de pagamento no seu WhatsApp; o saldo entra após o pagamento.
           </p>
         </Card>
+      )}
+
+      {/* Resultado da recarga (H11.10): a mensagem com o Pix foi empurrada ao WhatsApp. */}
+      {enviado && (
+        <Banner tom="sucesso" className="mt-4">
+          Enviamos as instruções de pagamento no seu WhatsApp. Pague via Pix e envie o
+          comprovante na conversa que liberamos seus envios.
+          {linkConversa && (
+            <>
+              {' '}
+              <a
+                href={linkConversa}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline"
+              >
+                Abrir conversa no WhatsApp
+              </a>
+              .
+            </>
+          )}
+        </Banner>
+      )}
+      {recarga.isError && !enviado && (
+        <Banner tom="erro" className="mt-4">
+          {recarga.error instanceof ApiError && recarga.error.code === 'telefone_ausente' ? (
+            <>
+              Cadastre seu WhatsApp na{' '}
+              <Link to="/app/conta" className="font-medium underline">
+                tela Conta
+              </Link>{' '}
+              para receber as instruções de pagamento.
+            </>
+          ) : (
+            (recarga.error instanceof ApiError && recarga.error.message) ||
+            'Não foi possível iniciar a recarga. Tente de novo.'
+          )}
+        </Banner>
       )}
 
       {/* Extrato dos lançamentos (H11.8: transparência) */}
@@ -182,19 +228,28 @@ export default function CreditosPage() {
 
       <ConfirmDialog
         aberto={aConfirmar}
-        titulo="Continuar a recarga no WhatsApp"
-        textoConfirmar={linkWhats ? 'Continuar no WhatsApp' : 'Entendi'}
-        onConfirmar={() => {
-          if (linkWhats) window.open(linkWhats, '_blank', 'noopener,noreferrer')
-          setAConfirmar(false)
-        }}
+        titulo="Confirmar recarga"
+        textoConfirmar="Enviar instruções no WhatsApp"
+        carregando={recarga.isPending}
+        onConfirmar={() =>
+          recarga.mutate(
+            { quantidade },
+            {
+              onSuccess: () => {
+                setAConfirmar(false)
+                setEnviado(true)
+              },
+              onError: () => setAConfirmar(false),
+            },
+          )
+        }
         onCancelar={() => setAConfirmar(false)}
       >
         <span>
           Você vai recarregar <strong>{quantidade} envios</strong> por{' '}
-          <MoneyText centavos={total} className="text-sm" />. No MVP a recarga é feita pelo
-          WhatsApp: o saldo entra após o pagamento via Pix.
-          {!linkWhats && ' (O canal de recarga ainda não está configurado.)'}
+          <MoneyText centavos={total} className="text-sm" />. Vamos enviar as instruções de
+          pagamento no seu WhatsApp; o saldo entra após você pagar via Pix e enviar o
+          comprovante na conversa.
         </span>
       </ConfirmDialog>
     </div>

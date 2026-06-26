@@ -36,7 +36,10 @@ import {
   adminMensagensResposta,
   adminMetricasResposta,
   adminUsuariosResposta,
+  configPlataformaSchema,
   creditosCatalogoSchema,
+  type ConfigPlataforma,
+  type AdminAtualizarConfigPlataformaBody,
   envioSchema,
   novaMensagemResposta,
   previewMensagemResposta,
@@ -46,6 +49,7 @@ import {
   type AdminUsuario,
   type AdminUsuariosResposta,
   type CreditosCatalogo,
+  type CurvaPonto,
   type Envio,
   type NovaMensagemBody,
   type NovaMensagemResposta,
@@ -61,6 +65,7 @@ export const adminKeys = {
   usuarios: (filtros: unknown) => ['admin', 'usuarios', filtros] as const,
   envios: (filtros: unknown) => ['admin', 'envios', filtros] as const,
   catalogo: ['admin', 'creditos-catalogo'] as const,
+  configPlataforma: ['admin', 'config-plataforma'] as const,
   whatsapp: ['admin', 'whatsapp'] as const,
   mensagens: ['admin', 'mensagens'] as const,
 }
@@ -260,14 +265,12 @@ export function useCreditosCatalogo() {
   })
 }
 
-// PATCH /v1/admin/creditos-catalogo: edita a curva (piso/topo, faixa de envios, cortesia,
-// tetos de agenda). Atualização parcial. Invalida o catálogo admin E as chaves de billing
-// (['billing']) para a tela de Créditos do usuário refletir a mudança na hora.
+// PATCH /v1/admin/creditos-catalogo: edita a curva de MARCOS (tabela envios -> R$/envio),
+// a cortesia e os tetos de agenda. Atualização parcial. envios_min/max derivam dos marcos
+// (não são editados direto). Invalida o catálogo admin E as chaves de billing (['billing'])
+// para a tela de Créditos do usuário refletir a mudança na hora.
 export interface AtualizarCatalogoBody {
-  envios_min?: number
-  envios_max?: number
-  preco_centavos?: number
-  preco_max_centavos?: number
+  curva?: CurvaPonto[]
   cortesia_inicial?: number
   agenda_teto_free?: number
   agenda_teto_pago?: number
@@ -283,6 +286,35 @@ export function useAtualizarCatalogo() {
       // Prefixo das queries do billing (carteira/catálogo), por chave e nunca por import
       // do módulo billing (fronteira do lint). Reflete a edição do owner na hora.
       void qc.invalidateQueries({ queryKey: ['billing'] })
+    },
+  })
+}
+
+// ---- Chave Pix da plataforma (config singleton, owner, H11.10) ------------
+// GET/PATCH /v1/admin/config-plataforma: a chave Pix que vai na mensagem de compra de
+// crédito empurrada ao WhatsApp do usuário (template billing.recarga). Edição PARCIAL
+// (campos ausentes ficam; null limpa). A chave nunca é exposta ao usuário final.
+export function useConfigPlataforma() {
+  return useQuery({
+    queryKey: adminKeys.configPlataforma,
+    queryFn: ({ signal }) =>
+      apiClient.get<ConfigPlataforma>('/admin/config-plataforma', {
+        schema: configPlataformaSchema,
+        signal,
+      }),
+  })
+}
+
+export function useAtualizarConfigPlataforma() {
+  const qc = useQueryClient()
+  return useMutation<ConfigPlataforma, Error, AdminAtualizarConfigPlataformaBody>({
+    mutationFn: (body) =>
+      apiClient.patch<ConfigPlataforma>('/admin/config-plataforma', {
+        body,
+        schema: configPlataformaSchema,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: adminKeys.configPlataforma })
     },
   })
 }

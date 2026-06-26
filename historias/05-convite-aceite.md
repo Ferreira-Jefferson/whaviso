@@ -85,7 +85,7 @@ Como **sistema (zap)**, quero processar o aceite com segurança e sem duplicar e
 ### H5.7: Convite expirado ou já respondido 🟢
 Como **convidado**, quero entender quando o convite não vale mais, para saber que preciso de um novo.
 *Critérios de aceite:*
-- [ ] Um convite em `aguardando_aceite` **expira** (`aguardando_aceite → expirado`) após **7 dias** (prazo fixo, igual para todos os planos); depois disso não pode ser aceito.
+- [ ] Um convite em `aguardando_aceite` **expira** (`aguardando_aceite → expirado`) após **7 dias** (prazo fixo, igual para todas as contas); depois disso não pode ser aceito.
 - [ ] Convidado tentando responder um convite expirado recebe orientação para pedir um novo a quem convidou.
 - [ ] Convidado tentando responder um combinado **já aceito** recebe aviso de que já está ativo (sem reprocessar).
 
@@ -137,7 +137,7 @@ Como **sistema (zap)**, quero reagir quando alguém erra o número de validaçã
 - **Compartilhamento manual do convite é permanente:** quem convida envia a mensagem pronta para o convidado (link `wa.me`), e o aceite começa quando o convidado escreve a mensagem inicial (H5.1). Isso vale **mesmo após migrar para a Meta oficial** e é proposital: evita que o número do Whaviso inicie conversa com quem não o conhece (risco de bloqueio) e evita disparo para números digitados errados. **Por isso não há história de auto-envio** do convite por template.
 - **Efeito ao estourar 3 tentativas (H5.9):** distingue **telefone cadastrado** (gera novo número de validação, notifica quem convidou para reenviar) de **telefone não cadastrado** (bloqueia o número até um novo combinado ser enviado, mensagem diferente). Cada ciclo de 3 falhas, no caso cadastrado, gera novo número.
 - **Rótulos dos botões:** os textos padrão (*Aceitar*, *Algum dado está incorreto* / *Chave Pix incorreta*, *Recusar combinado*) são confirmados, mas **editáveis pelo owner** (Épico 12).
-- **Prazo de expiração:** **7 dias fixo** para todos os planos (não varia por plano).
+- **Prazo de expiração:** **7 dias fixo** para todas as contas (universal, não varia; recursos não dependem de plano, H11.2).
 
 ### Decisões em aberto
 - Nenhuma pendente neste épico.

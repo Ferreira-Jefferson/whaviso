@@ -32,12 +32,18 @@ export type TipoLancamento =
 /** Quem originou o lançamento (para a auditoria do livro-razão). */
 export type AtorLancamento = 'sistema' | 'owner' | 'usuario'
 
+/** Um MARCO da curva: a partir de `envios`, o preço é `centavos` POR ENVIO. */
+export interface CurvaPonto {
+  envios: number
+  centavos: number
+}
+
 /** Curva de preço dos créditos (catálogo, 1 linha). Editável pelo owner em runtime. */
 export interface CreditosCatalogo {
   envios_min: number
   envios_max: number
-  preco_centavos: number
-  preco_max_centavos: number
+  /** Marcos (envios -> R$/envio em centavos), ordenados por `envios`. Fonte do preço. */
+  curva: CurvaPonto[]
   cortesia_inicial: number
   agenda_teto_free: number
   agenda_teto_pago: number
@@ -53,25 +59,41 @@ export interface CarteiraSaldo {
 }
 
 /**
- * Preço TOTAL (centavos) de uma compra de `n` envios. Interpola linearmente o total entre
- * o piso (`envios_min` -> `preco_centavos`) e o topo (`envios_max` -> `preco_max_centavos`);
- * o R$/envio cai conforme o volume sobe. Fonte única: a UI espelha esta função e o backend
- * a recomputa quando precisa do total. `n` é grampeado na faixa.
+ * Preço TOTAL (centavos) de uma compra de `n` envios pela curva de MARCOS. O R$/envio é
+ * interpolado linearmente entre os dois marcos vizinhos (passando exatamente pelos valores
+ * da tabela nos marcos); o total é `round(n * R$/envio(n))`. Fora da faixa, `n` é grampeado
+ * ao primeiro/último marco. Fonte única: a UI espelha esta função e o backend a recomputa
+ * quando precisa do total.
  */
-export function precoPorEnvioCentavos(
-  curva: { envios_min: number; envios_max: number; preco_centavos: number; preco_max_centavos: number },
-  n: number,
-): number {
-  const { envios_min: lo, envios_max: hi, preco_centavos: pLo, preco_max_centavos: pHi } = curva
-  const nn = Math.min(Math.max(n, lo), hi)
-  if (hi === lo) return pLo
-  return Math.round(pLo + ((pHi - pLo) * (nn - lo)) / (hi - lo))
+export function precoPorEnvioCentavos(curva: { curva: CurvaPonto[] }, n: number): number {
+  const pts = curva.curva
+  const lo = pts[0]
+  const hi = pts[pts.length - 1]
+  if (!lo || !hi) return 0
+  const nn = Math.min(Math.max(n, lo.envios), hi.envios)
+  let porEnvio = hi.centavos
+  if (nn <= lo.envios) porEnvio = lo.centavos
+  else {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]
+      const b = pts[i + 1]
+      if (!a || !b) continue
+      if (nn >= a.envios && nn <= b.envios) {
+        porEnvio =
+          b.envios === a.envios
+            ? a.centavos
+            : a.centavos + ((b.centavos - a.centavos) * (nn - a.envios)) / (b.envios - a.envios)
+        break
+      }
+    }
+  }
+  return Math.round(nn * porEnvio)
 }
 
 /** Lê a curva de preço + tetos do catálogo (1 linha, id=1). Fonte única do preço. */
 export async function lerCatalogo(ex: Executor): Promise<CreditosCatalogo> {
   const { rows } = await ex.query<CreditosCatalogo>(
-    `select envios_min, envios_max, preco_centavos, preco_max_centavos,
+    `select envios_min, envios_max, curva,
             cortesia_inicial, agenda_teto_free, agenda_teto_pago
        from public.creditos_catalogo where id = 1`,
   )

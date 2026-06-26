@@ -5,7 +5,7 @@
 > A conta nasce **Free** com um **saldo inicial de cortesia** (poucos envios) para experimentar. Sem saldo, a conta vira agenda: anota e visualiza, mas não dispara.
 > **Comprar = escolher a quantidade num seletor (slider) e pagar.** O preço total segue uma **curva**: o R$/envio cai conforme a quantidade sobe. O saldo comprado é **aditivo** (10 que sobraram + 25 comprados = 35) e **nunca expira** (regra de confiança: o que a pessoa pagou não se perde).
 > **Cobra só o que foi de fato usado (charge-on-success).** Ativar um aviso **reserva** o crédito; o crédito só é **consumido de vez quando o lembrete dispara**. Convite **não aceito** (recusado/expirado) **devolve** o crédito. Opt-out/cancelamento no meio de um recorrente põe os envios não disparados em **hold de 24h** e depois devolve ao saldo, com aviso claro à pessoa.
-> No MVP **não há gateway**: a compra de crédito é **manual** (a pessoa fala no WhatsApp, paga via Pix, e o **owner credita** os envios na conta). Gateway de pagamento e recarga automática/assinatura mensal são **futuro** (🟡).
+> No MVP **não há gateway**: a compra de crédito é **manual**, mas conduzida pelo produto. Ao confirmar a recarga, o sistema **empurra ao WhatsApp da pessoa** o valor e a **chave Pix da plataforma** (configurada pelo owner); ela paga via Pix, **envia o comprovante na conversa**, e o **owner credita** os envios na conta. Gateway de pagamento e recarga automática/assinatura mensal são **futuro** (🟡).
 > **Não há cliente em produção ainda:** o schema e as regras são feitos do zero, sem compatibilidade com o modelo antigo de 4 planos (Free/Start/Profissional/Plus), que fica revogado (ver Divergências).
 
 ---
@@ -37,11 +37,12 @@ Como **pessoa usuária**, quero acesso a todos os recursos desde o Free, para o 
 ### H11.3: Comprar créditos por quantidade (slider + curva) 🟢
 Como **pessoa usuária**, quero escolher exatamente quantos créditos comprar num seletor de quantidade, para pagar pelo que preciso (não "ou 10 ou 100").
 *Critérios de aceite:*
-- [ ] A compra é por **quantidade livre** num **seletor (slider/range)**, de um **mínimo** a um **máximo** parametrizáveis (sugestão inicial: de 10 a 500 envios). Não há pacotes fixos como produtos separados.
-- [ ] O **preço total** segue uma **curva**: o R$/envio **cai** conforme a quantidade sobe. O total é **interpolado** entre o total no piso (quantidade mínima) e o total no topo (quantidade máxima); o cálculo é uma **função única** (espelhada front/back, fonte única do preço), a mesma ideia da antiga curva do Plus.
-- [ ] O preço (piso, topo, quantidades mín/máx) é **dado de catálogo** editável pelo owner em runtime (H11.11), não fixado em código.
+- [ ] A compra é por **quantidade livre** num **seletor (slider/range)**, de um **mínimo** a um **máximo** parametrizáveis (faixa atual: de 10 a 250 envios). Não há pacotes fixos como produtos separados.
+- [ ] O **preço total** segue uma **curva de marcos**: uma **tabela** de marcos (`envios` -> `R$/envio`) onde o R$/envio **cai** conforme a quantidade sobe. Entre dois marcos o R$/envio é **interpolado** linearmente (passando exatamente pelos valores da tabela nos marcos) e o total de `n` envios é `round(n * R$/envio(n))`; o cálculo é uma **função única** (espelhada front/back, fonte única do preço). O mínimo/máximo do slider derivam do **primeiro/último marco**. Tabela atual: 10->R$0,99 (R$ 9,90 no total, mesmo preço inicial de antes) · 25->R$0,95 · 50->R$0,90 · 100->R$0,85 · 150->R$0,80 · 200->R$0,75 · 250->R$0,70.
+- [ ] A curva (a tabela de marcos, com a cortesia e os tetos de agenda) é **dado de catálogo** editável pelo owner em runtime (H11.11), não fixada em código.
+- [ ] O **R$/envio NÃO aparece para a pessoa usuária** na tela de compra (só o total): o custo por envio é informação do owner (tela de admin).
 - [ ] O seletor pode ter **marcas de atalho** (ex.: 25/50/100) só como conveniência visual; não são SKUs distintos.
-- [ ] No MVP a compra é **manual** (sem gateway): o seletor leva à finalização **pelo WhatsApp** (a pessoa escolhe a quantidade, vê o preço, e é direcionada para pagar via Pix; o owner credita depois, H11.11). A mecânica de pagamento real é 🟡 (H11.13).
+- [ ] No MVP a compra é **manual** (sem gateway): a pessoa escolhe a quantidade, vê o preço e confirma; o sistema **empurra as instruções de pagamento ao WhatsApp dela** (valor + chave Pix da plataforma) e o owner credita depois (detalhe em H11.10/H11.11). A mecânica de pagamento real é 🟡 (H11.13).
 - [ ] Comprar **soma ao saldo** (aditivo); nunca substitui nem zera o que já existe.
 - [ ] A linguagem respeita as Regras de Ouro (sem "dívida/cobrança/atraso", gênero neutro, sem travessão); vocabulário: **crédito, envio, saldo, recarga**.
 
@@ -115,7 +116,10 @@ Como **pessoa usuária**, quero uma área "Créditos" onde vejo meu saldo e comp
 *Critérios de aceite:*
 - [ ] Há um item **"Créditos"** no menu do usuário (separado da Conta) que abre a tela.
 - [ ] A tela mostra **saldo/reservado/em hold** (H11.8) e o **seletor de quantidade (slider)** com o **preço calculado ao vivo** conforme a quantidade (H11.3).
-- [ ] A compra no MVP é **manual via WhatsApp**: ao escolher a quantidade, abre um **popup** com a quantidade e o preço e um **botão para finalizar no WhatsApp** (recebe o Pix por lá; o owner credita após o pagamento). O número fica em config (env), nunca hardcode.
+- [ ] A compra no MVP é **manual via WhatsApp**, mas conduzida pelo produto (não mais um texto digitado à mão): ao confirmar a recarga, o **servidor empurra** uma mensagem de compra para o **WhatsApp do próprio usuário**, com a quantidade, o preço e a **chave Pix da plataforma** (configurada pelo owner, H11.11). A mensagem é um **template editável** (`billing.recarga`); o número de WhatsApp fica em config (env) e deve ser o **mesmo número pareado pelo `zap`** (o comprovante volta nessa conversa).
+- [ ] A mensagem **instrui a pessoa a pagar via Pix e enviar o comprovante na própria conversa**; o owner confere e **credita** os envios (H11.11). Confirmar a recarga **não** credita nada sozinho (a confirmação de pagamento segue manual).
+- [ ] Se a conta **não tem WhatsApp cadastrado**, a recarga não é enviada: a tela mostra uma CTA para cadastrar o WhatsApp na Conta. Se a **chave Pix da plataforma não estiver configurada**, a recarga é recusada com aviso claro (nada é enviado).
+- [ ] A **chave Pix da plataforma nunca volta para o front** (H13.8): só viaja na mensagem do WhatsApp.
 - [ ] A tela nunca destrói saldo; comprar só **soma**.
 
 ---
@@ -126,7 +130,8 @@ Como **owner**, quero creditar envios numa conta e ajustar o preço dos crédito
 - [ ] Na tela de admin de **Usuários**, o owner **credita uma quantidade de envios** numa conta (ativação manual pós-pagamento via WhatsApp). **Cada crédito exige confirmação** antes de aplicar no banco.
 - [ ] Creditar é um **lançamento no livro-razão** (tipo "crédito do owner", com quantidade e quem creditou), **aditivo**, **append-only** (nunca apaga; estornar é outro lançamento negativo explícito, se um dia for preciso).
 - [ ] Só o **owner** credita (authz `requireRole('owner')` no servidor); qualquer outra pessoa recebe recusa `{ error: { code, message } }`. O usuário **nunca** se credita (fecha a brecha de se dar saldo de graça).
-- [ ] O owner edita a **curva de preço** dos créditos (piso, topo, quantidades mín/máx) pela tela de admin; validado no servidor (piso <= topo, mín <= máx, preço >= 0).
+- [ ] O owner edita a **curva de preço** dos créditos (a **tabela de marcos** `envios` -> `R$/envio`, mais cortesia e tetos de agenda) pela tela de admin; pode adicionar/remover marcos; validado no servidor (ao menos 2 marcos, `envios` estritamente crescentes, valores >= 0). O mínimo/máximo do slider derivam do primeiro/último marco.
+- [ ] O owner **configura a chave Pix da plataforma** (de recebimento das recargas) pela tela de admin, no **mesmo formato da chave do cobrador** (tipo, chave, titular, banco) mais um comentário livre. É essa chave que entra na mensagem de compra empurrada ao usuário (H11.10). Config única (singleton), editável em runtime; a chave **nunca volta para o usuário no HTTP** (H13.8).
 - [ ] O owner **não** mexe no saldo "na unha" fora do livro-razão (sem update direto que quebre a auditoria).
 
 ---
@@ -166,7 +171,7 @@ Como **owner**, quero, no futuro, recorrência sem parecer pegadinha, para ter r
 - **Modelo = carteira de créditos pré-paga.** Free + compra de envios; sem planos com recursos.
 - **Unidade = 1 envio = 1 ocorrência de aviso** (simples = 1; recorrente de N = N).
 - **Tudo liberado para todos;** o limite é só o saldo (H11.2). Recorrência é livre (acelera consumo, bom para os dois lados).
-- **Compra por quantidade livre (slider) com curva de preço** (R$/envio cai com o volume); preço editável pelo owner (H11.3/H11.11).
+- **Compra por quantidade livre (slider) com curva de marcos** (tabela `envios` -> `R$/envio`, interpolada entre marcos; R$/envio cai com o volume; faixa 10..250); o R$/envio só aparece para o owner; preço editável pelo owner (H11.3/H11.11).
 - **Saldo aditivo e que não expira** (regra de confiança: o pago não se perde).
 - **Charge-on-success:** reserva na ativação, consumo no disparo, devolução do não aceito; envio disparado nunca volta (H11.4/H11.5).
 - **Hold de 24h** na interrupção de recorrente, com aviso claro (H11.6).
@@ -176,7 +181,7 @@ Como **owner**, quero, no futuro, recorrência sem parecer pegadinha, para ter r
 - **MVP manual:** compra via WhatsApp + crédito do owner; gateway/recarga/assinatura são 🟡 (H11.13).
 
 ### Decisões em aberto
-- **Valores iniciais a calibrar:** saldo de cortesia do Free; teto de agenda do Free e da conta com crédito; mínimo/máximo do slider; piso/topo da curva de preço.
+- **Valores iniciais a calibrar:** saldo de cortesia do Free; teto de agenda do Free e da conta com crédito; os marcos da curva de preço (tabela `envios` -> `R$/envio`, que também define o mínimo/máximo do slider).
 - **Confirmar a regra de agenda** (2 estados como proposto, ou agenda generosa para todos desde o Free).
 
 ### Fora de escopo deste épico

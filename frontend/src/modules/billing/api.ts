@@ -8,13 +8,16 @@
 //
 // NÃO há endpoint de compra/auto-crédito: a compra é MANUAL via WhatsApp (o owner credita
 // depois). O front só LÊ o saldo (espelho do servidor, H11.8) e o extrato.
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api_client'
 import {
   carteiraResposta,
   extratoResposta,
+  recargaResposta,
   type CarteiraResposta,
   type ExtratoResposta,
+  type RecargaBody,
+  type RecargaResposta,
 } from '@/shared/contracts'
 
 export const billingKeys = {
@@ -44,5 +47,18 @@ export function useExtrato(page = 1) {
         schema: extratoResposta,
         signal,
       }),
+  })
+}
+
+/**
+ * POST /v1/billing/recarga: confirma a recarga e o servidor EMPURRA a mensagem de compra
+ * (template + chave Pix da plataforma) para o WhatsApp do próprio usuário. NÃO credita
+ * saldo (o owner credita após o pagamento). Não invalida a carteira (o saldo não muda).
+ * Erros tratados pela tela: telefone_ausente (422) e pix_nao_configurado (422).
+ */
+export function useRecarga() {
+  return useMutation<RecargaResposta, Error, RecargaBody>({
+    mutationFn: (body) =>
+      apiClient.post<RecargaResposta>('/billing/recarga', { body, schema: recargaResposta }),
   })
 }

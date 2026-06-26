@@ -29,6 +29,12 @@ export const CATALOGO_VARIAVEIS: VariavelCatalogo[] = [
   { chave: 'valor', token: 'VALOR', rotulo: 'Valor', exemplo: 'R$ 120,00' },
   { chave: 'data', token: 'DATA', rotulo: 'Data', exemplo: '12 de junho' },
   { chave: 'pix_chave', token: 'PIX', rotulo: 'Chave Pix', exemplo: 'ana@email.com' },
+  // Compra de crédito (billing.recarga): quantidade de envios + dados da chave da plataforma.
+  { chave: 'quantidade', token: 'QUANTIDADE', rotulo: 'Quantidade de envios', exemplo: '50' },
+  { chave: 'pix_tipo', token: 'PIX_TIPO', rotulo: 'Tipo da chave Pix', exemplo: 'Chave aleatória' },
+  { chave: 'pix_titular', token: 'PIX_TITULAR', rotulo: 'Titular da chave Pix', exemplo: 'Whaviso' },
+  { chave: 'pix_banco', token: 'PIX_BANCO', rotulo: 'Banco da chave Pix', exemplo: 'Banco X' },
+  { chave: 'pix_comentario', token: 'PIX_COMENTARIO', rotulo: 'Comentário do Pix', exemplo: 'confirmamos em até 1 dia útil' },
 ]
 
 const POR_TOKEN = new Map(CATALOGO_VARIAVEIS.map((v) => [v.token, v]))

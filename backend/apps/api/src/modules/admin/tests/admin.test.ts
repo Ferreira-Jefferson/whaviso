@@ -152,62 +152,70 @@ describe('admin (integração)', () => {
     const app = await criarAppTeste(comum)
     const r = await app.inject({
       method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
-      payload: { preco_centavos: 1234 },
+      payload: { cortesia_inicial: 3 },
     })
     await app.close()
     expect(r.statusCode).toBe(403)
   })
 
-  it('owner edita a curva de créditos; reflete na carteira (runtime); restaura', async () => {
+  it('owner edita a curva de marcos; reflete na carteira (runtime); restaura', async () => {
     const antes = await poolSuper.query(
-      `select preco_centavos, preco_max_centavos, cortesia_inicial from public.creditos_catalogo where id=1`,
+      `select envios_min, envios_max, curva, cortesia_inicial from public.creditos_catalogo where id=1`,
     )
-    const { preco_centavos: precoOrig, preco_max_centavos: precoMaxOrig, cortesia_inicial: cortOrig } =
-      antes.rows[0]
+    const orig = antes.rows[0]
 
+    const novaCurva = [
+      { envios: 10, centavos: 120 },
+      { envios: 250, centavos: 60 },
+    ]
     const app = await criarAppTeste(owner)
     const patch = await app.inject({
       method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
-      payload: { preco_centavos: 1290, preco_max_centavos: 40000, cortesia_inicial: 3 },
+      payload: { curva: novaCurva, cortesia_inicial: 3 },
     })
     expect(patch.statusCode).toBe(200)
-    expect(patch.json().preco_centavos).toBe(1290)
-    expect(patch.json().preco_max_centavos).toBe(40000)
+    expect(patch.json().curva).toEqual(novaCurva)
     expect(patch.json().cortesia_inicial).toBe(3)
+    // envios_min/max derivam do primeiro/último marco.
+    expect(patch.json().envios_min).toBe(10)
+    expect(patch.json().envios_max).toBe(250)
 
     // Reflete no que a tela de créditos lê (GET /v1/billing/carteira -> catalogo).
     const cat = await app.inject({ method: 'GET', url: '/v1/billing/carteira', headers: AUTH })
     await app.close()
-    expect(cat.json().catalogo.preco_centavos).toBe(1290)
+    expect(cat.json().catalogo.curva).toEqual(novaCurva)
 
     // Restaura para não afetar billing.test.ts (assertivas fixas na curva original).
     await poolSuper.query(
-      `update public.creditos_catalogo set preco_centavos=$1, preco_max_centavos=$2, cortesia_inicial=$3 where id=1`,
-      [precoOrig, precoMaxOrig, cortOrig],
+      `update public.creditos_catalogo
+          set envios_min=$1, envios_max=$2, curva=$3::jsonb, cortesia_inicial=$4 where id=1`,
+      [orig.envios_min, orig.envios_max, JSON.stringify(orig.curva), orig.cortesia_inicial],
     )
   })
 
-  it('PATCH /admin/creditos-catalogo: faixa/preço invertidos no body → 400', async () => {
+  it('PATCH /admin/creditos-catalogo: curva inválida no body → 400', async () => {
     const app = await criarAppTeste(owner)
-    const faixa = await app.inject({
+    // Menos de 2 marcos.
+    const poucos = await app.inject({
       method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
-      payload: { envios_min: 100, envios_max: 50 },
+      payload: { curva: [{ envios: 10, centavos: 100 }] },
     })
-    const preco = await app.inject({
+    // Marcos não crescentes em envios.
+    const naoCrescente = await app.inject({
       method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
-      payload: { preco_centavos: 5000, preco_max_centavos: 1000 },
+      payload: { curva: [{ envios: 50, centavos: 90 }, { envios: 50, centavos: 80 }] },
     })
     await app.close()
-    expect(faixa.statusCode).toBe(400)
-    expect(preco.statusCode).toBe(400)
+    expect(poucos.statusCode).toBe(400)
+    expect(naoCrescente.statusCode).toBe(400)
   })
 
   it('PATCH /admin/creditos-catalogo: estado MERGEADO inválido → 422 catalogo_invalido', async () => {
-    // Só envia preco_max menor que o piso atual (990): o merge com o estado fica inválido.
+    // Só envia agenda_teto_free acima do teto pago atual (1000): o merge fica inválido.
     const app = await criarAppTeste(owner)
     const r = await app.inject({
       method: 'PATCH', url: '/v1/admin/creditos-catalogo', headers: AUTH,
-      payload: { preco_max_centavos: 100 },
+      payload: { agenda_teto_free: 99999 },
     })
     await app.close()
     expect(r.statusCode).toBe(422)

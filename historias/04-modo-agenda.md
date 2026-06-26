@@ -38,7 +38,7 @@ Como **criador**, quero pegar um combinado da agenda e ativar o envio, para pass
 - [ ] A ação **ativar** gera o **número de convite** (H2.2/H3.2) e produz a mensagem pronta para compartilhar.
 - [ ] Ao ativar, o combinado transita de **`sem_aviso` → `aguardando_aceite`** e segue o fluxo normal (Convite & Aceite, depois lembretes).
 - [ ] Se faltar dado obrigatório para ativar (ex.: **telefone** da outra ponta, ou **Pix** no fluxo invertido), o sistema pede antes de ativar.
-- [ ] Ativar **consome uma vaga de aviso ativo** do plano; quem está no **free** pode manter a agenda, mas **não pode ativar** (a ativação leva à CTA de plano, ver H1.5 e Épico 11).
+- [ ] Ativar **reserva créditos** (1 por ocorrência, charge-on-success, H11.4); manter a agenda é livre para todos (até o teto de agenda, H11.7), mas **ativar sem saldo** recusa com `saldo_insuficiente` e CTA de recarga (o item fica na agenda, não se perde).
 - [ ] Antes de ativar, nada do ciclo de lembretes existe; depois de ativar, vale tudo do épico de lembretes.
 
 ---
@@ -68,12 +68,12 @@ Como **criador**, quero marcar como pago um combinado que ficou só na agenda, p
 
 - **Estado novo `sem_aviso`** (modo agenda): anterior ao convite. Transições a acrescentar na máquina de estados: `sem_aviso → aguardando_aceite` (ativar), `sem_aviso → cancelado` (descartar) e `sem_aviso → pago` (registro manual da H4.5). Em `sem_aviso`, **nenhum** envio/lembrete é programado.
 - **Criação sem convite:** hoje criar já gera o número/convite. Precisa separar "criar" de "gerar convite": o convite só nasce ao **ativar** (H4.3).
-- **Free cria item de agenda:** hoje o free não cria nada (H1.5/H2.3 = só visualizar). Passa a poder **manter agenda** (sem envio), mas continua sem poder **ativar**. Refatorar a regra de plano para distinguir "criar agenda" de "ativar/enviar".
+- **Free cria item de agenda:** hoje o free não cria nada (H1.5/H2.3 = só visualizar). Passa a poder **manter agenda** (sem envio), mas continua sem poder **ativar**. Distinguir "criar agenda" de "ativar/enviar": criar/manter anotação é livre (até o teto de agenda, H11.7); só **ativar** reserva/consome crédito.
 - **Painel com a agenda:** o painel passa a ter uma faixa/filtro de "Sem aviso", a modelar no épico do Painel.
 
 ### Decisões tomadas
 - **Nome do estado:** `sem_aviso`, exibido como **"Sem aviso"**. Escolhido por dizer exatamente o que é: um combinado do qual nenhum aviso é enviado.
-- **Limite da agenda por plano** (capacidade própria, separada do teto de **vagas de aviso ativo**): **Free 50, Start 100, Profissional 150, Plus 1 item de agenda por envio contratado** (escala 1:1). Os tetos de vagas de aviso ativo (Free 0 / Start 10 / Profissional 25 / Plus 26 a 200) e os valores finais ficam no Épico 11.
+- **Limite da agenda (balde único, H11.7):** a agenda tem um **teto por conta**, em **2 estados**: modesto enquanto a conta nunca comprou crédito, generoso após a 1ª compra (valores no catálogo de créditos do Épico 11; iniciais: 25 sem compra, 1000 após a 1ª compra). Não há mais limite por plano nem "vagas de aviso ativo" (o modelo de 4 planos foi revogado): criar anotação é livre até o teto; o que limita **enviar** é o **saldo de créditos** (cada ocorrência custa 1 envio).
 - **H4.5 no MVP:** sim. A agenda já nasce **completa e usável**, incluindo marcar como pago manualmente.
 
 ### Fora de escopo deste épico

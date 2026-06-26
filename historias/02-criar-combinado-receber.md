@@ -38,13 +38,13 @@ Como **cobrador**, quero receber uma mensagem pronta com número de convite e li
 
 ---
 
-### H2.3: Respeitar o limite do plano ao criar 🟢
-Como **sistema (api)**, quero validar o limite do plano antes de criar, para impedir uso acima do contratado.
+### H2.3: Respeitar saldo e teto de agenda ao criar/ativar 🟢
+Como **sistema (api)**, quero validar o **saldo de créditos** e o **teto de agenda** antes de criar/ativar, para impedir uso além do disponível.
 *Critérios de aceite:*
-- [ ] Plano **free** não pode criar combinados (só visualizar); a tentativa retorna erro e a UI mostra CTA de plano (ver H1.5 e Épico 11).
-- [ ] Os planos respeitam o **teto de vagas de aviso ativo** ("envios de aviso") do plano vigente (ex.: Start 10, Profissional 25, ver Épico 11); ao estourar, retorna erro `{ error: { code, message } }`.
+- [ ] **Criar é livre para todos** (não há mais plano free travado): anotar na agenda (modo agenda) é livre até o **teto de agenda** da conta (balde único, H11.7); **ativar/enviar** exige **saldo de créditos** (reserva na ativação, H11.4). Sem saldo, a ativação recusa com erro `saldo_insuficiente` e CTA de recarga, sem destruir o trabalho (o item fica na agenda).
+- [ ] **Não há "teto de vagas de aviso ativo" por plano** (modelo de 4 planos revogado): o limite de envios é o **saldo de créditos** (cada ocorrência reserva 1 envio, H11.4); o limite de anotações é o **teto de agenda** (H11.7). Ao faltar saldo ou estourar a agenda, a api recusa com `{ error: { code, message } }`.
 - [ ] A checagem acontece na **API**, não só na UI.
-- [ ] Combinados em estado terminal não contam para o limite de "ativos".
+- [ ] Para o **teto de agenda** (balde único, H11.7), toda anotação **não-arquivada** conta (inclusive em estado terminal); só o **arquivamento** libera espaço (nunca há remoção automática).
 
 ---
 
@@ -69,7 +69,7 @@ Como **cobrador**, quero editar o combinado a qualquer momento, para corrigir ou
 - [ ] Se o devedor **recusar** a edição, o cobrador é notificado e pode escolher: **reativar nas condições anteriores** ou **reeditar**.
 - [ ] No aceite, em vez de aceitar ou recusar, o devedor pode sinalizar **"algum dado está incorreto"** (sem texto livre): isso **não aceita nem recusa**, só **notifica o cobrador** para revisar. O devedor vê uma resposta neutra (*"Certo, vamos comunicar sua resposta."*) e o cobrador edita e reenvia o convite (como ainda não houve aceite, a edição é livre, sem `aguardando_aprovacao_aviso_editado`). Detalhe no Épico 5.
 - [ ] Toda alteração (edição, desfazer, aprovação, recusa, pedido de ajuste) é registrada como evento (auditoria append-only).
-- [ ] A **quantidade de edições/reedições** permitidas pode variar por plano (ver Épico 11).
+- [ ] A **quantidade de edições/reedições** permitidas é **universal** (não varia por plano; o modelo é carteira de créditos, H11.2).
 
 ---
 

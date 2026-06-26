@@ -4,7 +4,12 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { comTransacao } from '@whaviso/shared/db'
 import {
+  adminAtualizarConfigPlataformaBody,
+  type AdminAtualizarConfigPlataformaBody,
+  configPlataformaSchema,
   adminAtualizarCreditosCatalogoBody,
+  type AdminAtualizarCreditosCatalogoBody,
+  type CurvaPonto,
   adminAtualizarUsuarioBody,
   adminAvisosQuery,
   adminAvisosResposta,
@@ -26,22 +31,16 @@ import {
 } from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import { creditarEnvios } from '../../shared/planos'
+import { lerConfigPlataforma } from '../../shared/config_plataforma'
 import * as repo from './repo'
 
 const idParam = z.object({ id: z.uuid() })
 
-// Colunas editáveis da curva de créditos (espelha adminAtualizarCreditosCatalogoBody e a
-// migration 0057). O owner edita VALORES em runtime; nunca cria nem apaga (1 linha, id=1).
-const COLS_EDITAVEIS_CATALOGO = [
-  'envios_min',
-  'envios_max',
-  'preco_centavos',
-  'preco_max_centavos',
-  'cortesia_inicial',
-  'agenda_teto_free',
-  'agenda_teto_pago',
-] as const
-const COLS_CATALOGO_RETORNO = COLS_EDITAVEIS_CATALOGO.join(', ')
+// Colunas retornadas do catálogo de créditos (GET e PATCH devolvem o catálogo inteiro).
+// O owner edita VALORES em runtime; nunca cria nem apaga (1 linha, id=1). envios_min/max
+// derivam dos marcos da curva (primeiro/último), não são editados direto.
+const COLS_CATALOGO_RETORNO =
+  'envios_min, envios_max, curva, cortesia_inicial, agenda_teto_free, agenda_teto_pago'
 
 // Lint de linguagem do conteúdo estruturado: texto + rótulos dos botões.
 // Concatena tudo que é texto editável (texto + rótulos) e aplica as três regras:
@@ -319,68 +318,127 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
     },
   )
 
-  // Edição da CURVA de créditos (H11.11/H11.12): preço (piso/topo), faixa de envios
-  // (min/max), cortesia inicial e tetos de agenda (free/após compra). Atualização PARCIAL:
-  // os campos não enviados ficam como estão. 1 linha só (id=1); o owner não cria nem apaga.
-  // As CHECKs da migration 0057 (preço >= 0, piso <= topo, min <= max, free <= pago) são
-  // espelhadas no contrato e revalidadas aqui contra o estado MERGEADO (defesa em
-  // profundidade), para erro limpo em vez de violar constraint.
+  // Edição da CURVA de créditos (H11.11): a tabela de MARCOS (envios -> R$/envio), a
+  // cortesia inicial e os tetos de agenda (free/após compra). Atualização PARCIAL: o que não
+  // veio fica como está. 1 linha só (id=1); o owner não cria nem apaga. envios_min/max NÃO
+  // são editados direto, derivam do primeiro/último marco da curva. As CHECKs da migration
+  // (curva com >= 2 marcos crescentes; agenda free <= pago) são espelhadas no contrato e
+  // revalidadas aqui contra o estado MERGEADO (defesa em profundidade), para erro limpo.
   app.patch(
     '/admin/creditos-catalogo',
     { preHandler: owner, schema: { body: adminAtualizarCreditosCatalogoBody } },
     async (req) => {
-      const body = req.body as Record<string, number>
+      const body = req.body as AdminAtualizarCreditosCatalogoBody
       return await comTransacao(app.pool, async (cli) => {
-        // 1) Estado atual (lock por linha) das colunas editáveis.
-        const { rows: atualRows } = await cli.query<Record<string, number>>(
-          `select ${COLS_CATALOGO_RETORNO} from public.creditos_catalogo where id = 1 for update`,
+        // 1) Estado atual (lock por linha).
+        const { rows: atualRows } = await cli.query<{
+          curva: CurvaPonto[]
+          cortesia_inicial: number
+          agenda_teto_free: number
+          agenda_teto_pago: number
+        }>(
+          `select curva, cortesia_inicial, agenda_teto_free, agenda_teto_pago
+             from public.creditos_catalogo where id = 1 for update`,
         )
         const atual = atualRows[0]
         if (!atual) throw naoEncontrado('Catálogo de créditos não encontrado')
 
-        // 2) Merge: o body sobrescreve só os campos enviados; o resto fica.
-        const m = (c: (typeof COLS_EDITAVEIS_CATALOGO)[number]) =>
-          body[c] !== undefined ? body[c]! : atual[c]!
-        const valores = {
-          envios_min: m('envios_min'),
-          envios_max: m('envios_max'),
-          preco_centavos: m('preco_centavos'),
-          preco_max_centavos: m('preco_max_centavos'),
-          cortesia_inicial: m('cortesia_inicial'),
-          agenda_teto_free: m('agenda_teto_free'),
-          agenda_teto_pago: m('agenda_teto_pago'),
-        }
+        // 2) Merge: o body sobrescreve só o que veio; o resto fica.
+        const curva = body.curva ?? atual.curva
+        const cortesia = body.cortesia_inicial ?? atual.cortesia_inicial
+        const agendaFree = body.agenda_teto_free ?? atual.agenda_teto_free
+        const agendaPago = body.agenda_teto_pago ?? atual.agenda_teto_pago
 
         // 3) Revalida o estado mergeado (defesa antes da constraint).
-        if (valores.envios_max < valores.envios_min) {
-          throw regraNegocio('catalogo_invalido', 'envios_max não pode ser menor que envios_min.')
+        if (curva.length < 2) {
+          throw regraNegocio('catalogo_invalido', 'A curva precisa de ao menos 2 marcos.')
         }
-        if (valores.preco_max_centavos < valores.preco_centavos) {
-          throw regraNegocio('catalogo_invalido', 'O topo do preço não pode ser menor que o piso.')
+        if (
+          curva.some((p, i) => {
+            const ant = curva[i - 1]
+            return ant !== undefined && p.envios <= ant.envios
+          })
+        ) {
+          throw regraNegocio('catalogo_invalido', 'Os marcos da curva devem ter envios crescentes.')
         }
-        if (valores.agenda_teto_pago < valores.agenda_teto_free) {
+        if (agendaPago < agendaFree) {
           throw regraNegocio(
             'catalogo_invalido',
             'O teto de agenda após a compra não pode ser menor que o do free.',
           )
         }
 
-        // 4) Atualiza a linha única e devolve a curva corrente.
+        // envios_min/max derivam dos marcos (primeiro/último), bounds do slider.
+        const primeiro = curva[0]
+        const ultimo = curva[curva.length - 1]
+        if (!primeiro || !ultimo) {
+          throw regraNegocio('catalogo_invalido', 'A curva precisa de ao menos 2 marcos.')
+        }
+        const enviosMin = primeiro.envios
+        const enviosMax = ultimo.envios
+
+        // 4) Atualiza a linha única e devolve o catálogo corrente.
         const { rows } = await cli.query(
           `update public.creditos_catalogo
-              set envios_min = $1, envios_max = $2, preco_centavos = $3, preco_max_centavos = $4,
-                  cortesia_inicial = $5, agenda_teto_free = $6, agenda_teto_pago = $7
+              set envios_min = $1, envios_max = $2, curva = $3::jsonb,
+                  cortesia_inicial = $4, agenda_teto_free = $5, agenda_teto_pago = $6
             where id = 1
           returning ${COLS_CATALOGO_RETORNO}`,
-          [
-            valores.envios_min,
-            valores.envios_max,
-            valores.preco_centavos,
-            valores.preco_max_centavos,
-            valores.cortesia_inicial,
-            valores.agenda_teto_free,
-            valores.agenda_teto_pago,
-          ],
+          [enviosMin, enviosMax, JSON.stringify(curva), cortesia, agendaFree, agendaPago],
+        )
+        return rows[0]
+      })
+    },
+  )
+
+  // Chave Pix DA PLATAFORMA (config singleton 0059): a chave que vai na mensagem de compra
+  // de crédito empurrada ao WhatsApp do usuário (template billing.recarga). Mesmo formato da
+  // chave do cobrador (tipo/chave/titular/banco) + comentário livre. Só o owner lê/edita; a
+  // chave nunca volta para o usuário final (vai só na mensagem do WhatsApp, via zap).
+  app.get(
+    '/admin/config-plataforma',
+    { preHandler: owner, schema: { response: { 200: configPlataformaSchema } } },
+    async () => lerConfigPlataforma(app.pool),
+  )
+
+  // PATCH parcial: o que não veio fica como está; `null` LIMPA o campo. 1 linha só (id=1);
+  // o owner não cria nem apaga. Nunca loga a chave.
+  app.patch(
+    '/admin/config-plataforma',
+    { preHandler: owner, schema: { body: adminAtualizarConfigPlataformaBody, response: { 200: configPlataformaSchema } } },
+    async (req) => {
+      const body = req.body as AdminAtualizarConfigPlataformaBody
+      return await comTransacao(app.pool, async (cli) => {
+        const { rows: atualRows } = await cli.query<{
+          pix_tipo: string | null
+          pix_chave: string | null
+          pix_titular: string | null
+          pix_banco: string | null
+          pix_comentario: string | null
+        }>(
+          `select pix_tipo, pix_chave, pix_titular, pix_banco, pix_comentario
+             from public.config_plataforma where id = 1 for update`,
+        )
+        const atual = atualRows[0]
+        if (!atual) throw naoEncontrado('Configuração da plataforma não encontrada')
+
+        // Merge: undefined = mantém; null = limpa; string = substitui. (Não usar ?? aqui:
+        // null é "limpar", não "manter".)
+        const merge = <T,>(novo: T | null | undefined, velho: T | null): T | null =>
+          novo === undefined ? velho : novo
+        const tipo = merge(body.pix_tipo, atual.pix_tipo)
+        const chave = merge(body.pix_chave, atual.pix_chave)
+        const titular = merge(body.pix_titular, atual.pix_titular)
+        const banco = merge(body.pix_banco, atual.pix_banco)
+        const comentario = merge(body.pix_comentario, atual.pix_comentario)
+
+        const { rows } = await cli.query(
+          `update public.config_plataforma
+              set pix_tipo = $1::tipo_chave_pix, pix_chave = $2, pix_titular = $3,
+                  pix_banco = $4, pix_comentario = $5
+            where id = 1
+          returning pix_tipo, pix_chave, pix_titular, pix_banco, pix_comentario`,
+          [tipo, chave, titular, banco, comentario],
         )
         return rows[0]
       })

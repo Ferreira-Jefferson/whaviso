@@ -53,11 +53,11 @@ Como **cobrador convidado**, quero conferir o combinado (inclusive a chave Pix) 
 
 ---
 
-### H3.4: Respeitar o limite do plano ao criar 🟢
-Como **sistema (api)**, quero validar o limite do plano antes de criar o combinado invertido, para impedir uso acima do contratado.
+### H3.4: Respeitar saldo e teto de agenda ao criar/ativar 🟢
+Como **sistema (api)**, quero validar o **saldo de créditos** e o **teto de agenda** antes de criar/ativar o combinado invertido, para impedir uso além do disponível.
 *Critérios de aceite:*
-- [ ] Vale a **mesma regra da H2.3**: free não cria (só visualiza); os planos pagos respeitam o teto de **vagas de aviso ativo** do plano vigente (Épico 11); checagem na **API**.
-- [ ] Combinados em estado terminal não contam para o limite de "ativos".
+- [ ] Vale a **mesma regra da H2.3**: criar é livre para todos (anotar na agenda é livre até o teto, H11.7); **ativar/enviar** exige **saldo de créditos** (reserva na ativação, H11.4); checagem na **API**. Não há mais "vagas de aviso ativo" por plano (modelo de 4 planos revogado).
+- [ ] Para o **teto de agenda** (balde único, H11.7), toda anotação **não-arquivada** conta (inclusive terminal); só o arquivamento libera espaço.
 - [ ] O limite considera os combinados onde sou o **criador**, independente do papel (receber ou pagar).
 
 ---

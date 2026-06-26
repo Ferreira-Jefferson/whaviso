@@ -407,12 +407,33 @@ export const adminCarteiraResposta = z.object({
 })
 export type AdminCarteiraResposta = z.infer<typeof adminCarteiraResposta>
 
-// ---- Catálogo de créditos (curva de preço + cortesia + tetos de agenda) ----
+// ---- Catálogo de créditos (curva de MARCOS + cortesia + tetos de agenda) ----
+// A curva é uma tabela de marcos {envios, centavos} onde centavos = R$/envio NAQUELE marco.
+// Entre dois marcos o R$/envio é interpolado; o total de n envios é round(n * R$/envio(n)).
+// Os marcos vêm ordenados por `envios`, estritamente crescentes (ao menos 2). Fonte única
+// do preço (front e back recomputam pela MESMA função). envios_min/max derivam dos marcos.
+export const curvaPontoSchema = z.object({
+  envios: z.number().int().min(1),
+  centavos: z.number().int().min(0),
+})
+export type CurvaPonto = z.infer<typeof curvaPontoSchema>
+
+export const curvaMarcosSchema = z
+  .array(curvaPontoSchema)
+  .min(2, { message: 'a curva precisa de ao menos 2 marcos' })
+  .refine(
+    (pts) =>
+      pts.every((p, i) => {
+        const ant = pts[i - 1]
+        return ant === undefined || p.envios > ant.envios
+      }),
+    { message: 'os marcos da curva devem ter envios estritamente crescentes' },
+  )
+
 export const creditosCatalogoSchema = z.object({
   envios_min: z.number().int().min(1),
   envios_max: z.number().int().min(1),
-  preco_centavos: z.number().int().min(0),
-  preco_max_centavos: z.number().int().min(0),
+  curva: curvaMarcosSchema,
   cortesia_inicial: z.number().int().min(0),
   agenda_teto_free: z.number().int().min(0),
   agenda_teto_pago: z.number().int().min(0),
@@ -420,31 +441,17 @@ export const creditosCatalogoSchema = z.object({
 export type CreditosCatalogo = z.infer<typeof creditosCatalogoSchema>
 
 // ---- PATCH /v1/admin/creditos-catalogo (owner edita a curva, H11.11) ----
-// Atualização PARCIAL: todos os campos opcionais (ao menos um). Espelha as CHECKs da
-// migration 0057 (preço >= 0, piso <= topo, envios_min <= envios_max, agenda free <=
-// pago) quando os dois lados vierem juntos, para erro limpo em vez de violar constraint.
+// Atualização PARCIAL: todos os campos opcionais (ao menos um). envios_min/envios_max NÃO
+// são editados direto: derivam do primeiro/último marco da curva. Espelha as CHECKs da
+// migration (curva com >= 2 marcos crescentes; agenda free <= pago) para erro limpo.
 export const adminAtualizarCreditosCatalogoBody = z
   .object({
-    envios_min: z.number().int().min(1).optional(),
-    envios_max: z.number().int().min(1).optional(),
-    preco_centavos: z.number().int().min(0).optional(),
-    preco_max_centavos: z.number().int().min(0).optional(),
+    curva: curvaMarcosSchema.optional(),
     cortesia_inicial: z.number().int().min(0).optional(),
     agenda_teto_free: z.number().int().min(0).optional(),
     agenda_teto_pago: z.number().int().min(0).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'informe ao menos um campo' })
-  .refine(
-    (b) => b.envios_min === undefined || b.envios_max === undefined || b.envios_max >= b.envios_min,
-    { message: 'envios_max não pode ser menor que envios_min' },
-  )
-  .refine(
-    (b) =>
-      b.preco_centavos === undefined ||
-      b.preco_max_centavos === undefined ||
-      b.preco_max_centavos >= b.preco_centavos,
-    { message: 'o topo do preço não pode ser menor que o piso' },
-  )
   .refine(
     (b) =>
       b.agenda_teto_free === undefined ||
@@ -453,6 +460,48 @@ export const adminAtualizarCreditosCatalogoBody = z
     { message: 'o teto de agenda após a compra não pode ser menor que o do free' },
   )
 export type AdminAtualizarCreditosCatalogoBody = z.infer<typeof adminAtualizarCreditosCatalogoBody>
+
+// ---- POST /v1/billing/recarga (H11.10) ----
+// Confirma a recarga: o servidor valida a quantidade contra o catálogo, recalcula o valor
+// (fonte única) e ENFILEIRA a mensagem de compra (template billing.recarga + chave Pix da
+// plataforma) para o WhatsApp do próprio usuário. A chave Pix NUNCA volta no HTTP (H13.8).
+export const recargaBody = z.object({
+  quantidade: z.number().int().min(1),
+})
+export type RecargaBody = z.infer<typeof recargaBody>
+
+export const recargaResposta = z.object({
+  enfileirado: z.boolean(),
+  quantidade: z.number().int(),
+  valor_centavos: valorCentavos,
+})
+export type RecargaResposta = z.infer<typeof recargaResposta>
+
+// ---- GET/PATCH /v1/admin/config-plataforma (chave Pix da plataforma, owner) ----
+// Config singleton (0059) com a chave Pix do whaviso, no MESMO formato da chave do cobrador
+// (tipo/chave/titular/banco) + comentário livre. Todos os campos NULLABLE: nasce vazia e o
+// owner preenche pela tela de admin. Só o owner lê/edita; o usuário final nunca a recebe.
+export const configPlataformaSchema = z.object({
+  pix_tipo: tipoChavePix.nullable(),
+  pix_chave: z.string().max(140).nullable(),
+  pix_titular: z.string().max(120).nullable(),
+  pix_banco: z.string().max(80).nullable(),
+  pix_comentario: z.string().max(140).nullable(),
+})
+export type ConfigPlataforma = z.infer<typeof configPlataformaSchema>
+
+// PATCH parcial (ao menos um campo). nullish permite limpar um campo (set null). Tamanhos
+// espelham chaves_pix; tipo é auxiliar (detecção no servidor), não bloqueio.
+export const adminAtualizarConfigPlataformaBody = z
+  .object({
+    pix_tipo: tipoChavePix.nullish(),
+    pix_chave: z.string().trim().max(140).nullish(),
+    pix_titular: z.string().trim().max(120).nullish(),
+    pix_banco: z.string().trim().max(80).nullish(),
+    pix_comentario: z.string().trim().max(140).nullish(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: 'informe ao menos um campo' })
+export type AdminAtualizarConfigPlataformaBody = z.infer<typeof adminAtualizarConfigPlataformaBody>
 
 // ---- GET /v1/admin/envios (auditoria, com nome do destinatário) ----
 export const adminEnviosQuery = z.object({

@@ -14,7 +14,7 @@ CURVA de créditos. Restrito a owner.
 
 ## Rotas de créditos (E11)
 - `POST  /admin/usuarios/:id/creditar` credita N envios (lançamento 'credito_owner', aditivo)
-- `PATCH /admin/creditos-catalogo`     edita a curva (piso/topo/min/max/cortesia/tetos de agenda)
+- `PATCH /admin/creditos-catalogo`     edita a curva de marcos (tabela envios -> R$/envio; cortesia; tetos de agenda; min/max derivam dos marcos)
 
 ## Especialistas consumidos
 - `@whaviso/shared/contracts`, `@whaviso/shared/db`

@@ -90,7 +90,7 @@ Como **sistema**, quero que as notificações sejam confiáveis e não virem spa
 *Critérios de aceite:*
 - [ ] Toda notificação é **idempotente** e registrada (auditoria/visibilidade), sem dado sensível em log.
 - [ ] Eventos repetidos do mesmo tipo no mesmo combinado **não** geram notificações duplicadas (ex.: "já paguei" repetido, H10.2).
-- [ ] As notificações respeitam o **limite de envios do plano** quando saem por WhatsApp (Épico 11), sem deixar de registrar o evento no painel.
+- [ ] As notificações ao cobrador são **universais e não consomem crédito** (notificar o criador não é lembrete ao devedor, H11.2); registram sempre o evento no painel, mesmo quando saem por WhatsApp.
 - [ ] **Canal: o WhatsApp é o core do produto.** Os avisos **sempre** acontecem por WhatsApp; o **painel/site é uma segunda opção** (complementar, para quem tem conta), nunca o canal principal. Não há "preferência de canal" em que o usuário desliga o WhatsApp e fica só no site.
 
 ---
@@ -139,5 +139,5 @@ Como **sistema (zap)**, quero uma fila simples (sem Redis) que espace os envios 
 - ❌ Mensagens **ao devedor** (lembretes, confirmações, Pix, empurrãozinho de D+1) (Épicos 6/7/8).
 - ❌ O efeito das ações que o cobrador toma a partir da notificação (confirmar/rejeitar) (Épico 8).
 - ❌ Como as pendências aparecem no painel ("precisa de você") (Épico 9).
-- ❌ Limites de envio por plano e o que conta como envio (Épico 11).
+- ❌ Limites de envio (saldo de créditos) e o que conta como envio (Épico 11).
 - ❌ Edição dos textos das notificações pelo owner (Épico 12).

@@ -4,20 +4,30 @@
 Carteira de créditos de envio (Épico 11, modelo pré-pago). 1 envio = 1 ocorrência de
 aviso; tudo é liberado para todos, o que limita é o SALDO. Não há mais planos,
 assinatura, checkout nem webhook de pagamento: a compra é MANUAL no MVP (o usuário
-escolhe a quantidade num slider, fala no WhatsApp e paga via Pix; o OWNER credita
-depois, no módulo admin). Este módulo só LÊ: saldo da carteira + curva do catálogo
-(para o slider) e o extrato dos lançamentos. NÃO há endpoint de auto-crédito (o
-usuário nunca se credita, H11.11).
+escolhe a quantidade num slider, confirma, e o servidor EMPURRA as instruções de
+pagamento ao WhatsApp dele; o usuário paga via Pix e manda o comprovante na conversa; o
+OWNER credita depois, no módulo admin). Este módulo LÊ (saldo + curva + extrato) e
+ENFILEIRA a recarga (não credita: o usuário nunca se credita, H11.11).
 
 ## Entry points
 - `index.ts`: plugin Fastify registrado em `src/routes.ts` sob `/v1`
 
 ## Rotas
-- `GET /billing/carteira` (JWT) saldo (livre/reservado/em hold/consumido) + curva do catálogo
-- `GET /billing/extrato`  (JWT) lançamentos da conta, paginado (compra/crédito/reserva/consumo/devolução/hold)
+- `GET  /billing/carteira` (JWT) saldo (livre/reservado/em hold/consumido) + curva do catálogo
+- `GET  /billing/extrato`  (JWT) lançamentos da conta, paginado (compra/crédito/reserva/consumo/devolução/hold)
+- `POST /billing/recarga`  (JWT) valida a quantidade, calcula o valor e ENFILEIRA a mensagem de
+  compra (template `billing.recarga` + chave Pix da plataforma) na outbox de billing; o `zap`
+  envia ao WhatsApp do próprio usuário (H11.10). Recusa: `telefone_ausente`, `pix_nao_configurado`,
+  `quantidade_invalida`. NÃO retorna a chave Pix (H13.8). NÃO credita saldo.
 
 ## Tabelas
-- lê de: creditos_carteira, creditos_catalogo, creditos_lancamentos
+- lê de: creditos_carteira, creditos_catalogo, creditos_lancamentos, config_plataforma
+- escreve em: notificacoes_billing (enfileira a recarga; o zap drena/envia)
+
+## Especialistas consumidos (shared/, módulo nunca importa módulo)
+- `shared/planos` (lerCarteira/lerCatalogo/precoPorEnvioCentavos)
+- `shared/config_plataforma` (lerConfigPlataforma/temChavePix: a chave Pix da plataforma)
+- `shared/notificacoes_billing` (enfileirarRecarga: insere na outbox de billing)
 
 ## Carteira (shared/planos, lido em runtime)
 A leitura do saldo, a curva de preço (`precoPorEnvioCentavos`) e a movimentação da

@@ -9,7 +9,7 @@ auto-crédito no front.
 **Rotas:** /app/creditos
 
 ## Dados (api.ts): mapa REAL do backend
-- `GET /v1/billing/carteira` → `{ carteira: { saldo_livre, reservado, em_hold, consumido, ja_comprou }, catalogo: { envios_min, envios_max, preco_centavos, preco_max_centavos, cortesia_inicial, agenda_teto_free, agenda_teto_pago } }`
+- `GET /v1/billing/carteira` → `{ carteira: { saldo_livre, reservado, em_hold, consumido, ja_comprou }, catalogo: { envios_min, envios_max, curva: [{ envios, centavos }], cortesia_inicial, agenda_teto_free, agenda_teto_pago } }` (`curva` = tabela de marcos `envios` -> `R$/envio`; o R$/envio só aparece para o owner)
 - `GET /v1/billing/extrato?page=` → lançamentos paginados (compra/crédito/reserva/consumo/devolução/hold)
 
 ## Limite (H11.4/H11.9)

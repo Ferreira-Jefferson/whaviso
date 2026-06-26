@@ -28,18 +28,29 @@ describe('billing carteira (integração)', () => {
     expect(r.statusCode).toBe(200)
     const body = r.json() as {
       carteira: { saldo_livre: number; reservado: number; em_hold: number; consumido: number; ja_comprou: boolean }
-      catalogo: { envios_min: number; envios_max: number; preco_centavos: number; preco_max_centavos: number }
+      catalogo: {
+        envios_min: number
+        envios_max: number
+        curva: { envios: number; centavos: number }[]
+      }
     }
     // Cortesia inicial do free (migration 0057 = 5 envios).
     expect(body.carteira.saldo_livre).toBe(5)
     expect(body.carteira.reservado).toBe(0)
     expect(body.carteira.em_hold).toBe(0)
     expect(body.carteira.ja_comprou).toBe(false)
-    // Curva do catálogo (faixa 10..500; total 990 no piso, 35000 no topo).
+    // Curva de marcos do catálogo (faixa 10..250; R$/envio cai de 0,99 a 0,70; migration 0058).
     expect(body.catalogo.envios_min).toBe(10)
-    expect(body.catalogo.envios_max).toBe(500)
-    expect(body.catalogo.preco_centavos).toBe(990)
-    expect(body.catalogo.preco_max_centavos).toBe(35000)
+    expect(body.catalogo.envios_max).toBe(250)
+    expect(body.catalogo.curva).toEqual([
+      { envios: 10, centavos: 99 },
+      { envios: 25, centavos: 95 },
+      { envios: 50, centavos: 90 },
+      { envios: 100, centavos: 85 },
+      { envios: 150, centavos: 80 },
+      { envios: 200, centavos: 75 },
+      { envios: 250, centavos: 70 },
+    ])
   })
 
   it('carteira reflete o crédito do owner (ja_comprou vira true)', async () => {

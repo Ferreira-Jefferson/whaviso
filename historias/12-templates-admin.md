@@ -11,7 +11,7 @@
 ### H12.1: Modelo unificado de templates 🟢
 Como **owner/admin**, quero todas as mensagens numa única tabela chaveada, para editar qualquer texto do produto num só lugar, sem caça a strings espalhadas pelo código.
 *Critérios de aceite:*
-- [ ] Existe **uma** tabela `templates`, chaveada por `chave` estável (ex.: `ciclo.d_menos_2`, `ciclo.d`, `cobrador.pagamento_informado`, `resposta.ja_paguei`, `resposta.optout`, `resposta.ver_pix`, `resposta.sem_pix`, `resposta.aceite`, `resposta.recusa`).
+- [ ] Existe **uma** tabela `templates`, chaveada por `chave` estável (ex.: `ciclo.d_menos_2`, `ciclo.d`, `cobrador.pagamento_informado`, `resposta.ja_paguei`, `resposta.optout`, `resposta.ver_pix`, `resposta.sem_pix`, `resposta.aceite`, `resposta.recusa`, `billing.recarga`).
 - [ ] O conteúdo é **estruturado** (jsonb): `{ texto, botoes: [{ acao, rotulo }], midia: { tipo, url } }`, não uma string solta.
 - [ ] Não há tabelas paralelas por etapa/tipo (as antigas `templates_mensagem` e `templates_cobrador` foram unificadas nesta).
 - [ ] Há **um catálogo da estrutura** (quais chaves existem, quais variáveis e quais ações cada chave aceita), fonte para o editor saber o que oferecer.
@@ -94,7 +94,7 @@ Como **sistema (zap)**, quero renderizar e enviar qualquer template a partir da 
 ### H12.9: Hub de navegação das mensagens 🟢
 Como **owner**, quero uma tela que lista todas as mensagens do produto agrupadas, para achar e abrir a que quero editar.
 *Critérios de aceite:*
-- [ ] Há uma **tela hub** (`/admin/templates`) que mostra as famílias de mensagem: a **trilha do ciclo** (D-2 a D+1) e as demais famílias (cobrador, respostas).
+- [ ] Há uma **tela hub** (`/admin/templates`) que mostra as famílias de mensagem: a **trilha do ciclo** (D-2 a D+1) e as demais famílias (cobrador, respostas, **compra de crédito** `billing.*`).
 - [ ] Cada item do hub leva ao **editor da chave** (`/admin/mensagens/:chave`).
 - [ ] O hub e o editor são área **admin/owner** (acesso restrito, ver Épico 1); usuário comum não chega lá.
 - [ ] A navegação reflete o **catálogo** (H12.1): adicionar uma chave nova ao catálogo a faz aparecer no hub, sem tela nova.

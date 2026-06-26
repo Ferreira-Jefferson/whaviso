@@ -80,7 +80,7 @@ Como **dono do produto**, quero que o devedor só interaja por botões, para o W
 ### H13.8: Nunca logar dado sensível 🟢
 Como **dono do produto**, quero garantir que telefone, chave Pix e token nunca apareçam em log, para proteger quem usa mesmo em caso de vazamento de log.
 *Critérios de aceite:*
-- [ ] **Telefone, chave Pix (e titular/banco) e token** nunca aparecem em log, em nenhum dos serviços (`api`, `zap`).
+- [ ] **Telefone, chave Pix (e titular/banco) e token** nunca aparecem em log, em nenhum dos serviços (`api`, `zap`). Vale também para a **chave Pix DA PLATAFORMA** (recebimento de recarga, config do owner): nunca é logada, NÃO volta para o usuário no HTTP, e só viaja na mensagem de compra empurrada ao WhatsApp (o `zap` a lê da config no envio; ver Épico 11 H11.10).
 - [ ] Tokens vivem **só como hash sha256** no banco; o valor claro nunca é persistido (CLAUDE.md).
 - [ ] O payload do botão do WhatsApp leva **`aviso_id`** (webhook HMAC-autenticado), nunca o token.
 - [ ] Erros da API usam o envelope `{ error: { code, message } }` e a mensagem **não** vaza dado sensível.

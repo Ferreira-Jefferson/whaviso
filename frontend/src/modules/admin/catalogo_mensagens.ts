@@ -164,6 +164,30 @@ export const SECOES_MENSAGENS: SecaoMensagens[] = [
     ],
   },
   {
+    id: 'billing',
+    titulo: 'Compra de crédito',
+    descricao: 'Mensagem enviada ao WhatsApp de quem recarrega, com o valor e a chave Pix de recebimento.',
+    variante: 'lista',
+    mensagens: [
+      {
+        nome: 'Instruções de pagamento (recarga)',
+        destinatario: 'Quem recarrega',
+        quando: 'Ao confirmar a recarga na tela de Créditos',
+        estado: 'fixo',
+        chave: 'billing.recarga',
+        variaveis: [
+          'quantidade',
+          'valor',
+          'pix_tipo',
+          'pix_chave',
+          'pix_titular',
+          'pix_banco',
+          'pix_comentario',
+        ],
+      },
+    ],
+  },
+  {
     id: 'conta',
     titulo: 'Acesso à conta',
     descricao: 'Mensagens de login e de boas-vindas de quem usa o painel.',
