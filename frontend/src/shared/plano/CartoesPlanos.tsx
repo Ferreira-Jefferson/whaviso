@@ -75,7 +75,6 @@ function CartaoSimples({
             ? '• Visualização e agenda (sem enviar avisos)'
             : '• Avisos automáticos no WhatsApp'}
         </li>
-        {p.permite_recorrente && <li>• Combinados recorrentes</li>}
         {p.cadencia_configuravel && <li>• Cadência configurável</li>}
       </ul>
       <div className="mt-auto">{renderCta(p, null)}</div>
@@ -136,7 +135,6 @@ function CartaoPlus({
       <ul className="flex flex-1 flex-col gap-2 text-sm text-tinta">
         <li className="font-medium">{`• Até ${envios} envios de aviso por mês`}</li>
         <li>• Avisos automáticos no WhatsApp</li>
-        {p.permite_recorrente && <li>• Combinados recorrentes</li>}
         {p.cadencia_configuravel && <li>• Cadência configurável</li>}
       </ul>
 

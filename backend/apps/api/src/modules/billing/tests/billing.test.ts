@@ -31,7 +31,7 @@ describe('billing (integração)', () => {
 
     const free = planos.find((p) => p.id === 'free')!
     expect(free.preco_centavos).toBe(0)
-    expect(free.capacidade_agenda).toBe(50)
+    expect(free.capacidade_agenda).toBe(25)
     expect(free.somente_leitura).toBe(true)
     expect(free.vagas_ativas).toBe(0) // 0 envios de aviso (somente leitura)
     expect(free.totais_periodo).toBe(true) // totais por periodo virou base em todos os planos (0050)
@@ -43,7 +43,7 @@ describe('billing (integração)', () => {
     expect(start.cadencia_configuravel).toBe(false)
 
     const prof = planos.find((p) => p.id === 'profissional')!
-    expect(prof.preco_centavos).toBe(2990) // R$ 29,90 (0049)
+    expect(prof.preco_centavos).toBe(2390) // R$ 23,90 (reprecificação 0052)
     expect(prof.capacidade_agenda).toBe(150)
     expect(prof.vagas_ativas).toBe(25) // 25 envios de aviso (teto de vagas ativas, 0049)
     expect(prof.cadencia_configuravel).toBe(true)
@@ -54,7 +54,7 @@ describe('billing (integração)', () => {
     expect(plus.por_envio).toBe(true)
     expect(plus.envios_min).toBe(26)
     expect(plus.envios_max).toBe(200)
-    expect(plus.preco_centavos).toBe(3110) // piso (26 envios): R$ 31,10 (contínuo c/ o Profissional)
+    expect(plus.preco_centavos).toBe(2400) // piso (26 envios): R$ 24,00 (contínuo c/ o Profissional, 0052)
     expect(plus.preco_max_centavos).toBe(14000) // topo (200 envios): R$ 140,00 (0,70/envio)
     // Capacidade escala 1:1 com os envios (agenda/ativável por "unidade" = 1).
     expect(plus.agenda_por_unidade).toBe(1)
@@ -68,13 +68,13 @@ describe('billing (integração)', () => {
     expect(a.statusCode).toBe(200)
     expect(a.json().plano_id).toBe('free')
     expect(a.json().somente_leitura).toBe(true)
-    expect(a.json().capacidade_agenda).toBe(50)
+    expect(a.json().capacidade_agenda).toBe(25)
   })
 
   it('assinar Plus grava os envios e congela o preço interpolado da curva', async () => {
     const app = await criarAppTeste(u)
-    // Curva: total(26)=3110, total(200)=14000. Para 50 envios:
-    //   round(3110 + (14000-3110)*(50-26)/(200-26)) = 4612.
+    // Curva: total(26)=2400, total(200)=14000. Para 50 envios:
+    //   round(2400 + (14000-2400)*(50-26)/(200-26)) = 4000.
     const r = await app.inject({
       method: 'POST',
       url: '/v1/billing/assinar',
@@ -83,7 +83,7 @@ describe('billing (integração)', () => {
     })
     expect(r.statusCode).toBe(200)
     expect(r.json().unidades).toBe(50)
-    expect(r.json().preco_centavos).toBe(4612)
+    expect(r.json().preco_centavos).toBe(4000)
 
     const a = await app.inject({ method: 'GET', url: '/v1/billing/assinatura', headers: AUTH })
     await app.close()
@@ -101,7 +101,7 @@ describe('billing (integração)', () => {
       headers: AUTH,
       payload: { plano_id: 'plus', unidades: 26 },
     })
-    expect(piso.json().preco_centavos).toBe(3110)
+    expect(piso.json().preco_centavos).toBe(2400)
     const topo = await app.inject({
       method: 'POST',
       url: '/v1/billing/assinar',
@@ -166,7 +166,7 @@ describe('billing (integração)', () => {
        where profile_id = $1 order by criado_em desc limit 1`,
       [u],
     )
-    expect(rows[0]!.valor_centavos).toBe(2990) // preço congelado do profissional (R$ 29,90)
+    expect(rows[0]!.valor_centavos).toBe(2390) // preço congelado do profissional (R$ 23,90)
     const ref = rows[0]!.provedor_ref
 
     const wh = await app.inject({

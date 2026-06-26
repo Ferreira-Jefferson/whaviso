@@ -141,8 +141,8 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     await app.close()
   })
 
-  it('H4.1: FREE PODE criar agenda até a capacidade (50), recusa no limite com agenda_cheia', async () => {
-    const free = await criarUsuario('FreeAgenda') // nasce free (capacidade_agenda 50)
+  it('H4.1: FREE PODE criar agenda até a capacidade (25), recusa no limite com agenda_cheia', async () => {
+    const free = await criarUsuario('FreeAgenda') // nasce free (capacidade_agenda 25)
     const app = await criarAppTeste(free)
     // Cria alguns itens de agenda (free não é barrado: nada é enviado).
     for (let i = 0; i < 3; i++) {

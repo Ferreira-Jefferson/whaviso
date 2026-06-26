@@ -52,7 +52,6 @@ function InteiroInput({
 
 // Recursos liga/desliga do plano. Rótulos nas Regras de Ouro (sem termos proibidos).
 const RECURSOS: { chave: keyof FormPlano & RecursoBool; rotulo: string }[] = [
-  { chave: 'permite_recorrente', rotulo: 'Lembretes recorrentes' },
   { chave: 'cadencia_configuravel', rotulo: 'Cadência configurável' },
   { chave: 'menu_texto_livre', rotulo: 'Menu de texto livre' },
   { chave: 'informado_pago_habilitado', rotulo: 'Confirmação de pagamento' },
