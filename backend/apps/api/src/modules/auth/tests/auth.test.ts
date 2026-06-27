@@ -30,7 +30,7 @@ describe('auth: status-telefone (H1.2/H1.3)', () => {
     await limparUsuario(comConta)
   })
 
-  it('número já cadastrado → { existe: true }', async () => {
+  it('número já cadastrado → { existe: true, metodo: null }', async () => {
     const app = await criarAppTeste(null)
     const r = await app.inject({
       method: 'POST',
@@ -39,10 +39,11 @@ describe('auth: status-telefone (H1.2/H1.3)', () => {
     })
     await app.close()
     expect(r.statusCode).toBe(200)
-    expect(r.json()).toEqual({ existe: true })
+    // metodo: null porque o usuário de teste não tem entrada em auth.identities.
+    expect(r.json()).toEqual({ existe: true, metodo: null })
   })
 
-  it('número novo → { existe: false }', async () => {
+  it('número novo → { existe: false, metodo: null }', async () => {
     const app = await criarAppTeste(null)
     const r = await app.inject({
       method: 'POST',
@@ -51,7 +52,7 @@ describe('auth: status-telefone (H1.2/H1.3)', () => {
     })
     await app.close()
     expect(r.statusCode).toBe(200)
-    expect(r.json()).toEqual({ existe: false })
+    expect(r.json()).toEqual({ existe: false, metodo: null })
   })
 
   it('audita só o HASH do telefone (nunca o número em claro)', async () => {

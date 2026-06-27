@@ -46,6 +46,13 @@ describe('perfil: backfill de avisos por telefone (PATCH /perfil)', () => {
   }
 
   async function patchTelefone(uid: string, telefone: string) {
+    // Simula posse do telefone verificada via OTP: insere identidade phone em auth.identities
+    // (o PATCH /perfil só faz backfill quando usuario_tem_identidade_phone retorna true).
+    await poolSuper.query(
+      `insert into auth.identities (id, user_id, provider) values ($1, $2, 'phone')
+       on conflict (provider, id) do nothing`,
+      [telefone, uid],
+    )
     const app = await criarAppTeste(uid)
     const r = await app.inject({ method: 'PATCH', url: '/v1/perfil', headers: AUTH, payload: { telefone } })
     await app.close()
