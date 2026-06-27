@@ -23,6 +23,14 @@ async function definirConfigPix(): Promise<void> {
 async function definirTelefone(uid: string, tel: string | null): Promise<void> {
   await poolSuper.query(`update public.profiles set telefone=$2 where id=$1`, [uid, tel])
 }
+// Sessão do WhatsApp (whats_sessao, id=1): a recarga devolve telefone_vendas = numero quando
+// status='conectado'. A linha nasce 'desconectado' pela migration 0020; só este arquivo a mexe.
+async function conectarSessao(numero: string): Promise<void> {
+  await poolSuper.query(`update public.whats_sessao set status='conectado', numero=$1 where id=1`, [numero])
+}
+async function desconectarSessao(): Promise<void> {
+  await poolSuper.query(`update public.whats_sessao set status='desconectado', numero=null where id=1`)
+}
 async function linhasBilling(uid: string) {
   const { rows } = await poolSuper.query<{
     telefone_alvo: string
@@ -47,6 +55,7 @@ describe('billing recarga (integração)', () => {
   afterAll(async () => {
     await limparUsuario(u)
     await limparConfigPix()
+    await desconectarSessao()
     await encerrarPools()
   })
 
@@ -85,12 +94,13 @@ describe('billing recarga (integração)', () => {
   it('com telefone e chave Pix: enfileira com a quantidade e o valor da curva (não credita)', async () => {
     await definirTelefone(u, '+5511988887777')
     await definirConfigPix()
+    await desconectarSessao() // sem sessão conectada -> telefone_vendas = null
     const app = await criarAppTeste(u)
     const r = await app.inject({ method: 'POST', url: '/v1/billing/recarga', headers: AUTH, payload: { quantidade: 50 } })
     await app.close()
     expect(r.statusCode).toBe(200)
     // Curva em 50 envios = 90 centavos/envio (migration 0058) -> 50 * 90 = 4500.
-    expect(r.json()).toEqual({ enfileirado: true, quantidade: 50, valor_centavos: 4500 })
+    expect(r.json()).toEqual({ enfileirado: true, quantidade: 50, valor_centavos: 4500, telefone_vendas: null })
 
     const linhas = await linhasBilling(u)
     expect(linhas).toHaveLength(1)
@@ -107,6 +117,17 @@ describe('billing recarga (integração)', () => {
       [u],
     )
     expect(rows[0]!.saldo_livre).toBe(5) // só a cortesia inicial
+  })
+
+  it('com sessão do zap conectada: devolve telefone_vendas com o número pareado', async () => {
+    await definirTelefone(u, '+5511988887777')
+    await definirConfigPix()
+    await conectarSessao('5511925451886')
+    const app = await criarAppTeste(u)
+    const r = await app.inject({ method: 'POST', url: '/v1/billing/recarga', headers: AUTH, payload: { quantidade: 50 } })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json().telefone_vendas).toBe('5511925451886')
   })
 
   it('exige autenticação (401 sem token)', async () => {

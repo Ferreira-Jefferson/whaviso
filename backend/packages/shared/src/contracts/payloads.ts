@@ -474,6 +474,10 @@ export const recargaResposta = z.object({
   enfileirado: z.boolean(),
   quantidade: z.number().int(),
   valor_centavos: valorCentavos,
+  // Número da conversa (só dígitos com DDI) para o front montar o link "abrir conversa":
+  // é o próprio número pareado pelo zap (whats_sessao), não uma env. null se desconectado.
+  // NÃO é PII de devedor/cobrador: é o número público de atendimento do whaviso.
+  telefone_vendas: z.string().nullable(),
 })
 export type RecargaResposta = z.infer<typeof recargaResposta>
 

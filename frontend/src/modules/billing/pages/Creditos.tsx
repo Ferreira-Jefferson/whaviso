@@ -58,9 +58,10 @@ export default function CreditosPage() {
   const quantidade = qtd ?? Math.min(Math.max(Math.round((min + max) / 2), min), max)
   const total = catalogo ? precoEnvioCentavos(catalogo, quantidade) : 0
 
-  // Link só para ABRIR a conversa (a mensagem é empurrada pelo servidor). null se não
-  // houver número de vendas configurado.
-  const linkConversa = linkConversaWhatsApp()
+  // Link só para ABRIR a conversa (a mensagem é empurrada pelo servidor). O número vem da
+  // resposta da recarga (telefone_vendas = número pareado pelo zap), não de env. null se a
+  // sessão estiver desconectada -> a tela mostra o aviso sem o botão de abrir conversa.
+  const linkConversa = linkConversaWhatsApp(recarga.data?.telefone_vendas)
 
   // Mudar a quantidade reseta o resultado/erro anterior (nova intenção de recarga).
   function aoMudarQuantidade(n: number) {

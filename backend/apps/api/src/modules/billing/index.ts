@@ -6,6 +6,7 @@ import { recargaBody, recargaResposta } from '@whaviso/shared/contracts'
 import { lerCarteira, lerCatalogo, precoPorEnvioCentavos } from '../../shared/planos'
 import { lerConfigPlataforma, temChavePix } from '../../shared/config_plataforma'
 import { enfileirarRecarga } from '../../shared/notificacoes_billing'
+import { lerNumeroVendas } from '../../shared/whats_sessao'
 import { regraNegocio } from '../../shared/http_errors'
 
 // Billing do Épico 11 (modelo de CARTEIRA DE CRÉDITOS). O whaviso é pré-pago por crédito
@@ -108,7 +109,16 @@ export const billingRoutes: FastifyPluginAsync = async (raiz) => {
           quantidade,
           valorCentavos,
         })
-        return { enfileirado: true, quantidade, valor_centavos: valorCentavos }
+        // 5) Número da conversa para o front montar o link "abrir conversa": é o próprio
+        // número pareado pelo zap (whats_sessao), então sempre bate com quem envia a
+        // mensagem e recebe o comprovante. null se a sessão estiver desconectada.
+        const telefoneVendas = await lerNumeroVendas(cli)
+        return {
+          enfileirado: true,
+          quantidade,
+          valor_centavos: valorCentavos,
+          telefone_vendas: telefoneVendas,
+        }
       })
     },
   )

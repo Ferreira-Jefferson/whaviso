@@ -397,6 +397,9 @@ export const recargaResposta = z.object({
   enfileirado: z.boolean(),
   quantidade: z.number().int(),
   valor_centavos: valorCentavos,
+  // Número da conversa (só dígitos com DDI) para o link "abrir conversa": é o próprio
+  // número pareado pelo zap (whats_sessao), não uma env. null se a sessão está desconectada.
+  telefone_vendas: z.string().nullable(),
 })
 export type RecargaResposta = z.infer<typeof recargaResposta>
 
