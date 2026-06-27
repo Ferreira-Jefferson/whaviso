@@ -7,7 +7,11 @@ import type { AuthError } from '@supabase/supabase-js'
 export function mensagemDeErroAuth(erro: AuthError | null | undefined): string {
   if (!erro) return 'Algo deu errado. Tente novamente.'
   const msg = erro.message.toLowerCase()
+  const code = (erro as { code?: string }).code ?? ''
 
+  if (code === 'hook_timeout' || msg.includes('hook')) {
+    return 'Não conseguimos enviar o código agora. Aguarde alguns segundos e tente de novo.'
+  }
   if (
     msg.includes('expired') ||
     msg.includes('invalid') ||
@@ -20,7 +24,7 @@ export function mensagemDeErroAuth(erro: AuthError | null | undefined): string {
     msg.includes('too many requests') ||
     msg.includes('you can only request this after')
   ) {
-    return 'Muitas tentativas. Aguarde um instante e peça o código de novo.'
+    return 'Muitas tentativas. Aguarde 1 minuto e peça o código de novo.'
   }
   if (msg.includes('phone') || msg.includes('number')) {
     return 'Número de WhatsApp inválido. Confira o DDD e tente de novo.'
