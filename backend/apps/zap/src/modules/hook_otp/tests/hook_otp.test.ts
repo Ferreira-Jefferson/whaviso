@@ -144,6 +144,8 @@ describe('hook_otp: POST /hooks/sms (integração)', () => {
     expect(r.statusCode).toBe(200)
     expect(whats.textos[0]!.texto).toContain('cadastro')
     expect(whats.textos[0]!.texto).toContain('303030')
+    // No cadastro a copy pede para salvar o contato (número próprio via Baileys).
+    expect(whats.textos[0]!.texto).toContain('Salve este contato')
     await app.close()
   })
 

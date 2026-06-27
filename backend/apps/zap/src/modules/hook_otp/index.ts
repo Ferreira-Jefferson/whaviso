@@ -12,11 +12,15 @@ interface CorpoHook {
 // H1.2/H1.3: a copy varia conforme o número JÁ tem cadastro (login) ou é novo
 // (cadastro). Sem travessão, gênero neutro, sem palavras proibidas. O código nunca
 // é logado; só entra na mensagem entregue.
+//
+// No CADASTRO (número novo) a mensagem também pede para salvar o contato: como o
+// Whaviso usa um número próprio (Baileys), é por aqui que as mensagens vão chegar, e
+// salvar o contato melhora o reconhecimento e a entrega das conversas seguintes.
 const textoOtpLogin = (codigo: string): string =>
   `Whaviso: identificamos uma tentativa de login com seu número. Seu código de acesso é: ${codigo}\n\nSe não foi você, ignore esta mensagem. Não compartilhe este código com ninguém.`
 
 const textoOtpCadastro = (codigo: string): string =>
-  `Olá, aqui é o Whaviso. Identificamos uma tentativa de cadastro com seu número. Seu código para confirmar é: ${codigo}\n\nSe não foi você, ignore esta mensagem. Não compartilhe este código com ninguém.`
+  `Olá, aqui é o Whaviso. Identificamos uma tentativa de cadastro com seu número. Seu código para confirmar é: ${codigo}\n\nSalve este contato: as mensagens do Whaviso chegam sempre por aqui.\n\nSe não foi você, ignore esta mensagem. Não compartilhe este código com ninguém.`
 
 /**
  * Endpoint do Send SMS Hook do Supabase. O Supabase gera o OTP do login por
