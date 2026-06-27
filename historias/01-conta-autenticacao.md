@@ -1,8 +1,8 @@
 # Épico 1: Conta & Autenticação
 
-> Login **sem e-mail/senha**: **Google OAuth** e **WhatsApp** (confirmação por botão).
+> Login **sem e-mail/senha**: **Google OAuth** e **WhatsApp** (código de acesso de 6 dígitos).
 > O canal WhatsApp já é viável agora via **Baileys**, então o fluxo todo é 🟢 MVP. O **Meta oficial** é só uma troca de transporte no futuro.
-> Princípio: o número de WhatsApp é a identidade. Confirmar acesso/cadastro acontece no próprio WhatsApp, com botões, sem digitar código.
+> Princípio: o número de WhatsApp é a identidade. O Whaviso envia um código de acesso no próprio WhatsApp e o usuário digita esse código para entrar ou se cadastrar.
 
 ---
 
@@ -17,24 +17,24 @@ Como **cobrador**, quero entrar com minha conta Google, para acessar o painel se
 ---
 
 ### H1.2: Entrar pelo WhatsApp (usuário já cadastrado) 🟢
-Como **cobrador já cadastrado**, quero entrar informando meu número e aprovando no WhatsApp, para acessar sem Google e sem digitar código.
+Como **cobrador já cadastrado**, quero entrar informando meu número e digitando o código que recebo no WhatsApp, para acessar sem Google e sem senha.
 *Critérios de aceite:*
 - [ ] Informo o telefone na tela de login.
-- [ ] Recebo no WhatsApp uma mensagem de confirmação: *"Tentativa de login com seu número"*, com botões **Acessar** e **Negar acesso**.
-- [ ] Ao tocar **Acessar**, a sessão é criada e o painel carrega.
-- [ ] Ao tocar **Negar acesso**, o login é recusado e o evento registrado.
+- [ ] A tela confirma que o código verificador foi enviado para aquele WhatsApp e pede para eu digitá-lo.
+- [ ] Recebo no WhatsApp a mensagem: *"Seu código de login Whaviso é: «código em negrito». Caso não tenha solicitado, desconsidere esta mensagem."*
+- [ ] Ao digitar o código correto, a sessão é criada e o painel carrega.
 - [ ] Essa mensagem (login) só é enviada para número que **já tem cadastro**.
 
 ---
 
 ### H1.3: Cadastro pelo WhatsApp (número novo) 🟢
-Como **pessoa sem conta**, quero me cadastrar confirmando no próprio WhatsApp, para começar a usar sem formulário de senha.
+Como **pessoa sem conta**, quero me cadastrar digitando o código que recebo no próprio WhatsApp, para começar a usar sem formulário de senha.
 *Critérios de aceite:*
 - [ ] Informo um número que ainda não tem cadastro.
-- [ ] Recebo no WhatsApp: *"Olá, eu sou o Whaviso, identificamos uma tentativa de cadastro com seu número"*, com botões **Sim, sou eu** e **Não fui eu**.
+- [ ] A tela confirma que o código verificador foi enviado para aquele WhatsApp, para confirmar o cadastro.
+- [ ] Recebo no WhatsApp a mensagem: *"Seu código de cadastro Whaviso é: «código em negrito». Caso não tenha solicitado, desconsidere esta mensagem."*
 - [ ] A mensagem de cadastro também pede para **salvar o contato do Whaviso**: como o número é próprio (Baileys), é por aqui que as mensagens seguintes (lembretes, avisos) vão chegar.
-- [ ] Ao tocar **Sim, sou eu**, a conta é criada e eu já acesso o sistema.
-- [ ] Ao tocar **Não fui eu**, o cadastro é abortado e o evento registrado.
+- [ ] Ao digitar o código correto, a conta é criada e eu já acesso o sistema.
 - [ ] Nos acessos seguintes, esse número passa a receber a mensagem **de login** (H1.2), não a de cadastro.
 
 ---

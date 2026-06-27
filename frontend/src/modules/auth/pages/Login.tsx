@@ -89,10 +89,8 @@ export default function LoginPage() {
       jaCadastrado === false ? 'Confirme seu cadastro' : 'Digite o código'
     const subtitulo =
       jaCadastrado === false
-        ? `Identificamos uma tentativa de cadastro com o WhatsApp ${telefoneEnviado}. Digite o código que enviamos para confirmar.`
-        : jaCadastrado === true
-          ? `Identificamos uma tentativa de login com o WhatsApp ${telefoneEnviado}. Digite o código que enviamos.`
-          : `Enviamos um código no WhatsApp ${telefoneEnviado}.`
+        ? `O código verificador foi enviado para o WhatsApp ${telefoneEnviado}. Digite-o abaixo para confirmar seu cadastro.`
+        : `O código verificador foi enviado para o WhatsApp ${telefoneEnviado}. Digite-o abaixo.`
     return (
       <AuthCard titulo={titulo} subtitulo={subtitulo}>
         <form

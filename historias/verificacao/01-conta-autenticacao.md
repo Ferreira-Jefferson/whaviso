@@ -22,9 +22,9 @@ Resumo: a infraestrutura de auth está sólida (JWKS local, conta nasce free, fr
 | Critério | Status | Evidência (arquivo:linha) | Teste |
 |---|---|---|---|
 | Informo o telefone na tela de login | [x] | `Login.tsx:151-176` (form de telefone) | Não coberto |
-| Recebo mensagem de confirmação "Tentativa de login com seu número" com botões **Acessar** e **Negar acesso** | [!] | `backend/apps/zap/src/modules/hook_otp/index.ts:15-16` (`textoOtpLogin`): entrega um **código de 6 dígitos**, sem botões Acessar/Negar. Diverge da história (aprovação por botão) | `backend/apps/zap/src/modules/hook_otp/tests/hook_otp.test.ts` (cobre entrega de OTP) |
-| Ao tocar **Acessar**, a sessão é criada e o painel carrega | [!] | Não há botão "Acessar"; a sessão nasce ao **digitar o código** (`Login.tsx:62-71`, `verifyOtp` em `frontend/src/shared/supabase/client.ts:55`) | Não coberto |
-| Ao tocar **Negar acesso**, o login é recusado e o evento registrado | [+] | Não existe botão "Negar acesso" nem registro de `login_negado`. O tipo está declarado em `backend/apps/api/src/shared/eventos_auth/index.ts:17` mas **nunca é inserido** por código não-teste (único insert é `status_consultado`, `auth/index.ts:34`) | Não coberto |
+| A tela confirma que o código verificador foi enviado para aquele WhatsApp e pede para digitá-lo | [x] | `Login.tsx:88-95` (subtítulo "O código verificador foi enviado para o WhatsApp …") | Não coberto |
+| Recebo no WhatsApp "Seu código de login Whaviso é: «código em negrito»…" | [x] | `backend/apps/zap/src/modules/hook_otp/index.ts:19-20` (`textoOtpLogin`, código em `*negrito*`) | `backend/apps/zap/src/modules/hook_otp/tests/hook_otp.test.ts` (copy de login + código) |
+| Ao digitar o código correto, a sessão é criada e o painel carrega | [x] | `Login.tsx:66-81` (`verificarCodigoWhatsapp` → `verifyOtp` em `frontend/src/shared/supabase/client.ts:55`) | Não coberto |
 | Mensagem de login só vai para número que **já tem cadastro** | [x] | `hook_otp/index.ts:54-67` (consulta `profiles`; existe → `textoOtpLogin`, novo → `textoOtpCadastro`); `auth/index.ts:19-39` (`/auth/status-telefone` para a UI escolher a copy) | `auth.test.ts:33-55` (existe true/false); `hook_otp.test.ts` (copy login vs cadastro) |
 
 ### H1.3: Cadastro pelo WhatsApp (número novo) 🟢
@@ -32,9 +32,9 @@ Resumo: a infraestrutura de auth está sólida (JWKS local, conta nasce free, fr
 | Critério | Status | Evidência (arquivo:linha) | Teste |
 |---|---|---|---|
 | Informo um número que ainda não tem cadastro | [x] | `Login.tsx:44-60` + `auth/index.ts:19-39` (status do telefone) | `auth.test.ts:45-55` |
-| Recebo "Olá, eu sou o Whaviso, identificamos uma tentativa de cadastro..." com botões **Sim, sou eu** e **Não fui eu** | [!] | `hook_otp/index.ts:18-19` (`textoOtpCadastro`): texto bate o tom mas entrega **código**, sem botões Sim sou eu/Não fui eu. Diverge | `hook_otp.test.ts` |
-| Ao tocar **Sim, sou eu**, a conta é criada e já acesso | [!] | Sem botão; a conta nasce ao **digitar o código** (`verifyOtp` → trigger `handle_new_user`) | Não coberto |
-| Ao tocar **Não fui eu**, o cadastro é abortado e o evento registrado | [+] | Sem botão "Não fui eu"; `cadastro_negado` declarado (`eventos_auth/index.ts:18`) mas **nunca inserido** | Não coberto |
+| A tela confirma que o código verificador foi enviado para aquele WhatsApp, para confirmar o cadastro | [x] | `Login.tsx:88-92` (subtítulo de cadastro: "… Digite-o abaixo para confirmar seu cadastro") | Não coberto |
+| Recebo no WhatsApp "Seu código de cadastro Whaviso é: «código em negrito»…" + pedido para salvar o contato | [x] | `hook_otp/index.ts:22-23` (`textoOtpCadastro`, código em `*negrito*` + "Salve este contato") | `hook_otp.test.ts` (copy de cadastro + "Salve este contato") |
+| Ao digitar o código correto, a conta é criada e já acesso | [x] | `verifyOtp` → trigger `handle_new_user` cria o `profiles` (`client.ts:55`, `Login.tsx:66-81`) | Não coberto |
 | Nos acessos seguintes, esse número recebe a mensagem **de login** (H1.2), não a de cadastro | [x] | `hook_otp/index.ts:57-67` (decide login vs cadastro por existência em `profiles`) | `hook_otp.test.ts` (copy varia por cadastro) |
 
 ### H1.4: Conta criada automaticamente no aceite 🟢
@@ -75,15 +75,15 @@ Resumo: a infraestrutura de auth está sólida (JWKS local, conta nasce free, fr
 
 ## O que o código precisa mudar para seguir a história (acionável, priorizado; mudanças de CÓDIGO)
 
-> Atenção: a própria história, em "Decisões em aberto" (linha 80), reconhece que doc/plano de auth previam OTP por código e que o fluxo por botão tem outra implementação ("o Supabase não emite sessão a partir de um clique"). Ela NÃO marca isso como fora de escopo nem como gated; manda "decidir antes de implementar; na validação vai aparecer como divergência". Logo, abaixo está listado como divergência de código a corrigir, não como item futuro.
+> Atenção: a decisão de design foi **fechada em OTP por código** (decisão do produto, 2026-06-27): a história H1.2/H1.3 foi reescrita para o fluxo de código de 6 dígitos, que é o que está implementado. Os itens abaixo que pressupunham aprovação por botão deixaram de ser divergência.
 
-1. **Login/cadastro por WhatsApp via botão, não por código (H1.2, H1.3).** O código entrega um OTP de 6 dígitos (`hook_otp/index.ts:15-19`, `Login.tsx:62-72`, `verifyOtp`). A história pede aprovação por botão: *Acessar / Negar acesso* (login) e *Sim, sou eu / Não fui eu* (cadastro), sem digitar código. Como o Supabase não emite sessão a partir de um clique (nota da própria história), seguir a história exige um adaptador que: envie a mensagem com botões pelo zap (Baileys), capture o clique no `webhook_whatsapp`, e emita/gerencie a sessão (JWT) para a SPA. É a maior mudança do épico.
+1. **RESOLVIDO (design fechado em código).** O fluxo por botão (*Acessar / Negar acesso*, *Sim, sou eu / Não fui eu*) foi abandonado: a história agora pede OTP de 6 dígitos, exatamente o que o código entrega (`hook_otp/index.ts:19-23`, `Login.tsx:66-81`, `verifyOtp`). Não há mais divergência a corrigir aqui.
 
-2. **Registrar o evento de recusa de login e de cadastro (H1.2, H1.3).** Os tipos `login_negado` e `cadastro_negado` existem em `eventos_auth/index.ts:17-18` mas **nunca são inseridos**. Ao implementar os botões "Negar acesso"/"Não fui eu", chamar `registrarEventoAuth(..., 'login_negado'|'cadastro_negado', ...)` no ramo de recusa.
+2. **Não se aplica (sem botão de recusa).** Os tipos `login_negado` e `cadastro_negado` (`eventos_auth/index.ts:17-18`) só fariam sentido no fluxo por botão, agora abandonado. No fluxo OTP a recusa é simplesmente não digitar o código. Manter os tipos é inofensivo; inseri-los não é exigido pela história.
 
 3. **Enviar o link de "acompanhar no painel" junto da confirmação do aceite (H1.4, critério 2).** Hoje `resposta.aceite` (`0022_templates_unificada.sql:72-74`) não tem link. Acrescentar o link de painel ao texto entregue no aceite (template e/ou variável com a URL do app), para que o convidado consiga acessar pela 1ª vez (e cair no fluxo de login da H1.2). Sem isso, o critério 3 da H1.4 também fica pela metade.
 
-4. **(Decorrente de 1) Mensagens de login/cadastro com a copy exata da história.** As frases pedidas são *"Tentativa de login com seu número"* (H1.2) e *"Olá, eu sou o Whaviso, identificamos uma tentativa de cadastro com seu número"* (H1.3). O texto de cadastro já está próximo (`hook_otp/index.ts:18`); ao trocar para botões, ajustar a copy e remover a parte do "código".
+4. **RESOLVIDO (copy alinhada).** A copy do OTP foi reescrita e a história passou a citá-la verbatim: *"Seu código de login Whaviso é: «código»…"* (H1.2) e *"Seu código de cadastro Whaviso é: «código»… Salve este contato…"* (H1.3), em `hook_otp/index.ts:19-23`. A tela do passo 2 confirma o envio ("O código verificador foi enviado para o WhatsApp …", `Login.tsx:88-95`).
 
 5. **(Opcional, decorrente de 1) Registrar `login_ok`/`cadastro_ok`/`otp_solicitado`/`otp_entregue`/`conta_criada_no_aceite`.** Estão declarados (`eventos_auth/index.ts:14-21`, `0027_eventos_auth.sql:25-32`) e nenhum é inserido em código não-teste. A história não exige explicitamente esses (só "o evento registrado" da recusa), mas o `conta_criada_no_aceite` reforçaria a auditoria de H1.4. Tratar como melhoria, não bloqueio.
 
