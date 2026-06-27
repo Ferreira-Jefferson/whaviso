@@ -13,7 +13,6 @@ import { extrairBotao, extrairTexto } from './inbound'
 import { gravarSessao } from './qr'
 
 const exigir = createRequire(import.meta.url)
-const MAX_RECONEXOES = 10
 
 interface EscritorQr {
   toFile: (caminho: string, texto: string, opcoes?: Record<string, unknown>) => Promise<void>
@@ -208,10 +207,6 @@ export class GerenciadorConexao {
 
   private agendarReconexao(espera: number): void {
     if (this.parado || this.reconectando) return
-    if (this.backoff.tentativas > MAX_RECONEXOES) {
-      this.deps.logger.error('limite de reconexões atingido; encerrando para que o systemd reinicie')
-      process.exit(1)
-    }
     this.reconectando = true
     setTimeout(() => {
       this.reconectando = false
