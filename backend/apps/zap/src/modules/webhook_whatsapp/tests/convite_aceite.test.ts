@@ -84,6 +84,7 @@ describe('E5 H5.1/H5.2: localizar pelo número + resumo + botões', () => {
     expect(m.botoes).toHaveLength(3)
     expect(m.botoes!.map((b) => b.id.split(':')[0])).toEqual(['aceite', 'dado_incorreto', 'recusa'])
     expect(m.botoes!.every((b) => b.id.endsWith(avisoId))).toBe(true) // payload leva aviso_id
+    expect(m.texto).toContain('Cobrador') // {{1}} = variável `cobrador` resolvida (rename 0063)
     expect(m.texto.toLowerCase()).not.toMatch(/d[ií]vida|cobran|atras/)
   })
 

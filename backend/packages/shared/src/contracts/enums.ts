@@ -90,9 +90,9 @@ export type ContextoTemplate = z.infer<typeof contextoTemplate>
 // ausente aqui faz GET /admin/mensagens falhar a validação Zod no front e a tela de
 // templates não carregar.
 //
-// FRONTEIRA E5 (H12.3 / M3): 'dado_incorreto' é a terceira opção do aceite (aceitar /
-// algum dado incorreto / recusar), gated até o convite por template Meta (família
-// convite.*) destravar no E5: o enum já a comporta; nada a emite hoje.
+// E5: 'dado_incorreto' é a terceira opção do aceite (aceitar / algum dado incorreto /
+// recusar). Emitida hoje no template convite.resumo, enviado pelo zap via Baileys (número
+// próprio, sem template aprovado na Meta); o webhook trata o toque (H5.4).
 export const acaoBotaoTemplate = z.enum([
   'ja_paguei',
   'optout',

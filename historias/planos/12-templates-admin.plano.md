@@ -76,10 +76,11 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 - `[x]` Área owner: `RequireRole role="owner"` no `/admin`; nav só no `NAV_OWNER.admin`.
 - `[~]` "Navegação reflete o catálogo (adicionar chave aparece no hub sem tela nova)": o hub é dirigido por `SECOES_MENSAGENS` (catálogo **estático do front**), não pelos templates do banco. Adicionar uma chave nova exige editar `catalogo_mensagens.ts` (1 entrada), não cria tela. Aceitável, mas a "fonte" do hub é o catálogo do front, não o backend — coerente com H12.1 `[~]`.
 
-### H12.10 Famílias ainda sem editor 🟡 — `[x]` (corretamente gated)
-- `[x]` `convite.*`: sem chave editável; aparece no hub com estado `gated` ("Depende da Meta"). Hoje convite por `wa.me` + página pública (Épico 5).
-- `[x]` `conta.*` (OTP/boas-vindas): no hub como `gated`/`planejado`.
-- `[x]` Quando ligarem, entram na mesma tabela/editor (modelo já comporta; basta adicionar a chave ao catálogo e semear o template). **Não implementar agora.**
+### H12.10 Famílias ainda sem editor 🟡 — `[x]`
+- `[x]` `convite.resumo` (resumo + 3 botões, H5.2): **agora editável** no hub (chave `convite.resumo`, variante padrão/revisão, botões aceitar/dado incorreto/recusar). Não depende mais da Meta: o resumo já sai pelo Baileys (`responderResumo`); a variável "quem recebe" foi padronizada de `nome_cobrador` para `cobrador` (migration 0063) para casar com a paleta do editor.
+- `[x]` `conta.*` (OTP): no hub como `fixo` (texto no zap, entregue por Baileys; vira template editável na Fase 2). `boas-vindas`: `planejado`.
+- `[x]` O estado `gated` ("Depende da Meta") saiu do catálogo: com Baileys (número próprio) nenhuma família depende de aprovação na Meta.
+- `[x]` Demais `convite.*` (pedir número, não encontrado, expirado, etc.) seguem como respostas fixas do fluxo; entram no editor se/quando precisarem (modelo já comporta).
 
 ### Divergências do épico — fechamento
 - **Aprovação manual vs Meta:** decisão de produto, não código. Listada em aberto.

@@ -8,7 +8,6 @@
 // e mostram um estado honesto:
 //   - 'em_breve': vai ganhar editor.
 //   - 'fixo': texto fixo no sistema, sem edição.
-//   - 'gated': depende de aprovação na Meta / fase ainda não ligada.
 //   - 'planejado': previsto, ainda sem implementação no backend.
 //
 // Linguagem das Regras de Ouro em toda string (aviso/lembrete/combinado).
@@ -16,7 +15,7 @@
 import { etapaEnvio, type AcaoBotaoTemplate, type EtapaEnvio } from '@/shared/contracts'
 import { ROTULO_ETAPA } from '@/shared/format'
 
-export type EstadoMensagem = 'em_breve' | 'fixo' | 'gated' | 'planejado'
+export type EstadoMensagem = 'em_breve' | 'fixo' | 'planejado'
 
 export interface MensagemItem {
   /** Nome curto e claro da mensagem. */
@@ -105,10 +104,18 @@ export const SECOES_MENSAGENS: SecaoMensagens[] = [
     variante: 'lista',
     mensagens: [
       {
+        // Resumo do combinado + 3 botões (aceitar / dado incorreto / recusar), enviado ao
+        // convidado quando ele abre o convite no WhatsApp (H5.2). Editável: o transporte é o
+        // Baileys (número próprio), não depende de template aprovado na Meta. A variante
+        // 'revisao' inclui a chave Pix para o cobrador conferir no fluxo invertido.
         nome: 'Convite (Aceitar ou Recusar)',
         destinatario: 'Convidado',
-        quando: 'Ao criar o combinado',
-        estado: 'gated',
+        quando: 'Ao abrir o convite no WhatsApp',
+        estado: 'fixo',
+        chave: 'convite.resumo',
+        variaveis: ['cobrador', 'nome_devedor', 'motivo', 'valor', 'data', 'pix_chave'],
+        acoes: ['aceite', 'dado_incorreto', 'recusa'],
+        temRevisao: true,
       },
       {
         nome: 'Confirmação de aceite',
@@ -197,7 +204,9 @@ export const SECOES_MENSAGENS: SecaoMensagens[] = [
         nome: 'Código de acesso',
         destinatario: 'Conta',
         quando: 'Login por telefone',
-        estado: 'gated',
+        // Entregue pelo nosso WhatsApp (Baileys via Send SMS Hook), não pela Meta.
+        // Texto fixo no zap hoje; na Fase 2 vira template editável no admin.
+        estado: 'fixo',
       },
       {
         nome: 'Boas-vindas',
@@ -216,7 +225,6 @@ export const ESTADO_MENSAGEM: Record<
 > = {
   em_breve: { rotulo: 'Editor em breve', classe: 'bg-ambar-claro text-ambar' },
   fixo: { rotulo: 'Texto fixo', classe: 'bg-papel-2 text-tinta-2' },
-  gated: { rotulo: 'Depende da Meta', classe: 'bg-revisao-claro text-revisao' },
   planejado: { rotulo: 'Planejado', classe: 'bg-papel-2 text-cinza-expirado' },
 }
 

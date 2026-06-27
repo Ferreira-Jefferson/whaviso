@@ -355,8 +355,11 @@ async function processarErroNumero(deps: DepsInbound, telefone: string): Promise
  */
 async function responderResumo(deps: DepsInbound, telefone: string, a: repo.AvisoConvite): Promise<void> {
   const invertido = a.criador_papel === 'devedor'
+  // `cobrador` = "quem vai receber" (mesmo nome de variável do ciclo/billing e da paleta do
+  // editor; a coluna do banco é nome_cobrador). Padronizado para o template ser editável em
+  // /admin/mensagens/convite.resumo sem variável órfã (ver migration 0063).
   const valores: Record<string, string> = {
-    nome_cobrador: a.nome_cobrador ?? '',
+    cobrador: a.nome_cobrador ?? '',
     nome_devedor: a.nome_devedor,
     motivo: a.motivo,
     valor: formatarValorBr(a.valor_centavos),

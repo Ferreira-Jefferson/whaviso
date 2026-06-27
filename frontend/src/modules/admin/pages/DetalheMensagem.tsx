@@ -317,9 +317,10 @@ const ROTULO_PADRAO: Record<AcaoBotaoTemplate, string> = {
   ver_pix: 'Ver chave Pix',
   optout: 'Não quero mais lembretes',
   ativar: 'Ativar lembretes',
-  aceite: 'Confirmar',
-  recusa: 'Recusar',
-  // 3ª opção do aceite (E5, gated): reservada para o convite por template Meta.
+  aceite: 'Aceitar',
+  recusa: 'Recusar combinado',
+  // 3ª opção do aceite (E5): no convite.resumo, "Algum dado está incorreto" (no invertido o
+  // owner costuma trocar por "Chave Pix incorreta").
   dado_incorreto: 'Algum dado está incorreto',
   // Confirmação de pagamento (E8): quem recebe confirma ou nega o recebimento.
   confirmar: 'Confirmar pagamento',

@@ -92,9 +92,9 @@ export type ContextoTemplate = z.infer<typeof contextoTemplate>
 // única ação fora do enum derruba a validação Zod de GET /admin/mensagens (z.array falha
 // inteiro) e a tela de templates deixa de carregar.
 //
-// FRONTEIRA E5 (H12.3 / M3): 'dado_incorreto' é a terceira opção do aceite (aceitar /
-// algum dado incorreto / recusar), gated até o convite por template Meta (família
-// convite.*) destravar no E5; nada a emite hoje.
+// E5: 'dado_incorreto' é a terceira opção do aceite (aceitar / algum dado incorreto /
+// recusar). Emitida hoje no template convite.resumo (editável em /admin/mensagens),
+// enviado pelo zap via Baileys (número próprio, sem template aprovado na Meta).
 export const acaoBotaoTemplate = z.enum([
   'ja_paguei',
   'optout',
