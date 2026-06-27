@@ -21,7 +21,8 @@ import {
 } from '@/shared/ui'
 import { ROTULO_TIPO_CHAVE } from '@/shared/format'
 import type { TipoChavePix } from '@/shared/contracts'
-import { useAuth, usePerfil, atualizarPerfil } from '@/shared/auth'
+import { useAuth, usePerfil, atualizarPerfil, mensagemDeErroAuth } from '@/shared/auth'
+import { atualizarTelefone, verificarNovoTelefone } from '@/shared/supabase'
 import {
   useChavesPix,
   useAtualizarChavePix,
@@ -63,6 +64,11 @@ function FormularioPerfil({ onSalvo }: { onSalvo: () => Promise<void> }) {
   const perfil = usePerfil()
   const [feedback, setFeedback] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  // Passo de verificação OTP quando o telefone muda.
+  const [verificandoPhone, setVerificandoPhone] = useState(false)
+  const [codigoPhone, setCodigoPhone] = useState('')
+  const [dadosParaSalvar, setDadosParaSalvar] = useState<PerfilForm | null>(null)
+  const [salvandoCodigo, setSalvandoCodigo] = useState(false)
 
   const {
     register,
@@ -81,20 +87,52 @@ function FormularioPerfil({ onSalvo }: { onSalvo: () => Promise<void> }) {
     }
   }, [perfil, reset])
 
+  async function salvarPerfil(dados: PerfilForm) {
+    await atualizarPerfil({ nome: dados.nome, telefone: dados.telefone })
+    await onSalvo()
+    setFeedback('Dados salvos.')
+    setVerificandoPhone(false)
+    setDadosParaSalvar(null)
+    setCodigoPhone('')
+  }
+
   async function onSubmit(dados: PerfilForm) {
     setFeedback(null)
     setErro(null)
+    const phoneChanged = dados.telefone && dados.telefone !== perfil?.telefone
+    if (phoneChanged) {
+      // Telefone novo: verificar posse via OTP antes de salvar.
+      const { error } = await atualizarTelefone(dados.telefone!)
+      if (error) {
+        setErro(mensagemDeErroAuth(error))
+        return
+      }
+      setDadosParaSalvar(dados)
+      setVerificandoPhone(true)
+      return
+    }
     try {
-      await atualizarPerfil({
-        nome: dados.nome,
-        telefone: dados.telefone,
-      })
-      await onSalvo()
-      setFeedback('Dados salvos.')
+      await salvarPerfil(dados)
     } catch (e) {
-      setErro(
-        e instanceof ApiError ? e.message : 'Não foi possível salvar. Tente novamente.',
-      )
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar. Tente novamente.')
+    }
+  }
+
+  async function confirmarCodigo() {
+    if (!dadosParaSalvar?.telefone) return
+    setErro(null)
+    setSalvandoCodigo(true)
+    try {
+      const { error } = await verificarNovoTelefone(dadosParaSalvar.telefone, codigoPhone)
+      if (error) {
+        setErro(mensagemDeErroAuth(error))
+        return
+      }
+      await salvarPerfil(dadosParaSalvar)
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar. Tente novamente.')
+    } finally {
+      setSalvandoCodigo(false)
     }
   }
 
@@ -125,11 +163,38 @@ function FormularioPerfil({ onSalvo }: { onSalvo: () => Promise<void> }) {
           />
         </Field>
 
-        <div className="flex justify-end pt-1">
-          <Button type="submit" loading={isSubmitting}>
-            Salvar perfil
-          </Button>
-        </div>
+        {verificandoPhone && dadosParaSalvar?.telefone && (
+          <Field label="Código recebido no WhatsApp">
+            <div className="flex gap-2">
+              <Input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                value={codigoPhone}
+                onChange={(e) => setCodigoPhone(e.target.value)}
+              />
+              <Button
+                type="button"
+                loading={salvandoCodigo}
+                onClick={confirmarCodigo}
+              >
+                Confirmar
+              </Button>
+            </div>
+            <p className="mt-1 text-xs text-tinta-2">
+              Enviamos um código para {dadosParaSalvar.telefone} para confirmar a troca.
+            </p>
+          </Field>
+        )}
+
+        {!verificandoPhone && (
+          <div className="flex justify-end pt-1">
+            <Button type="submit" loading={isSubmitting}>
+              Salvar perfil
+            </Button>
+          </div>
+        )}
       </form>
     </Card>
   )

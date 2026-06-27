@@ -215,8 +215,23 @@ export type StatusTelefoneBody = z.infer<typeof statusTelefoneBody>
 
 export const statusTelefoneResposta = z.object({
   existe: z.boolean(),
+  // 'phone': tem identidade phone (OTP funciona direto); 'google': conta Google sem identidade
+  // phone ainda (OTP vai criar conta temporária que o backend mescla); null: não existe.
+  metodo: z.enum(['phone', 'google']).nullable(),
 })
 export type StatusTelefoneResposta = z.infer<typeof statusTelefoneResposta>
+
+// ---- POST /v1/auth/verificar-sessao (autenticado; chamado logo após OTP login) ----
+// Detecta conta split (phone-only sem profile, mas com profile em outro user_id com
+// mesmo telefone) e retorna o magic_token para o frontend trocar a sessão. Casos:
+//   'ok': usuário phone existente (já tem profile) ou usuário Google, sem ação.
+//   'novo': phone-only sem match de profile, vai para onboarding.
+//   'mesclado': split detectado e resolvido, usar magic_token para trocar a sessão.
+export const verificarSessaoResposta = z.object({
+  tipo: z.enum(['ok', 'novo', 'mesclado']),
+  magic_token: z.string().optional(),
+})
+export type VerificarSessaoResposta = z.infer<typeof verificarSessaoResposta>
 
 // ---- POST /v1/acao/:token (público) ----
 export const acaoBody = z.object({

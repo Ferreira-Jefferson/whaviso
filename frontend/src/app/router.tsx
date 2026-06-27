@@ -12,6 +12,7 @@ import { Spinner } from '@/shared/ui'
 import { PublicLayout } from './layouts/PublicLayout'
 import { AppShell } from './layouts/AppShell'
 import { ErrorBoundary } from './ErrorBoundary'
+import { AppError } from './AppError'
 import {
   RequireAuth,
   RequireRole,
@@ -71,6 +72,7 @@ function RedirectAvisos() {
 const router = createBrowserRouter([
   {
     element: <ComSuspense />,
+    errorElement: <AppError />,
     children: [
       // ---- LANDING (layout próprio de marketing, largo) ----
       // Logado: vai direto para a home do papel (cobre clique no logo, que aponta p/ "/").

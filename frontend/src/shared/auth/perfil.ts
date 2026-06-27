@@ -6,23 +6,42 @@ import { ApiError, apiClient } from '../api_client'
 import {
   perfilSchema,
   statusTelefoneResposta,
+  verificarSessaoResposta,
   type AtualizarPerfilBody,
   type Perfil,
   type StatusTelefoneResposta,
+  type VerificarSessaoResposta,
 } from '../contracts'
 
 /**
- * H1.2/H1.3: pergunta ao backend se o número já tem cadastro, para escolher a copy do
- * OTP (login vs cadastro). Rota pública (sem sessão). Em falha, devolve null e a UI
- * segue com a copy neutra de "enviar código".
+ * H1.2/H1.3: pergunta ao backend se o número já tem cadastro e qual o método de login.
+ * 'phone': pode entrar por OTP. 'google': deve entrar pelo Google (bloqueia OTP).
+ * null: número novo. Em falha retorna null e a UI segue com copy neutra.
  */
-export async function statusTelefone(telefoneE164: string): Promise<boolean | null> {
+export async function statusTelefone(
+  telefoneE164: string,
+): Promise<{ existe: boolean; metodo: 'phone' | 'google' | null } | null> {
   try {
     const r = await apiClient.post<StatusTelefoneResposta>('/auth/status-telefone', {
       body: { telefone: telefoneE164 },
       schema: statusTelefoneResposta,
     })
-    return r.existe
+    return { existe: r.existe, metodo: r.metodo }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Chamada logo após verificarCodigoWhatsapp. Detecta se a conta phone-only recém-criada
+ * é um "split" de uma conta Google existente e retorna o magic_token para resolver.
+ * Retorna null em falha de rede (o frontend trata como 'novo').
+ */
+export async function verificarSessao(): Promise<VerificarSessaoResposta | null> {
+  try {
+    return await apiClient.post<VerificarSessaoResposta>('/auth/verificar-sessao', {
+      schema: verificarSessaoResposta,
+    })
   } catch {
     return null
   }

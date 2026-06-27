@@ -21,6 +21,12 @@ export interface ContaPorTelefone {
   jaExistia: boolean
 }
 
+/** Resultado do merge de conta split (phone-only → Google). */
+export interface ResultadoMesclagem {
+  /** Token hashed para o frontend fazer verifyOtp e obter sessão da conta Google. null se o merge falhou. */
+  magicToken: string | null
+}
+
 /**
  * Cria (ou reaproveita) um usuário no Supabase Auth a partir do TELEFONE, já confirmado.
  *
@@ -37,6 +43,26 @@ export interface AdminSupabase {
     telefoneE164: string,
     nome: string,
   ): Promise<ContaPorTelefone>
+
+  /**
+   * Merge de conta split (H1.2): um usuário logou por OTP e Supabase criou uma conta
+   * phone-only separada da conta Google que já existia para aquele telefone.
+   *
+   * Sequência:
+   *  1. Busca e-mail do usuário Google (necessário para gerar o magic link).
+   *  2. Gera magic link para o usuário Google (obter antes de qualquer deleção).
+   *  3. Deleta o usuário phone-only (libera o número para o próximo passo).
+   *  4. Vincula o telefone à conta Google (phone identity).
+   *  5. Devolve o hashed_token; o frontend troca a sessão pelo Google account.
+   *
+   * Retorna { magicToken: null } em qualquer falha: o frontend trata como "novo
+   * usuário" (onboarding) em vez de expor o erro ao usuário.
+   */
+  mesclarContas(
+    phoneUserId: string,
+    googleUserId: string,
+    telefoneE164: string,
+  ): Promise<ResultadoMesclagem>
 }
 
 interface UsuarioGoTrue {
@@ -71,6 +97,48 @@ export function criarAdminSupabase(supabaseUrl: string, serviceRoleKey: string):
   }
 
   return {
+    async mesclarContas(phoneUserId, googleUserId, telefoneE164) {
+      // 1. Busca e-mail do usuário Google.
+      const userResp = await fetch(`${base}/auth/v1/admin/users/${googleUserId}`, {
+        method: 'GET',
+        headers,
+      })
+      if (!userResp.ok) return { magicToken: null }
+      const googleUser = (await userResp.json()) as { email?: string }
+      const email = googleUser.email
+      if (!email) return { magicToken: null }
+
+      // 2. Gera magic link antes de qualquer deleção (garante o token mesmo se os
+      //    passos seguintes falharem parcialmente).
+      const linkResp = await fetch(`${base}/auth/v1/admin/generate_link`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ type: 'magiclink', email }),
+      })
+      if (!linkResp.ok) return { magicToken: null }
+      const linkData = (await linkResp.json()) as { hashed_token?: string }
+      const magicToken = linkData.hashed_token ?? null
+      if (!magicToken) return { magicToken: null }
+
+      // 3. Deleta o usuário phone-only (libera o número; sem o '+' no GoTrue).
+      await fetch(`${base}/auth/v1/admin/users/${phoneUserId}`, {
+        method: 'DELETE',
+        headers,
+      }).catch(() => undefined)
+
+      // 4. Vincula o telefone à conta Google.
+      await fetch(`${base}/auth/v1/admin/users/${googleUserId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          phone: telefoneE164.replace(/^\+/, ''),
+          phone_confirm: true,
+        }),
+      }).catch(() => undefined)
+
+      return { magicToken }
+    },
+
     async garantirContaPorTelefone(telefoneE164, nome) {
       const resp = await fetch(`${base}/auth/v1/admin/users`, {
         method: 'POST',

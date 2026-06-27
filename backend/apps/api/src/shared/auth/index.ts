@@ -29,6 +29,8 @@ declare module 'fastify' {
   interface FastifyRequest {
     /** uid do Supabase Auth; preenchido pelo preHandler `autenticar`. */
     userId: string
+    /** Telefone E.164 do JWT (só presente em sessões phone-OTP); null em sessões Google. */
+    userPhone: string | null
   }
   interface FastifyInstance {
     autenticar: preHandlerHookHandler
@@ -43,6 +45,7 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
   const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`))
 
   app.decorateRequest('userId', '')
+  app.decorateRequest('userPhone', null)
 
   async function verificar(req: FastifyRequest): Promise<void> {
     const header = req.headers.authorization
@@ -51,6 +54,7 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
       const { payload } = await jwtVerify(header.slice('Bearer '.length), jwks, { issuer })
       if (!payload.sub) throw new Error('sem sub')
       req.userId = payload.sub
+      req.userPhone = typeof payload.phone === 'string' ? payload.phone : null
     } catch {
       throw naoAutorizado('Token inválido ou expirado')
     }

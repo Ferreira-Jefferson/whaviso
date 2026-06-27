@@ -3,8 +3,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Button, Field, Input, Banner } from '@/shared/ui'
-import { enviarCodigoWhatsapp, verificarCodigoWhatsapp } from '@/shared/supabase'
-import { mensagemDeErroAuth, statusTelefone } from '@/shared/auth'
+import { enviarCodigoWhatsapp, verificarCodigoWhatsapp, completarMesclagem } from '@/shared/supabase'
+import { mensagemDeErroAuth, statusTelefone, verificarSessao } from '@/shared/auth'
 import { AuthCard } from '../components/AuthCard'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import {
@@ -51,14 +51,15 @@ export default function LoginPage() {
       setErroGeral('Telefone inválido. Confira o DDD e o número.')
       return
     }
-    // Antes de enviar, descobre a copy (login vs cadastro). Não bloqueia se falhar.
-    const existe = await statusTelefone(e164)
+    // Consulta o status do número apenas para determinar a copy (login vs cadastro).
+    // Não bloqueia mais pelo método: conta split é resolvida pelo backend após o OTP.
+    const status = await statusTelefone(e164)
     const { error } = await enviarCodigoWhatsapp(e164)
     if (error) {
       setErroGeral(mensagemDeErroAuth(error))
       return
     }
-    setJaCadastrado(existe)
+    setJaCadastrado(status?.existe ?? null)
     setTelefoneEnviado(e164)
   }
 
@@ -70,7 +71,13 @@ export default function LoginPage() {
       setErroGeral(mensagemDeErroAuth(error))
       return
     }
-    // O AuthProvider resolve o perfil; os guards levam à home/onboarding.
+    // Detecta conta split (phone-only sem profile, mas phone já existe numa conta Google).
+    // Se houver merge, troca a sessão transparentemente antes de navegar.
+    const resultado = await verificarSessao()
+    if (resultado?.tipo === 'mesclado' && resultado.magic_token) {
+      await completarMesclagem(resultado.magic_token)
+    }
+    // AuthProvider resolve o perfil pela mudança de sessão; guards levam à home/onboarding.
     navigate(next ?? '/app', { replace: true })
   }
 

@@ -178,8 +178,19 @@ export type StatusTelefoneBody = z.infer<typeof statusTelefoneBody>
 
 export const statusTelefoneResposta = z.object({
   existe: z.boolean(),
+  metodo: z.enum(['phone', 'google']).nullable(),
 })
 export type StatusTelefoneResposta = z.infer<typeof statusTelefoneResposta>
+
+// ---- POST /v1/auth/verificar-sessao (autenticado; chamado após OTP login) ----
+// 'ok': phone user existente ou Google, sem ação.
+// 'novo': novo usuário, vai para onboarding.
+// 'mesclado': split resolvido, usar magic_token para trocar a sessão para a conta Google.
+export const verificarSessaoResposta = z.object({
+  tipo: z.enum(['ok', 'novo', 'mesclado']),
+  magic_token: z.string().optional(),
+})
+export type VerificarSessaoResposta = z.infer<typeof verificarSessaoResposta>
 
 // ---- POST /v1/acao/:token (público) ----
 export const acaoBody = z.object({

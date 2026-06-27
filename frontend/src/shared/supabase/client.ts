@@ -55,6 +55,28 @@ export async function verificarCodigoWhatsapp(telefone: string, codigo: string) 
   return supabase.auth.verifyOtp({ phone: telefone, token: codigo, type: 'sms' })
 }
 
+/**
+ * Usuário já logado (Google ou phone) quer vincular/trocar o telefone: envia OTP
+ * via Send SMS Hook para o novo número. O Supabase linka a identidade phone ao
+ * usuário atual ao confirmar. Não cria conta nova.
+ */
+export async function atualizarTelefone(telefone: string) {
+  return supabase.auth.updateUser({ phone: telefone })
+}
+
+/** Confirma o OTP de troca/vinculação de telefone (type phone_change). */
+export async function verificarNovoTelefone(telefone: string, codigo: string) {
+  return supabase.auth.verifyOtp({ phone: telefone, token: codigo, type: 'phone_change' })
+}
+
+/**
+ * Troca a sessão phone-only pela sessão da conta Google após merge server-side.
+ * Usa o hashed_token devolvido por `POST /auth/verificar-sessao` (magic link flow).
+ */
+export async function completarMesclagem(magicToken: string) {
+  return supabase.auth.verifyOtp({ token_hash: magicToken, type: 'email' })
+}
+
 export async function signOut() {
   return supabase.auth.signOut()
 }

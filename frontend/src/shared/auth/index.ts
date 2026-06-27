@@ -1,6 +1,6 @@
 export { AuthProvider } from './AuthProvider'
 export { useAuth, useSession, useRole, usePerfil } from './hooks'
-export { atualizarPerfil, buscarPerfil, perfilIncompleto, statusTelefone } from './perfil'
+export { atualizarPerfil, buscarPerfil, perfilIncompleto, statusTelefone, verificarSessao } from './perfil'
 export { homeDoPapel } from './papeis'
 export { useTemVinculoDevedor } from './useVinculoDevedor'
 export { mensagemDeErroAuth } from './erros'

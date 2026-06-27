@@ -87,9 +87,17 @@ export const perfilRoutes: FastifyPluginAsync = async (raiz) => {
           )
           perfil = rows[0]
         }
-        // Definiu um telefone → puxa os avisos abertos por esse número para esta conta.
+        // Definiu um telefone → puxa os avisos abertos por esse número, MAS SÓ se o
+        // telefone foi verificado via OTP (identidade phone em auth.identities). Evita
+        // que um usuário Google "puxe" avisos de um número que não comprovou possuir.
         if (typeof telefone === 'string' && telefone.length > 0) {
-          await vincularAvisosPorTelefone(cli, req.userId, telefone)
+          const { rows: idRows } = await cli.query<{ tem: boolean }>(
+            `select public.usuario_tem_identidade_phone($1::uuid) as tem`,
+            [req.userId],
+          )
+          if (idRows[0]?.tem) {
+            await vincularAvisosPorTelefone(cli, req.userId, telefone)
+          }
         }
         return perfil
       })

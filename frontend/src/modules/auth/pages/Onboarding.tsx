@@ -3,37 +3,35 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Navigate, useNavigate } from 'react-router'
 import { Button, Field, Input, Banner, Spinner } from '@/shared/ui'
-import { useAuth, atualizarPerfil, homeDoPapel } from '@/shared/auth'
+import { useAuth, atualizarPerfil, homeDoPapel, mensagemDeErroAuth } from '@/shared/auth'
+import { atualizarTelefone, verificarNovoTelefone } from '@/shared/supabase'
 import { ApiError } from '@/shared/api_client'
 import { AuthCard } from '../components/AuthCard'
-import { onboardingSchema, paraE164, type OnboardingForm } from '../schemas'
+import { onboardingSchema, codigoOtpSchema, paraE164, type OnboardingForm, type CodigoOtpForm } from '../schemas'
 
-// Tela curta pós-signup/primeiro login: o trigger do backend cria o profile com
-// nome vazio (role 'user' por padrão), então aqui coletamos nome e WhatsApp e fazemos
-// PATCH /v1/perfil. O WhatsApp serve para "puxar" os avisos abertos para esse número
-// (backfill por telefone na api). Depois → home do papel. O Pix NÃO é pedido aqui, só
-// no cadastro de um aviso (NovoAviso).
+// Tela curta pós-signup/primeiro login: coletamos nome e WhatsApp.
+// Para usuários Google, o WhatsApp passa por verificação OTP via updateUser
+// (Supabase linka a identidade phone à conta Google existente). Só depois o
+// PATCH /perfil salva o telefone e o backfill de avisos acontece com segurança.
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const { status, profile, precisaOnboarding, role, recarregarPerfil } = useAuth()
   const [erroGeral, setErroGeral] = useState<string | null>(null)
+  // null = passo 1 (dados); string E.164 = passo 2 (código recebido no WhatsApp)
+  const [telefoneVerificando, setTelefoneVerificando] = useState<string | null>(null)
+  const [dadosPendentes, setDadosPendentes] = useState<OnboardingForm | null>(null)
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<OnboardingForm>({ resolver: zodResolver(onboardingSchema) })
+  const formDados = useForm<OnboardingForm>({ resolver: zodResolver(onboardingSchema) })
+  const formCodigo = useForm<CodigoOtpForm>({ resolver: zodResolver(codigoOtpSchema) })
 
-  // Pré-preenche se já houver algum dado parcial no perfil.
   useEffect(() => {
     if (profile) {
-      reset({
+      formDados.reset({
         nome: profile.nome || '',
         telefone: profile.telefone ?? '',
       })
     }
-  }, [profile, reset])
+  }, [profile, formDados])
 
   if (status === 'carregando') {
     return (
@@ -43,28 +41,91 @@ export default function OnboardingPage() {
     )
   }
 
-  // Sem sessão → login. Perfil já completo → segue para a home do papel.
   if (status === 'deslogado') return <Navigate to="/entrar" replace />
   if (!precisaOnboarding) return <Navigate to={homeDoPapel(role)} replace />
 
-  async function onSubmit(dados: OnboardingForm) {
+  // ---- Passo 1: nome + WhatsApp ----
+  async function onSubmitDados(dados: OnboardingForm) {
     setErroGeral(null)
+    const e164 = paraE164(dados.telefone)
+    if (!e164) {
+      setErroGeral('Telefone inválido. Confira o DDD e o número.')
+      return
+    }
+    // Envia OTP via updateUser: o Supabase vincula a identidade phone ao usuário logado
+    // (Google ou phone), garantindo posse do número antes do backfill.
+    const { error } = await atualizarTelefone(e164)
+    if (error) {
+      setErroGeral(mensagemDeErroAuth(error))
+      return
+    }
+    setDadosPendentes(dados)
+    setTelefoneVerificando(e164)
+  }
+
+  // ---- Passo 2: código recebido no WhatsApp ----
+  async function onConfirmarCodigo(dados: CodigoOtpForm) {
+    if (!telefoneVerificando || !dadosPendentes) return
+    setErroGeral(null)
+    const { error } = await verificarNovoTelefone(telefoneVerificando, dados.codigo)
+    if (error) {
+      setErroGeral(mensagemDeErroAuth(error))
+      return
+    }
     try {
-      // PATCH retorna o perfil atualizado (com o role definitivo do banco).
       const atualizado = await atualizarPerfil({
-        nome: dados.nome,
-        telefone: paraE164(dados.telefone),
+        nome: dadosPendentes.nome,
+        telefone: telefoneVerificando,
       })
-      // Sincroniza o provider; o redirect usa o role da resposta (não o do closure).
       await recarregarPerfil()
       navigate(homeDoPapel(atualizado.role), { replace: true })
     } catch (err) {
-      if (err instanceof ApiError) {
-        setErroGeral(err.message)
-        return
-      }
-      setErroGeral('Não foi possível salvar. Tente novamente.')
+      setErroGeral(err instanceof ApiError ? err.message : 'Não foi possível salvar. Tente novamente.')
     }
+  }
+
+  if (telefoneVerificando) {
+    return (
+      <AuthCard
+        titulo="Confirme seu WhatsApp"
+        subtitulo={`Enviamos um código para ${telefoneVerificando}. Digite abaixo para confirmar.`}
+      >
+        <form
+          onSubmit={formCodigo.handleSubmit(onConfirmarCodigo)}
+          className="flex flex-col gap-4"
+          noValidate
+        >
+          {erroGeral && <Banner tom="erro">{erroGeral}</Banner>}
+
+          <Field label="Código" erro={formCodigo.formState.errors.codigo?.message}>
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              {...formCodigo.register('codigo')}
+            />
+          </Field>
+
+          <Button type="submit" loading={formCodigo.formState.isSubmitting} className="w-full">
+            Confirmar
+          </Button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTelefoneVerificando(null)
+              setDadosPendentes(null)
+              setErroGeral(null)
+              formCodigo.reset()
+            }}
+            className="text-sm text-tinta-2 hover:text-salvia hover:underline"
+          >
+            Usar outro número
+          </button>
+        </form>
+      </AuthCard>
+    )
   }
 
   return (
@@ -72,23 +133,23 @@ export default function OnboardingPage() {
       titulo="Vamos completar seu cadastro"
       subtitulo="Informe seu nome e seu WhatsApp."
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+      <form onSubmit={formDados.handleSubmit(onSubmitDados)} className="flex flex-col gap-4" noValidate>
         {erroGeral && <Banner tom="erro">{erroGeral}</Banner>}
 
-        <Field label="Seu nome" erro={errors.nome?.message}>
-          <Input autoComplete="name" placeholder="Como devemos te chamar?" {...register('nome')} />
+        <Field label="Seu nome" erro={formDados.formState.errors.nome?.message}>
+          <Input autoComplete="name" placeholder="Como devemos te chamar?" {...formDados.register('nome')} />
         </Field>
 
         <Field
           label="Seu WhatsApp"
-          dica="Usamos para encontrar os avisos registrados para o seu WhatsApp."
-          erro={errors.telefone?.message}
+          dica="Vamos confirmar com um código enviado por mensagem."
+          erro={formDados.formState.errors.telefone?.message}
         >
-          <Input type="tel" autoComplete="tel" placeholder="(11) 99999-8888" {...register('telefone')} />
+          <Input type="tel" autoComplete="tel" placeholder="(11) 99999-8888" {...formDados.register('telefone')} />
         </Field>
 
-        <Button type="submit" loading={isSubmitting} className="w-full">
-          Concluir
+        <Button type="submit" loading={formDados.formState.isSubmitting} className="w-full">
+          Enviar código
         </Button>
       </form>
     </AuthCard>

@@ -204,6 +204,10 @@ export function adminFakeSupabase(): AdminSupabase {
       await poolSuper.query(`insert into auth.users (id) values ($1)`, [id])
       return { uid: id, jaExistia: false }
     },
+    // Merge não é exercido nos testes unitários (depende de rede GoTrue real).
+    async mesclarContas() {
+      return { magicToken: null }
+    },
   }
 }
 
