@@ -209,8 +209,8 @@ export class GerenciadorConexao {
   private agendarReconexao(espera: number): void {
     if (this.parado || this.reconectando) return
     if (this.backoff.tentativas > MAX_RECONEXOES) {
-      this.deps.logger.error('limite de reconexões atingido; WhatsApp ficará desconectado até reiniciar')
-      return
+      this.deps.logger.error('limite de reconexões atingido; encerrando para que o systemd reinicie')
+      process.exit(1)
     }
     this.reconectando = true
     setTimeout(() => {
