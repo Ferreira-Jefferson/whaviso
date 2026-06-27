@@ -18,9 +18,8 @@ import {
 // Login por WhatsApp (OTP de 6 dígitos): o Supabase gera o código e o nosso `zap`
 // (Baileys) entrega pelo WhatsApp via Send SMS Hook. A copy do passo 2 varia entre
 // "login" (número já cadastrado) e "cadastro" (número novo), decidido por um GET ao
-// backend (/auth/status-telefone). A ENTREGA do OTP a +55 ainda é gated pela
-// verificação de empresa na Meta + template de Autenticação aprovado; o fluxo de
-// código já fica pronto. Para esconder de novo, volte a flag para false.
+// backend (/auth/status-telefone). A entrega usa o nosso número (Baileys), então não
+// depende da Meta. Para esconder de novo, volte a flag para false.
 const WHATSAPP_LOGIN_ATIVO = true
 
 export default function LoginPage() {

@@ -104,8 +104,8 @@ Como **owner**, quero uma tela que lista todas as mensagens do produto agrupadas
 ### H12.10: Famílias ainda sem editor 🟡
 Como **owner**, quero que as mensagens que hoje não têm chave editável sejam migradas para o mesmo modelo, para um dia editar tudo no mesmo lugar.
 *Critérios de aceite:*
-- [ ] 🟡 A família `convite.*` (convite por template Meta com botões aceitar/recusar) **ainda não tem chave editável**: depende da Meta oficial (gated, ver CLAUDE.md / Épico 5). Hoje o convite sai por link `wa.me` + página pública.
-- [ ] 🟡 A família `conta.*` (OTP de login, boas-vindas) **ainda não tem editor**: o OTP é gated por verificação Meta (ver Épico 1 / memória de auth).
+- [ ] 🟢 A família `convite.*`: o **resumo do aceite** (`convite.resumo`, botões aceitar/dado incorreto/recusar) **já é editável** no hub, sem depender da Meta (sai pelo Baileys). O convite inicial continua saindo por link `wa.me` que o criador compartilha (H5.1, por design); as demais respostas `convite.*` (pedir número, expirado, etc.) seguem como texto do fluxo e entram no editor quando precisarem.
+- [ ] 🟡 A família `conta.*` (OTP de login, boas-vindas) **ainda não tem editor**: o OTP é texto fixo no `zap` hoje (entregue por Baileys, não gated por Meta); na Fase 2 vira template editável.
 - [ ] 🟡 Quando ligadas, essas famílias entram **na mesma tabela e no mesmo editor**, sem modelo paralelo.
 
 ---
@@ -114,8 +114,8 @@ Como **owner**, quero que as mensagens que hoje não têm chave editável sejam 
 
 > A consolidação de templates já foi feita no código (uma tabela, um editor, zap genérico). As divergências aqui são pontos a **confirmar/fechar** na fase de validação, não reescritas grandes.
 
-- **Aprovação manual vs Meta:** o passo de "aprovar" (H12.5) hoje é **manual** (era da época em que o transporte era Meta e a aprovação vinha do template oficial). Confirmar se o fluxo manual atual bate com a história e se some/permanece quando voltar à Meta oficial.
-- **Famílias sem editor (`convite.*`, `conta.*`):** estão fora do editor por serem gated; a história prevê que entrem no mesmo modelo. Verificar se já existe chave reservada ou se entra só quando ligar.
+- **Aprovação manual (definitiva com Baileys):** o passo de "aprovar" (H12.5) é **manual**. Como o transporte é Baileys (número próprio), não há aprovação de template na Meta para substituí-lo: o passo manual é o modelo, não um stopgap. Só voltaria a ser a aprovação oficial se/quando migrar para a Meta.
+- **Famílias sem editor (`conta.*`):** `convite.resumo` já entrou no editor (Baileys); falta o `conta.*` (OTP/boas-vindas), hoje texto fixo no `zap`, que entra no mesmo modelo na Fase 2.
 - **Garantia de linguagem no editor:** as regras de ouro (palavras proibidas, travessão, gênero neutro) precisam ser **validadas ao salvar** o template, não só confiar no owner. Amarração com o Épico 13 (`contracts/linguagem.ts` / dicionário do front); confirmar se a validação roda no editor hoje.
 
 ### Decisões tomadas
@@ -127,7 +127,7 @@ Como **owner**, quero que as mensagens que hoje não têm chave editável sejam 
 - **Preview sem envio**, mesmo renderizador do envio real.
 - **zap genérico:** nenhuma string de negócio no código; carrega a versão ativa por chave/contexto e renderiza.
 - **Hub `/admin/templates` + editor `/admin/mensagens/:chave`**, área owner, dirigidos pelo catálogo.
-- **`convite.*` e `conta.*` ficam gated**, mas no mesmo modelo quando ligarem.
+- **`convite.resumo` é editável** (Baileys); `conta.*` (OTP) entra no mesmo modelo na Fase 2. Nenhuma família depende da Meta.
 
 ### Decisões em aberto
 - Nenhuma pendente neste épico.
@@ -135,5 +135,5 @@ Como **owner**, quero que as mensagens que hoje não têm chave editável sejam 
 ### Fora de escopo deste épico
 - ❌ Textos finais de cada mensagem (copy): aqui é o **mecanismo** de edição, não o conteúdo.
 - ❌ Regras de linguagem/compliance em si (palavras proibidas, opt-out, gênero neutro): Épico 13.
-- ❌ Aprovação de template Meta oficial e convite por template com botões: gated (Épicos 1 e 5).
+- ❌ Aprovação de template Meta oficial: só relevante numa futura migração para a Meta (o convite por botões já funciona via Baileys, Épico 5).
 - ❌ Qual variável existe em cada chave (catálogo de conteúdo): é dado do catálogo, não história.

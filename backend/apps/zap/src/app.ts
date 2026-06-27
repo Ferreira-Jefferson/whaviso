@@ -34,7 +34,7 @@ export async function criarApp(deps: DepsZap) {
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
 
-  // Preserva o corpo cru p/ validar a assinatura Standard Webhooks do /hooks/sms.
+  // Preserva o corpo cru p/ validar a assinatura Standard Webhooks do /hooks/send-code.
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, corpo, done) => {
     ;(req as { rawBody?: Buffer }).rawBody = corpo as Buffer
     if ((corpo as Buffer).length === 0) return done(null, undefined)

@@ -62,7 +62,7 @@ Resumo: a infraestrutura de auth está sólida (JWKS local, conta nasce free, fr
 |---|---|---|---|
 | Toda rota protegida exige `Authorization: Bearer <jwt>` e valida via JWKS | [x] | `backend/apps/api/src/shared/auth/index.ts:42-62` (`createRemoteJWKSet` + `jwtVerify` por issuer); `preHandler: app.autenticar` nas rotas protegidas (ex.: `perfil/index.ts:52`) | `auth.test.ts:116-122` (sem token → 401) |
 | Token inválido/expirado → envelope `{ error: { code, message } }` com 401 | [x] | `auth/index.ts:49,54` (`naoAutorizado`); `auth.test.ts:121` confirma `error.code === 'nao_autorizado'` | `auth.test.ts:116-122` |
-| Rotas públicas (ex.: webhook WhatsApp) não exigem JWT e usam mecanismo próprio | [x] | `/auth/status-telefone` público com rate-limit (`auth/index.ts:17-23`); `/hooks/sms` valida assinatura Standard Webhooks (`hook_otp/index.ts:36-45`); webhook do zap por HMAC | `auth.test.ts:33-55`; `hook_otp.test.ts` |
+| Rotas públicas (ex.: webhook WhatsApp) não exigem JWT e usam mecanismo próprio | [x] | `/auth/status-telefone` público com rate-limit (`auth/index.ts:17-23`); `/hooks/send-code` valida assinatura Standard Webhooks (`hook_otp/index.ts:36-45`); webhook do zap por HMAC | `auth.test.ts:33-55`; `hook_otp.test.ts` |
 
 ### H1.7: Manter sessão e sair 🟢
 

@@ -32,6 +32,7 @@ Como **pessoa sem conta**, quero me cadastrar confirmando no próprio WhatsApp, 
 *Critérios de aceite:*
 - [ ] Informo um número que ainda não tem cadastro.
 - [ ] Recebo no WhatsApp: *"Olá, eu sou o Whaviso, identificamos uma tentativa de cadastro com seu número"*, com botões **Sim, sou eu** e **Não fui eu**.
+- [ ] A mensagem de cadastro também pede para **salvar o contato do Whaviso**: como o número é próprio (Baileys), é por aqui que as mensagens seguintes (lembretes, avisos) vão chegar.
 - [ ] Ao tocar **Sim, sou eu**, a conta é criada e eu já acesso o sistema.
 - [ ] Ao tocar **Não fui eu**, o cadastro é abortado e o evento registrado.
 - [ ] Nos acessos seguintes, esse número passa a receber a mensagem **de login** (H1.2), não a de cadastro.
@@ -77,7 +78,7 @@ Como **usuário logado**, quero permanecer logado entre visitas e poder sair, pa
 ---
 
 ### Decisões em aberto
-- **Login WhatsApp: botão vs código.** As histórias H1.2/H1.3 descrevem aprovação por **botão** (*Acessar / Negar*, *Sim sou eu / Não fui eu*). A doc atual (CLAUDE.md, plano de auth) prevê **OTP por código** de 6 dígitos via Supabase Auth (`POST /hooks/sms`), do qual o JWT sai pronto do Supabase. O fluxo por botão tem UX melhor mas o Supabase não emite sessão a partir de um clique, exigiria a gente emitir/gerenciar o JWT (ou um adaptador). Decidir antes de implementar; na validação vai aparecer como divergência.
+- **Login WhatsApp: botão vs código.** As histórias H1.2/H1.3 descrevem aprovação por **botão** (*Acessar / Negar*, *Sim sou eu / Não fui eu*). A doc atual (CLAUDE.md, plano de auth) prevê **OTP por código** de 6 dígitos via Supabase Auth (`POST /hooks/send-code`), do qual o JWT sai pronto do Supabase. O fluxo por botão tem UX melhor mas o Supabase não emite sessão a partir de um clique, exigiria a gente emitir/gerenciar o JWT (ou um adaptador). Decidir antes de implementar; na validação vai aparecer como divergência.
 
 ### Fora de escopo deste épico (escopo negativo)
 - ❌ Cadastro/login por e-mail e senha (decisão de 2026-06-17).

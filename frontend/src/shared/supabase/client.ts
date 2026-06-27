@@ -8,7 +8,7 @@
 //   1. Google via Identity Services + signInWithIdToken (o consentimento roda na NOSSA
 //      origem, não redireciona pro supabase.co → o Google mostra o nosso app).
 //   2. WhatsApp OTP (phone auth + Send SMS Hook; o nosso `zap` entrega o código via
-//      Baileys). A entrega a +55 ainda é gated por verificação de empresa na Meta.
+//      Baileys, pelo nosso número). A entrega não depende da Meta.
 import { createClient, type Session } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL

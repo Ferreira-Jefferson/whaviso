@@ -21,8 +21,9 @@ Runbook para preparar o VPS do zero e deixar o sistema pronto para receber o pro
                   /                         \
         SPA estatica                   api.whaviso.com
      /var/www/whaviso              -> 127.0.0.1:3001 (api)
+                                    -> /hooks/ -> 127.0.0.1:3002 (zap, Send SMS Hook)
 
-  zap :3002  -> nao exposto (so firewall interno; expor so ao ligar o OTP)
+  zap :3002  -> so /hooks/ exposto (sob api.whaviso.com); resto so no firewall interno
   api/zap    -> Supabase cloud (Postgres + Auth)
 ```
 
@@ -373,29 +374,15 @@ nc -6 -vz db.exxczsyjvgjsxmwlrwww.supabase.co 5432
 
   Mantenha o sufixo `.<ref>` no usuario e use as senhas dos roles `whaviso_api`/`whaviso_zap` do `production.env`. **Use a porta 5432 (session pooler), nunca a 6543 (transaction pooler):** o app usa transacoes com `FOR UPDATE SKIP LOCKED` e pools de vida longa, que o session pooler suporta como uma conexao direta.
 
-## Apendice B: habilitar o OTP por telefone (expor o zap depois)
+## Apendice B: habilitar o OTP por telefone
 
-Hoje o zap **nao** e exposto a internet (so o firewall interno). Quando ligar o login por OTP de telefone, o Send SMS Hook do Supabase precisa alcancar `/hooks/sms` do zap por HTTPS:
+O Send SMS Hook do Supabase (nuvem) entrega o codigo chamando `/hooks/send-code` do zap por HTTPS. O [nginx/whaviso.conf](nginx/whaviso.conf) **ja expoe esse path**: sob `api.whaviso.com`, um `location /hooks/` faz proxy para o zap (`127.0.0.1:3002`), enquanto `/` continua indo pro api (`:3001`). nginx casa o prefixo mais especifico, entao `/hooks/send-code` cai no zap e o resto na api. **Sem subdominio novo e sem DNS/cert novo** (o `api.whaviso.com` ja existe e o cert `*.whaviso.com` ja cobre).
 
-1. Cloudflare: registro `A hooks` -> `SEU_IP` (proxied), incluido no cert de origem (`*.whaviso.com` ja cobre).
-2. nginx: adicione um `server` so para `hooks.whaviso.com` que faz proxy **apenas** de `/hooks/` para `127.0.0.1:3002` e responde 404 no resto:
+Para ligar:
 
-   ```nginx
-   server {
-       listen 443 ssl;
-       http2 on;
-       server_name hooks.whaviso.com;
-       location /hooks/ {
-           limit_req zone=whaviso_api burst=10 nodelay;
-           proxy_pass http://127.0.0.1:3002;
-           proxy_set_header Host $host;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto https;
-       }
-       location / { return 404; }
-   }
-   ```
-3. Defina `SEND_SMS_HOOK_SECRET` em `/etc/whaviso/whaviso.env` e o mesmo segredo na config do hook no painel do Supabase (o `/hooks/sms` valida o HMAC; sem o secret responde 503).
+1. Garanta que o `nginx/whaviso.conf` atualizado esta no servidor e recarregue: `nginx -t && systemctl reload nginx`.
+2. Defina `SEND_CODE_HOOK_SECRET` (formato `v1,whsec_...`) em `/etc/whaviso/whaviso.env` e reinicie o zap: `systemctl restart whaviso-zap`.
+3. No painel do Supabase (Authentication > Hooks > Send SMS hook): tipo **HTTPS**, URL `https://api.whaviso.com/hooks/send-code`, e cole o **mesmo** segredo. Habilite tambem o provider **Phone**. Sem o secret batendo nos dois lados, o zap responde 503/401 e nada e entregue.
 
 ## Apendice C: limpeza pendente (referencias a Vercel)
 

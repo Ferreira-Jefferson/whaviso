@@ -30,8 +30,8 @@ const textoOtpCadastro = (codigo: string): string =>
  * verificação de empresa na Meta.
  */
 export const hookOtpRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/hooks/sms', async (req, reply) => {
-    const secret = app.env.SEND_SMS_HOOK_SECRET
+  app.post('/hooks/send-code', async (req, reply) => {
+    const secret = app.env.SEND_CODE_HOOK_SECRET
     if (!secret) {
       return reply.status(503).send({ error: 'hook_desligado' })
     }

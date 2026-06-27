@@ -37,9 +37,9 @@ export const envSchema = z.object({
   WHATS_MAX_POR_HORA: z.coerce.number().int().default(60),
 
   // Send SMS Hook do Supabase: gera o OTP do login por telefone e POSTa em
-  // /hooks/sms (assinatura Standard Webhooks); entregamos o código pelo Baileys.
+  // /hooks/send-code (assinatura Standard Webhooks); entregamos o código pelo Baileys.
   // Sem o secret a rota responde 503 (recurso desligado).
-  SEND_SMS_HOOK_SECRET: z.string().optional().describe('segredo whsec_ do Send SMS Hook'),
+  SEND_CODE_HOOK_SECRET: z.string().optional().describe('segredo whsec_ do Send SMS Hook'),
 
   // Conta-no-aceite (E5/H5.3): no ACEITE pelo WhatsApp criamos a conta FREE do convidado
   // por baixo dos panos, por telefone confirmado, via Admin API do GoTrue (service role

@@ -10,7 +10,7 @@ const CHAVE = Buffer.from('chave_secreta_do_hook_de_teste')
 const SECRET = 'whsec_' + CHAVE.toString('base64')
 
 async function montar(comSecret = true): Promise<{ app: Awaited<ReturnType<typeof criarApp>>; whats: WhatsFake }> {
-  const env = envZapFake({ SEND_SMS_HOOK_SECRET: comSecret ? SECRET : undefined })
+  const env = envZapFake({ SEND_CODE_HOOK_SECRET: comSecret ? SECRET : undefined })
   const whats = clienteWhatsFake()
   const logger = criarLogger('zap-test', 'silent')
   const app = await criarApp({ env, pool: poolSuper, logger, whats })
@@ -40,7 +40,7 @@ describe('hook_otp: assinaturaValida', () => {
   })
 })
 
-describe('hook_otp: POST /hooks/sms (integração)', () => {
+describe('hook_otp: POST /hooks/send-code (integração)', () => {
   it('entrega o OTP por WhatsApp quando a assinatura confere', async () => {
     const { app, whats } = await montar()
     const corpo = JSON.stringify({ user: { phone: '+5511999998888' }, sms: { otp: '654321' } })
@@ -48,7 +48,7 @@ describe('hook_otp: POST /hooks/sms (integração)', () => {
     const ts = '1718600001'
     const r = await app.inject({
       method: 'POST',
-      url: '/hooks/sms',
+      url: '/hooks/send-code',
       headers: {
         'content-type': 'application/json',
         'webhook-id': id,
@@ -69,7 +69,7 @@ describe('hook_otp: POST /hooks/sms (integração)', () => {
     const corpo = JSON.stringify({ user: { phone: '5511999998888' }, sms: { otp: '111111' } })
     const r = await app.inject({
       method: 'POST',
-      url: '/hooks/sms',
+      url: '/hooks/send-code',
       headers: {
         'content-type': 'application/json',
         'webhook-id': 'x',
@@ -83,11 +83,11 @@ describe('hook_otp: POST /hooks/sms (integração)', () => {
     await app.close()
   })
 
-  it('sem SEND_SMS_HOOK_SECRET → 503 (recurso desligado)', async () => {
+  it('sem SEND_CODE_HOOK_SECRET → 503 (recurso desligado)', async () => {
     const { app } = await montar(false)
     const r = await app.inject({
       method: 'POST',
-      url: '/hooks/sms',
+      url: '/hooks/send-code',
       headers: { 'content-type': 'application/json' },
       payload: '{}',
     })
@@ -107,7 +107,7 @@ describe('hook_otp: POST /hooks/sms (integração)', () => {
       const ts = '1718600010'
       const r = await app.inject({
         method: 'POST',
-        url: '/hooks/sms',
+        url: '/hooks/send-code',
         headers: {
           'content-type': 'application/json',
           'webhook-id': id,
@@ -132,7 +132,7 @@ describe('hook_otp: POST /hooks/sms (integração)', () => {
     const ts = '1718600011'
     const r = await app.inject({
       method: 'POST',
-      url: '/hooks/sms',
+      url: '/hooks/send-code',
       headers: {
         'content-type': 'application/json',
         'webhook-id': id,
@@ -156,7 +156,7 @@ describe('hook_otp: POST /hooks/sms (integração)', () => {
     const ts = '1718600002'
     const r = await app.inject({
       method: 'POST',
-      url: '/hooks/sms',
+      url: '/hooks/send-code',
       headers: {
         'content-type': 'application/json',
         'webhook-id': id,
