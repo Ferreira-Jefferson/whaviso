@@ -70,14 +70,13 @@ export const hookOtpRoutes: FastifyPluginAsync = async (app) => {
     }
     const texto = jaCadastrado ? textoOtpLogin(codigo) : textoOtpCadastro(codigo)
 
-    try {
-      await app.whats.enviarTexto(telefone, texto)
-    } catch (erro) {
-      // Nunca logar o código nem o telefone (Regras de Ouro). Só o motivo.
+    // Supabase encerra o hook em 5 s; o envio Baileys pode levar mais.
+    // Respondemos 200 agora e disparamos o envio em background.
+    // Nunca logar o código nem o telefone (Regras de Ouro). Só o motivo.
+    app.whats.enviarTexto(telefone, texto).catch((erro) => {
       const motivo = erro instanceof ErroEnvio ? `envio_${erro.codigo}` : 'erro_envio'
       req.log.error({ motivo }, 'falha ao entregar OTP por WhatsApp')
-      return reply.status(502).send({ error: motivo })
-    }
+    })
 
     return reply.status(200).send({})
   })
