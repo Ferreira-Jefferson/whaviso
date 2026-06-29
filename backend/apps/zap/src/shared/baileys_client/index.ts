@@ -8,7 +8,7 @@ import {
   type MensagemWhats,
   type OpcoesWhats,
 } from './tipos'
-import type { ConteudoEnvio } from './tipos_fork'
+import type { ConteudoEnvio, SocketWA } from './tipos_fork'
 import { GerenciadorConexao } from './conexao'
 import { Pacer } from './ritmo'
 import { digitarEEnviar } from './humanizar'
@@ -43,13 +43,33 @@ export function criarClienteWhats(opcoes: OpcoesWhats, deps: DepsCliente): Clien
     maxPorHora: opcoes.maxPorHora,
   })
 
+  // Resolve o JID canônico do destinatário. O Baileys NÃO entrega quando o JID é
+  // montado na unha e não bate com o registro real (no Brasil o "nono dígito"; e o
+  // esquema novo de LID): o sendMessage devolve um wamid mesmo assim e a mensagem
+  // some. onWhatsApp() devolve o jid certo. Número sem conta no WhatsApp = falha
+  // PERMANENTE (retentar não adianta). Se a própria checagem falhar (rede/socket),
+  // cai no JID montado e tenta mesmo assim (melhor que não enviar).
+  async function resolverJid(sock: SocketWA, numero: string): Promise<string> {
+    try {
+      const res = await sock.onWhatsApp(numero)
+      const info = res?.[0]
+      if (info?.exists && info.jid) return info.jid
+      if (info && info.exists === false) {
+        throw new ErroEnvio(0, 'numero sem whatsapp', true)
+      }
+    } catch (e) {
+      if (e instanceof ErroEnvio) throw e
+      // checagem indisponível: segue com o JID montado.
+    }
+    return `${numero}@s.whatsapp.net`
+  }
+
   async function enviar(m: MensagemWhats): Promise<{ wamid: string }> {
     const sock = gerente.obterSocket()
     if (!gerente.estaConectado() || !sock) {
       // Transitório: o drainer reagenda; volta quando a sessão reconectar.
       throw new ErroEnvio(0, 'whatsapp desconectado', false)
     }
-    const jid = `${m.para.replace(/\D/g, '')}@s.whatsapp.net`
     const conteudo: ConteudoEnvio = {}
     if (m.midia) {
       // Com mídia, o texto vira legenda (caption). Áudio não leva legenda no WhatsApp.
@@ -77,6 +97,7 @@ export function criarClienteWhats(opcoes: OpcoesWhats, deps: DepsCliente): Clien
       return { wamid: `dry_${Date.now()}` }
     }
 
+    const jid = await resolverJid(sock, m.para.replace(/\D/g, ''))
     const resultado = await pacer.agendar(() => digitarEEnviar(sock, jid, conteudo, opcoes.humanize))
     const wamid = resultado?.key?.id
     if (!wamid) throw new ErroEnvio(0, 'envio sem id de mensagem', false)

@@ -56,6 +56,8 @@ export interface SocketWA {
   user?: { id: string }
   authState: { creds: { registered?: boolean } }
   sendMessage(jid: string, conteudo: ConteudoEnvio, opcoes?: Record<string, unknown>): Promise<MensagemWA | undefined>
+  /** Resolve o JID canônico de um número (trata o nono dígito BR e o esquema de LID). */
+  onWhatsApp(...numeros: string[]): Promise<Array<{ exists?: boolean; jid?: string }> | undefined>
   presenceSubscribe(jid: string): Promise<void>
   sendPresenceUpdate(tipo: string, jid?: string): Promise<void>
   readMessages(chaves: ChaveWA[]): Promise<void>
