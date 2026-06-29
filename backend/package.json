@@ -31,7 +31,6 @@
     "esbuild@0.28.1": true,
     "esbuild@0.27.7": true,
     "unrs-resolver@1.12.2": true,
-    "@rexxhayanasi/elaina-baileys@1.3.1": true,
     "protobufjs@6.8.8": true,
     "protobufjs@6.11.6": true
   }

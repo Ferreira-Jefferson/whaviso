@@ -1,6 +1,7 @@
-// Tipagem mínima do fork @rexxhayanasi/elaina-baileys. O pacote declara um
-// `types` que não existe no tarball, então tipamos aqui só o que usamos e
-// carregamos o módulo por createRequire (ver conexao.ts).
+// Tipagem mínima do baileys (@whiskeysockets/baileys) que usamos. Mantemos uma
+// superfície pequena e própria (em vez de importar os tipos completos do pacote)
+// para o resto do zap depender só do contrato em tipos.ts; o módulo é carregado por
+// import() dinâmico em conexao.ts.
 
 export interface ChaveWA {
   id?: string | null

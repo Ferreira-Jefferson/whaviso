@@ -1,6 +1,6 @@
 // Gerenciador da conexão Baileys: socket, QR/pareamento, reconexão robusta e
-// dispatch do inbound de botões. O fork é carregado por createRequire (o `types`
-// que ele declara não existe no tarball, e o require evita ambiguidade ESM/CJS).
+// dispatch do inbound de botões. O baileys oficial (@whiskeysockets/baileys) é ESM
+// e é carregado por import() dinâmico em abrir(); o qrcode (CJS) segue por createRequire.
 import { createRequire } from 'node:module'
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -112,7 +112,24 @@ export class GerenciadorConexao {
   }
 
   private async abrir(): Promise<void> {
-    if (!this.modulo) this.modulo = exigir('@rexxhayanasi/elaina-baileys') as ModuloBaileys
+    if (!this.modulo) {
+      // baileys oficial (WhiskeySockets) é ESM e tipado: carregamos por import()
+      // dinâmico (não por createRequire, que era gambiarra pro fork de types quebrado).
+      // makeWASocket é o DEFAULT export; os utilitários são nomeados. Usamos o oficial
+      // por causa do suporte a LID: o fork antigo era rejeitado pelo WhatsApp com ack 463.
+      const bail = (await import('@whiskeysockets/baileys')) as unknown as {
+        default: ModuloBaileys['makeWASocket']
+        useMultiFileAuthState: ModuloBaileys['useMultiFileAuthState']
+        fetchLatestBaileysVersion: ModuloBaileys['fetchLatestBaileysVersion']
+        DisconnectReason: ModuloBaileys['DisconnectReason']
+      }
+      this.modulo = {
+        makeWASocket: bail.default,
+        useMultiFileAuthState: bail.useMultiFileAuthState,
+        fetchLatestBaileysVersion: bail.fetchLatestBaileysVersion,
+        DisconnectReason: bail.DisconnectReason,
+      }
+    }
     this.limparSocket()
 
     const { state, saveCreds } = await this.modulo.useMultiFileAuthState(this.opcoes.authDir)
@@ -121,7 +138,6 @@ export class GerenciadorConexao {
       ...(version ? { version } : {}),
       auth: state,
       logger: this.deps.logger,
-      printQRInTerminal: false,
       browser: [this.opcoes.browser, 'Chrome', '1.0.0'],
       keepAliveIntervalMs: 25_000,
       connectTimeoutMs: 60_000,
