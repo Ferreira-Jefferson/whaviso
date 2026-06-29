@@ -142,6 +142,21 @@ export async function marcarCancelado(pool: Pool, envioId: string, erro: string)
 }
 
 /**
+ * Template ausente ou ainda NÃO aprovado na Meta para a etapa: NÃO é falha de envio.
+ * Devolve a linha (reivindicada como 'processando') a 'agendado' com o motivo VISÍVEL e
+ * RECUPERÁVEL, sem tocar tentativas; volta a drenar quando o template for ativado/aprovado
+ * (bounded pela janela da etapa, que eventualmente cancela por janela_perdida).
+ */
+export async function devolverAguardandoTemplate(pool: Pool, envioId: string, motivo: string): Promise<void> {
+  await pool.query(
+    `update public.envios
+        set status='agendado', proxima_tentativa_em = now() + interval '60 seconds', erro=$2
+      where id=$1`,
+    [envioId, motivo],
+  )
+}
+
+/**
  * Cancela um envio por coalescing/obsolescência (estado terminal/superado, H10.9) e
  * AUDITA em eventos_aviso (append-only, M5), sem PII. Idempotente: só audita se a linha
  * ainda não estava cancelada. Mesma disciplina do drainer de notificações.

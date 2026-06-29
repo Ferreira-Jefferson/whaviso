@@ -54,8 +54,16 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
       }
 
       if (!dados.template_conteudo || !dados.template_variaveis) {
-        await repo.marcarFalhou(pool, envio.id, 'sem_template_ativo')
+        // Sem template ativo: recuperável (devolve agendado, sem queimar tentativa);
+        // volta a drenar quando o owner ativar, bounded pela janela da etapa.
+        await repo.devolverAguardandoTemplate(pool, envio.id, 'sem_template_ativo')
         logger.error({ etapa: envio.etapa }, 'sem template ativo para a etapa')
+        continue
+      }
+      if (dados.template_status_meta !== 'aprovado') {
+        // GATED na Meta: template ativo ainda não aprovado (enviar daria erro permanente).
+        await repo.devolverAguardandoTemplate(pool, envio.id, 'template_meta_nao_aprovado')
+        logger.warn({ etapa: envio.etapa }, 'template não aprovado na Meta para a etapa')
         continue
       }
       if (!dados.telefone_devedor) {

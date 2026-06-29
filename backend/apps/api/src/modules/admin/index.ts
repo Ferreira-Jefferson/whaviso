@@ -222,7 +222,10 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
     },
   )
 
-  // Aprovação manual (era Baileys, sem submissão à Meta), habilita a ativação.
+  // Aprovação manual: o owner marca que a Meta aprovou o template (status_meta='aprovado'),
+  // habilitando a ativação e o envio (os drains têm gate por status_meta). Um sync automático
+  // do status real da Meta (GET Graph message_templates) é um follow-up (precisa de credenciais
+  // Meta na api; testável só pós-verificação da empresa).
   app.post(
     '/admin/mensagens/:id/aprovar',
     { preHandler: owner, schema: { params: idParam } },

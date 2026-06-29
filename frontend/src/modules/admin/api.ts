@@ -8,7 +8,7 @@
 //   POST /v1/admin/mensagens                ✔ 201; lint bloqueia: 422 'linguagem_proibida'
 //   POST /v1/admin/mensagens/preview        ✔ { render, lint_ok, palavra_proibida }
 //   POST /v1/admin/mensagens/:id/ativar     ✔ 409 'template_nao_aprovado' se não aprovado
-//   POST /v1/admin/mensagens/:id/aprovar    ✔ aprovação manual (era Baileys, sem Meta)
+//   POST /v1/admin/mensagens/:id/aprovar    ✔ marca status_meta=aprovado (libera ativar/enviar)
 //   DELETE /v1/admin/mensagens/:id          ✔ apaga versão; 409 'template_ativo' na ativa
 //   GET  /v1/admin/whatsapp                  ✔ { status, numero } (Meta Cloud API; sem QR/comando)
 //   GET  /v1/billing/carteira               ✔ (catálogo de créditos reusado aqui via .catalogo)

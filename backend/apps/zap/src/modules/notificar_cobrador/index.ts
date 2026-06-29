@@ -24,6 +24,7 @@ import { anexarCta, valoresNotificacao } from './render'
 // template: visível ao owner em /admin/notificacoes. A linha continua 'agendado' e
 // volta a drenar sozinha quando o template for ativado.
 const MOTIVO_SEM_TEMPLATE = 'sem_template_ativo'
+const MOTIVO_NAO_APROVADO = 'template_meta_nao_aprovado'
 
 export interface DepsNotificarCobrador {
   pool: Pool
@@ -230,6 +231,16 @@ async function processarUma(deps: DepsNotificarCobrador, notif: NotificacaoClaim
     logger.error(
       { chave: config.chave, tipo: notif.tipo, notifId: notif.id },
       'sem template ativo: notificação aguardando ativação',
+    )
+    return 'sem_template'
+  }
+  if (template.status_meta !== 'aprovado') {
+    // GATED na Meta: o template ativo ainda não está APROVADO na Meta (enviar agora daria
+    // erro permanente 132001/132015). Devolve recuperável; volta a drenar ao aprovar.
+    await repo.devolverSemTemplate(pool, notif.id, MOTIVO_NAO_APROVADO)
+    logger.warn(
+      { chave: config.chave, tipo: notif.tipo, notifId: notif.id },
+      'template não aprovado na Meta: notificação aguardando aprovação',
     )
     return 'sem_template'
   }

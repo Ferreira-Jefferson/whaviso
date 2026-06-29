@@ -102,6 +102,26 @@ describe('notificar_cobrador: gating por template (H12.8)', () => {
     expect(notif.erro).toBeNull()
     await limpar(cobradorId)
   })
+
+  it('GATED na Meta: template ativo porém NÃO aprovado, devolve agendado + erro visível', async () => {
+    const { cobradorId, avisoId } = await emRevisao()
+    await poolSuper.query(`update public.profiles set telefone='+5511988887777' where id=$1`, [cobradorId])
+    // ativo=true mas status_meta=pendente (cenário pós-rejeição/sync da Meta).
+    await poolSuper.query(
+      `update public.templates set ativo=true, status_meta='pendente'::status_meta_template
+        where chave='cobrador.pagamento_informado'`,
+    )
+    const notifId = await enfileirar(avisoId, { cobradorId })
+    const whats = clienteWhatsFake(() => ({ wamid: 'nao_deveria' }))
+
+    const n = await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
+    expect(n).toBe(0)
+    expect(whats.enviadas).toHaveLength(0)
+    const notif = await lerNotif(notifId)
+    expect(notif.status).toBe('agendado')
+    expect(notif.erro).toBe('template_meta_nao_aprovado')
+    await limpar(cobradorId)
+  })
 })
 
 describe('notificar_cobrador: roteamento por alvo (H10.1/H10.7)', () => {

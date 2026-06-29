@@ -18,6 +18,7 @@ import type { RecargaClaim } from './repo'
 
 const CHAVE_TEMPLATE = 'billing.recarga'
 const MOTIVO_SEM_TEMPLATE = 'sem_template_ativo'
+const MOTIVO_NAO_APROVADO = 'template_meta_nao_aprovado'
 const MOTIVO_SEM_PIX = 'pix_nao_configurado'
 
 export interface DepsNotificarBilling {
@@ -90,6 +91,12 @@ async function processarUma(deps: DepsNotificarBilling, r: RecargaClaim): Promis
     // GATED: sem template ativo, não envia quebrado. Devolve recuperável (volta ao ativar).
     await repo.devolverAguardando(pool, r.id, MOTIVO_SEM_TEMPLATE)
     logger.error({ recargaId: r.id, chave: CHAVE_TEMPLATE }, 'recarga aguardando: sem template ativo')
+    return false
+  }
+  if (template.status_meta !== 'aprovado') {
+    // GATED na Meta: template ativo ainda não aprovado na Meta. Devolve recuperável.
+    await repo.devolverAguardando(pool, r.id, MOTIVO_NAO_APROVADO)
+    logger.warn({ recargaId: r.id, chave: CHAVE_TEMPLATE }, 'recarga aguardando: template não aprovado na Meta')
     return false
   }
 
