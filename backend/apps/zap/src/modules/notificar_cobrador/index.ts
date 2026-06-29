@@ -14,7 +14,7 @@
 // cancelamento do par são produzidos pelo enfileirador (api/zap shared/notificacoes).
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
-import { ErroEnvio, type ClienteWhats } from '../../shared/baileys_client'
+import { ErroEnvio, type ClienteWhats } from '../../shared/whats'
 import { carregarTemplateAtivo, renderMensagem, type ContextoTemplate } from '../../shared/templates'
 import * as repo from './repo'
 import type { DadosNotificacao, NotificacaoClaim } from './repo'
@@ -237,6 +237,7 @@ async function processarUma(deps: DepsNotificarCobrador, notif: NotificacaoClaim
   const mensagem = renderMensagem(template, dados.telefone_alvo, {
     valores: valoresNotificacao(dados),
     refId: notif.aviso_id, // botões (E8) levam o aviso_id no payload (HMAC no webhook).
+    comoTemplate: true, // notificação INICIA conversa: vai por template aprovado na Meta.
   })
   // H10.7/H8.5: cobrador SEM conta (cobrador_id nulo, alvo é o cobrador) recebe uma CTA
   // discreta de criar conta ao fim da mensagem, injetada em RUNTIME (não no template).

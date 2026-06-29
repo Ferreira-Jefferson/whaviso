@@ -1,22 +1,7 @@
-// Estado da sessão do WhatsApp no banco (tabela whats_sessao, 1 linha id=1): o zap
-// grava status/QR e a api (admin) lê para mostrar "escaneie o QR" / "conectado como X".
-// Resolve o pareamento numa VPS headless sem expor endpoint extra.
+// Poller de comandos de pareamento do Baileys (tabela whats_sessao): a api (admin)
+// enfileira 'conectar'/'desconectar' e o zap consome aqui. O estado da sessão em si
+// (gravarSessao/StatusSessao) é neutro e vive em shared/sessao.
 import type { Pool } from '@whaviso/shared/db'
-
-export type StatusSessao = 'desconectado' | 'aguardando_qr' | 'conectado'
-
-export async function gravarSessao(
-  pool: Pool,
-  dados: { status: StatusSessao; numero?: string | null; qr?: string | null },
-): Promise<void> {
-  await pool.query(
-    `insert into public.whats_sessao (id, status, numero, qr, atualizado_em)
-     values (1, $1, $2, $3, now())
-     on conflict (id) do update
-       set status=excluded.status, numero=excluded.numero, qr=excluded.qr, atualizado_em=now()`,
-    [dados.status, dados.numero ?? null, dados.qr ?? null],
-  )
-}
 
 export type ComandoSessao = 'conectar' | 'desconectar'
 

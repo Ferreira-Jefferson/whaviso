@@ -10,7 +10,7 @@ import type { HandlerBotao, HandlerTexto, OpcoesWhats } from './tipos'
 import type { AtualizacaoConexao, MensagemWA, ModuloBaileys, SocketWA } from './tipos_fork'
 import { calcularBackoff, classificarDesconexao, type EstadoBackoff } from './reconexao'
 import { extrairBotao, extrairTexto } from './inbound'
-import { gravarSessao } from './qr'
+import { gravarSessao } from '../sessao'
 
 const exigir = createRequire(import.meta.url)
 

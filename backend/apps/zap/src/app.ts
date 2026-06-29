@@ -6,7 +6,7 @@ import {
 } from 'fastify-type-provider-zod'
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
-import type { ClienteWhats } from './shared/baileys_client'
+import type { ClienteWhats } from './shared/whats'
 import { hookOtpRoutes } from './modules/hook_otp'
 import type { EnvZap } from './env'
 

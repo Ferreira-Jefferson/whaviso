@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { ErroEnvio } from '../../../shared/baileys_client'
+import { ErroEnvio } from '../../../shared/whats'
 import { processarEnviosDevidos } from '../index'
 import {
   clienteWhatsFake,

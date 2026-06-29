@@ -1,6 +1,6 @@
 import type { Pool } from '@whaviso/shared/db'
 import type { EtapaEnvio } from '@whaviso/shared/contracts'
-import type { ConteudoTemplate } from '../../shared/templates'
+import type { ConteudoTemplate, StatusMeta } from '../../shared/templates'
 import { decidirReagendamento } from '../../shared/retry'
 
 export interface EnvioClaim {
@@ -28,6 +28,10 @@ export interface DadosEnvio {
   nome_cobrador: string
   template_conteudo: ConteudoTemplate | null
   template_variaveis: string[] | null
+  // Metadados do template Meta (envio por template aprovado + gating por status).
+  template_nome_meta: string | null
+  template_idioma: string | null
+  template_status_meta: StatusMeta | null
 }
 
 // Lote menor que antes (Meta): o envio pelo Baileys é serializado e espaçado pelo
@@ -104,11 +108,13 @@ export async function carregarDados(pool: Pool, avisoId: string, etapa: EtapaEnv
             a.motivo, a.valor_centavos::bigint as valor_centavos,
             to_char(a.data_combinada,'YYYY-MM-DD') as data_combinada, a.pix_chave,
             coalesce(a.nome_cobrador, p.nome) as nome_cobrador,
-            t.conteudo as template_conteudo, t.variaveis as template_variaveis
+            t.conteudo as template_conteudo, t.variaveis as template_variaveis,
+            t.nome_meta as template_nome_meta, t.idioma as template_idioma,
+            t.status_meta as template_status_meta
      from public.avisos a
      left join public.profiles p on p.id = a.cobrador_id
      left join lateral (
-       select t.conteudo, t.variaveis
+       select t.conteudo, t.variaveis, t.nome_meta, t.idioma, t.status_meta
        from public.templates t
        where t.chave = 'ciclo.' || $2 and t.ativo
          and t.contexto in (

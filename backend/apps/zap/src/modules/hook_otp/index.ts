@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify'
-import { ErroEnvio } from '../../shared/baileys_client'
+import { ErroEnvio } from '../../shared/whats'
 import { assinaturaValida } from './verificar_assinatura'
 
 interface CorpoHook {

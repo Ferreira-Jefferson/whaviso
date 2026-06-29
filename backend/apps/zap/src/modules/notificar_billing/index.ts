@@ -10,7 +10,7 @@
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import { formatarValorBr } from '@whaviso/shared/datas'
-import { ErroEnvio, type ClienteWhats } from '../../shared/baileys_client'
+import { ErroEnvio, type ClienteWhats } from '../../shared/whats'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import { lerConfigPlataforma, temChavePix, type ConfigPlataforma } from '../../shared/config_plataforma'
 import * as repo from './repo'
@@ -94,7 +94,10 @@ async function processarUma(deps: DepsNotificarBilling, r: RecargaClaim): Promis
   }
 
   // Sem botões (refId omitido): o usuário responde com o comprovante em texto livre/imagem.
-  const mensagem = renderMensagem(template, r.telefone_alvo, { valores: valoresRecarga(config, r) })
+  const mensagem = renderMensagem(template, r.telefone_alvo, {
+    valores: valoresRecarga(config, r),
+    comoTemplate: true, // recarga INICIA conversa: vai por template aprovado na Meta.
+  })
   const { wamid } = await deps.whats.enviarMensagem(mensagem)
   await repo.marcarEnviado(pool, r.id, wamid)
   return true

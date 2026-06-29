@@ -5,7 +5,7 @@
 // backend: isso é decisão de quem chama (scheduler/webhook). Sem strings fixas aqui.
 import type { Pool } from '@whaviso/shared/db'
 import { renderizarTexto } from '@whaviso/shared/contracts'
-import type { BotaoZap, MensagemWhats, TipoMidia } from '../baileys_client'
+import type { BotaoZap, MensagemWhats, TipoMidia } from '../whats'
 
 export type ContextoTemplate = 'padrao' | 'revisao'
 
@@ -16,11 +16,14 @@ export interface ConteudoTemplate {
   midia?: { tipo: TipoMidia; url: string }
 }
 
+export type StatusMeta = 'pendente' | 'aprovado' | 'rejeitado'
+
 export interface TemplateAtivo {
   nome_meta: string
   idioma: string
   conteudo: ConteudoTemplate
   variaveis: string[]
+  status_meta: StatusMeta
 }
 
 /**
@@ -34,7 +37,7 @@ export async function carregarTemplateAtivo(
   contexto: ContextoTemplate = 'padrao',
 ): Promise<TemplateAtivo | null> {
   const { rows } = await pool.query<TemplateAtivo>(
-    `select nome_meta, idioma, conteudo, variaveis
+    `select nome_meta, idioma, conteudo, variaveis, status_meta
        from public.templates
       where chave = $1 and ativo
         and contexto in ('padrao'::template_contexto, $2::template_contexto)
@@ -52,11 +55,15 @@ export async function carregarTemplateAtivo(
  *  - botoes: cada { acao, rotulo } vira id "acao:<refId>" (o payload que volta no
  *    inbound). Sem `refId`, os botões são omitidos (não há a quem amarrar a ação).
  *  - midia: repassada como está.
+ *  - template: quando `comoTemplate`, anexa o descritor (nome_meta/idioma + parâmetros
+ *    posicionais + payload dos botões) para o transporte enviar por TEMPLATE aprovado
+ *    da Meta, em vez de texto livre (mensagem que inicia conversa, fora da janela 24h).
+ *    O texto renderizado segue presente (preview/fallback); o transporte decide.
  */
 export function renderMensagem(
-  template: { conteudo: ConteudoTemplate; variaveis: string[] },
+  template: { conteudo: ConteudoTemplate; variaveis: string[]; nome_meta?: string; idioma?: string },
   para: string,
-  opcoes: { valores?: Record<string, string>; refId?: string } = {},
+  opcoes: { valores?: Record<string, string>; refId?: string; comoTemplate?: boolean } = {},
 ): MensagemWhats {
   const valores = opcoes.valores ?? {}
   // Render compartilhado (mesma fonte do preview da api): valor ausente -> ''.
@@ -65,11 +72,24 @@ export function renderMensagem(
   const m: MensagemWhats = { para, texto }
 
   const botoes = template.conteudo.botoes
-  if (botoes?.length && opcoes.refId) {
+  const temBotoes = Boolean(botoes?.length && opcoes.refId)
+  if (botoes && temBotoes) {
     m.botoes = botoes.map((b): BotaoZap => ({ id: `${b.acao}:${opcoes.refId}`, rotulo: b.rotulo }))
   }
   if (template.conteudo.midia) {
     m.midia = { tipo: template.conteudo.midia.tipo, url: template.conteudo.midia.url }
+  }
+
+  if (opcoes.comoTemplate && template.nome_meta) {
+    m.template = {
+      nome: template.nome_meta,
+      idioma: template.idioma ?? 'pt_BR',
+      // mesma ordem de `variaveis`, paridade com {{1}}..{{n}} do corpo.
+      parametros: template.variaveis.map((v) => valores[v] ?? ''),
+      ...(botoes && temBotoes
+        ? { botoesPayload: botoes.map((b) => `${b.acao}:${opcoes.refId}`) }
+        : {}),
+    }
   }
   return m
 }

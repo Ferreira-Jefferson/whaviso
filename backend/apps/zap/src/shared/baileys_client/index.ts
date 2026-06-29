@@ -110,6 +110,8 @@ export function criarClienteWhats(opcoes: OpcoesWhats, deps: DepsCliente): Clien
     desconectar: () => gerente.desconectar(),
     onBotao: (cb) => gerente.onBotao(cb),
     onTexto: (cb) => gerente.onTexto(cb),
+    // O Baileys não entrega recibos de status por mensagem; no-op (só a Meta dá isso).
+    onStatus: () => undefined,
     status: () => ({ conectado: gerente.estaConectado(), numero: gerente.numeroAtual() }),
     enviarMensagem: (m) => enviar(m),
     enviarTexto: (para, texto) => enviar({ para, texto }),

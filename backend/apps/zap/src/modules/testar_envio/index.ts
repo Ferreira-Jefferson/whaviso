@@ -6,7 +6,7 @@
 // server) liga o módulo; o módulo não importa outro módulo.
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
-import { ErroEnvio, type ClienteWhats, type EventoTexto } from '../../shared/baileys_client'
+import { ErroEnvio, type ClienteWhats, type EventoTexto } from '../../shared/whats'
 import * as repo from './repo'
 
 export interface DepsTeste {

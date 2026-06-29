@@ -5,11 +5,13 @@ import type { EtapaEnvio } from '@whaviso/shared/contracts'
 import type {
   ClienteWhats,
   EventoBotao,
+  EventoStatus,
   EventoTexto,
   HandlerBotao,
+  HandlerStatus,
   HandlerTexto,
   MensagemWhats,
-} from '../src/shared/baileys_client'
+} from '../src/shared/whats'
 import type { EnvZap } from '../src/env'
 
 const SENHA = process.env.POSTGRES_PASSWORD ?? 'postgres'
@@ -187,6 +189,8 @@ export interface WhatsFake extends ClienteWhats {
   disparar(evento: EventoBotao): Promise<void>
   /** simula uma mensagem de TEXTO chegando pelo socket (inbound, E5). */
   dispararTexto(evento: EventoTexto): Promise<void>
+  /** simula um recibo de entrega chegando (sent/delivered/read/failed). */
+  dispararStatus(evento: EventoStatus): Promise<void>
 }
 
 /**
@@ -201,6 +205,7 @@ export function clienteWhatsFake(
   const textos: Array<{ para: string; texto: string }> = []
   const handlers: HandlerBotao[] = []
   const handlersTexto: HandlerTexto[] = []
+  const handlersStatus: HandlerStatus[] = []
   let n = 0
   const responder = (m: MensagemWhats): { wamid: string } =>
     comportamento ? comportamento(m) : { wamid: `wamid_${++n}` }
@@ -218,6 +223,9 @@ export function clienteWhatsFake(
     onTexto: (cb) => {
       handlersTexto.push(cb)
     },
+    onStatus: (cb) => {
+      handlersStatus.push(cb)
+    },
     enviarMensagem: async (m) => {
       enviadas.push(m)
       return responder(m)
@@ -233,6 +241,9 @@ export function clienteWhatsFake(
     },
     dispararTexto: async (evento) => {
       for (const h of handlersTexto) await h(evento)
+    },
+    dispararStatus: async (evento) => {
+      for (const h of handlersStatus) await h(evento)
     },
   }
 }

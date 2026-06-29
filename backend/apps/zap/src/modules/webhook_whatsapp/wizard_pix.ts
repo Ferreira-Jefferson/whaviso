@@ -9,7 +9,7 @@
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
 import { detectarTipoChavePix, type TipoChavePix } from '@whaviso/shared/contracts'
-import type { ClienteWhats } from '../../shared/baileys_client'
+import type { ClienteWhats } from '../../shared/whats'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import { enfileirarNotificacao, enfileirarNotificacaoDevedor, type AvisoAlvo } from '../../shared/notificacoes'
 

@@ -1,7 +1,7 @@
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import { janelaPerdida } from '@whaviso/shared/datas'
-import { ErroEnvio, type ClienteWhats, type MensagemWhats } from '../../shared/baileys_client'
+import { ErroEnvio, type ClienteWhats, type MensagemWhats } from '../../shared/whats'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import { consumirNoDisparo } from '../../shared/creditos'
 import * as repo from './repo'
@@ -70,9 +70,14 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
       // identificar de QUAL mensagem do ciclo veio; só os botões do último aviso enviado
       // agem. O webhook parseia "acao:<aviso>:<etapa>".
       const mensagem = renderMensagem(
-        { conteudo: dados.template_conteudo, variaveis: dados.template_variaveis },
+        {
+          conteudo: dados.template_conteudo,
+          variaveis: dados.template_variaveis,
+          nome_meta: dados.template_nome_meta ?? undefined,
+          idioma: dados.template_idioma ?? undefined,
+        },
         dados.telefone_devedor,
-        { valores: valoresCiclo(dados), refId: `${dados.aviso_id}:${envio.etapa}` },
+        { valores: valoresCiclo(dados), refId: `${dados.aviso_id}:${envio.etapa}`, comoTemplate: true },
       )
       // E14: invertido SEM chave -> o devedor não tem o que "ver"; troca o botão
       // "Chave de Pag." (ver_pix) por "Solicitar chave de pagamento" (solicitar_pix), que

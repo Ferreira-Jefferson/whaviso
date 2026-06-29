@@ -6,7 +6,7 @@ import {
   sha256ConviteHex,
 } from '@whaviso/shared/contracts'
 import { formatarDataBr, formatarValorBr } from '@whaviso/shared/datas'
-import type { ClienteWhats, EventoBotao, EventoTexto } from '../../shared/baileys_client'
+import type { ClienteWhats, EventoBotao, EventoTexto } from '../../shared/whats'
 import type { AdminSupabase } from '../../shared/supabase_admin'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import * as repo from './repo'

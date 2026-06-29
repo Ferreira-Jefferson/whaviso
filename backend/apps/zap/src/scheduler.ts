@@ -1,7 +1,7 @@
 // Orquestra os ticks do zap (app-root pode chamar módulos; módulo nunca chama módulo).
 import type { Logger } from '@whaviso/shared/logger'
 import type { Pool } from '@whaviso/shared/db'
-import type { ClienteWhats } from './shared/baileys_client'
+import type { ClienteWhats } from './shared/whats'
 import { processarEnviosDevidos } from './modules/enviar_lembretes'
 import { processarTestesDevidos } from './modules/testar_envio'
 import { expirarAvisos } from './modules/expirar_avisos'
