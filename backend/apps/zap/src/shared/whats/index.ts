@@ -33,6 +33,9 @@ export interface TemplateWhats {
   parametros: string[]
   /** payload de cada botão quick_reply, na ordem do template (ex.: "ja_paguei:<id>"). */
   botoesPayload?: string[]
+  /** template de categoria AUTHENTICATION (OTP): o código (parametros[0]) também vai no
+   *  botão. Formato fixo da Meta (sem copy custom); usado só pelo login OTP. */
+  autenticacao?: boolean
 }
 
 /**

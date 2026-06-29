@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { criarLogger } from '@whaviso/shared/logger'
 import { criarApp } from '../../../app'
@@ -41,7 +41,7 @@ describe('hook_otp: assinaturaValida', () => {
 })
 
 describe('hook_otp: POST /hooks/send-code (integração)', () => {
-  it('entrega o OTP por WhatsApp quando a assinatura confere', async () => {
+  it('entrega o OTP pelo template AUTHENTICATION quando a assinatura confere', async () => {
     const { app, whats } = await montar()
     const corpo = JSON.stringify({ user: { phone: '+5511999998888' }, sms: { otp: '654321' } })
     const id = 'msg_ok'
@@ -58,9 +58,14 @@ describe('hook_otp: POST /hooks/send-code (integração)', () => {
       payload: corpo,
     })
     expect(r.statusCode).toBe(200)
-    expect(whats.textos).toHaveLength(1)
-    expect(whats.textos[0]!.para).toBe('5511999998888')
-    expect(whats.textos[0]!.texto).toContain('654321')
+    expect(whats.enviadas).toHaveLength(1)
+    const m = whats.enviadas[0]!
+    expect(m.para).toBe('5511999998888')
+    // Vai por template de autenticação: o código entra nos parâmetros (corpo + botão).
+    expect(m.template?.autenticacao).toBe(true)
+    expect(m.template?.parametros).toEqual(['654321'])
+    // O texto de fallback (contrato) também carrega o código, nunca logado.
+    expect(m.texto).toContain('654321')
     await app.close()
   })
 
@@ -79,7 +84,7 @@ describe('hook_otp: POST /hooks/send-code (integração)', () => {
       payload: corpo,
     })
     expect(r.statusCode).toBe(401)
-    expect(whats.textos).toHaveLength(0)
+    expect(whats.enviadas).toHaveLength(0)
     await app.close()
   })
 
@@ -92,60 +97,6 @@ describe('hook_otp: POST /hooks/send-code (integração)', () => {
       payload: '{}',
     })
     expect(r.statusCode).toBe(503)
-    await app.close()
-  })
-
-  it('copy de LOGIN quando o número já tem cadastro (H1.2)', async () => {
-    const { app, whats } = await montar()
-    const uid = randomUUID()
-    const tel = '+5511970445566'
-    await poolSuper.query(`insert into auth.users (id) values ($1)`, [uid])
-    await poolSuper.query(`update public.profiles set telefone = $2 where id = $1`, [uid, tel])
-    try {
-      const corpo = JSON.stringify({ user: { phone: tel }, sms: { otp: '202020' } })
-      const id = 'msg_login'
-      const ts = '1718600010'
-      const r = await app.inject({
-        method: 'POST',
-        url: '/hooks/send-code',
-        headers: {
-          'content-type': 'application/json',
-          'webhook-id': id,
-          'webhook-timestamp': ts,
-          'webhook-signature': assinar(id, ts, corpo),
-        },
-        payload: corpo,
-      })
-      expect(r.statusCode).toBe(200)
-      expect(whats.textos[0]!.texto).toContain('login')
-      expect(whats.textos[0]!.texto).toContain('202020')
-    } finally {
-      await poolSuper.query(`delete from auth.users where id = $1`, [uid])
-      await app.close()
-    }
-  })
-
-  it('copy de CADASTRO quando o número é novo (H1.3)', async () => {
-    const { app, whats } = await montar()
-    const corpo = JSON.stringify({ user: { phone: '+5511970990011' }, sms: { otp: '303030' } })
-    const id = 'msg_cadastro'
-    const ts = '1718600011'
-    const r = await app.inject({
-      method: 'POST',
-      url: '/hooks/send-code',
-      headers: {
-        'content-type': 'application/json',
-        'webhook-id': id,
-        'webhook-timestamp': ts,
-        'webhook-signature': assinar(id, ts, corpo),
-      },
-      payload: corpo,
-    })
-    expect(r.statusCode).toBe(200)
-    expect(whats.textos[0]!.texto).toContain('cadastro')
-    expect(whats.textos[0]!.texto).toContain('303030')
-    // No cadastro a copy pede para salvar o contato (número próprio via Baileys).
-    expect(whats.textos[0]!.texto).toContain('Salve este contato')
     await app.close()
   })
 

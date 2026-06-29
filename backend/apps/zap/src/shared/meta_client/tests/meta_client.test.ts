@@ -155,6 +155,22 @@ describe('montarBody', () => {
     expect((body.text as Record<string, unknown>).body).toBe('Oi, João.')
   })
 
+  it('template de autenticação: código no corpo E no botão (sub_type url)', () => {
+    const body = montarBody({
+      ...base,
+      template: { nome: 'whaviso_otp', idioma: 'pt_BR', parametros: ['654321'], autenticacao: true },
+    }) as Record<string, unknown>
+    const tpl = body.template as Record<string, unknown>
+    const comps = tpl.components as Array<Record<string, unknown>>
+    expect(comps[0]).toEqual({ type: 'body', parameters: [{ type: 'text', text: '654321' }] })
+    expect(comps[1]).toEqual({
+      type: 'button',
+      sub_type: 'url',
+      index: '0',
+      parameters: [{ type: 'text', text: '654321' }],
+    })
+  })
+
   it('mídia: type da mídia + caption (exceto áudio)', () => {
     const img = montarBody({ ...base, midia: { tipo: 'imagem', url: 'https://x/y.png' } }) as Record<string, unknown>
     expect(img.type).toBe('image')

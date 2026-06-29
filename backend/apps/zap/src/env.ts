@@ -47,6 +47,10 @@ export const envSchema = z.object({
   META_VERIFY_TOKEN: z.string().optional().describe('verify token do handshake do webhook'),
   META_GRAPH_URL: z.url().default('https://graph.facebook.com'),
   META_API_VERSION: z.string().default('v23.0'),
+  // Template AUTHENTICATION do OTP de login (registrado na Meta; categoria AUTHENTICATION,
+  // formato fixo). O nome aqui deve bater com o nome aprovado na WABA.
+  META_OTP_TEMPLATE: z.string().default('whaviso_otp'),
+  META_OTP_IDIOMA: z.string().default('pt_BR'),
 
   // Send SMS Hook do Supabase: gera o OTP do login por telefone e POSTa em
   // /hooks/send-code (assinatura Standard Webhooks); entregamos o código por template

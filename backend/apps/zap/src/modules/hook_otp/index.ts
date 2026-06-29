@@ -7,27 +7,19 @@ interface CorpoHook {
   sms?: { otp?: string }
 }
 
-// Texto do OTP (Fase 1, no código). Na Fase 2 vira um template editável no admin.
-//
-// H1.2/H1.3: a copy varia conforme o número JÁ tem cadastro (login) ou é novo
-// (cadastro). Sem travessão, gênero neutro, sem palavras proibidas. O código nunca
+// Texto de fallback do OTP (só satisfaz o contrato MensagemWhats e documenta a copy; a
+// Meta entrega pelo TEMPLATE de autenticação, não por este texto). Templates
+// AUTHENTICATION têm formato fixo da Meta: não dá copy custom nem variar login/cadastro,
+// então a antiga distinção H1.2/H1.3 e o "salve o contato" não cabem aqui. O código nunca
 // é logado; só entra na mensagem entregue.
-//
-// No CADASTRO (número novo) a mensagem também pede para salvar o contato: como o
-// Whaviso usa um número próprio (Baileys), é por aqui que as mensagens vão chegar, e
-// salvar o contato melhora o reconhecimento e a entrega das conversas seguintes.
-const textoOtpLogin = (codigo: string): string =>
-  `Seu código de login Whaviso é:\n\n*${codigo}*\n\nCaso não tenha solicitado, desconsidere esta mensagem.`
-
-const textoOtpCadastro = (codigo: string): string =>
-  `Seu código de cadastro Whaviso é:\n\n*${codigo}*\n\nSalve este contato: as mensagens do Whaviso chegam sempre por aqui.\n\nCaso não tenha solicitado, desconsidere esta mensagem.`
+const textoOtp = (codigo: string): string =>
+  `Seu código Whaviso é:\n\n*${codigo}*\n\nCaso não tenha solicitado, desconsidere esta mensagem.`
 
 /**
- * Endpoint do Send SMS Hook do Supabase. O Supabase gera o OTP do login por
- * telefone e POSTa aqui; entregamos o código pelo nosso WhatsApp (Baileys).
- * Resposta vazia 200 = sucesso (contrato do hook); não-200 = falha (o usuário
- * pode pedir o código de novo). Com Baileys o OTP deixa de ser gated por
- * verificação de empresa na Meta.
+ * Endpoint do Send SMS Hook do Supabase. O Supabase gera o OTP do login por telefone e
+ * POSTa aqui; entregamos o código pelo WhatsApp via TEMPLATE AUTHENTICATION da Meta Cloud
+ * API (nome em META_OTP_TEMPLATE). Resposta vazia 200 = sucesso (contrato do hook);
+ * não-200 = falha (o usuário pode pedir o código de novo).
  */
 export const hookOtpRoutes: FastifyPluginAsync = async (app) => {
   app.post('/hooks/send-code', async (req, reply) => {
@@ -55,28 +47,24 @@ export const hookOtpRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: 'payload_incompleto' })
     }
 
-    // H1.2/H1.3: número já cadastrado → copy de LOGIN; número novo → copy de CADASTRO.
-    // profiles.telefone está em E.164 (+55...); o hook recebe só dígitos. Falha de
-    // consulta cai em cadastro (mais conservador: não promete login a quem não tem conta).
-    let jaCadastrado = false
-    try {
-      const { rows } = await app.pool.query<{ existe: boolean }>(
-        `select exists(select 1 from public.profiles where telefone = $1) as existe`,
-        [`+${telefone}`],
-      )
-      jaCadastrado = rows[0]?.existe ?? false
-    } catch {
-      jaCadastrado = false
-    }
-    const texto = jaCadastrado ? textoOtpLogin(codigo) : textoOtpCadastro(codigo)
-
-    // Supabase encerra o hook em 5 s; o envio Baileys pode levar mais.
-    // Respondemos 200 agora e disparamos o envio em background.
-    // Nunca logar o código nem o telefone (Regras de Ouro). Só o motivo.
-    app.whats.enviarTexto(telefone, texto).catch((erro) => {
-      const motivo = erro instanceof ErroEnvio ? `envio_${erro.codigo}` : 'erro_envio'
-      req.log.error({ motivo }, 'falha ao entregar OTP por WhatsApp')
-    })
+    // Supabase encerra o hook em 5 s; o envio pode levar mais. Respondemos 200 agora e
+    // disparamos em background. O OTP vai por TEMPLATE AUTHENTICATION (o código entra no
+    // corpo e no botão). Nunca logar o código nem o telefone (Regras de Ouro); só o motivo.
+    app.whats
+      .enviarMensagem({
+        para: telefone,
+        texto: textoOtp(codigo),
+        template: {
+          nome: app.env.META_OTP_TEMPLATE,
+          idioma: app.env.META_OTP_IDIOMA,
+          parametros: [codigo],
+          autenticacao: true,
+        },
+      })
+      .catch((erro) => {
+        const motivo = erro instanceof ErroEnvio ? `envio_${erro.codigo}` : 'erro_envio'
+        req.log.error({ motivo }, 'falha ao entregar OTP por WhatsApp')
+      })
 
     return reply.status(200).send({})
   })

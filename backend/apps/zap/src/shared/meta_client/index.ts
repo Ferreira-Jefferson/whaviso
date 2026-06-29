@@ -38,6 +38,24 @@ export function montarBody(m: MensagemWhats): Record<string, unknown> {
   const to = m.para.replace(/\D/g, '')
 
   if (m.template) {
+    // Template AUTHENTICATION (OTP): o código (parametros[0]) vai no corpo E no botão
+    // (sub_type 'url', formato fixo da Meta para copiar/auto-preencher o código).
+    if (m.template.autenticacao) {
+      const codigo = m.template.parametros[0] ?? ''
+      return {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+          name: m.template.nome,
+          language: { code: m.template.idioma },
+          components: [
+            { type: 'body', parameters: [{ type: 'text', text: codigo }] },
+            { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: codigo }] },
+          ],
+        },
+      }
+    }
     const components: Record<string, unknown>[] = []
     if (m.template.parametros.length) {
       components.push({
