@@ -36,9 +36,21 @@ export const envSchema = z.object({
   WHATS_BATCH_PAUSE_MAX: z.coerce.number().int().default(180_000),
   WHATS_MAX_POR_HORA: z.coerce.number().int().default(60),
 
+  // Meta Cloud API (transporte oficial do WhatsApp). Opcionais no schema para o harness
+  // de teste e o typecheck; o server.ts EXIGE as 4 essenciais no boot (token, phone_id,
+  // app_secret, verify_token) e encerra com mensagem clara se faltarem. O token NUNCA é
+  // logado. WABA id só é usado pelo sync de templates (futuro).
+  META_ACCESS_TOKEN: z.string().optional().describe('token do System User (permanente) ou de teste'),
+  META_PHONE_NUMBER_ID: z.string().optional().describe('Phone Number ID do número na WABA'),
+  META_WABA_ID: z.string().optional().describe('WhatsApp Business Account ID'),
+  META_APP_SECRET: z.string().optional().describe('App Secret p/ validar a assinatura do webhook'),
+  META_VERIFY_TOKEN: z.string().optional().describe('verify token do handshake do webhook'),
+  META_GRAPH_URL: z.url().default('https://graph.facebook.com'),
+  META_API_VERSION: z.string().default('v23.0'),
+
   // Send SMS Hook do Supabase: gera o OTP do login por telefone e POSTa em
-  // /hooks/send-code (assinatura Standard Webhooks); entregamos o código pelo Baileys.
-  // Sem o secret a rota responde 503 (recurso desligado).
+  // /hooks/send-code (assinatura Standard Webhooks); entregamos o código por template
+  // AUTHENTICATION da Meta. Sem o secret a rota responde 503 (recurso desligado).
   SEND_CODE_HOOK_SECRET: z.string().optional().describe('segredo whsec_ do Send SMS Hook'),
 
   // Conta-no-aceite (E5/H5.3): no ACEITE pelo WhatsApp criamos a conta FREE do convidado

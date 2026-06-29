@@ -1,12 +1,10 @@
-import { join } from 'node:path'
+import type { FastifyInstance } from 'fastify'
 import { parseEnv } from '@whaviso/shared/config'
 import { criarPool } from '@whaviso/shared/db'
 import { criarLogger } from '@whaviso/shared/logger'
 import { envSchema } from './env'
 import { criarApp } from './app'
-import { criarClienteWhats } from './shared/baileys_client'
-import { adquirirLock, liberarLock } from './shared/baileys_client/lock'
-import { lerEConsumirComando } from './shared/baileys_client/qr'
+import { criarClienteMeta } from './shared/meta_client'
 import { registrarInboundWhats } from './modules/webhook_whatsapp'
 import { registrarInboundTeste } from './modules/testar_envio'
 import { criarAdminSupabase } from './shared/supabase_admin'
@@ -25,27 +23,29 @@ const env = parseEnv(envSchema)
 const logger = criarLogger('zap', env.LOG_LEVEL)
 const pool = criarPool({ connectionString: env.DATABASE_URL, max: 3 })
 
-// Instância única: dois processos brigando pela sessão causam o erro 440.
-const arquivoLock = join(env.WHATS_AUTH_DIR, '..', '.baileys.lock')
-if (!adquirirLock(arquivoLock, logger)) {
-  logger.error('não foi possível adquirir o lock do WhatsApp; encerrando')
+// Transporte oficial (Meta Cloud API): exige as 4 credenciais essenciais. Sem elas o zap
+// não envia nem recebe nada, então falha o boot com mensagem clara (em vez de subir mudo).
+if (
+  !env.META_ACCESS_TOKEN ||
+  !env.META_PHONE_NUMBER_ID ||
+  !env.META_APP_SECRET ||
+  !env.META_VERIFY_TOKEN
+) {
+  logger.error(
+    'META_* ausentes: defina META_ACCESS_TOKEN, META_PHONE_NUMBER_ID, META_APP_SECRET e META_VERIFY_TOKEN',
+  )
   process.exit(1)
 }
 
-const whats = criarClienteWhats(
+const whats = criarClienteMeta(
   {
-    authDir: env.WHATS_AUTH_DIR,
-    phone: env.WHATS_PHONE,
-    usePairing: env.WHATS_USE_PAIRING,
-    browser: env.WHATS_BROWSER,
-    humanize: env.WHATS_HUMANIZE,
-    dryRun: env.WHATS_DRY_RUN,
-    gapMin: env.WHATS_GAP_MIN,
-    gapMax: env.WHATS_GAP_MAX,
-    batchSize: env.WHATS_BATCH_SIZE,
-    batchPauseMin: env.WHATS_BATCH_PAUSE_MIN,
-    batchPauseMax: env.WHATS_BATCH_PAUSE_MAX,
-    maxPorHora: env.WHATS_MAX_POR_HORA,
+    accessToken: env.META_ACCESS_TOKEN,
+    phoneNumberId: env.META_PHONE_NUMBER_ID,
+    wabaId: env.META_WABA_ID ?? '',
+    appSecret: env.META_APP_SECRET,
+    verifyToken: env.META_VERIFY_TOKEN,
+    graphUrl: env.META_GRAPH_URL,
+    apiVersion: env.META_API_VERSION,
   },
   { logger, pool },
 )
@@ -57,12 +57,17 @@ const admin =
     ? criarAdminSupabase(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
     : null
 
-// Inbound de botões/texto pelo socket (app-root liga o módulo; módulo não importa módulo).
+// Inbound (botões/texto/status) pelo webhook (app-root liga o módulo; módulo não importa
+// módulo). Os handlers ficam guardados no cliente Meta e a rota do webhook os chama.
 registrarInboundWhats({ pool, logger, whats, admin })
 // Captura as respostas do número de teste no mini-chat de diagnóstico (sandbox).
 registrarInboundTeste({ pool, logger, whats })
 
 const app = await criarApp({ env, pool, logger, whats })
+// Monta GET/POST /webhook/whatsapp (handshake + eventos da Meta) antes do listen. O cast
+// concilia o FastifyInstance do app (com ZodTypeProvider/logger pino) com o tipo default.
+whats.montarRotaWebhook(app as unknown as FastifyInstance)
+
 const scheduler = iniciarScheduler({
   pool,
   logger,
@@ -71,40 +76,22 @@ const scheduler = iniciarScheduler({
   appUrl: env.ZAP_APP_URL,
 })
 
-// Conecta ao WhatsApp em paralelo ao boot do HTTP (o envio só ocorre quando online).
-void whats.conectar().catch((e) => logger.error({ err: e }, 'falha ao conectar ao WhatsApp'))
+// Valida as credenciais e grava o status (não há QR na Meta); não bloqueia o boot do HTTP.
+void whats.conectar().catch((e) => logger.error({ err: e }, 'falha ao conectar à Meta Cloud API'))
 
-// Comandos do admin (api) chegam pela tabela whats_sessao: a api só enfileira,
-// quem age é o zap (dono do socket). Poll de 1,5s: claim numa linha só, custo
-// irrisório, e encurta o tempo entre clicar "Conectar" e o QR começar a gerar.
-let processandoComando = false
-const timerComando = setInterval(() => {
-  if (processandoComando) return
-  processandoComando = true
-  void (async () => {
-    try {
-      const comando = await lerEConsumirComando(pool)
-      if (comando === 'conectar') await whats.conectar()
-      else if (comando === 'desconectar') await whats.desconectar()
-    } catch (e) {
-      logger.error({ err: e }, 'falha ao processar comando do WhatsApp')
-    } finally {
-      processandoComando = false
-    }
-  })()
-}, 1_500)
-
+// Encerramento limpo e idempotente: para o scheduler antes de fechar o pool (senão um
+// tick em voo usa o pool já encerrado). SIGINT e SIGTERM podem chegar ambos; só roda 1x.
+let encerrando = false
 const encerrar = async () => {
-  clearInterval(timerComando)
+  if (encerrando) return
+  encerrando = true
   scheduler.parar()
   await whats.parar().catch(() => undefined)
-  await app.close()
-  await pool.end()
-  liberarLock(arquivoLock)
+  await app.close().catch(() => undefined)
+  await pool.end().catch(() => undefined)
   process.exit(0)
 }
 process.on('SIGINT', () => void encerrar())
 process.on('SIGTERM', () => void encerrar())
-process.on('exit', () => liberarLock(arquivoLock))
 
 await app.listen({ port: env.PORT, host: '0.0.0.0' })

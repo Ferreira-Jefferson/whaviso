@@ -6,7 +6,7 @@ import {
   sha256ConviteHex,
 } from '@whaviso/shared/contracts'
 import { formatarDataBr, formatarValorBr } from '@whaviso/shared/datas'
-import type { ClienteWhats, EventoBotao, EventoTexto } from '../../shared/whats'
+import type { ClienteWhats, EventoBotao, EventoStatus, EventoTexto } from '../../shared/whats'
 import type { AdminSupabase } from '../../shared/supabase_admin'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import * as repo from './repo'
@@ -67,6 +67,14 @@ export interface DepsInbound {
   whats: ClienteWhats
   /** Admin API do Supabase p/ a conta-no-aceite (H5.3). null = recurso desligado. */
   admin?: AdminSupabase | null
+}
+
+/**
+ * Recibo de entrega da Meta (sent/delivered/read/failed): atualiza envios.entrega_status
+ * pelo wamid. O Baileys não dá esse sinal (onStatus no-op); com a Meta passa a dar.
+ */
+export async function processarStatus(deps: DepsInbound, evento: EventoStatus): Promise<void> {
+  await repo.atualizarEntrega(deps.pool, evento.wamid, evento.status, evento.erro)
 }
 
 /**

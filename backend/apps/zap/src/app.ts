@@ -34,7 +34,8 @@ export async function criarApp(deps: DepsZap) {
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
 
-  // Preserva o corpo cru p/ validar a assinatura Standard Webhooks do /hooks/send-code.
+  // Preserva o corpo cru p/ validar assinaturas de webhook: Standard Webhooks do
+  // /hooks/send-code (Supabase) e X-Hub-Signature-256 do /webhook/whatsapp (Meta).
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, corpo, done) => {
     ;(req as { rawBody?: Buffer }).rawBody = corpo as Buffer
     if ((corpo as Buffer).length === 0) return done(null, undefined)
@@ -51,8 +52,8 @@ export async function criarApp(deps: DepsZap) {
 
   app.get('/healthz', async () => ({ ok: true, servico: 'zap', whatsapp: deps.whats.status() }))
 
-  // O inbound de botões do WhatsApp chega pelo socket do Baileys (ver server.ts),
-  // não por webhook HTTP. Aqui só fica o Send SMS Hook do Supabase (OTP).
+  // Send SMS Hook do Supabase (OTP). O inbound do WhatsApp (botões/texto/status) chega
+  // pela rota /webhook/whatsapp, montada pelo server.ts via whats.montarRotaWebhook(app).
   await app.register(hookOtpRoutes)
 
   return app

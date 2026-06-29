@@ -267,6 +267,8 @@ export function envZapFake(over: Partial<EnvZap> = {}): EnvZap {
     WHATS_BATCH_PAUSE_MIN: 0,
     WHATS_BATCH_PAUSE_MAX: 0,
     WHATS_MAX_POR_HORA: 60,
+    META_GRAPH_URL: 'https://graph.facebook.com',
+    META_API_VERSION: 'v23.0',
     ...over,
   }
 }
