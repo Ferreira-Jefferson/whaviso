@@ -67,6 +67,8 @@ export const adminKeys = {
   catalogo: ['admin', 'creditos-catalogo'] as const,
   configPlataforma: ['admin', 'config-plataforma'] as const,
   whatsapp: ['admin', 'whatsapp'] as const,
+  testeNumero: ['admin', 'whatsapp', 'teste', 'numero'] as const,
+  testeMensagens: ['admin', 'whatsapp', 'teste', 'mensagens'] as const,
   mensagens: ['admin', 'mensagens'] as const,
 }
 
@@ -245,6 +247,79 @@ export function useConectarWhatsapp() {
 /** POST /v1/admin/whatsapp/desconectar: logout + apaga a sessão (exige QR novo). */
 export function useDesconectarWhatsapp() {
   return useComandoWhatsapp('/admin/whatsapp/desconectar')
+}
+
+// ---- Mini-chat de teste do WhatsApp (diagnóstico) ------------------------
+// O owner cadastra um número de teste e troca mensagens de TEXTO com ele para checar
+// se o número conectado envia/recebe. A api enfileira a saída; o zap envia/recebe pelo
+// Baileys (mesma fila/transporte das automáticas, porém sem template).
+const testeNumeroResposta = z.object({ telefone: z.string().nullable() })
+type TesteNumeroResposta = z.infer<typeof testeNumeroResposta>
+
+const testeMensagem = z.object({
+  id: z.string(),
+  direcao: z.enum(['saida', 'entrada']),
+  texto: z.string(),
+  status: z.enum(['agendado', 'processando', 'enviado', 'falhou', 'recebido']),
+  erro: z.string().nullable(),
+  horario: z.string(),
+})
+export type TesteMensagem = z.infer<typeof testeMensagem>
+const testeMensagensResposta = z.object({ itens: z.array(testeMensagem) })
+type TesteMensagensResposta = z.infer<typeof testeMensagensResposta>
+const testeEnviarResposta = z.object({ id: z.string(), status: z.string() })
+type TesteEnviarResposta = z.infer<typeof testeEnviarResposta>
+
+/** GET /v1/admin/whatsapp/teste/numero: número de teste atual (E.164) ou null. */
+export function useTesteNumero() {
+  return useQuery<TesteNumeroResposta>({
+    queryKey: adminKeys.testeNumero,
+    queryFn: ({ signal }) =>
+      apiClient.get<TesteNumeroResposta>('/admin/whatsapp/teste/numero', {
+        schema: testeNumeroResposta,
+        signal,
+      }),
+  })
+}
+
+/** POST /v1/admin/whatsapp/teste/numero: cadastra/edita o número de teste (E.164 ou null). */
+export function useSalvarTesteNumero() {
+  const qc = useQueryClient()
+  return useMutation<TesteNumeroResposta, Error, string | null>({
+    mutationFn: (telefone) =>
+      apiClient.post<TesteNumeroResposta>('/admin/whatsapp/teste/numero', {
+        body: { telefone },
+        schema: testeNumeroResposta,
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: adminKeys.testeNumero }),
+  })
+}
+
+/** GET /v1/admin/whatsapp/teste/mensagens: histórico do mini-chat. Poll de 2s quando ativo. */
+export function useTesteMensagens(ativo: boolean) {
+  return useQuery<TesteMensagensResposta>({
+    queryKey: adminKeys.testeMensagens,
+    refetchInterval: ativo ? 2_000 : false,
+    refetchOnWindowFocus: false,
+    queryFn: ({ signal }) =>
+      apiClient.get<TesteMensagensResposta>('/admin/whatsapp/teste/mensagens', {
+        schema: testeMensagensResposta,
+        signal,
+      }),
+  })
+}
+
+/** POST /v1/admin/whatsapp/teste/enviar: enfileira uma mensagem para o número de teste. */
+export function useEnviarTeste() {
+  const qc = useQueryClient()
+  return useMutation<TesteEnviarResposta, Error, string>({
+    mutationFn: (texto) =>
+      apiClient.post<TesteEnviarResposta>('/admin/whatsapp/teste/enviar', {
+        body: { texto },
+        schema: testeEnviarResposta,
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: adminKeys.testeMensagens }),
+  })
 }
 
 // ---- Créditos: curva de preço (catálogo). Leitura reusa GET /billing/carteira ----

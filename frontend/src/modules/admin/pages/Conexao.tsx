@@ -19,6 +19,7 @@ import {
   useWhatsappSessao,
   type WhatsappStatus,
 } from '../api'
+import { ChatTeste } from '../components/ChatTeste'
 
 const ROTULO_STATUS: Record<WhatsappStatus, string> = {
   desconectado: 'Desconectado',
@@ -239,6 +240,10 @@ export default function ConexaoPage() {
               </>
             )}
           </div>
+
+          {/* Mini-chat de teste: só com o aparelho conectado. Serve para conferir, na
+              prática, se o número conectado envia e recebe mensagens. */}
+          {status === 'conectado' && <ChatTeste />}
         </Card>
     </div>
   )

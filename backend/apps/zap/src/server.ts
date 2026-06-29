@@ -8,6 +8,7 @@ import { criarClienteWhats } from './shared/baileys_client'
 import { adquirirLock, liberarLock } from './shared/baileys_client/lock'
 import { lerEConsumirComando } from './shared/baileys_client/qr'
 import { registrarInboundWhats } from './modules/webhook_whatsapp'
+import { registrarInboundTeste } from './modules/testar_envio'
 import { criarAdminSupabase } from './shared/supabase_admin'
 import { iniciarScheduler } from './scheduler'
 
@@ -58,6 +59,8 @@ const admin =
 
 // Inbound de botões/texto pelo socket (app-root liga o módulo; módulo não importa módulo).
 registrarInboundWhats({ pool, logger, whats, admin })
+// Captura as respostas do número de teste no mini-chat de diagnóstico (sandbox).
+registrarInboundTeste({ pool, logger, whats })
 
 const app = await criarApp({ env, pool, logger, whats })
 const scheduler = iniciarScheduler({

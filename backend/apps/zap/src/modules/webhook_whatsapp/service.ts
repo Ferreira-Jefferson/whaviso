@@ -260,6 +260,11 @@ export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Pr
   const telefone = normalizarTelefone(evento.telefone)
   if (!telefone) return
 
+  // Mini-chat de teste (sandbox): o número de teste do painel conversa SÓ com o chat
+  // de teste do admin (capturado em testar_envio). Não entra na máquina de estados de
+  // convite/devedor, então não recebe "pedir número de convite" nem menu automático.
+  if (await ehNumeroDeTeste(deps.pool, telefone)) return
+
   // E14: se há um wizard de chave ATIVO para o telefone, o texto é dado da etapa atual
   // (titular/banco/chave ou resposta numerada do tipo). Precede a detecção de número de
   // convite/menu (H14.4): um número durante o wizard é dado da etapa, não convite.
@@ -377,4 +382,16 @@ async function responderResumo(deps: DepsInbound, telefone: string, a: repo.Avis
 function normalizarTelefone(bruto: string): string | null {
   const so = bruto.replace(/\D/g, '')
   return so.length >= 8 ? `+${so}` : null
+}
+
+/**
+ * True quando o telefone (E.164) é o número de teste configurado no painel. Usado para
+ * que o sandbox do mini-chat de diagnóstico não dispare a regra de negócio do inbound.
+ */
+async function ehNumeroDeTeste(pool: Pool, telefone: string): Promise<boolean> {
+  const { rows } = await pool.query<{ existe: boolean }>(
+    `select exists(select 1 from public.whats_teste_config where id=1 and telefone=$1) as existe`,
+    [telefone],
+  )
+  return rows[0]?.existe ?? false
 }

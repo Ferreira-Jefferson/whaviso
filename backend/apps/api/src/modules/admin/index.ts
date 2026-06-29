@@ -528,4 +528,73 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
     )
     return { comando: 'desconectar' as const }
   })
+
+  // ---- Mini-chat de teste do WhatsApp (diagnóstico) ------------------------
+  // O owner cadastra um número de teste e troca mensagens de TEXTO com ele, sem passar
+  // pelo template/agendamento do ciclo. A api só enfileira a saída e lê o histórico
+  // (whats_teste_*); quem envia/recebe pelo Baileys é o zap (mesma fila/transporte das
+  // automáticas). Serve para checar se o número conectado realmente envia/recebe.
+
+  // Número de teste atual (E.164) ou null.
+  app.get('/admin/whatsapp/teste/numero', { preHandler: owner }, async () => {
+    const { rows } = await app.pool.query<{ telefone: string | null }>(
+      `select telefone from public.whats_teste_config where id = 1`,
+    )
+    return { telefone: rows[0]?.telefone ?? null }
+  })
+
+  // Cadastra/edita o número de teste. Aceita E.164 ou null (limpar). Normaliza dígitos.
+  app.post(
+    '/admin/whatsapp/teste/numero',
+    { preHandler: owner, schema: { body: z.object({ telefone: z.string().max(24).nullable() }) } },
+    async (req) => {
+      const digitos = (req.body.telefone ?? '').replace(/\D/g, '')
+      const telefone = digitos.length >= 10 ? `+${digitos}` : null
+      await app.pool.query(
+        `update public.whats_teste_config set telefone = $1, atualizado_em = now() where id = 1`,
+        [telefone],
+      )
+      return { telefone }
+    },
+  )
+
+  // Histórico do mini-chat (cronológico: mais antigas primeiro). Horário em SP.
+  app.get('/admin/whatsapp/teste/mensagens', { preHandler: owner }, async () => {
+    const { rows } = await app.pool.query<{
+      id: string
+      direcao: 'saida' | 'entrada'
+      texto: string
+      status: string
+      erro: string | null
+      horario: string
+    }>(
+      `select id, direcao, texto, status, erro,
+              to_char(criado_em at time zone 'America/Sao_Paulo', 'HH24:MI') as horario
+       from public.whats_teste_mensagens
+       order by criado_em desc
+       limit 100`,
+    )
+    return { itens: rows.reverse() }
+  })
+
+  // Enfileira uma mensagem de saída para o número de teste (o zap drena e envia).
+  app.post(
+    '/admin/whatsapp/teste/enviar',
+    { preHandler: owner, schema: { body: z.object({ texto: z.string().trim().min(1).max(1000) }) } },
+    async (req) => {
+      const { rows: cfg } = await app.pool.query<{ telefone: string | null }>(
+        `select telefone from public.whats_teste_config where id = 1`,
+      )
+      const telefone = cfg[0]?.telefone ?? null
+      if (!telefone) {
+        throw regraNegocio('sem_numero_teste', 'Cadastre um número de teste antes de enviar.')
+      }
+      const { rows } = await app.pool.query<{ id: string }>(
+        `insert into public.whats_teste_mensagens (direcao, telefone, texto)
+         values ('saida', $1, $2) returning id`,
+        [telefone, req.body.texto],
+      )
+      return { id: rows[0]!.id, status: 'agendado' as const }
+    },
+  )
 }
