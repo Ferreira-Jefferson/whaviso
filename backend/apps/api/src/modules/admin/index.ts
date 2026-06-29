@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module'
 import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
@@ -59,13 +58,6 @@ function lintConteudo(c: { texto?: string; botoes?: { rotulo: string }[] }): {
     travessao: lintTravessao(alvo),
     avisos_genero: alertaGenero(alvo),
   }
-}
-
-// qrcode é CJS (igual ao zap): carrega por createRequire para evitar atrito de
-// interop ESM sob verbatimModuleSyntax. Renderiza a string do QR como PNG dataURL.
-const exigir = createRequire(import.meta.url)
-interface GeradorQr {
-  toDataURL: (texto: string, opcoes?: Record<string, unknown>) => Promise<string>
 }
 
 export const adminRoutes: FastifyPluginAsync = async (raiz) => {
@@ -476,63 +468,27 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
     },
   )
 
-  // ---- Conexão do WhatsApp (Baileys) ---------------------------------------
-  // O socket vive no `zap` (processo separado). A api só LÊ a sessão (status/QR,
-  // tabela whats_sessao) e ENFILEIRA comandos (coluna `comando`); quem age é o
-  // zap. Assim o owner cria/derruba a conexão e pega o QR pela tela de admin.
+  // ---- Conexão do WhatsApp (Meta Cloud API) --------------------------------
+  // O transporte vive no `zap` (processo separado), que valida token+phone_id e grava
+  // o status na tabela whats_sessao. A api só LÊ o status/numero para a tela de admin.
+  // Não há QR nem comando de conectar/desconectar: a conexão é por credenciais (env).
 
-  // Status atual + QR renderizado como imagem (PNG dataURL) quando aguardando.
+  // Status atual da conexão (status + número de exibição).
   app.get('/admin/whatsapp', { preHandler: owner }, async () => {
     const { rows } = await app.pool.query<{
       status: 'desconectado' | 'aguardando_qr' | 'conectado'
       numero: string | null
-      qr: string | null
-      comando: 'conectar' | 'desconectar' | null
       atualizado_em: Date
-    }>(
-      `select status, numero, qr, comando, atualizado_em from public.whats_sessao where id = 1`,
-    )
+    }>(`select status, numero, atualizado_em from public.whats_sessao where id = 1`)
     const s = rows[0]
-    if (!s) return { status: 'desconectado', numero: null, qr_img: null, comando_pendente: null, atualizado_em: null }
-
-    let qrImg: string | null = null
-    if (s.status === 'aguardando_qr' && s.qr) {
-      try {
-        const qrcode = exigir('qrcode') as GeradorQr
-        qrImg = await qrcode.toDataURL(s.qr, { width: 320, margin: 2 })
-      } catch {
-        qrImg = null // sem o gerador, o front cai no estado "aguardando" sem imagem
-      }
-    }
-    return {
-      status: s.status,
-      numero: s.numero,
-      qr_img: qrImg,
-      comando_pendente: s.comando,
-      atualizado_em: s.atualizado_em,
-    }
-  })
-
-  // Enfileira "conectar": o zap (re)abre o socket e emite um QR novo se preciso.
-  app.post('/admin/whatsapp/conectar', { preHandler: owner }, async () => {
-    await app.pool.query(
-      `update public.whats_sessao set comando = 'conectar', comando_em = now() where id = 1`,
-    )
-    return { comando: 'conectar' as const }
-  })
-
-  // Enfileira "desconectar": o zap faz logout e apaga a sessão (exige QR novo).
-  app.post('/admin/whatsapp/desconectar', { preHandler: owner }, async () => {
-    await app.pool.query(
-      `update public.whats_sessao set comando = 'desconectar', comando_em = now() where id = 1`,
-    )
-    return { comando: 'desconectar' as const }
+    if (!s) return { status: 'desconectado' as const, numero: null, atualizado_em: null }
+    return { status: s.status, numero: s.numero, atualizado_em: s.atualizado_em }
   })
 
   // ---- Mini-chat de teste do WhatsApp (diagnóstico) ------------------------
   // O owner cadastra um número de teste e troca mensagens de TEXTO com ele, sem passar
   // pelo template/agendamento do ciclo. A api só enfileira a saída e lê o histórico
-  // (whats_teste_*); quem envia/recebe pelo Baileys é o zap (mesma fila/transporte das
+  // (whats_teste_*); quem envia/recebe pela Meta Cloud API é o zap (mesma fila/transporte das
   // automáticas). Serve para checar se o número conectado realmente envia/recebe.
 
   // Número de teste atual (E.164) ou null.

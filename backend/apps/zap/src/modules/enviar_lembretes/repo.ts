@@ -34,9 +34,8 @@ export interface DadosEnvio {
   template_status_meta: StatusMeta | null
 }
 
-// Lote menor que antes (Meta): o envio pelo Baileys é serializado e espaçado pelo
-// ritmo anti-bloqueio, então um claim grande seguraria linhas em 'processando' por
-// muito tempo. ressuscitarTravados cobre eventuais travas.
+// Lote pequeno por tick: mantém o espaçamento de 10min por devedor previsível e evita
+// segurar muitas linhas em 'processando'. ressuscitarTravados cobre eventuais travas.
 const LIMITE_CLAIM = 5
 
 /** Reseta envios travados em 'processando' por mais de 10 min (crash-safety). */

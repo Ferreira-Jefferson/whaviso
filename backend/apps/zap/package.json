@@ -10,13 +10,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "6.7.23",
     "@whaviso/shared": "*",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.0",
     "fastify-type-provider-zod": "^6.0.0",
-    "jimp": "^0.16.13",
-    "qrcode": "^1.5.4",
     "zod": "^4.0.0"
   }
 }

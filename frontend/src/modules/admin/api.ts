@@ -10,9 +10,7 @@
 //   POST /v1/admin/mensagens/:id/ativar     ✔ 409 'template_nao_aprovado' se não aprovado
 //   POST /v1/admin/mensagens/:id/aprovar    ✔ aprovação manual (era Baileys, sem Meta)
 //   DELETE /v1/admin/mensagens/:id          ✔ apaga versão; 409 'template_ativo' na ativa
-//   GET  /v1/admin/whatsapp                  ✔ { status, numero, qr_img(dataURL), comando_pendente }
-//   POST /v1/admin/whatsapp/conectar        ✔ enfileira comando p/ o zap abrir o socket (gera QR)
-//   POST /v1/admin/whatsapp/desconectar     ✔ enfileira comando p/ o zap deslogar (exige QR novo)
+//   GET  /v1/admin/whatsapp                  ✔ { status, numero } (Meta Cloud API; sem QR/comando)
 //   GET  /v1/billing/carteira               ✔ (catálogo de créditos reusado aqui via .catalogo)
 //   PATCH /v1/admin/creditos-catalogo       ✔ edita a curva (owner, H11.11)
 //   GET   /v1/admin/usuarios                ✔ { itens:[perfil+suspenso+saldo da carteira], total, page, per_page }
@@ -187,66 +185,31 @@ export function useApagarMensagem() {
 
 export type { Template }
 
-// ---- Conexão do WhatsApp (Baileys) ---------------------------------------
-// O socket vive no `zap`; a api só reflete a sessão (whats_sessao) e enfileira
-// comandos. O QR vem já renderizado como imagem (dataURL) pelo backend.
+// ---- Conexão do WhatsApp (Meta Cloud API) --------------------------------
+// O transporte vive no `zap`, que valida token+phone_id (env) e grava o status na
+// sessão (whats_sessao). A api só reflete o status/numero. Não há QR nem comando: a
+// conexão é por credenciais. O status 'aguardando_qr' fica no enum só por dados legados.
 const whatsappStatus = z.enum(['desconectado', 'aguardando_qr', 'conectado'])
 const whatsappSessaoResposta = z.object({
   status: whatsappStatus,
   numero: z.string().nullable(),
-  qr_img: z.string().nullable(),
-  comando_pendente: z.enum(['conectar', 'desconectar']).nullable(),
   atualizado_em: z.string().nullable(),
 })
 export type WhatsappStatus = z.infer<typeof whatsappStatus>
 export type WhatsappSessao = z.infer<typeof whatsappSessaoResposta>
 
-// Poll de 1,5s em duas situações: (1) há uma intenção pendente (a tela disparou
-// conectar/desconectar e o banco ainda não refletiu o desfecho); ou (2) o status
-// real é 'aguardando_qr', ou seja, o QR está na tela esperando a leitura. O caso
-// (2) é o que faz a conexão ser detectada SOZINHA: quando o owner escaneia, o zap
-// grava 'conectado' e o poll vira a tela na hora (sem clicar em atualizar); de
-// quebra, o QR rotacionado pelo Baileys também atualiza sozinho. Para de pollar ao
-// conectar ou ao voltar para desconectado ocioso, evitando o poll perpétuo.
-export function useWhatsappSessao(aguardando: boolean) {
+/** GET /v1/admin/whatsapp: status atual da conexão (status + número de exibição). */
+export function useWhatsappSessao() {
   return useQuery<WhatsappSessao>({
     queryKey: adminKeys.whatsapp,
     retry: false,
     refetchOnWindowFocus: false,
-    refetchInterval: (query) =>
-      aguardando || query.state.data?.status === 'aguardando_qr' ? 1_500 : false,
     queryFn: ({ signal }) =>
       apiClient.get<WhatsappSessao>('/admin/whatsapp', {
         schema: whatsappSessaoResposta,
         signal,
       }),
   })
-}
-
-const comandoWhatsappResposta = z.object({
-  comando: z.enum(['conectar', 'desconectar']),
-})
-export type ComandoWhatsappResposta = z.infer<typeof comandoWhatsappResposta>
-
-function useComandoWhatsapp(path: string) {
-  const qc = useQueryClient()
-  return useMutation<ComandoWhatsappResposta, Error, void>({
-    mutationFn: () =>
-      apiClient.post<ComandoWhatsappResposta>(path, { schema: comandoWhatsappResposta }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: adminKeys.whatsapp })
-    },
-  })
-}
-
-/** POST /v1/admin/whatsapp/conectar: o zap (re)abre o socket e gera o QR. */
-export function useConectarWhatsapp() {
-  return useComandoWhatsapp('/admin/whatsapp/conectar')
-}
-
-/** POST /v1/admin/whatsapp/desconectar: logout + apaga a sessão (exige QR novo). */
-export function useDesconectarWhatsapp() {
-  return useComandoWhatsapp('/admin/whatsapp/desconectar')
 }
 
 // ---- Mini-chat de teste do WhatsApp (diagnóstico) ------------------------

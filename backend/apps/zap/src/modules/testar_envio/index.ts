@@ -1,9 +1,10 @@
 // Mini-chat de teste do WhatsApp (diagnóstico do owner). Drena a fila de SAÍDA
 // (whats_teste_mensagens) no mesmo scheduler das automáticas e envia pelo MESMO
-// transporte Baileys (whats.enviarTexto), porém SEM template/agendamento de aviso:
-// é texto livre para um número de teste. Também captura as RESPOSTAS desse número
-// (listener inbound adicional) para o painel mostrar a conversa. O app-root (scheduler/
-// server) liga o módulo; o módulo não importa outro módulo.
+// transporte (Meta Cloud API, whats.enviarTexto), porém SEM template/agendamento de
+// aviso: é texto livre, então só chega dentro da janela de 24h (o número de teste
+// precisa ter respondido antes). Também captura as RESPOSTAS desse número (listener
+// inbound adicional) para o painel mostrar a conversa. O app-root (scheduler/server)
+// liga o módulo; o módulo não importa outro módulo.
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import { ErroEnvio, type ClienteWhats, type EventoTexto } from '../../shared/whats'

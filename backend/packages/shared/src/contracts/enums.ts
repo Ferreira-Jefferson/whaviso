@@ -91,8 +91,8 @@ export type ContextoTemplate = z.infer<typeof contextoTemplate>
 // templates não carregar.
 //
 // E5: 'dado_incorreto' é a terceira opção do aceite (aceitar / algum dado incorreto /
-// recusar). Emitida hoje no template convite.resumo, enviado pelo zap via Baileys (número
-// próprio, sem template aprovado na Meta); o webhook trata o toque (H5.4).
+// recusar). Emitida no template convite.resumo, enviado pelo zap via Meta Cloud API
+// (template aprovado, botões quick_reply); o webhook trata o toque (H5.4).
 export const acaoBotaoTemplate = z.enum([
   'ja_paguei',
   'optout',

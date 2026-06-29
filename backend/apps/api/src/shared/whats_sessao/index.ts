@@ -1,4 +1,4 @@
-// Leitura do NÚMERO conectado do WhatsApp (sessão do Baileys, whats_sessao 0020) no lado da api.
+// Leitura do NÚMERO conectado do WhatsApp (sessão da Meta Cloud API, whats_sessao 0020) no lado da api.
 // O zap grava o número ao conectar (status='conectado'); aqui a api só LÊ para devolver ao front
 // o número da conversa de recarga (link wa.me). Isso elimina a env VITE_WHATSAPP_VENDAS: a conversa
 // passa a ser sempre o número que o zap está DE FATO usando, sem configurar nada à mão. Vive em

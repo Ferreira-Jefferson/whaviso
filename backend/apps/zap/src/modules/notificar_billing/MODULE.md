@@ -14,7 +14,7 @@ manda o comprovante na conversa; o owner credita depois (módulo admin, H11.11).
 
 ## Especialistas consumidos
 - `@whaviso/shared/db`, `@whaviso/shared/datas` (formatarValorBr), `@whaviso/shared/logger`
-- `shared/baileys_client` (ClienteWhats.enviarMensagem; ErroEnvio)
+- `shared/whats` (ClienteWhats.enviarMensagem; ErroEnvio)
 - `shared/templates` (carregarTemplateAtivo + renderMensagem)
 - `shared/config_plataforma` (lerConfigPlataforma + temChavePix)
 
