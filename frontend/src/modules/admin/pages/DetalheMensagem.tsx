@@ -48,6 +48,7 @@ import {
   CATALOGO_VARIAVEIS,
   exemplosPadrao,
   paraIndexado,
+  paraNomeado,
   variaveisDoCorpo,
 } from '../templates_catalogo'
 
@@ -174,6 +175,10 @@ function Conteudo({
           meta={meta}
           sugestaoNomeMeta={ativo?.nome_meta}
           sugestaoBotoes={ativo?.conteudo.botoes}
+          // Semeia o editor com a versão ativa (texto reconvertido para tokens
+          // nomeados; categoria da Meta), para propor a partir dela em vez do zero.
+          sugestaoTexto={ativo ? paraNomeado(ativo.conteudo.texto, ativo.variaveis) : undefined}
+          sugestaoCategoria={ativo?.categoria}
         />
       </div>
     </div>
@@ -379,20 +384,26 @@ function NovaProposta({
   meta,
   sugestaoNomeMeta,
   sugestaoBotoes,
+  sugestaoTexto,
+  sugestaoCategoria,
 }: {
   chave: string
   contexto: ContextoTemplate
   meta: MensagemItem
   sugestaoNomeMeta?: string
   sugestaoBotoes?: BotaoTemplate[]
+  sugestaoTexto?: string
+  sugestaoCategoria?: CategoriaTemplate
 }) {
   // Default do nome: o da versão ativa do contexto, ou derivado da chave (a
   // variante de revisão recebe sufixo para não colidir com o nome do padrão).
   const nomePadrao =
     chave.replace(/\./g, '_') + (contexto === 'revisao' ? '_revisao' : '')
   const [nomeMeta, setNomeMeta] = useState(sugestaoNomeMeta ?? nomePadrao)
-  const [corpo, setCorpo] = useState('')
-  const [categoria, setCategoria] = useState<CategoriaTemplate>('UTILITY')
+  // Texto e categoria nascem da versão ativa (se houver), para o owner propor a
+  // partir dela; o componente remonta por contexto (key={ctx}), reancorando o seed.
+  const [corpo, setCorpo] = useState(sugestaoTexto ?? '')
+  const [categoria, setCategoria] = useState<CategoriaTemplate>(sugestaoCategoria ?? 'UTILITY')
 
   // Botões editáveis: as ações permitidas da chave (acao é código, rotulo editável).
   // Prefill a partir da versão ativa, se houver; senão usa os rótulos padrão.
@@ -504,7 +515,8 @@ function NovaProposta({
       },
       {
         onSuccess: () => {
-          setCorpo('')
+          // Volta ao seed da versão ativa (a proposta nova ainda não é o ativo).
+          setCorpo(sugestaoTexto ?? '')
           previewReset()
         },
       },

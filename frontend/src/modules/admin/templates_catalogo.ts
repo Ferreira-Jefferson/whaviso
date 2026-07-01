@@ -43,6 +43,9 @@ const POR_CHAVE = new Map(CATALOGO_VARIAVEIS.map((v) => [v.chave, v]))
 /** Token entre chaves duplas, só letras maiúsculas e underscore: {{NOME_DEVEDOR}}. */
 const PADRAO_TOKEN = /\{\{([A-Z_]+)\}\}/g
 
+/** Token indexado do backend: {{1}}, {{2}}… (posição -> chave via `variaveis`). */
+const PADRAO_INDICE = /\{\{(\d+)\}\}/g
+
 export function variavelPorChave(chave: string): VariavelCatalogo | undefined {
   return POR_CHAVE.get(chave)
 }
@@ -72,6 +75,20 @@ export function paraIndexado(corpoNomeado: string, variaveis: string[]): string 
     if (!cat) return inteiro
     const i = variaveis.indexOf(cat.chave)
     return i >= 0 ? `{{${i + 1}}}` : inteiro
+  })
+}
+
+/**
+ * Inverso de paraIndexado: converte o corpo INDEXADO ({{1}}) de volta ao NOMEADO
+ * ({{NOME_DEVEDOR}}), usando a ordem de `variaveis` (variaveis[0] = {{1}}). Serve
+ * para semear o editor a partir de uma versão já salva. Índices fora de
+ * `variaveis` ou chaves fora do catálogo ficam intactos.
+ */
+export function paraNomeado(corpoIndexado: string, variaveis: string[]): string {
+  return corpoIndexado.replace(PADRAO_INDICE, (inteiro, num: string) => {
+    const chave = variaveis[Number(num) - 1]
+    const cat = chave ? POR_CHAVE.get(chave) : undefined
+    return cat ? `{{${cat.token}}}` : inteiro
   })
 }
 
