@@ -1,0 +1,8 @@
+{
+  "TARGET_BASE_URL": "http://localhost:5173",
+  "SCREEN_MANIFEST": "docs/qa/PLAN.md",
+  "OWNER_DOCS_ROOT": "historias/",
+  "REPORTS_ROOT": "docs/qa/reports/",
+  "RUN_MODE": "core",
+  "_notas": "OWNER_DOCS_ROOT aponta para historias/ (fonte da verdade do produto). RUN_MODE default. O dev local (5173) aponta para o Supabase cloud, entao read-only continua obrigatorio. Para rodar contra producao, troque TARGET_BASE_URL pela URL publica."
+}
