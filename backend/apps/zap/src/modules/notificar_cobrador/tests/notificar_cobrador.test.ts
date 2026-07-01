@@ -5,6 +5,7 @@ import {
   clienteWhatsFake,
   criarAvisoInvertido,
   criarAvisoPendente,
+  criarConviteReceber,
   encerrarPools,
   limpar,
   poolSuper,
@@ -120,6 +121,68 @@ describe('notificar_cobrador: gating por template (H12.8)', () => {
     const notif = await lerNotif(notifId)
     expect(notif.status).toBe('agendado')
     expect(notif.erro).toBe('template_meta_nao_aprovado')
+    await limpar(cobradorId)
+  })
+})
+
+describe('notificar_cobrador: convite ao convidado (E5 H5.0)', () => {
+  afterAll(async () => {
+    // Volta o convite.resumo ao estado semeado pela migration 0067 (pendente p/ re-aprovar).
+    await poolSuper.query(
+      `update public.templates set status_meta='pendente'::status_meta_template where chave='convite.resumo'`,
+    )
+  })
+
+  it('receber: o Whaviso manda o convite (template convite.resumo) ao DEVEDOR com os 3 botões', async () => {
+    const { cobradorId, avisoId } = await criarConviteReceber({ dataCombinada: futuro, telefoneDevedor: '+5511977776666' })
+    await ativarTemplate('convite.resumo', true)
+    const notifId = await enfileirar(avisoId, {
+      telefoneAlvo: '+5511977776666',
+      alvoPapel: 'devedor',
+      tipo: 'convite_enviar',
+    })
+    // Isolamento: o banco whaviso_dev é compartilhado (a api roda antes e deixa convites
+    // pendentes de outros avisos). Zera os convites de OUTROS avisos para o dreno ser
+    // determinístico (só a minha linha sai neste lote).
+    await poolSuper.query(
+      `delete from public.notificacoes_cobrador where tipo='convite_enviar' and aviso_id<>$1`,
+      [avisoId],
+    )
+
+    // Captura todas as mensagens do lote e localiza a MINHA pelo telefone.
+    const whats = clienteWhatsFake(() => ({ wamid: 'w_convite' }))
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
+
+    const msg = whats.enviadas.find((m) => m.para === '+5511977776666')
+    expect(msg).toBeDefined()
+    // Convite INICIA a conversa: sai por TEMPLATE aprovado, não texto livre.
+    expect(msg!.template?.nome).toBe('whaviso_convite_resumo')
+    // Os 3 botões carregam acao + aviso_id (o webhook parseia "acao:avisoId").
+    expect((msg!.botoes ?? []).map((b) => b.id)).toEqual([
+      `aceite:${avisoId}`,
+      `dado_incorreto:${avisoId}`,
+      `recusa:${avisoId}`,
+    ])
+    expect((await lerNotif(notifId)).status).toBe('enviado')
+    await limpar(cobradorId)
+  })
+
+  it('convite obsoleto (combinado já saiu de aguardando_aceite): supera sem enviar', async () => {
+    // Fixture nasce 'programado' (já aceito): aindaValida exige aguardando_aceite.
+    const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: futuro, telefone: '+5511977775555' })
+    await ativarTemplate('convite.resumo', true)
+    const notifId = await enfileirar(avisoId, {
+      telefoneAlvo: '+5511977775555',
+      alvoPapel: 'devedor',
+      tipo: 'convite_enviar',
+    })
+    const whats = clienteWhatsFake(() => ({ wamid: 'x' }))
+
+    await processarNotificacoesCobrador({ pool: poolZap, logger, whats, appUrl: APP_URL })
+    expect(whats.enviadas).toHaveLength(0)
+    const notif = await lerNotif(notifId)
+    expect(notif.status).toBe('cancelado')
+    expect(notif.erro).toBe('evento_superado')
     await limpar(cobradorId)
   })
 })

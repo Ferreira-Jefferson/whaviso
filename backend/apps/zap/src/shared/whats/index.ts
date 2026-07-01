@@ -79,9 +79,26 @@ export interface EventoStatus {
   erro?: string
 }
 
+/**
+ * Mudança de status de um TEMPLATE na Meta (webhook `message_template_status_update`):
+ * a Meta avisa quando um template submetido é aprovado/rejeitado. Casa por (nome, idioma);
+ * `motivo` traz a justificativa da recusa. Quem aplica é o módulo sincronizar_templates.
+ */
+export interface EventoTemplateStatus {
+  /** nome do template na Meta (= templates.nome_meta). */
+  nomeMeta: string
+  /** idioma do template (= templates.idioma; ex.: 'pt_BR'). */
+  idioma: string
+  /** veredito já traduzido para o vocabulário do banco (status_meta). */
+  status: 'aprovado' | 'rejeitado' | 'pendente'
+  /** motivo da recusa, quando rejeitado. */
+  motivo?: string
+}
+
 export type HandlerBotao = (e: EventoBotao) => Promise<void>
 export type HandlerTexto = (e: EventoTexto) => Promise<void>
 export type HandlerStatus = (e: EventoStatus) => Promise<void>
+export type HandlerTemplateStatus = (e: EventoTemplateStatus) => Promise<void>
 
 export interface StatusConexao {
   conectado: boolean
@@ -110,5 +127,7 @@ export interface ClienteWhats {
   onTexto(cb: HandlerTexto): void
   /** recibos de entrega (sent/delivered/read/failed). No transporte sem suporte, no-op. */
   onStatus(cb: HandlerStatus): void
+  /** mudanças de status de template na Meta (aprovado/rejeitado). Sem suporte, no-op. */
+  onTemplateStatus(cb: HandlerTemplateStatus): void
   status(): StatusConexao
 }

@@ -67,17 +67,30 @@ describe('avisos (integração com whaviso_dev)', () => {
     await app.close()
   })
 
-  it('cria aviso (receber) → 201 com número de convite e link wa.me, status aguardando_aceite', async () => {
+  it('cria aviso (receber) → 201 com número de convite (reserva), enfileira o convite ao devedor, status aguardando_aceite', async () => {
     const app = await criarAppTeste(uid)
     const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
     expect(r.statusCode).toBe(201)
     const body = r.json()
     expect(body.aviso.status).toBe('aguardando_aceite')
-    // E5: aceite 100% WhatsApp. Sai o número de 6 dígitos (xxx-xxx) e o link wa.me do
-    // Whaviso (não mais o link de site /aceite/:token).
+    // E5 H5.0: o Whaviso INICIA a conversa. A api não devolve mais link/mensagem para o
+    // criador compartilhar; sai só o número de 6 dígitos (xxx-xxx), como reserva (H5.1).
     expect(body.numero_convite).toMatch(/^\d{3}-\d{3}$/)
-    expect(body.link_whatsapp).toContain('wa.me/')
+    expect(JSON.stringify(body)).not.toContain('wa.me/')
     expect(JSON.stringify(body)).not.toContain('/aceite/')
+    expect(body.mensagem_convite).toBeUndefined()
+    expect(body.link_whatsapp).toBeUndefined()
+    // E5 H5.0: enfileirou o convite (convite_enviar) ao CONVIDADO (devedor, por telefone)
+    // na outbox, para o zap mandar o template convite.resumo.
+    const { rows } = await poolSuper.query(
+      `select alvo_papel, cobrador_id, telefone_alvo from public.notificacoes_cobrador
+        where aviso_id=$1 and tipo='convite_enviar'`,
+      [body.aviso.id],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].alvo_papel).toBe('devedor')
+    expect(rows[0].cobrador_id).toBeNull() // convidado sem conta em aguardando_aceite
+    expect(rows[0].telefone_alvo).toBe('+5511999998888')
     await app.close()
   })
 
@@ -107,6 +120,15 @@ describe('avisos (integração com whaviso_dev)', () => {
     expect(body.aviso.status).toBe('aguardando_aceite')
     expect(body.aviso.pix_chave).toBeNull()
     expect(body.numero_convite).toMatch(/^\d{3}-\d{3}$/)
+    // E5 H5.0: no invertido o CONVIDADO é o cobrador; o convite vai ao telefone_cobrador.
+    const { rows } = await poolSuper.query(
+      `select alvo_papel, telefone_alvo from public.notificacoes_cobrador
+        where aviso_id=$1 and tipo='convite_enviar'`,
+      [body.aviso.id],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].alvo_papel).toBe('cobrador')
+    expect(rows[0].telefone_alvo).toBe('+5511988887777')
     await app.close()
   })
 

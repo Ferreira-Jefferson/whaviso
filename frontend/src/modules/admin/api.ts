@@ -8,7 +8,7 @@
 //   POST /v1/admin/mensagens                ✔ 201; lint bloqueia: 422 'linguagem_proibida'
 //   POST /v1/admin/mensagens/preview        ✔ { render, lint_ok, palavra_proibida }
 //   POST /v1/admin/mensagens/:id/ativar     ✔ 409 'template_nao_aprovado' se não aprovado
-//   POST /v1/admin/mensagens/:id/aprovar    ✔ marca status_meta=aprovado (libera ativar/enviar)
+//   POST /v1/admin/mensagens/:id/submeter   ✔ enfileira p/ a Meta validar (meta_acao='criar'); 409 'template_ja_aprovado'
 //   DELETE /v1/admin/mensagens/:id          ✔ apaga versão; 409 'template_ativo' na ativa
 //   GET  /v1/admin/whatsapp                  ✔ { status, numero } (Meta Cloud API; sem QR/comando)
 //   GET  /v1/billing/carteira               ✔ (catálogo de créditos reusado aqui via .catalogo)
@@ -159,12 +159,19 @@ export function useAtivarMensagem() {
   })
 }
 
-const aprovarMensagemResposta = z.object({ id: z.uuid(), status_meta: z.string() })
-export function useAprovarMensagem() {
+// Submete a versão à Meta para validação (a api enfileira meta_acao='criar'; o zap cria o
+// template na WABA e o status_meta passa a refletir o veredito real). Substitui o antigo
+// "aprovar" manual (resíduo da era Baileys).
+const submeterMensagemResposta = z.object({
+  id: z.uuid(),
+  status_meta: z.string(),
+  meta_acao: z.string().nullable(),
+})
+export function useSubmeterMensagem() {
   const qc = useQueryClient()
-  return useMutation<z.infer<typeof aprovarMensagemResposta>, Error, string>({
+  return useMutation<z.infer<typeof submeterMensagemResposta>, Error, string>({
     mutationFn: (id) =>
-      apiClient.post(`/admin/mensagens/${id}/aprovar`, { schema: aprovarMensagemResposta }),
+      apiClient.post(`/admin/mensagens/${id}/submeter`, { schema: submeterMensagemResposta }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: adminKeys.mensagens })
     },

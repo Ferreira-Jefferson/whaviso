@@ -50,6 +50,16 @@ interface ConfigTipo {
 const PADRAO = (): ContextoTemplate => 'padrao'
 
 const CONFIG: Record<string, ConfigTipo> = {
+  // E5 H5.0: o CONVITE que o Whaviso manda ao CONVIDADO (o Whaviso inicia a conversa).
+  // Reusa o template `convite.resumo` (resumo + 3 botões aceite/dado_incorreto/recusa),
+  // variante 'revisao' no invertido (criador = devedor: inclui a chave Pix para o
+  // cobrador conferir). Só sai enquanto o combinado segue aguardando aceite; se já foi
+  // respondido/expirou/encerrou antes do envio, supera (não manda convite obsoleto).
+  convite_enviar: {
+    chave: 'convite.resumo',
+    contexto: (d) => (d.criador_papel === 'devedor' ? 'revisao' : 'padrao'),
+    aindaValida: (d) => d.aviso_status === 'aguardando_aceite',
+  },
   // "Já paguei": só vale enquanto o aviso segue em revisão (cobrador ainda não agiu).
   pagamento_informado: {
     chave: 'cobrador.pagamento_informado',

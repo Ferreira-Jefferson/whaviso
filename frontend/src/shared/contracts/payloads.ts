@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import {
   acaoDevedor,
+  categoriaTemplate,
   contextoTemplate,
   direcaoAviso,
   etapaEnvio,
@@ -97,11 +98,10 @@ export type CriarAvisoBody = z.infer<typeof criarAvisoBody>
 
 export const criarAvisoResposta = z.object({
   aviso: avisoSchema,
-  // E5: aceite 100% WhatsApp (sem site). Número de convite em claro (xxx-xxx), mensagem
-  // pronta e link wa.me do Whaviso. null no modo agenda (nada enviado).
+  // E5 H5.0: o Whaviso ENVIA o convite direto ao convidado (não há mais compartilhamento
+  // manual), então não vem mais mensagem pronta nem link wa.me. Sobra o número de convite
+  // em claro (xxx-xxx), só como identificador de RESERVA (H5.1). null no modo agenda.
   numero_convite: z.string().nullable(),
-  mensagem_convite: z.string().nullable(),
-  link_whatsapp: z.string().nullable(),
 })
 export type CriarAvisoResposta = z.infer<typeof criarAvisoResposta>
 
@@ -504,6 +504,9 @@ export const novaMensagemBody = z
     idioma: z.string().default('pt_BR'),
     conteudo: conteudoTemplate,
     variaveis: z.array(z.string()).default([]),
+    // Categoria (default UTILITY) + amostras por variável p/ o `example` da Meta.
+    categoria: categoriaTemplate.default('UTILITY'),
+    exemplos: z.record(z.string(), z.string()).default({}),
   })
   .refine((b) => b.conteudo.texto.trim().length > 0 || b.conteudo.midia != null, {
     message: 'a mensagem precisa de texto ou mídia',

@@ -441,7 +441,7 @@ describe('admin (integração)', () => {
     expect(r.json().avisos_genero).toEqual([])
   })
 
-  it('propor versão (pendente) -> aprovar -> ativar troca a ativa da chave', async () => {
+  it('propor versão (pendente) -> submeter à Meta -> (Meta aprova) -> ativar troca a ativa da chave', async () => {
     const app = await criarAppTeste(owner)
     const nova = await app.inject({
       method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
@@ -456,8 +456,17 @@ describe('admin (integração)', () => {
     expect(semAprovar.statusCode).toBe(409)
     expect(semAprovar.json().error.code).toBe('template_nao_aprovado')
 
-    const aprovar = await app.inject({ method: 'POST', url: `/v1/admin/mensagens/${id}/aprovar`, headers: AUTH })
-    expect(aprovar.json().status_meta).toBe('aprovado')
+    // Submeter à Meta: a api só ENFILEIRA (meta_acao='criar'); não aprova nada.
+    const submeter = await app.inject({ method: 'POST', url: `/v1/admin/mensagens/${id}/submeter`, headers: AUTH })
+    expect(submeter.statusCode).toBe(200)
+    expect(submeter.json().meta_acao).toBe('criar')
+    expect(submeter.json().status_meta).toBe('pendente')
+
+    // Simula o zap (sincronizar_templates) refletindo a APROVAÇÃO real da Meta.
+    await poolSuper.query(
+      `update public.templates set status_meta='aprovado', meta_acao=null, meta_submetido_em=now() where id=$1`,
+      [id],
+    )
     const ativar = await app.inject({ method: 'POST', url: `/v1/admin/mensagens/${id}/ativar`, headers: AUTH })
     await app.close()
     expect(ativar.statusCode).toBe(200)

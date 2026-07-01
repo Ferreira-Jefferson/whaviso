@@ -1,17 +1,33 @@
 # Épico 5: Convite & Aceite pelo WhatsApp
 
 > O aceite acontece **100% pelo WhatsApp**, sem site e sem login. É a regra de ouro: o convidado só interage por botões.
+> **O Whaviso inicia a conversa:** assim que o combinado é criado (ou ativado, na agenda) no modo enviar, o Whaviso **manda o convite direto** para o WhatsApp do convidado, por template aprovado na Meta, com o resumo + os botões (H5.0). O convidado não precisa mais falar primeiro nem digitar número: só toca um botão. O caminho por **número de 6 dígitos** (H5.1) continua existindo como **reserva** (se a pessoa perder a mensagem, ou escrever antes de o convite chegar).
 > Vale para os dois fluxos: no **receber** o convidado é o devedor; no **pagar invertido** o convidado é o cobrador (que confere a chave Pix, ou a informa depois quando o convite veio sem ela, Épico 14).
-> O convite é identificado por um **número de 6 dígitos** + **telefone** (Épicos 2 e 3), nunca por token exposto.
+> O convite é identificado internamente por um **número de 6 dígitos** + **telefone** (Épicos 2 e 3), nunca por token exposto.
 > Três respostas possíveis no aceite: **aceitar**, **algum dado está incorreto** (no invertido: **chave Pix incorreta**) e **recusar**. Em qualquer uma, **o criador é notificado**.
 > Toda mensagem segue as convenções: gênero neutro, sem palavras proibidas, sem travessão (ver README).
 
 ---
 
-### H5.1: Localizar o combinado pelo número de convite 🟢
-Como **convidado**, quero abrir a conversa com o Whaviso e ser reconhecido pelo número de convite, para chegar no combinado certo sem login.
+### H5.0: O Whaviso envia o convite ao convidado 🟢
+Como **sistema (api + zap)**, quero mandar o convite direto ao convidado assim que o combinado entra no modo enviar, para a pessoa receber o resumo e os botões sem precisar dar o primeiro passo.
 *Critérios de aceite:*
-- [ ] Ao clicar no link, abro o WhatsApp do Whaviso com a mensagem inicial pré-preenchida (*"Oi, aqui é [nome], meu convite é o xxx-xxx"*).
+- [ ] Ao **criar** (ou **ativar**, no modo agenda) um combinado no modo **enviar**, o combinado entra em `aguardando_aceite` e a **api enfileira um envio de convite ao convidado** (outbox `notificacoes_cobrador`, tipo `convite_enviar`), na **mesma transação** que cria/ativa o combinado.
+- [ ] O **alvo é o convidado** (o não criador): no **receber** é o **devedor** (`telefone_devedor`); no **pagar invertido** é o **cobrador** (`telefone_cobrador`).
+- [ ] O `zap` drena o envio e manda o **template aprovado** `convite.resumo` (variante `revisao` no invertido, com a chave Pix para conferir), com o resumo + os **3 botões** (aceitar / dado incorreto / recusar) carregando o `aviso_id` no payload.
+- [ ] **Gate de template (E12):** enquanto o `convite.resumo` não estiver **aprovado na Meta**, o envio fica visível e recuperável (não some, não quebra) e sai assim que aprovar.
+- [ ] **Idempotência:** um combinado gera **um** envio de convite (dedupe por combinado); recriar, editar antes do aceite ou reativar não duplica.
+- [ ] Sem telefone do convidado não há envio (a ativação já exige o telefone da outra ponta antes, Épico 4).
+- [ ] **Sem compartilhamento manual:** a api **não devolve mais** link `wa.me` nem mensagem pronta para o criador repassar (ver Divergências); o convite é sempre enviado pelo Whaviso. O `numero_convite` segue existindo como identificador de reserva (H5.1).
+- [ ] Nada de telefone, Pix ou número de convite aparece em log.
+
+---
+
+### H5.1: Localizar o combinado pelo número de convite (reserva) 🟢
+Como **convidado**, quero, **se precisar**, abrir a conversa com o Whaviso e ser reconhecido pelo número de convite, para chegar no combinado certo sem login mesmo quando o convite automático (H5.0) não chegou.
+> Caminho **reserva**: o primário é H5.0 (o Whaviso envia direto). Este fluxo cobre quem perdeu a mensagem, escreveu antes de o convite chegar, ou recebeu o número por outro meio.
+*Critérios de aceite:*
+- [ ] Se o convidado **escreve ao Whaviso** com o número (ex.: *"Oi, aqui é [nome], meu convite é o xxx-xxx"*), o Whaviso reconhece o combinado sem login.
 - [ ] O Whaviso **extrai o número de 6 dígitos** da mensagem, aceitando com hífen (`xxx-xxx`) ou os 6 dígitos corridos.
 - [ ] O combinado é localizado confrontando **número de convite + telefone** de quem enviou (comparação contra o **hash** do número; o valor em claro nunca é persistido nem logado).
 - [ ] **Fallback sem número:** se a mensagem não traz o número (texto editado), o Whaviso pede, ex.: *"Olá! Para localizar seu combinado, me envie o número de convite (6 dígitos). Sem ele não consigo encontrar."*
@@ -32,6 +48,7 @@ Como **convidado**, quero ver um resumo do combinado e responder por botão, par
   - **Algum dado está incorreto** (no invertido: **Chave Pix incorreta**);
   - **Recusar combinado**.
 - [ ] O botão carrega o **`aviso_id`** no payload (não o número/token); o webhook é autenticado (HMAC).
+- [ ] Como o Whaviso **inicia a conversa** (H5.0), a mensagem do resumo traz uma **sugestão gentil de salvar o contato do Whaviso** (para não perder as próximas mensagens), sem obrigar e em linguagem neutra.
 - [ ] Linguagem neutra quanto a gênero e sem palavras proibidas.
 
 ---
@@ -117,6 +134,7 @@ Como **sistema (zap)**, quero reagir quando alguém erra o número de validaçã
 
 ### Divergências com a definição atual (precisam de refatoração)
 
+- **Auto-envio do convite (H5.0):** a `api` passa a enfileirar um envio ao convidado (`notificacoes_cobrador`, tipo `convite_enviar`) ao criar/ativar no modo enviar; o `zap` drena e manda o template `convite.resumo`. A api **deixa de devolver** `mensagem_convite` e `link_whatsapp`; a tela de sucesso passa a dizer que o convite foi enviado, e o `numero_convite` fica como reserva. O texto do `convite.resumo` é reescrito para soar como **primeira mensagem do Whaviso** e trazer a sugestão de salvar o contato (H5.2). Comportamento novo.
 - **Remover aceite via site:** a página pública `/aceite/:token` e a rota `POST` pública de aceite saem do código; o aceite passa a ser 100% pelo WhatsApp (dívida técnica já registrada no README). No invertido, a coleta/confirmação do Pix migra do site para o fluxo do WhatsApp.
 - **Estado `recusado` novo:** hoje a recusa cai em `cancelado` (migration `0017`). Passa a existir um terminal próprio **`recusado`** (convidado recusou), separado de `cancelado` (criador cancelou). Transição a acrescentar: `aguardando_aceite → recusado`. Refatoração da máquina de estados (vale também nos Épicos 2 e 3).
 - **Validação por número de 6 dígitos + telefone** (em vez de token): o webhook precisa **extrair e validar o número** da mensagem inicial e contar tentativas (3). Comportamento novo.
@@ -134,7 +152,7 @@ Como **sistema (zap)**, quero reagir quando alguém erra o número de validaçã
 - **Pix opcional no invertido** (Épico 3, decisão revista): se a chave veio no convite, o cobrador confirma ou aponta como incorreta; se o convite veio sem chave, o cobrador pode **informar a própria chave depois**, de forma guiada (Épico 14).
 - **Linguagem neutra** quanto a gênero em todas as mensagens.
 - **Recusa vira `recusado`** (não `cancelado`): terminal próprio para distinguir recusa do convidado de cancelamento pelo criador.
-- **Compartilhamento manual do convite é permanente:** quem convida envia a mensagem pronta para o convidado (link `wa.me`), e o aceite começa quando o convidado escreve a mensagem inicial (H5.1). Isso vale **mesmo após migrar para a Meta oficial** e é proposital: evita que o número do Whaviso inicie conversa com quem não o conhece (risco de bloqueio) e evita disparo para números digitados errados. **Por isso não há história de auto-envio** do convite por template.
+- **Whaviso inicia a conversa (decisão revista na migração para a Meta oficial):** o convite é **enviado direto pelo Whaviso** ao convidado, por template aprovado (H5.0), nos dois fluxos. A decisão anterior (compartilhamento manual permanente por link `wa.me`, "vale mesmo após migrar para a Meta") foi **revogada**: na Meta Cloud API o modelo oficial e sancionado é o **template aprovado + opt-in**, e o próprio convite/aceite do whaviso já é, na prática, o opt-in. O caminho manual por número (H5.1) fica só como **reserva**. **Risco aceito:** um telefone digitado errado por quem cria faz o resumo do combinado (nomes, motivo, valor e, no invertido, a chave Pix) chegar à pessoa errada, e a proteção de telefone divergente (H5.8) só cobre o caminho de número, não o auto-envio. Mitiga-se conferindo o número na criação; o dono assume esse risco em troca de tirar a barreira do compartilhamento manual.
 - **Efeito ao estourar 3 tentativas (H5.9):** distingue **telefone cadastrado** (gera novo número de validação, notifica quem convidou para reenviar) de **telefone não cadastrado** (bloqueia o número até um novo combinado ser enviado, mensagem diferente). Cada ciclo de 3 falhas, no caso cadastrado, gera novo número.
 - **Rótulos dos botões:** os textos padrão (*Aceitar*, *Algum dado está incorreto* / *Chave Pix incorreta*, *Recusar combinado*) são confirmados, mas **editáveis pelo owner** (Épico 12).
 - **Prazo de expiração:** **7 dias fixo** para todas as contas (universal, não varia; recursos não dependem de plano, H11.2).

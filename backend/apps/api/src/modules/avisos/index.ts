@@ -22,7 +22,7 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
     '/avisos',
     { preHandler: app.autenticar, schema: { body: criarAvisoBody, response: { 201: criarAvisoResposta } } },
     async (req, reply) => {
-      const r = await service.criarAviso(app.pool, req.userId, req.body, app.env.WHAVISO_WHATSAPP)
+      const r = await service.criarAviso(app.pool, req.userId, req.body)
       return reply.status(201).send(r)
     },
   )
@@ -32,8 +32,7 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
   app.post(
     '/avisos/:id/ativar',
     { preHandler: app.autenticar, schema: { params: idParam, body: ativarAvisoBody, response: { 200: criarAvisoResposta } } },
-    async (req) =>
-      service.ativarAviso(app.pool, req.userId, req.params.id, req.body, app.env.WHAVISO_WHATSAPP),
+    async (req) => service.ativarAviso(app.pool, req.userId, req.params.id, req.body),
   )
 
   // H4.5: marcar pago MANUAL de uma anotação da agenda (sem_aviso -> pago), terminal.

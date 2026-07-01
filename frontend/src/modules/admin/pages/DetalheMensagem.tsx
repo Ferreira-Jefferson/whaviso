@@ -30,11 +30,12 @@ import {
   lintLinguagem,
   type AcaoBotaoTemplate,
   type BotaoTemplate,
+  type CategoriaTemplate,
   type ContextoTemplate,
   type Template,
 } from '@/shared/contracts'
 import {
-  useAprovarMensagem,
+  useSubmeterMensagem,
   useAtivarMensagem,
   useCriarMensagem,
   useApagarMensagem,
@@ -107,6 +108,13 @@ function Voltar() {
 const OPCOES_CONTEXTO: SegmentOption<ContextoTemplate>[] = [
   { value: 'padrao', label: 'Padrão' },
   { value: 'revisao', label: 'Em revisão' },
+]
+
+// Categoria do template na Meta: UTILITY p/ avisos/notificações (quase tudo); AUTHENTICATION
+// é o OTP (formato fixo, registrado à parte); MARKETING raramente. Default UTILITY.
+const OPCOES_CATEGORIA: SegmentOption<CategoriaTemplate>[] = [
+  { value: 'UTILITY', label: 'Utilidade' },
+  { value: 'MARKETING', label: 'Marketing' },
 ]
 
 function Conteudo({
@@ -235,10 +243,13 @@ function Propostas({ propostas }: { propostas: Template[] }) {
 
 function LinhaProposta({ template }: { template: Template }) {
   const ativar = useAtivarMensagem()
-  const aprovar = useAprovarMensagem()
+  const submeter = useSubmeterMensagem()
   const apagar = useApagarMensagem()
   const [confirmando, setConfirmando] = useState(false)
   const aprovado = template.status_meta === 'aprovado'
+  const rejeitado = template.status_meta === 'rejeitado'
+  // 'pendente' com data de submissão = em análise na Meta; sem data = rascunho (nunca enviado).
+  const emAnalise = template.status_meta === 'pendente' && template.meta_submetido_em != null
 
   return (
     <li className="flex flex-col gap-2 border-b border-linha pb-4 last:border-0 last:pb-0">
@@ -252,16 +263,31 @@ function LinhaProposta({ template }: { template: Template }) {
         {template.conteudo.texto}
       </pre>
 
+      {/* A Meta recusou: mostra o motivo para o owner corrigir e reenviar. */}
+      {rejeitado && template.meta_motivo && (
+        <Banner tom="erro">
+          <span className="inline-flex items-center gap-1.5">
+            <AlertTriangle strokeWidth={1.75} className="size-4" />
+            A Meta recusou este template: {template.meta_motivo}. Ajuste o texto e submeta de novo.
+          </span>
+        </Banner>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {aprovado ? (
           <Button variante="secondary" loading={ativar.isPending} onClick={() => ativar.mutate(template.id)}>
             <CheckCircle2 strokeWidth={1.75} className="size-4" />
             Ativar esta versão
           </Button>
-        ) : (
-          <Button variante="secondary" loading={aprovar.isPending} onClick={() => aprovar.mutate(template.id)}>
+        ) : emAnalise ? (
+          <span className="inline-flex items-center gap-1.5 text-sm text-tinta-2">
             <ShieldCheck strokeWidth={1.75} className="size-4" />
-            Marcar como aprovada
+            Em análise na Meta
+          </span>
+        ) : (
+          <Button variante="secondary" loading={submeter.isPending} onClick={() => submeter.mutate(template.id)}>
+            <ShieldCheck strokeWidth={1.75} className="size-4" />
+            {rejeitado ? 'Submeter à Meta de novo' : 'Submeter à Meta'}
           </Button>
         )}
 
@@ -291,13 +317,18 @@ function LinhaProposta({ template }: { template: Template }) {
         )}
       </div>
 
-      {!aprovado && (
+      {!aprovado && !emAnalise && (
         <p className="text-xs text-tinta-2">
-          Aprove a versão para poder ativá-la. Enquanto o WhatsApp roda via Baileys, a aprovação é manual.
+          Submeta a versão para a Meta validar. Quando ela aprovar, o status muda aqui e você poderá ativá-la.
+        </p>
+      )}
+      {emAnalise && (
+        <p className="text-xs text-tinta-2">
+          A Meta está analisando esta versão. O status atualiza sozinho quando ela responder (costuma levar de minutos a horas).
         </p>
       )}
 
-      {(ativar.isError || aprovar.isError || apagar.isError) && (
+      {(ativar.isError || submeter.isError || apagar.isError) && (
         <Banner tom="erro">
           <span className="inline-flex items-center gap-1.5">
             <AlertTriangle strokeWidth={1.75} className="size-4" />
@@ -361,6 +392,7 @@ function NovaProposta({
     chave.replace(/\./g, '_') + (contexto === 'revisao' ? '_revisao' : '')
   const [nomeMeta, setNomeMeta] = useState(sugestaoNomeMeta ?? nomePadrao)
   const [corpo, setCorpo] = useState('')
+  const [categoria, setCategoria] = useState<CategoriaTemplate>('UTILITY')
 
   // Botões editáveis: as ações permitidas da chave (acao é código, rotulo editável).
   // Prefill a partir da versão ativa, se houver; senão usa os rótulos padrão.
@@ -466,6 +498,9 @@ function NovaProposta({
         nome_meta: nomeMeta.trim(),
         conteudo: conteudoAtual,
         variaveis,
+        categoria,
+        // Amostras por variável p/ o `example` exigido pela Meta no create (mesmas usadas no preview).
+        exemplos: valores,
       },
       {
         onSuccess: () => {
@@ -491,6 +526,15 @@ function NovaProposta({
 
       <Field label="Nome do template na Meta">
         <Input value={nomeMeta} onChange={(e) => setNomeMeta(e.target.value)} placeholder="ex.: resposta_ja_paguei" />
+      </Field>
+
+      <Field label="Categoria na Meta">
+        <SegmentedControl
+          value={categoria}
+          onChange={setCategoria}
+          options={OPCOES_CATEGORIA}
+          ariaLabel="Categoria do template na Meta"
+        />
       </Field>
 
       {/* Pré-visualização AO VIVO, ACIMA do editor (texto vem do backend; os

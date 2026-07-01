@@ -40,8 +40,9 @@ estrutura em `catalogo_mensagens.ts`; ver memória `whaviso-templates-unificados
     E rótulos de botão; backend revalida → 422 `linguagem_proibida`).
   - Editor de texto + paleta de variáveis da chave + editor de botões (a `acao` é
     fixa/código; o `rotulo` é editável).
-  - Propor nova versão via `POST /v1/admin/mensagens` (nasce `pendente`).
-  - Aprovar via `POST /v1/admin/mensagens/:id/aprovar` (manual, era Baileys).
+  - Propor nova versão via `POST /v1/admin/mensagens` (nasce `pendente`; inclui categoria + exemplos).
+  - Submeter à Meta via `POST /v1/admin/mensagens/:id/submeter` (enfileira; o zap cria na WABA e
+    o status_meta reflete o veredito real). Em análise = `pendente` já submetido; recusa mostra motivo.
   - Ativar via `POST /v1/admin/mensagens/:id/ativar`; não-aprovado → 409
     `template_nao_aprovado`. Apagar versão → `DELETE`; ativa → 409 `template_ativo`.
   - Sem edição ao vivo do texto enviado.
@@ -61,7 +62,7 @@ EXISTEM hoje:
 - `GET /v1/admin/mensagens` → `{ mensagens: [...] }` (templates unificados por chave)
 - `POST /v1/admin/mensagens` (201; lint → 422 `linguagem_proibida`)
 - `POST /v1/admin/mensagens/preview` → `{ render, lint_ok, palavra_proibida }`
-- `POST /v1/admin/mensagens/:id/aprovar` (aprovação manual)
+- `POST /v1/admin/mensagens/:id/submeter` (enfileira p/ a Meta validar; 409 `template_ja_aprovado`)
 - `POST /v1/admin/mensagens/:id/ativar` (409 `template_nao_aprovado` se não aprovado)
 - `DELETE /v1/admin/mensagens/:id` (409 `template_ativo` na versão ativa)
 - `GET /v1/billing/planos` (módulo billing)

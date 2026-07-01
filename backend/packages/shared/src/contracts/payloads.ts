@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   acaoDevedor,
+  categoriaTemplate,
   contextoTemplate,
   direcaoAviso,
   etapaEnvio,
@@ -111,16 +112,14 @@ export const criarAvisoBody = z
   // PATCH /avisos/:id. Por isso NÃO há refine de pix no `pagar` (o receber segue exigindo).
 export type CriarAvisoBody = z.infer<typeof criarAvisoBody>
 
-// Resposta da criação (H2.2): além do aviso e do link de aceite (legado, E5 vai
-// reformular), devolve o NÚMERO DE CONVITE em claro (xxx-xxx; única vez que sai), a
-// MENSAGEM PRONTA para o cobrador compartilhar (intro + número + link) e o LINK wa.me
-// do WhatsApp do Whaviso já com a mensagem inicial pré-preenchida. No invertido/agenda
-// (sem número) esses campos vêm null.
+// Resposta da criação (H2.2): devolve o aviso e o NÚMERO DE CONVITE em claro (xxx-xxx;
+// única vez que sai). E5 H5.0: o Whaviso ENVIA o convite direto ao convidado (não há
+// mais compartilhamento manual), então a api NÃO devolve mais mensagem pronta nem link
+// wa.me; o número fica só como identificador de RESERVA (H5.1). No modo agenda (nada
+// enviado) o número vem null.
 export const criarAvisoResposta = z.object({
   aviso: avisoSchema,
   numero_convite: z.string().nullable(),
-  mensagem_convite: z.string().nullable(),
-  link_whatsapp: z.string().nullable(),
 })
 export type CriarAvisoResposta = z.infer<typeof criarAvisoResposta>
 
@@ -624,6 +623,10 @@ export const novaMensagemBody = z
     idioma: z.string().default('pt_BR'),
     conteudo: conteudoTemplate,
     variaveis: z.array(z.string()).default([]),
+    // Categoria exigida pela Meta no create (default UTILITY). exemplos = amostras por
+    // variável p/ o `example` da Meta (o painel as preenche; placeholder cru pode ser recusado).
+    categoria: categoriaTemplate.default('UTILITY'),
+    exemplos: z.record(z.string(), z.string()).default({}),
   })
   .refine((b) => b.conteudo.texto.trim().length > 0 || b.conteudo.midia != null, {
     message: 'a mensagem precisa de texto ou mídia',

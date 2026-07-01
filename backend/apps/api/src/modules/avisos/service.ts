@@ -28,54 +28,26 @@ import {
   reservarCreditos,
   resolverReservaAoEncerrar,
 } from '../../shared/planos'
-import { enfileirarNotificacaoDevedor, enfileirarNotificacao } from '../../shared/notificacoes'
+import { enfileirarConvite, enfileirarNotificacaoDevedor, enfileirarNotificacao } from '../../shared/notificacoes'
 import { estadosDoGrupo } from '../../shared/estados'
 import * as repo from './repo'
 
 export interface AvisoCriado {
   aviso: Aviso
-  /** Número de convite em claro (xxx-xxx); única vez que sai. null no agenda. */
+  /**
+   * Número de convite em claro (xxx-xxx); única vez que sai. null no agenda.
+   * E5 H5.0: com o auto-envio do convite (o Whaviso inicia a conversa), este número
+   * deixa de ser para compartilhamento manual e vale só como identificador de RESERVA
+   * (caso a pessoa precise localizar o combinado pelo número, H5.1). A api não devolve
+   * mais mensagem pronta nem link wa.me.
+   */
   numero_convite: string | null
-  /** Mensagem pronta para o criador compartilhar (intro + número + link). */
-  mensagem_convite: string | null
-  /** Link wa.me do WhatsApp do Whaviso com a 1ª mensagem pré-preenchida. */
-  link_whatsapp: string | null
 }
 
 // Quantas vezes regenerar o número de convite ao colidir (unicidade por telefone). Com
 // 1M de espaço e poucos avisos por telefone, a colisão é raríssima; 10 tentativas é
 // folga enorme. Esgotando, o erro é amigável (cobrador tenta de novo).
 const MAX_TENTATIVAS_CONVITE = 10
-
-/**
- * Monta a mensagem pronta + link wa.me do Whaviso (H2.2 receber / H3.2 invertido).
- * A 1ª mensagem é sempre na VOZ DE QUEM CRIA o convite (quem manda ao Whaviso):
- *  - receber: o COBRADOR pede para o devedor confirmar -> nomeAutor = nome do cobrador.
- *  - invertido: o DEVEDOR pede para o cobrador confirmar -> nomeAutor = nome do devedor.
- * O texto é idêntico ("Oi, aqui é <nome>, meu convite é o xxx-xxx"); muda só o autor.
- */
-function montarConvite(
-  numeroFormatado: string,
-  nomeAutor: string,
-  whavisoWhatsapp: string | undefined,
-): { mensagem: string; link: string | null } {
-  // A 1ª mensagem que quem cria manda ao Whaviso (pré-preenchida no wa.me).
-  const msgInicial = `Oi, aqui é ${nomeAutor}, meu convite é o ${numeroFormatado}`
-  // Mensagem completa para o cobrador compartilhar (intro + número + link).
-  const link = whavisoWhatsapp
-    ? `https://wa.me/${whavisoWhatsapp}?text=${encodeURIComponent(msgInicial)}`
-    : null
-  const linhas = [
-    `Oi! Tenho um combinado com você no Whaviso.`,
-    `Número de convite: ${numeroFormatado}`,
-  ]
-  if (link) {
-    linhas.push(`Para confirmar, fale com o Whaviso: ${link}`)
-  } else {
-    linhas.push(`Para confirmar, envie ao Whaviso: "${msgInicial}"`)
-  }
-  return { mensagem: linhas.join('\n'), link }
-}
 
 /**
  * Gera um número de convite de 6 dígitos com RETRY de unicidade POR TELEFONE (loop
@@ -159,7 +131,6 @@ export async function criarAviso(
   pool: Pool,
   uid: string,
   body: CriarAvisoBody,
-  whavisoWhatsapp?: string,
 ): Promise<AvisoCriado> {
   return comTransacao(pool, async (cli) => {
     const ehReceber = body.direcao === 'receber'
@@ -242,7 +213,7 @@ export async function criarAviso(
         direcao: body.direcao,
         modo: 'agenda',
       })
-      return { aviso, numero_convite: null, mensagem_convite: null, link_whatsapp: null }
+      return { aviso, numero_convite: null }
     }
 
     // ---- Modo ENVIAR: gera o convite (aguardando_aceite). O aceite é 100% pelo
@@ -288,15 +259,12 @@ export async function criarAviso(
     // H2.2/H3.2: evento de geração do convite (sem o número/hash nos detalhes).
     await repo.inserirEvento(cli, aviso.id, 'convite_gerado', criadorPapel)
 
-    const numeroFormatado = formatarNumeroConvite(numeroClaro)
-    const convite = montarConvite(numeroFormatado, body.nome_devedor, whavisoWhatsapp)
+    // E5 H5.0: o Whaviso INICIA a conversa. Enfileira o convite (resumo + botões) ao
+    // CONVIDADO na MESMA transação; o zap drena e manda o template convite.resumo. Não
+    // há mais compartilhamento manual (link/mensagem) pelo criador.
+    await enfileirarConvite(cli, aviso)
 
-    return {
-      aviso,
-      numero_convite: numeroFormatado,
-      mensagem_convite: convite.mensagem,
-      link_whatsapp: convite.link,
-    }
+    return { aviso, numero_convite: formatarNumeroConvite(numeroClaro) }
   })
 }
 
@@ -319,7 +287,6 @@ export async function ativarAviso(
   uid: string,
   id: string,
   body: AtivarAvisoBody,
-  whavisoWhatsapp?: string,
 ): Promise<AvisoCriado> {
   return comTransacao(pool, async (cli) => {
     const aviso = await repo.buscarComoCriadorParaUpdate(cli, id, uid)
@@ -424,15 +391,11 @@ export async function ativarAviso(
     await repo.inserirEvento(cli, id, 'ativado', aviso.criador_papel)
     await repo.inserirEvento(cli, id, 'convite_gerado', aviso.criador_papel)
 
-    const numeroFormatado = formatarNumeroConvite(numeroClaro)
-    const convite = montarConvite(numeroFormatado, ativado.nome_devedor, whavisoWhatsapp)
+    // E5 H5.0: espelho da criação. O Whaviso envia o convite ao CONVIDADO direto (o
+    // ativado já tem os telefones resolvidos); sem compartilhamento manual pelo criador.
+    await enfileirarConvite(cli, ativado)
 
-    return {
-      aviso: ativado,
-      numero_convite: numeroFormatado,
-      mensagem_convite: convite.mensagem,
-      link_whatsapp: convite.link,
-    }
+    return { aviso: ativado, numero_convite: formatarNumeroConvite(numeroClaro) }
   })
 }
 

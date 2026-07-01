@@ -116,7 +116,6 @@ const envFake: EnvApi = {
   DATABASE_URL: 'x',
   SUPABASE_URL: 'http://localhost',
   APP_URL: 'http://app.local',
-  WHAVISO_WHATSAPP: '5511999990000',
   LOG_LEVEL: 'silent',
 }
 

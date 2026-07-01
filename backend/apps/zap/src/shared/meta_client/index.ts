@@ -10,6 +10,7 @@ import {
   type ClienteWhats,
   type HandlerBotao,
   type HandlerStatus,
+  type HandlerTemplateStatus,
   type HandlerTexto,
   type MensagemWhats,
 } from '../whats'
@@ -112,6 +113,7 @@ export function criarClienteMeta(opcoes: OpcoesMeta, deps: DepsClienteMeta): Cli
   const handlersBotao: HandlerBotao[] = []
   const handlersTexto: HandlerTexto[] = []
   const handlersStatus: HandlerStatus[] = []
+  const handlersTemplateStatus: HandlerTemplateStatus[] = []
   let conectado = false
   let numero: string | undefined
 
@@ -140,7 +142,7 @@ export function criarClienteMeta(opcoes: OpcoesMeta, deps: DepsClienteMeta): Cli
   async function processarWebhook(rawBody: Buffer): Promise<void> {
     try {
       const payload = JSON.parse(rawBody.toString('utf8')) as PayloadWebhook
-      const { botoes, textos, statuses } = extrairEventosWebhook(payload)
+      const { botoes, textos, statuses, templatesStatus } = extrairEventosWebhook(payload)
       for (const e of botoes)
         for (const h of handlersBotao)
           await h(e).catch((err) => deps.logger.error({ err }, 'erro no handler de botão'))
@@ -150,6 +152,9 @@ export function criarClienteMeta(opcoes: OpcoesMeta, deps: DepsClienteMeta): Cli
       for (const e of statuses)
         for (const h of handlersStatus)
           await h(e).catch((err) => deps.logger.error({ err }, 'erro no handler de status'))
+      for (const e of templatesStatus)
+        for (const h of handlersTemplateStatus)
+          await h(e).catch((err) => deps.logger.error({ err }, 'erro no handler de status de template'))
     } catch (e) {
       deps.logger.error({ err: e }, 'falha ao processar o webhook da Meta')
     }
@@ -195,6 +200,9 @@ export function criarClienteMeta(opcoes: OpcoesMeta, deps: DepsClienteMeta): Cli
     },
     onStatus: (cb) => {
       handlersStatus.push(cb)
+    },
+    onTemplateStatus: (cb) => {
+      handlersTemplateStatus.push(cb)
     },
     status: () => ({ conectado, numero }),
     montarRotaWebhook,

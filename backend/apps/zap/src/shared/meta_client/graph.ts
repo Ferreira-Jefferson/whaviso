@@ -3,7 +3,14 @@
 // NUNCA loga o token nem o corpo (PII): só repassa o erro classificado ao chamador.
 import { ErroEnvio } from '../whats'
 import { classificarErroGraph } from './erros'
-import type { ErroGraph, OpcoesMeta, RespostaEnvioGraph } from './tipos'
+import type {
+  ErroGraph,
+  OpcoesMeta,
+  RespostaEnvioGraph,
+  RespostaListaTemplates,
+  RespostaTemplateGraph,
+  TemplateMetaListado,
+} from './tipos'
 
 const TIMEOUT_MS = 20_000
 
@@ -41,6 +48,70 @@ export async function enviarGraph(o: OpcoesMeta, body: unknown): Promise<{ wamid
   const wamid = json.messages?.[0]?.id
   if (!wamid) throw new ErroEnvio(0, 'envio sem id de mensagem', false)
   return { wamid }
+}
+
+/**
+ * POST /{waba_id}/message_templates: cria um template na WABA. `def` é o corpo já montado
+ * (montarDefTemplate). Retorna o id e o status iniciais (geralmente PENDING). Lança
+ * ErroEnvio classificado (permanente = recusa de formato/categoria; transitório = rede/5xx).
+ */
+export async function criarTemplateGraph(
+  o: OpcoesMeta,
+  def: unknown,
+): Promise<{ id?: string; status?: string }> {
+  return chamarTemplate(`${base(o)}/${o.wabaId}/message_templates`, o, def)
+}
+
+/** POST /{message_template_id}: edita um template existente (reenvia para análise). */
+export async function editarTemplateGraph(
+  o: OpcoesMeta,
+  templateId: string,
+  def: unknown,
+): Promise<{ id?: string; status?: string }> {
+  return chamarTemplate(`${base(o)}/${templateId}`, o, def)
+}
+
+async function chamarTemplate(
+  url: string,
+  o: OpcoesMeta,
+  def: unknown,
+): Promise<{ id?: string; status?: string }> {
+  let resp: Response
+  try {
+    resp = await comTimeout(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${o.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(def),
+    })
+  } catch (e) {
+    throw new ErroEnvio(0, e instanceof Error ? e.message : 'falha de rede no Graph', false)
+  }
+  const json = (await resp.json().catch(() => ({}))) as RespostaTemplateGraph
+  if (!resp.ok || json.error) {
+    const err = json.error ?? {}
+    throw classificarErroGraph(err.code, err.message ?? `http ${resp.status}`, resp.status)
+  }
+  return { id: json.id, status: json.status }
+}
+
+/**
+ * GET /{waba_id}/message_templates: lista os templates da WABA (reconcile do status real).
+ * Pagina simples (a WABA do whaviso tem dezenas de templates, não milhares).
+ */
+export async function listarTemplatesGraph(o: OpcoesMeta): Promise<TemplateMetaListado[]> {
+  const url = `${base(o)}/${o.wabaId}/message_templates?fields=name,language,status,id,category&limit=200`
+  let resp: Response
+  try {
+    resp = await comTimeout(url, { headers: { Authorization: `Bearer ${o.accessToken}` } })
+  } catch (e) {
+    throw new ErroEnvio(0, e instanceof Error ? e.message : 'falha de rede no Graph', false)
+  }
+  const json = (await resp.json().catch(() => ({}))) as RespostaListaTemplates
+  if (!resp.ok || json.error) {
+    const err = json.error ?? {}
+    throw classificarErroGraph(err.code, err.message ?? `http ${resp.status}`, resp.status)
+  }
+  return json.data ?? []
 }
 
 /** GET /{phone_number_id}: valida token/phone_id e descobre o número de exibição. */

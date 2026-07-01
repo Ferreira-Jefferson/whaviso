@@ -6,9 +6,11 @@ import type {
   ClienteWhats,
   EventoBotao,
   EventoStatus,
+  EventoTemplateStatus,
   EventoTexto,
   HandlerBotao,
   HandlerStatus,
+  HandlerTemplateStatus,
   HandlerTexto,
   MensagemWhats,
 } from '../src/shared/whats'
@@ -81,6 +83,30 @@ export async function criarAvisoInvertido(opts: {
     [opts.comContaDevedor === false ? null : devedorId, opts.telefoneDevedor ?? '+5511970001111', opts.dataCombinada],
   )
   return { devedorId, avisoId: rows[0]!.id }
+}
+
+/**
+ * Convite RECEBER em aguardando_aceite (criador = cobrador; convidado = devedor por
+ * telefone). Nasce JÁ em aguardando_aceite (o trigger de estado barra o UPDATE
+ * programado -> aguardando_aceite). Usado para testar o auto-envio do convite (E5 H5.0).
+ */
+export async function criarConviteReceber(opts: {
+  dataCombinada: string
+  telefoneDevedor?: string
+}): Promise<{ cobradorId: string; avisoId: string }> {
+  const cobradorId = randomUUID()
+  await poolSuper.query(`insert into auth.users (id) values ($1)`, [cobradorId])
+  await poolSuper.query(`update public.profiles set nome='Cobrador' where id=$1`, [cobradorId])
+  const { rows } = await poolSuper.query<{ id: string }>(
+    `insert into public.avisos
+       (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
+        motivo, valor_centavos, data_combinada, pix_chave, convite_expira_em)
+     values ($1,'receber','cobrador','aguardando_aceite','Maria',$2,
+             'mensalidade',9900,$3,'cobrador@pix.com', now() + interval '7 days')
+     returning id`,
+    [cobradorId, opts.telefoneDevedor ?? '+5511977776666', opts.dataCombinada],
+  )
+  return { cobradorId, avisoId: rows[0]!.id }
 }
 
 /**
@@ -191,6 +217,8 @@ export interface WhatsFake extends ClienteWhats {
   dispararTexto(evento: EventoTexto): Promise<void>
   /** simula um recibo de entrega chegando (sent/delivered/read/failed). */
   dispararStatus(evento: EventoStatus): Promise<void>
+  /** simula uma mudança de status de template na Meta chegando pelo webhook. */
+  dispararTemplateStatus(evento: EventoTemplateStatus): Promise<void>
 }
 
 /**
@@ -206,6 +234,7 @@ export function clienteWhatsFake(
   const handlers: HandlerBotao[] = []
   const handlersTexto: HandlerTexto[] = []
   const handlersStatus: HandlerStatus[] = []
+  const handlersTemplateStatus: HandlerTemplateStatus[] = []
   let n = 0
   const responder = (m: MensagemWhats): { wamid: string } =>
     comportamento ? comportamento(m) : { wamid: `wamid_${++n}` }
@@ -226,6 +255,9 @@ export function clienteWhatsFake(
     onStatus: (cb) => {
       handlersStatus.push(cb)
     },
+    onTemplateStatus: (cb) => {
+      handlersTemplateStatus.push(cb)
+    },
     enviarMensagem: async (m) => {
       enviadas.push(m)
       return responder(m)
@@ -244,6 +276,9 @@ export function clienteWhatsFake(
     },
     dispararStatus: async (evento) => {
       for (const h of handlersStatus) await h(evento)
+    },
+    dispararTemplateStatus: async (evento) => {
+      for (const h of handlersTemplateStatus) await h(evento)
     },
   }
 }

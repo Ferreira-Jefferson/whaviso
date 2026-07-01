@@ -81,6 +81,39 @@ describe('extrairEventosWebhook', () => {
     expect(textos).toEqual([{ wamid: 'wamid.C', telefone: '5511777777777', texto: 'oi' }])
   })
 
+  it('mapeia message_template_status_update (aprovado/rejeitado com motivo)', () => {
+    const { templatesStatus } = extrairEventosWebhook({
+      entry: [
+        {
+          changes: [
+            {
+              field: 'message_template_status_update',
+              value: { event: 'APPROVED', message_template_name: 'resposta_ja_paguei', message_template_language: 'pt_BR', reason: 'NONE' },
+            },
+            {
+              field: 'message_template_status_update',
+              value: { event: 'REJECTED', message_template_name: 'ciclo_d2', message_template_language: 'pt_BR', reason: 'INVALID_FORMAT' },
+            },
+            // PENDING segue em análise; evento desconhecido é ignorado.
+            {
+              field: 'message_template_status_update',
+              value: { event: 'PENDING', message_template_name: 'ciclo_d1', message_template_language: 'pt_BR' },
+            },
+            {
+              field: 'message_template_status_update',
+              value: { event: 'WHATEVER', message_template_name: 'x', message_template_language: 'pt_BR' },
+            },
+          ],
+        },
+      ],
+    })
+    expect(templatesStatus).toEqual([
+      { nomeMeta: 'resposta_ja_paguei', idioma: 'pt_BR', status: 'aprovado' },
+      { nomeMeta: 'ciclo_d2', idioma: 'pt_BR', status: 'rejeitado', motivo: 'INVALID_FORMAT' },
+      { nomeMeta: 'ciclo_d1', idioma: 'pt_BR', status: 'pendente' },
+    ])
+  })
+
   it('mapeia statuses[] com erro', () => {
     const { statuses } = extrairEventosWebhook({
       entry: [

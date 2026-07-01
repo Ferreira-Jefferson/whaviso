@@ -131,7 +131,8 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
 
   app.get('/admin/mensagens', { preHandler: owner }, async () => {
     const { rows } = await app.pool.query(
-      `select id, chave, contexto, nome_meta, idioma, conteudo, variaveis, versao, status_meta, ativo, criado_em
+      `select id, chave, contexto, nome_meta, idioma, conteudo, variaveis, versao, status_meta, ativo, criado_em,
+              categoria, meta_template_id, meta_submetido_em, meta_motivo, exemplos
        from public.templates order by chave, versao desc`,
     )
     return { mensagens: rows }
@@ -156,10 +157,10 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
         )
       }
       const { rows } = await app.pool.query(
-        `insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, versao, status_meta, ativo)
+        `insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, versao, status_meta, ativo, categoria, exemplos)
          values ($1,$2,$3,$4,$5::jsonb,$6::jsonb,
            coalesce((select max(versao)+1 from public.templates where nome_meta=$3), 1),
-           'pendente', false)
+           'pendente', false, $7, $8::jsonb)
          returning id, chave, nome_meta, versao, status_meta, ativo`,
         [
           req.body.chave,
@@ -168,6 +169,8 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
           req.body.idioma,
           JSON.stringify(req.body.conteudo),
           JSON.stringify(req.body.variaveis),
+          req.body.categoria,
+          JSON.stringify(req.body.exemplos),
         ],
       )
       // Gênero é só ALERTA: salva mesmo assim, mas devolve os trechos para revisão.
@@ -222,21 +225,30 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
     },
   )
 
-  // Aprovação manual: o owner marca que a Meta aprovou o template (status_meta='aprovado'),
-  // habilitando a ativação e o envio (os drains têm gate por status_meta). Um sync automático
-  // do status real da Meta (GET Graph message_templates) é um follow-up (precisa de credenciais
-  // Meta na api; testável só pós-verificação da empresa).
+  // Submissão à Meta: o owner enfileira a versão para a Meta VALIDAR (a api não fala com a
+  // Meta; só marca meta_acao='criar'). O zap drena (sincronizar_templates), cria/edita o
+  // template na WABA e o status_meta passa a refletir o veredito REAL (pendente em análise,
+  // aprovado/rejeitado via webhook/reconcile). Substitui o "aprovar" manual da era Baileys:
+  // ninguém liga status_meta na mão. Só submete o que ainda não foi aprovado.
   app.post(
-    '/admin/mensagens/:id/aprovar',
+    '/admin/mensagens/:id/submeter',
     { preHandler: owner, schema: { params: idParam } },
     async (req) => {
       const { rows } = await app.pool.query(
-        `update public.templates set status_meta='aprovado' where id=$1 returning id, status_meta`,
+        `select id, status_meta from public.templates where id=$1`,
         [req.params.id],
       )
       const t = rows[0]
       if (!t) throw naoEncontrado('Mensagem não encontrada')
-      return { id: t.id, status_meta: t.status_meta }
+      if (t.status_meta === 'aprovado') {
+        throw conflito('template_ja_aprovado', 'Esta versão já está aprovada na Meta.')
+      }
+      const { rows: upd } = await app.pool.query(
+        `update public.templates set meta_acao='criar', meta_motivo=null where id=$1
+         returning id, status_meta, meta_acao`,
+        [req.params.id],
+      )
+      return { id: upd[0].id, status_meta: upd[0].status_meta, meta_acao: upd[0].meta_acao }
     },
   )
 

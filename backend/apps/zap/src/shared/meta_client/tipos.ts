@@ -59,11 +59,41 @@ export interface ValorWebhook {
   messaging_product?: string
   messages?: MensagemWebhook[]
   statuses?: StatusWebhook[]
+  // Campos do field 'message_template_status_update' (aprovação/recusa de template).
+  event?: string
+  message_template_id?: number | string
+  message_template_name?: string
+  message_template_language?: string
+  reason?: string
 }
 
 export interface MudancaWebhook {
+  /** ex.: 'messages' (inbound/recibos) ou 'message_template_status_update'. */
   field?: string
   value?: ValorWebhook
+}
+
+/** Item do GET /{waba_id}/message_templates (reconcile do status real). */
+export interface TemplateMetaListado {
+  id?: string
+  name?: string
+  language?: string
+  status?: string
+  category?: string
+}
+
+export interface RespostaListaTemplates {
+  data?: TemplateMetaListado[]
+  error?: ErroGraph
+}
+
+/** Resposta do create/edit de template (POST message_templates / POST {template_id}). */
+export interface RespostaTemplateGraph {
+  id?: string
+  status?: string
+  category?: string
+  success?: boolean
+  error?: ErroGraph
 }
 
 export interface EntradaWebhook {

@@ -2,10 +2,47 @@
 // EventoTexto, EventoStatus). Função PURA (sem rede/banco): o cliente Meta chama isto e
 // despacha aos handlers que o app-root ligou via onBotao/onTexto/onStatus. A regra de
 // negócio (parsear o payload do botão, aplicar a ação) segue no módulo webhook_whatsapp.
-import type { EventoBotao, EventoStatus, EventoTexto } from '../whats'
-import type { MensagemWebhook, PayloadWebhook, StatusWebhook } from './tipos'
+import type { EventoBotao, EventoStatus, EventoTemplateStatus, EventoTexto } from '../whats'
+import type { MensagemWebhook, PayloadWebhook, StatusWebhook, ValorWebhook } from './tipos'
 
 const STATUS_VALIDOS = new Set(['sent', 'delivered', 'read', 'failed'])
+
+// Traduz o `event`/`status` da Meta para o vocabulário do banco (status_meta). Os mesmos
+// rótulos valem no webhook (`event`) e na listagem do reconcile (`status`).
+// APPROVED -> aprovado; PENDING/IN_APPEAL -> pendente (segue em análise); o resto
+// (REJECTED/FLAGGED/PAUSED/DISABLED/PENDING_DELETION) -> rejeitado (não pode enviar).
+export function traduzirStatusTemplateMeta(
+  event: string | undefined,
+): EventoTemplateStatus['status'] | null {
+  switch (event) {
+    case 'APPROVED':
+      return 'aprovado'
+    case 'PENDING':
+    case 'IN_APPEAL':
+      return 'pendente'
+    case 'REJECTED':
+    case 'FLAGGED':
+    case 'PAUSED':
+    case 'DISABLED':
+    case 'PENDING_DELETION':
+      return 'rejeitado'
+    default:
+      return null
+  }
+}
+
+function templateStatusDe(v: ValorWebhook): EventoTemplateStatus | null {
+  const status = traduzirStatusTemplateMeta(v.event)
+  if (!status || !v.message_template_name || !v.message_template_language) return null
+  const e: EventoTemplateStatus = {
+    nomeMeta: v.message_template_name,
+    idioma: v.message_template_language,
+    status,
+  }
+  // 'NONE' é o "sem motivo" da Meta; só repassa motivo real (recusa).
+  if (v.reason && v.reason !== 'NONE') e.motivo = v.reason
+  return e
+}
 
 const soDigitos = (s: string | undefined): string => (s ?? '').replace(/\D/g, '')
 
@@ -41,17 +78,25 @@ export interface EventosWebhook {
   botoes: EventoBotao[]
   textos: EventoTexto[]
   statuses: EventoStatus[]
+  templatesStatus: EventoTemplateStatus[]
 }
 
 export function extrairEventosWebhook(payload: PayloadWebhook): EventosWebhook {
   const botoes: EventoBotao[] = []
   const textos: EventoTexto[] = []
   const statuses: EventoStatus[] = []
+  const templatesStatus: EventoTemplateStatus[] = []
 
   for (const entrada of payload.entry ?? []) {
     for (const mudanca of entrada.changes ?? []) {
       const valor = mudanca.value
       if (!valor) continue
+      // Aprovação/recusa de template (field 'message_template_status_update').
+      if (mudanca.field === 'message_template_status_update') {
+        const ts = templateStatusDe(valor)
+        if (ts) templatesStatus.push(ts)
+        continue
+      }
       for (const m of valor.messages ?? []) {
         // Botão/interactive tem prioridade sobre texto (uma resposta de botão não é texto).
         const botao = botaoDe(m)
@@ -68,5 +113,5 @@ export function extrairEventosWebhook(payload: PayloadWebhook): EventosWebhook {
       }
     }
   }
-  return { botoes, textos, statuses }
+  return { botoes, textos, statuses, templatesStatus }
 }

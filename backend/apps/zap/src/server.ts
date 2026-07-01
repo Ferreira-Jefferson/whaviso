@@ -7,6 +7,7 @@ import { criarApp } from './app'
 import { criarClienteMeta } from './shared/meta_client'
 import { registrarInboundWhats } from './modules/webhook_whatsapp'
 import { registrarInboundTeste } from './modules/testar_envio'
+import { processarStatusTemplate } from './modules/sincronizar_templates'
 import { criarAdminSupabase } from './shared/supabase_admin'
 import { iniciarScheduler } from './scheduler'
 
@@ -37,18 +38,17 @@ if (
   process.exit(1)
 }
 
-const whats = criarClienteMeta(
-  {
-    accessToken: env.META_ACCESS_TOKEN,
-    phoneNumberId: env.META_PHONE_NUMBER_ID,
-    wabaId: env.META_WABA_ID ?? '',
-    appSecret: env.META_APP_SECRET,
-    verifyToken: env.META_VERIFY_TOKEN,
-    graphUrl: env.META_GRAPH_URL,
-    apiVersion: env.META_API_VERSION,
-  },
-  { logger, pool },
-)
+const metaOpcoes = {
+  accessToken: env.META_ACCESS_TOKEN,
+  phoneNumberId: env.META_PHONE_NUMBER_ID,
+  wabaId: env.META_WABA_ID ?? '',
+  appSecret: env.META_APP_SECRET,
+  verifyToken: env.META_VERIFY_TOKEN,
+  graphUrl: env.META_GRAPH_URL,
+  apiVersion: env.META_API_VERSION,
+}
+
+const whats = criarClienteMeta(metaOpcoes, { logger, pool })
 
 // Conta-no-aceite (H5.3): Admin API do Supabase, só se a service role key estiver
 // configurada (senão o aceite só vincula por telefone, degrada sem quebrar).
@@ -62,6 +62,10 @@ const admin =
 registrarInboundWhats({ pool, logger, whats, admin })
 // Captura as respostas do número de teste no mini-chat de diagnóstico (sandbox).
 registrarInboundTeste({ pool, logger, whats })
+// Aprovação/recusa de template pela Meta (webhook message_template_status_update) reflete
+// no status_meta em tempo real (sincronizar_templates); o reconcile periódico é a rede de
+// segurança. App-root cruza a fronteira ligando o handler ao provider.
+whats.onTemplateStatus((e) => processarStatusTemplate({ pool, logger }, e))
 
 const app = await criarApp({ env, pool, logger, whats })
 // Monta GET/POST /webhook/whatsapp (handshake + eventos da Meta) antes do listen. O cast
@@ -74,6 +78,8 @@ const scheduler = iniciarScheduler({
   whats,
   intervaloMs: env.SCHEDULER_INTERVAL_MS,
   appUrl: env.ZAP_APP_URL,
+  // Submissão/reconcile de templates só com WABA id (precisa dele nas chamadas Graph).
+  metaOpcoes: metaOpcoes.wabaId ? metaOpcoes : undefined,
 })
 
 // Valida as credenciais e grava o status (não há QR na Meta); não bloqueia o boot do HTTP.

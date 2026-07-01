@@ -83,8 +83,12 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     const body = r.json()
     expect(body.aviso.status).toBe('sem_aviso')
     expect(body.numero_convite).toBeNull()
-    expect(body.mensagem_convite).toBeNull()
-    expect(body.link_whatsapp).toBeNull()
+    // Modo agenda: nada é enviado, então NÃO enfileira convite ao convidado (E5 H5.0).
+    const { rows: convites } = await poolSuper.query(
+      `select 1 from public.notificacoes_cobrador where aviso_id=$1 and tipo='convite_enviar'`,
+      [body.aviso.id],
+    )
+    expect(convites).toHaveLength(0)
 
     const id = body.aviso.id
     const hashes = await poolSuper.query<{ ac: string | null; co: string | null; ak: string | null }>(

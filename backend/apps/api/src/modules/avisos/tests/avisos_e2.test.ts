@@ -81,20 +81,18 @@ describe('E2 H2.1/H2.2: criar + Pix obrigatório + convite de 6 dígitos', () =>
     expect(body.aviso.pix_banco).toBe('Banco Exemplo')
   })
 
-  it('H2.2: gera número xxx-xxx + mensagem com link wa.me do Whaviso; só o HASH persiste', async () => {
+  it('H2.2/H5.0: gera número xxx-xxx (reserva), sem link/mensagem manual; só o HASH persiste', async () => {
     const app = await criarAppTeste(uid)
     const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
     await app.close()
     const body = r.json()
     // Formato xxx-xxx (hífen só visual).
     expect(body.numero_convite).toMatch(/^\d{3}-\d{3}$/)
-    // Mensagem completa: intro + número + link.
-    expect(body.mensagem_convite).toContain(body.numero_convite)
-    expect(body.mensagem_convite).toContain('Whaviso')
-    // Link wa.me do WHAVISO (não do convidado) com a 1ª mensagem pré-preenchida.
-    expect(body.link_whatsapp).toContain('https://wa.me/5511999990000')
-    expect(decodeURIComponent(body.link_whatsapp)).toContain('meu convite é o')
-    expect(decodeURIComponent(body.link_whatsapp)).toContain(body.numero_convite)
+    // E5 H5.0: o Whaviso envia o convite direto; a api não devolve mais mensagem pronta nem
+    // link wa.me para o criador compartilhar.
+    expect(body.mensagem_convite).toBeUndefined()
+    expect(body.link_whatsapp).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('wa.me/')
 
     // O CLARO nunca persiste: o banco guarda só o hash sha256 do número (6 dígitos).
     const corrido = body.numero_convite.replace('-', '')
@@ -389,7 +387,11 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     const r = await appC.inject({ method: 'POST', url: `/v1/avisos/${id}/cancelar`, headers: AUTH })
     await appC.close()
     expect(r.statusCode).toBe(200)
-    expect(await notifsAoDevedor(id)).toHaveLength(0)
+    // E5 H5.0: o convite (convite_enviar) é enfileirado na criação; isso é esperado. O que
+    // NÃO deve acontecer é uma notificação de CANCELAMENTO ao devedor (ele não estava no
+    // combinado). O convite pendente é superado no dreno (aviso saiu de aguardando_aceite).
+    const notifs = await notifsAoDevedor(id)
+    expect(notifs.some((n) => n.tipo === 'aviso_cancelado')).toBe(false)
   })
 
   it('H2.6: cancelar é possível em PAUSADO (fase viva) e notifica o devedor', async () => {

@@ -9,8 +9,6 @@ import { criarApp } from './app'
 if (process.env.API_PORT && !process.env.PORT) process.env.PORT = process.env.API_PORT
 if (process.env.API_DATABASE_URL && !process.env.DATABASE_URL)
   process.env.DATABASE_URL = process.env.API_DATABASE_URL
-if (process.env.API_WHAVISO_WHATSAPP && !process.env.WHAVISO_WHATSAPP)
-  process.env.WHAVISO_WHATSAPP = process.env.API_WHAVISO_WHATSAPP
 
 const env = parseEnv(envSchema)
 const logger = criarLogger('api', env.LOG_LEVEL)

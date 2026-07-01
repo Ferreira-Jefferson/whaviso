@@ -115,7 +115,13 @@ export async function carregarDados(pool: Pool, notifId: string): Promise<DadosN
   const { rows } = await pool.query<DadosNotificacao>(
     `select a.status as aviso_status, a.direcao, a.criador_papel,
             substr(a.id::text, 1, 6) as codigo,
-            a.nome_devedor, coalesce(a.nome_cobrador, '') as nome_cobrador, a.motivo,
+            a.nome_devedor,
+            -- Nome de "quem vai receber" (cobrador). No RECEBER a coluna nome_cobrador é
+            -- nula (o cobrador é o criador/dono da conta), então cai no nome do profile do
+            -- criador; assim o convite (E5 H5.0) e as mensagens devedor.* nomeiam quem
+            -- registrou o combinado em vez de mostrar vazio. No invertido a coluna já traz
+            -- o nome do cobrador convidado (vindo do formulário).
+            coalesce(nullif(a.nome_cobrador, ''), pcriador.nome, '') as nome_cobrador, a.motivo,
             a.valor_centavos::bigint as valor_centavos,
             to_char(a.data_combinada,'YYYY-MM-DD') as data_combinada,
             -- E14: snapshot do Pix p/ a notificação ao devedor (devedor.pix_chave_recebida).
@@ -132,6 +138,8 @@ export async function carregarDados(pool: Pool, notifId: string): Promise<DadosN
      from public.notificacoes_cobrador n
      join public.avisos a on a.id = n.aviso_id
      left join public.profiles p on p.id = n.cobrador_id
+     -- profile do CRIADOR quando ele é o cobrador (receber): fonte do nome "quem recebe".
+     left join public.profiles pcriador on a.criador_papel = 'cobrador' and pcriador.id = a.cobrador_id
      where n.id = $1`,
     [notifId],
   )

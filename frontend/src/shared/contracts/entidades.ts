@@ -4,6 +4,7 @@ import { z } from 'zod'
 import {
   acaoBotaoTemplate,
   atorEvento,
+  categoriaTemplate,
   contextoTemplate,
   direcaoAviso,
   entregaStatus,
@@ -172,5 +173,11 @@ export const templateSchema = z.object({
   status_meta: statusMetaTemplate,
   ativo: z.boolean(),
   criado_em: z.coerce.date(),
+  // Ciclo de submissão à Meta (espelha o backend 0066).
+  categoria: categoriaTemplate.default('UTILITY'),
+  meta_template_id: z.string().nullable().default(null),
+  meta_submetido_em: z.coerce.date().nullable().default(null),
+  meta_motivo: z.string().nullable().default(null),
+  exemplos: z.record(z.string(), z.string()).default({}),
 })
 export type Template = z.infer<typeof templateSchema>

@@ -81,6 +81,11 @@ export type AtorEvento = z.infer<typeof atorEvento>
 export const statusMetaTemplate = z.enum(['pendente', 'aprovado', 'rejeitado'])
 export type StatusMetaTemplate = z.infer<typeof statusMetaTemplate>
 
+// Categoria do template na Meta (exigida no create). UTILITY cobre quase tudo; AUTHENTICATION
+// é o OTP (formato fixo); MARKETING permitido mas não usado hoje. Espelha o backend.
+export const categoriaTemplate = z.enum(['UTILITY', 'AUTHENTICATION', 'MARKETING'])
+export type CategoriaTemplate = z.infer<typeof categoriaTemplate>
+
 // Contexto de um template: 'padrao' ou 'revisao' (variante para avisos em informado_pago).
 export const contextoTemplate = z.enum(['padrao', 'revisao'])
 export type ContextoTemplate = z.infer<typeof contextoTemplate>

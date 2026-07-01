@@ -2,8 +2,10 @@
 
 ## Propósito
 Métricas (com período + opt-out) e mensagens/templates UNIFICADOS por chave em
-`/admin/mensagens` (listar + preview/lint + propor versão + aprovar + ativar +
+`/admin/mensagens` (listar + preview/lint + propor versão + SUBMETER à Meta + ativar +
 apagar; ativação só com status_meta=aprovado; lint cobre texto e rótulos de botão).
+`POST /admin/mensagens/:id/submeter` enfileira (meta_acao='criar'); a api NÃO fala com a
+Meta, quem cria o template na WABA e reflete o status real é o zap (sincronizar_templates).
 Auditoria global read-only: usuários (com saldo da carteira), envios, avisos. E11: o
 owner CREDITA envios numa conta (ativação manual pós-pagamento via WhatsApp) e edita a
 CURVA de créditos. Restrito a owner.

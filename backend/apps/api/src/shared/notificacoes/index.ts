@@ -16,6 +16,9 @@
 import type { PoolClient } from '@whaviso/shared/db'
 
 export type TipoNotificacao =
+  // E5 H5.0: o Whaviso INICIA a conversa mandando o convite (resumo + botões) ao
+  // CONVIDADO assim que o combinado entra em aguardando_aceite (não é ao criador).
+  | 'convite_enviar'
   | 'pagamento_informado'
   | 'convite_aceito'
   | 'convite_dado_incorreto'
@@ -228,6 +231,40 @@ export async function enfileirarNotificacaoDevedor(
      values ($1, $2, 'devedor', $3, $4, $5, now() + ($6 || ' seconds')::interval, $7)
      on conflict (dedupe_key) where (dedupe_key is not null and status <> 'cancelado') do nothing`,
     [aviso.id, tipo, cobradorId, telefoneAlvo, dedupeKey, String(agendarSeg), opcoes.coalesceGrupo ?? null],
+  )
+  return { enfileirado: (rowCount ?? 0) > 0 }
+}
+
+/**
+ * E5 H5.0: enfileira o CONVITE ao CONVIDADO (o NÃO criador do combinado) assim que ele
+ * entra em `aguardando_aceite`. O Whaviso inicia a conversa: o `zap` drena e manda o
+ * template `convite.resumo` (resumo + 3 botões) direto ao WhatsApp do convidado.
+ *  - receber  (criador = cobrador): convidado = devedor  -> telefone_devedor.
+ *  - invertido (criador = devedor):  convidado = cobrador -> telefone_cobrador.
+ * No aguardando_aceite o convidado quase sempre NÃO tem conta (ela nasce no aceite,
+ * H5.3), então o alvo é por TELEFONE; se já existir profile (raro), roteia por ele.
+ * Sem alvo possível (nem conta nem telefone), NÃO enfileira. Idempotente por dedupe_key
+ * (um convite por combinado). NUNCA loga telefone (só roteia o canal).
+ */
+export async function enfileirarConvite(
+  cli: PoolClient,
+  aviso: AvisoAlvo,
+): Promise<ResultadoEnfileiramento> {
+  const ehReceber = aviso.criador_papel === 'cobrador'
+  const alvoPapel: Papel = ehReceber ? 'devedor' : 'cobrador'
+  const cobradorId = ehReceber ? aviso.devedor_profile_id : aviso.cobrador_id
+  const telefoneAlvo = cobradorId ? null : ehReceber ? aviso.telefone_devedor : aviso.telefone_cobrador
+  if (!cobradorId && !telefoneAlvo) return { enfileirado: false }
+
+  const ocorrencia = await ocorrenciaAtual(cli, aviso.id, 'convite_enviar')
+  const dedupeKey = `${aviso.id}:convite_enviar:${ocorrencia}`
+
+  const { rowCount } = await cli.query(
+    `insert into public.notificacoes_cobrador
+       (aviso_id, tipo, alvo_papel, cobrador_id, telefone_alvo, dedupe_key, agendar_para)
+     values ($1, 'convite_enviar', $2, $3, $4, $5, now())
+     on conflict (dedupe_key) where (dedupe_key is not null and status <> 'cancelado') do nothing`,
+    [aviso.id, alvoPapel, cobradorId, telefoneAlvo, dedupeKey],
   )
   return { enfileirado: (rowCount ?? 0) > 0 }
 }
