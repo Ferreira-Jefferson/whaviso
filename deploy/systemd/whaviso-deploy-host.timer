@@ -1,0 +1,15 @@
+# whaviso: roda o atualizador do DEPLOY_HOST no boot e a cada 5 min. Instalar em
+# /etc/systemd/system/whaviso-deploy-host.timer e habilitar:
+#   systemctl enable --now whaviso-deploy-host.timer
+[Unit]
+Description=whaviso: checa o IP do VPS e atualiza o DEPLOY_HOST periodicamente
+
+[Timer]
+# Logo apos o boot (IP costuma mudar em reboot/remanejo) e depois a cada 5 min.
+OnBootSec=1min
+OnUnitActiveSec=5min
+# Se o VPS estava desligado na hora agendada, roda assim que voltar.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

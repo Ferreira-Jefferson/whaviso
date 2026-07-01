@@ -1,0 +1,15 @@
+# whaviso: atualiza o secret DEPLOY_HOST (+ SSH_KNOWN_HOSTS) do GitHub com o IPv4 atual
+# do VPS. Disparado pelo whaviso-deploy-host.timer. Instalar em
+# /etc/systemd/system/whaviso-deploy-host.service
+[Unit]
+Description=whaviso: mantem o DEPLOY_HOST do GitHub em dia com o IP do VPS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# GH_TOKEN (fine-grained PAT, so este repo, Secrets: Read and write). root:root 600.
+EnvironmentFile=/etc/whaviso/deploy-host.env
+ExecStart=/opt/whaviso/app/deploy/scripts/update-deploy-host.sh
+# Precisa ler /etc/whaviso/deploy-host.env e escrever /var/lib/whaviso: roda como root.
+User=root

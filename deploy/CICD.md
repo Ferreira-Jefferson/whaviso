@@ -97,6 +97,41 @@ Repo no GitHub: **Settings -> Secrets and variables -> Actions -> New repository
 
 O usuário (`deploy`) está fixo no workflow, não é secret.
 
+### 5.1. Auto-cura do `DEPLOY_HOST` quando o IP do VPS muda
+
+O IP de origem muda de tempos em tempos e, quando muda, o deploy quebra no SSH
+(`connect to host ... port 22: Connection timed out`), porque o secret `DEPLOY_HOST`
+aponta pro IP velho (ver a memória [[whaviso-ci-deploy-host-ip]]). Para não corrigir
+isso na mão toda vez, o **próprio VPS mantém o secret em dia**: um timer roda
+[scripts/update-deploy-host.sh](scripts/update-deploy-host.sh), detecta o IPv4 público
+e, se mudou, reescreve `DEPLOY_HOST` e `SSH_KNOWN_HOSTS` via `gh` (que faz a criptografia
+sealed-box da API). O IP continua **só no secret** (nada vai pra DNS), então o esconde-IP
+da Cloudflare fica intacto. As chaves de host do SSH não mudam com o IP (mesma máquina),
+então o `SSH_KNOWN_HOSTS` é as mesmas chaves com o IP novo na frente.
+
+Bootstrap (uma vez, no VPS, com um SSH que já funcione, portanto com o IP atual):
+
+1. **Token de escopo mínimo:** crie um **fine-grained PAT** (GitHub Settings ->
+   Developer settings -> Fine-grained tokens) restrito a **este repositório** com a
+   permissão **Secrets: Read and write** (Metadata: Read vem junto). Nada além. Ponha em
+   `/etc/whaviso/deploy-host.env` como `GH_TOKEN=...` (root:root, `chmod 600`).
+2. **`gh` no VPS:** instale o GitHub CLI.
+3. **Instalar os units:** copie
+   [systemd/whaviso-deploy-host.service](systemd/whaviso-deploy-host.service) e
+   [systemd/whaviso-deploy-host.timer](systemd/whaviso-deploy-host.timer) para
+   `/etc/systemd/system/`, depois `systemctl daemon-reload && systemctl enable --now
+   whaviso-deploy-host.timer`. Valide na mão:
+   `sudo FORCE=1 /opt/whaviso/app/deploy/scripts/update-deploy-host.sh`.
+
+Depois disso, mudança de IP se resolve sozinha em até ~5 min. **Ovo e galinha:** se o
+secret já estiver desatualizado (deploy falhando), corrija-o **uma vez** na mão (pelo
+`gh secret set` do seu PC) para o SSH voltar, e só então instale o timer. Segurança: o
+PAT só **escreve** secrets deste repo (a API não deixa LER valor de secret); se o VPS for
+comprometido o atacante já tem a máquina, e o dano extra é reescrever secrets deste repo
+(rotacione o PAT nesse caso). Alternativa mais pesada, que dispensa token no VPS e esconde
+o IP de vez: expor o SSH por **Cloudflare Tunnel** (cloudflared), com o CI conectando por
+`cloudflared access ssh` com service token.
+
 ### 6. (Opcional, recomendado) Proteger a main
 
 Repo **Settings -> Branches -> Add branch ruleset** para `main`: exigir PR antes
