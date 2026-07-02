@@ -11,7 +11,7 @@
 // junto com as famílias que os usam (ciclo, convite); aqui as respostas não têm.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { AlertTriangle, ArrowLeft, CheckCircle2, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -138,6 +138,14 @@ function Conteudo({
   const ativo = daChave.find((t) => t.ativo) ?? null
   const propostas = daChave.filter((t) => !t.ativo)
 
+  // Versão que semeia o editor: a que o owner escolheu em "Usar como base", senão a
+  // ativa (o padrão). Trocar de base OU de contexto reancora o seed (via `key` no
+  // editor). Se a base escolhida sumir (troca de contexto, versão apagada), cai na
+  // ativa. `baseId` é só uma preferência de UI; a lista continua vindo do servidor.
+  const [baseId, setBaseId] = useState<string | null>(null)
+  const base = (baseId ? daChave.find((t) => t.id === baseId) : undefined) ?? ativo
+  const ehPadrao = base?.id === ativo?.id
+
   return (
     <div className="animate-rise">
       <Voltar />
@@ -165,28 +173,67 @@ function Conteudo({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
-          <VersaoAtiva ativo={ativo} />
-          <Propostas propostas={propostas} />
+          <VersaoAtiva ativo={ativo} emUso={ehPadrao} onUsarComoBase={() => setBaseId(null)} />
+          <Propostas propostas={propostas} baseId={base?.id ?? null} onUsarComoBase={setBaseId} />
         </div>
         <NovaProposta
-          key={ctx}
+          // Remonta (reancorando o seed) quando o contexto muda OU quando a versão
+          // BASE muda: o seed vem do useState inicial, que só lê no mount. Incluir a
+          // identidade da base no key garante que escolher "Usar como base", ativar
+          // uma versão, ou navegar para outro template (mesma rota :chave, mesmo ctx)
+          // sempre reancore o editor na versão certa em vez de manter estado velho.
+          key={`${ctx}:${base?.id ?? 'vazio'}`}
           chave={chave}
           contexto={ctx}
           meta={meta}
-          sugestaoNomeMeta={ativo?.nome_meta}
-          sugestaoBotoes={ativo?.conteudo.botoes}
-          // Semeia o editor com a versão ativa (texto reconvertido para tokens
+          sugestaoNomeMeta={base?.nome_meta}
+          sugestaoBotoes={base?.conteudo.botoes}
+          // Semeia o editor com a versão base (texto reconvertido para tokens
           // nomeados; categoria da Meta), para propor a partir dela em vez do zero.
-          sugestaoTexto={ativo ? paraNomeado(ativo.conteudo.texto, ativo.variaveis) : undefined}
-          sugestaoCategoria={ativo?.categoria}
+          sugestaoTexto={base ? paraNomeado(base.conteudo.texto, base.variaveis) : undefined}
+          sugestaoCategoria={base?.categoria}
+          baseLabel={ehPadrao || !base ? undefined : `${base.nome_meta} · v${base.versao}`}
+          ehPadrao={ehPadrao}
+          onVoltarPadrao={() => setBaseId(null)}
         />
       </div>
     </div>
   )
 }
 
+// Ação "Usar como base": carrega esta versão no editor "Propor nova versão" (para
+// replicar com ajustes). Quando a versão já é a base atual, vira só um indicador.
+function UsarComoBase({ emUso, onUsarComoBase }: { emUso: boolean; onUsarComoBase: () => void }) {
+  if (emUso) {
+    return (
+      <span className="inline-flex items-center gap-1.5 self-start text-xs font-medium text-salvia">
+        <CheckCircle2 strokeWidth={1.75} className="size-4" />
+        Em uso no editor
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onUsarComoBase}
+      className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-salvia hover:underline"
+    >
+      <Copy strokeWidth={1.75} className="size-4" />
+      Usar como base
+    </button>
+  )
+}
+
 // ---- Versão ativa: viewer + preview do BACKEND ----
-function VersaoAtiva({ ativo }: { ativo: Template | null }) {
+function VersaoAtiva({
+  ativo,
+  emUso,
+  onUsarComoBase,
+}: {
+  ativo: Template | null
+  emUso: boolean
+  onUsarComoBase: () => void
+}) {
   const preview = usePreviewMensagem()
   const { mutate } = preview
 
@@ -212,7 +259,7 @@ function VersaoAtiva({ ativo }: { ativo: Template | null }) {
   }
 
   return (
-    <Card className="flex flex-col gap-4">
+    <Card className={`flex flex-col gap-4 ${emUso ? 'ring-1 ring-salvia' : ''}`}>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-lg text-salvia">Versão ativa</h2>
         <span className="text-xs text-tinta-2">
@@ -227,26 +274,49 @@ function VersaoAtiva({ ativo }: { ativo: Template | null }) {
       ) : (
         <Banner tom="info">Pré-visualização indisponível no momento.</Banner>
       )}
+
+      <UsarComoBase emUso={emUso} onUsarComoBase={onUsarComoBase} />
     </Card>
   )
 }
 
 // ---- Propostas (versões não ativas) + aprovar/ativar/apagar ----
-function Propostas({ propostas }: { propostas: Template[] }) {
+function Propostas({
+  propostas,
+  baseId,
+  onUsarComoBase,
+}: {
+  propostas: Template[]
+  baseId: string | null
+  onUsarComoBase: (id: string) => void
+}) {
   if (propostas.length === 0) return null
   return (
     <Card className="flex flex-col gap-4">
       <h2 className="text-lg text-salvia">Outras versões</h2>
       <ul className="flex flex-col gap-4">
         {propostas.map((t) => (
-          <LinhaProposta key={t.id} template={t} />
+          <LinhaProposta
+            key={t.id}
+            template={t}
+            emUso={t.id === baseId}
+            onUsarComoBase={() => onUsarComoBase(t.id)}
+          />
         ))}
       </ul>
     </Card>
   )
 }
 
-function LinhaProposta({ template }: { template: Template }) {
+function LinhaProposta({
+  template,
+  emUso,
+  onUsarComoBase,
+}: {
+  template: Template
+  emUso: boolean
+  onUsarComoBase: () => void
+}) {
   const ativar = useAtivarMensagem()
   const submeter = useSubmeterMensagem()
   const apagar = useApagarMensagem()
@@ -257,7 +327,11 @@ function LinhaProposta({ template }: { template: Template }) {
   const emAnalise = template.status_meta === 'pendente' && template.meta_submetido_em != null
 
   return (
-    <li className="flex flex-col gap-2 border-b border-linha pb-4 last:border-0 last:pb-0">
+    <li
+      className={`flex flex-col gap-2 border-b border-linha pb-4 last:border-0 last:pb-0 ${
+        emUso ? 'rounded-input bg-salvia-claro/40 p-3 last:pb-3' : ''
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm text-tinta">
           {template.nome_meta} · v{template.versao}
@@ -320,6 +394,10 @@ function LinhaProposta({ template }: { template: Template }) {
             Apagar versão
           </button>
         )}
+
+        <span className="ml-auto">
+          <UsarComoBase emUso={emUso} onUsarComoBase={onUsarComoBase} />
+        </span>
       </div>
 
       {!aprovado && !emAnalise && (
@@ -386,6 +464,9 @@ function NovaProposta({
   sugestaoBotoes,
   sugestaoTexto,
   sugestaoCategoria,
+  baseLabel,
+  ehPadrao,
+  onVoltarPadrao,
 }: {
   chave: string
   contexto: ContextoTemplate
@@ -394,6 +475,11 @@ function NovaProposta({
   sugestaoBotoes?: BotaoTemplate[]
   sugestaoTexto?: string
   sugestaoCategoria?: CategoriaTemplate
+  // Rótulo da versão que semeou o editor quando NÃO é a ativa (ex.: "nome · v2").
+  baseLabel?: string
+  // A base atual é a versão ativa (o padrão)? Some o botão de voltar quando sim.
+  ehPadrao: boolean
+  onVoltarPadrao: () => void
 }) {
   // Default do nome: o da versão ativa do contexto, ou derivado da chave (a
   // variante de revisão recebe sufixo para não colidir com o nome do padrão).
@@ -529,11 +615,28 @@ function NovaProposta({
   return (
     <Card className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg text-salvia">Propor nova versão</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg text-salvia">Propor nova versão</h2>
+          {!ehPadrao && (
+            <button
+              type="button"
+              onClick={onVoltarPadrao}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-salvia hover:underline"
+            >
+              <RotateCcw strokeWidth={1.75} className="size-4" />
+              Voltar ao padrão
+            </button>
+          )}
+        </div>
         <p className="mt-1 text-sm text-tinta-2">
           A nova versão nasce aguardando aprovação. Escreva a mensagem
           {paleta.length > 0 ? ' e insira as variáveis pela paleta' : ''}: o exemplo abaixo atualiza ao vivo.
         </p>
+        {baseLabel && (
+          <p className="mt-1 text-xs text-tinta-2">
+            Partindo de <span className="font-medium text-tinta">{baseLabel}</span>. Ajuste o que precisar e proponha.
+          </p>
+        )}
       </div>
 
       <Field label="Nome do template na Meta">
