@@ -447,8 +447,8 @@ function RodapeMarketing() {
             procura no site (marca + razao social + CNPJ batendo com o portfolio
             empresarial verificado). */}
         <p className="mt-6 border-t border-linha pt-6 text-center text-xs text-tinta-2">
-          Whaviso é um serviço de Jefferson Cristian Tertuliano Cavalcante Ferreira
-          (MEI), CNPJ 56.883.976/0001-04, Caçapava/SP, Brasil.
+          Whaviso é um serviço de 56.883.976 Jefferson Cristian Tertuliano
+          Cavalcante Ferreira (MEI), CNPJ 56.883.976/0001-04, Caçapava/SP, Brasil.
         </p>
       </div>
     </footer>
