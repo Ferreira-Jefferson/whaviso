@@ -56,7 +56,7 @@ const MENSAGENS_CICLO = [
 
 export default function LandingPage() {
   useEffect(() => {
-    document.title = 'whaviso | automatize seus avisos de pagamento'
+    document.title = 'Whaviso | automatize seus avisos de pagamento'
   }, [])
 
   return (
@@ -431,15 +431,25 @@ function Planos() {
 function RodapeMarketing() {
   return (
     <footer className="border-t border-linha">
-      <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-tinta-2 sm:flex-row">
-        <span className="inline-flex items-center gap-2 text-salvia">
-          <BellLogo className="size-5 text-dourado" />
-          <span className="font-display font-semibold">whaviso</span>
-        </span>
-        <span>Avise o combinado.</span>
-        <Link to="/entrar" className="font-medium text-salvia hover:underline">
-          Entrar
-        </Link>
+      <div className="mx-auto w-full max-w-5xl px-4 py-8">
+        <div className="flex flex-col items-center justify-between gap-3 text-sm text-tinta-2 sm:flex-row">
+          <span className="inline-flex items-center gap-2 text-salvia">
+            <BellLogo className="size-5 text-dourado" />
+            <span className="font-display font-semibold">whaviso</span>
+          </span>
+          <span>Avise o combinado.</span>
+          <Link to="/entrar" className="font-medium text-salvia hover:underline">
+            Entrar
+          </Link>
+        </div>
+        {/* Identificacao legal da empresa responsavel pela marca Whaviso. Alem de
+            transparencia ao usuario, e o que a revisao de nome de exibicao da Meta
+            procura no site (marca + razao social + CNPJ batendo com o portfolio
+            empresarial verificado). */}
+        <p className="mt-6 border-t border-linha pt-6 text-center text-xs text-tinta-2">
+          Whaviso é um serviço de Jefferson Cristian Tertuliano Cavalcante Ferreira
+          (MEI), CNPJ 56.883.976/0001-04, Caçapava/SP, Brasil.
+        </p>
       </div>
     </footer>
   )
