@@ -14,7 +14,7 @@ import {
   RefreshCw,
   Unlock,
 } from 'lucide-react'
-import { Button, Card, WhatsAppPreview, BellLogo, cn } from '@/shared/ui'
+import { Button, Card, WhatsAppPreview, BellLogo, RodapeSite, cn } from '@/shared/ui'
 
 const MENSAGEM_EXEMPLO =
   'Oi, Maria. João pediu pra te lembrar do combinado: aluguel de junho, R$ 1.200,00 para 10 de junho.'
@@ -68,7 +68,7 @@ export default function LandingPage() {
         <Mensagem />
         <Planos />
       </main>
-      <RodapeMarketing />
+      <RodapeSite />
     </div>
   )
 }
@@ -428,27 +428,3 @@ function Planos() {
   )
 }
 
-function RodapeMarketing() {
-  return (
-    <footer className="border-t border-linha">
-      <div className="mx-auto w-full max-w-5xl px-4 py-8">
-        <div className="flex flex-col items-center justify-between gap-3 text-sm text-tinta-2 sm:flex-row">
-          <span className="inline-flex items-center gap-2 text-salvia">
-            <BellLogo className="size-5 text-dourado" />
-            <span className="font-display font-semibold">whaviso</span>
-          </span>
-          <span>Avise o combinado.</span>
-          <Link to="/entrar" className="font-medium text-salvia hover:underline">
-            Entrar
-          </Link>
-        </div>
-        {/* Identificacao legal discreta (transparencia ao usuario). A razao social
-            completa + o grounding que a revisao de nome de exibicao da Meta le vivem
-            no HTML cru (JSON-LD e <noscript> em index.html), nao aqui. */}
-        <p className="mt-5 text-center text-[10px] leading-relaxed text-tinta-2 opacity-60">
-          CNPJ 56.883.976/0001-04 · Caçapava/SP, Brasil.
-        </p>
-      </div>
-    </footer>
-  )
-}

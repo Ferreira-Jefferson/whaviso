@@ -10,6 +10,7 @@ import {
 } from 'react-router'
 import { Spinner } from '@/shared/ui'
 import { PublicLayout } from './layouts/PublicLayout'
+import { LegalLayout } from './layouts/LegalLayout'
 import { AppShell } from './layouts/AppShell'
 import { ErrorBoundary } from './ErrorBoundary'
 import { AppError } from './AppError'
@@ -21,6 +22,7 @@ import {
 } from './guards'
 
 import { LandingPage } from '@/modules/landing'
+import { PoliticaPrivacidadePage, TermosUsoPage } from '@/modules/legal'
 import { LoginPage, OnboardingPage } from '@/modules/auth'
 import { AcaoAvisoPage, SairLembretesPage } from '@/modules/aceite'
 import { PainelPage } from '@/modules/painel'
@@ -83,6 +85,15 @@ const router = createBrowserRouter([
             <LandingPage />
           </RedirectSeLogado>
         ),
+      },
+
+      // ---- LEGAL (LegalLayout: coluna de leitura larga) ----
+      {
+        element: <LegalLayout />,
+        children: [
+          { path: '/politica-de-privacidade', element: <PoliticaPrivacidadePage /> },
+          { path: '/termos-de-uso', element: <TermosUsoPage /> },
+        ],
       },
 
       // ---- PÚBLICO (PublicLayout: coluna estreita, mobile-first) ----
