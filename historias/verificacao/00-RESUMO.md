@@ -16,7 +16,7 @@ Legenda: `[x]` o código atende · `[~]` atende em parte · `[!]` diverge (refat
 | 04 Modo agenda | 29 | 1 | 0 | 0 |
 | 05 Convite & Aceite | 39 | 1 | 0 | 0 |
 | 06 Ciclo de lembretes | 38 | 1 | 0 | 0 |
-| 07 Interação do devedor | 39 | 2 | 0 | 0 |
+| 07 Interação do devedor | 40 | 1 | 0 | 0 |
 | 08 Confirmação de pagamento | 36 | 3 | 0 | 1 |
 | 09 Painel | 32 | 3 | 1 | 0 |
 | 10 Notificações ao cobrador | 38 | 1 | 1 | 0 |
@@ -46,4 +46,3 @@ Legenda: `[x]` o código atende · `[~]` atende em parte · `[!]` diverge (refat
 
 ## Itens que a própria história marca como 🟡/fora de escopo (sem ação)
 - 06 H6.10 cadência/janela configurável (🟡); 08 H8.7 recorrência (🟡); 09 H9.6 recorrentes (🟡); 11 gateway de pagamento real / mudar de plano / queda de assinatura (🟡); 02/03 validação do número no aceite (remetida ao Épico 5); eventos `dado_incorreto`/`telefone_divergente` (gated pelo próprio contrato/E5).
-- 05 H5.6 / 07 H7.1 "webhook HMAC": a história supõe webhook HTTP da Meta; hoje o transporte é Baileys (sem HMAC HTTP), com o payload validado por `aviso_id`. Religar HMAC só ao voltar à Meta oficial.

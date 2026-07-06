@@ -6,13 +6,11 @@ Código lido: `backend/apps/zap/src/modules/webhook_whatsapp/{service,repo,index
 `backend/apps/api/src/modules/acoes_devedor/service.ts`, migrations `0022/0024/0028/0039/0040`,
 testes `webhook_whatsapp/tests/interacao_devedor.test.ts`.
 
-## Veredito (39 [x] · 2 [~] · 0 [!] · 0 [+])
+## Veredito (40 [x] · 1 [~] · 0 [!] · 0 [+])
 
-O épico está implementado de ponta a ponta e bem coberto por testes. Duas ressalvas [~]:
-o transporte deixou de ser "webhook HMAC" e passou a ser evento de socket Baileys (a
-história, fonte da verdade, ainda descreve webhook autenticado por HMAC); e o texto da 1a
-mensagem do Pix diverge do exemplo da história (contém a palavra "Pix", embora a história
-só proíba a palavra no *rótulo do botão*, que está correto).
+O épico está implementado de ponta a ponta e bem coberto por testes. Uma ressalva [~]:
+o texto da 1a mensagem do Pix diverge do exemplo da história (contém a palavra "Pix",
+embora a história só proíba a palavra no *rótulo do botão*, que está correto).
 
 ## Por história
 
@@ -23,7 +21,7 @@ só proíba a palavra no *rótulo do botão*, que está correto).
 | Sem chat/IA/Pix automático; não responde livremente a texto | [x] | `service.ts:232-269` (`processarTexto`): texto livre só vira menu/silêncio, nunca conversa | `H7.1: texto livre...` |
 | Texto livre free/sem conta = silêncio | [x] | `service.ts:253-258`: só responde se `combinados.find(c => c.menuLiberado)`; senão `return` sem enviar; `repo.ts:812-830` lê `menu_texto_livre` do plano | `H7.1: texto livre, dono FREE → silêncio` |
 | Texto livre plano pago = menu de opções dos combinados ativos | [x] | `service.ts:256-258` envia `resposta.menu_opcoes` amarrado ao 1o acionável; template em `0040:85-96`; `listarCombinadosParaMenu` só `programado` (`repo.ts:823-825`) | `G-C1: texto livre com 1 programado + 1 informado_pago → menu só do programado` |
-| Cada toque = evento autenticado por HMAC, payload com `aviso_id`/etapa, sem token nem PII | [~] | payload `acao:avisoId:etapa` parseado em `service.ts:42-55`; `aviso_id` validado como UUID; etapa no refId (`enviar_lembretes/index.ts:74`). Porém o transporte é socket Baileys (`webhook_whatsapp/index.ts:10-12`, `whats.onBotao/onTexto`), NÃO webhook HTTP HMAC | testes via `processarBotao` direto |
+| Cada toque = evento autenticado por HMAC, payload com `aviso_id`/etapa, sem token nem PII | [x] | payload `acao:avisoId:etapa` parseado em `service.ts:42-55`; `aviso_id` validado como UUID; etapa no refId (`enviar_lembretes/index.ts:74`); webhook HTTP da Meta com validação HMAC (`X-Hub-Signature-256`, `META_APP_SECRET`) | testes via `processarBotao` direto |
 | Respostas neutras de gênero, sem palavras proibidas | [x] | templates de resposta em `0022:56-77` e `0040:69-103` | (revisão de texto) |
 
 ### H7.2: Tocar "Já paguei"
@@ -91,16 +89,11 @@ só proíba a palavra no *rótulo do botão*, que está correto).
 
 ## O que o código precisa mudar para seguir a história
 
-1. **Transporte HMAC vs Baileys (H7.1/H7.6) — [~]**: a história afirma "Cada toque de botão é um
-   evento de webhook **autenticado por HMAC**" (linha 19) e "O webhook usa o `aviso_id` do
-   payload (autenticado por HMAC)" (linha 83). O código entrega os toques por evento de socket
-   Baileys (`webhook_whatsapp/index.ts:10-12`), sem webhook HTTP nem verificação HMAC nesse
-   caminho (o único HMAC/Standard Webhooks no `zap` é o `hook_otp`, não a interação do devedor).
-   Como a história é a fonte da verdade, se ela exige autenticação HMAC do toque, o código
-   diverge. A robustez de roteamento por `aviso_id` no payload (não pela "última mensagem") está
-   satisfeita; o que falta é a autenticação criptográfica do toque. Avaliar com o dono se isto é
-   apenas defasagem de redação da história frente à troca para Baileys ou se o canal precisa de
-   uma camada de integridade equivalente.
+1. **RESOLVIDO (webhook HMAC real).** A história pede "evento de webhook **autenticado por HMAC**"
+   (linha 19) e "o webhook usa o `aviso_id` do payload (autenticado por HMAC)" (linha 83). O
+   webhook HTTP da Meta com validação HMAC (`X-Hub-Signature-256`, `META_APP_SECRET`) já está
+   implementado; roteamento por `aviso_id` no payload (não pela "última mensagem") também está
+   satisfeito. Não há mais divergência a corrigir aqui.
 
 2. **Texto da 1a mensagem do Pix (H7.3) — [~]**: a história exemplifica a 1a mensagem como
    *"Chave de pagamento: [chave]"* (linha 43). O template `resposta.ver_pix` (`0022:67`) usa
@@ -115,9 +108,10 @@ só proíba a palavra no *rótulo do botão*, que está correto).
 - "Confirmação/rejeição do pagamento e o ciclo de vida do `informado_pago` (Épico 8)." (linha 126)
 - "Abrangência ampla e compliance do opt-out (Épico 13)." (linha 127)
 - "Como esses eventos (`solicitou_pix`, opt-out, reativação, já paguei) aparecem no painel (Épico 9)." (linha 128)
-- "Risco do canal (botões via Baileys) ... talvez exigindo fallback (respostas numeradas)." (linha 111)
+- "Fallback de resposta numerada (resiliência) ... o sistema mantém um fallback de resposta
+  numerada como resiliência geral do canal, não como workaround pendente." (linha 111)
   Observação: o fallback numerado existe para o CONVITE (`service.ts:30-34,238-243`), não para os
-  três botões do ciclo do devedor (a história cita o risco mas não fecha critério [ ] para isso).
+  três botões do ciclo do devedor (a história não fecha critério [ ] específico para isso).
 
 ## Observações
 

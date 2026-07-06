@@ -105,7 +105,7 @@ Critérios sem nenhum passo: **nenhum** (todos têm ao menos passo parcial ou de
 | Notificação ao devedor sem duplicidade | Parcial — B2 | falta o caso "mesmo sinal por 2 canais" |
 | Validação de limite sem corrida (criar 2 invertidos em paralelo no limite) | Sim (§6) | bom |
 | Cobrador sem conta (guard na outbox) | Sim (§6) | bom |
-| Risco de canal Baileys (fallback numerado) | Sim (§6, defere E5/E6) | bom |
+| Fallback de resposta numerada (resiliência do canal) | Sim (§6, defere E5/E6) | bom |
 
 Os pontos críticos do `_CONTEXTO` relevantes a este épico (idempotência, limite sem corrida, reconferência de estado no disparo, terminal não envia) estão cobertos. O coalescing/fila 10min de E10 H10.9 é corretamente referido como dependência, não reimplementado aqui.
 

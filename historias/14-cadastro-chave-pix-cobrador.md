@@ -114,7 +114,7 @@ Como **owner**, quero que todo o fluxo respeite as regras de ouro, para manter c
 - [ ] Todas as mensagens (oferta, etapas, confirmações, notificação ao devedor) são **neutras quanto a gênero**, **sem travessão** e **sem palavras proibidas** (Épico 13).
 - [ ] Os textos da oferta, das etapas, da confirmação do tipo, do resumo, da confirmação ao cobrador, da notificação ao devedor e o rótulo do botão **[Solicitar chave Pix]** são **editáveis pelo owner** (Épico 12).
 - [ ] **Nada sensível em log:** chave, titular, banco, telefone do cobrador e do devedor nunca são logados (a redação de log cobre campos aninhados).
-- [ ] Os botões usados no fluxo respeitam o **limite de até 3 botões** por mensagem e **não** usam lista interativa (compatível com Baileys e com a futura Meta Cloud API).
+- [ ] Os botões usados no fluxo respeitam o **limite de até 3 botões** por mensagem e **não** usam lista interativa (limite da Meta Cloud API para mensagens de botão).
 
 ---
 

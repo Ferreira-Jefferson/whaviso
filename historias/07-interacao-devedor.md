@@ -108,7 +108,7 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 - **Notificação ao cobrador com atraso de 1 minuto:** o aviso de opt-out ao cobrador espera 1 min para absorver uma reativação rápida; e a reativação pós-notificação gera uma 2ª notificação. Lógica nova de janela/agendamento de notificação (Épico 10).
 - **Só o último aviso age (H7.7):** exige que o payload do botão identifique **o aviso/etapa**, e que o sistema saiba qual é o último envio do combinado, para invalidar botões de mensagens antigas. Não existe hoje.
 - **Menu de opções para texto livre:** resposta automática ao texto livre do devedor, **disponível para todas as contas** (não há mais distinção de plano; modelo de carteira de créditos, Épico 11). A resposta do menu é uma réplica dentro da janela de atendimento, não um lembrete, então **não consome crédito de envio**. Lógica nova.
-- **Risco do canal (botões via Baileys):** o modelo depende de **botões interativos** funcionando no WhatsApp; via Baileys (não oficial) podem ser instáveis, talvez exigindo **fallback** (respostas numeradas) até a Meta oficial. Validar cedo.
+- **Fallback de resposta numerada (resiliência):** além dos botões interativos oficiais da Meta, o sistema mantém um **fallback** de resposta numerada como resiliência geral do canal, não como workaround pendente.
 
 ### Decisões tomadas
 - **Texto livre:** todas as contas recebem um menu de opções (não há distinção de plano; modelo de créditos, Épico 11). Depois de "Já paguei", nem isso (silêncio total para aquele combinado).

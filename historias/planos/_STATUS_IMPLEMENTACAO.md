@@ -33,7 +33,7 @@ Fundações → fluxo: **E13 → E12 → E11 → E1 → F-STATE (máquina de est
 ## Pendências 🟡 (gated nos próprios épicos, fora do MVP)
 
 - Billing real / gateway de pagamento (E11 H11.9) — stub trial no MVP.
-- Entrega de OTP a +55 e convite por template Meta com botões (E1/E5/E12 H12.10) — gated por verificação Meta; código pronto, transporte atual é Baileys.
+- Entrega de OTP a +55 e convite por template Meta com botões (E1/E5/E12 H12.10): código pronto, transporte é a Meta Cloud API; falta aprovar os templates individualmente na Meta antes do envio real.
 - `dado_incorreto`/telefone_divergente no bloco "precisa de você" do painel — depende do convite por template (E5 gated).
 - 1 teste `it.todo` (recorrência) marcado no backend.
 

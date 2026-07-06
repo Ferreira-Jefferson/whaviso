@@ -37,7 +37,7 @@ O critério H8.6 exige: reabrir dentro de ~1 min → "o devedor **não recebe na
 
 ### Baixos
 
-**B1 — H8.5 fallback de botões (resposta numerada) via Baileys** é citado como risco do canal na história, mas o plano não cria passo nem nota de fallback. `_CONTEXTO.md` pede prever fallback. Adicionar nota (mesmo que "herda o fallback do E7").
+**B1 (H8.5 fallback de botões, resposta numerada, como resiliência geral do canal)** é citado na história, mas o plano não cria passo nem nota de fallback. `_CONTEXTO.md` pede prever fallback. Adicionar nota (mesmo que "herda o fallback do E7").
 
 **B2 — Evento de auditoria "com quem confirmou e quando" (H8.1):** o plano nota que `eventos_aviso` grava ator e `criado_em`, mas não confirma se grava o **id do ator** (qual cobrador, em combinado com cobrador sem conta o ator é o telefone). Verificar se `eventos_aviso` tem coluna para identificar o ator concreto além do papel; senão o painel E9 não distingue.
 

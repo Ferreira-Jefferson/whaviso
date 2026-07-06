@@ -26,7 +26,7 @@ P6 garante `FOR UPDATE` na linha de `convite_tentativas` para a contagem, e P8 c
 *Correção:* em P6, especificar que regeneração + reset do contador + enfileiramento da notificação ocorrem **na mesma transação** que detecta `erros >= 3`, e que o reset impede que a 4ª mensagem conte de novo. Em P8, definir a chave de idempotência da conta (telefone E.164 único em profiles; criar com `on conflict do nothing` ou checar existência sob a mesma transação do aceite).
 
 **G3 (H5.3 — vínculo por profile com sessão ativa não tem caminho).**
-O plano §2 marca `[x] Vínculo por telefone sem sessão` como correto e nota que o aceite por botão "não tem sessão, fica só pelo telefone". Verifiquei `repo.ts:64-67`: o aceite hoje **só** faz `update status/aceito_em`, **não grava nenhum `devedor_profile_id`** nem vínculo. A história H5.3 exige: "sem sessão, vinculado só pelo telefone; **com sessão ativa, vincula ao `profile.id`**". No canal WhatsApp do Baileys não há sessão de login no inbound, então o ramo "com sessão" **fica sem cobertura** e o plano não o reconhece como gap. Como o site sai (divergência), o único caminho com sessão desaparece.
+O plano §2 marca `[x] Vínculo por telefone sem sessão` como correto e nota que o aceite por botão "não tem sessão, fica só pelo telefone". Verifiquei `repo.ts:64-67`: o aceite hoje **só** faz `update status/aceito_em`, **não grava nenhum `devedor_profile_id`** nem vínculo. A história H5.3 exige: "sem sessão, vinculado só pelo telefone; **com sessão ativa, vincula ao `profile.id`**". No canal WhatsApp (webhook da Meta) não há sessão de login no inbound, então o ramo "com sessão" **fica sem cobertura** e o plano não o reconhece como gap. Como o site sai (divergência), o único caminho com sessão desaparece.
 *Correção:* o plano deve declarar explicitamente que, no aceite 100% WhatsApp, **não há sessão no inbound** → o vínculo é sempre por telefone, e a parte "com sessão vincula profile.id" de H5.3 passa a ser satisfeita pelo **backfill no signup por telefone** (gated por OTP, E1) e/ou pela conta-no-aceite de P8 (que cria/associa o profile pelo telefone). Sem isso, P8 deixa um critério de H5.3 sem dono.
 
 **G4 (H5.9 — desbloqueio do telefone não cadastrado é decisão em aberto, mas o critério exige comportamento).**
@@ -47,7 +47,7 @@ H5.9/H5.1 contam "número que não bate com nenhum convite" por telefone. O plan
 
 ### Baixos
 
-**G8 (§2 imprecisão — "HMAC" e canal Baileys).** O plano repete a equivalência "sessão pareada ≈ HMAC" (H5.6 pede HMAC). Está correto enquanto for Baileys, mas seria bom o plano registrar que, na volta à Meta oficial, o `aviso_id` no payload + HMAC real do webhook é que satisfazem H5.6/H5.2 textualmente; hoje é mitigação. Já está implícito em §3.5, só falta no §2 H5.6.
+**G8 RESOLVIDO (§2, HMAC do webhook).** O webhook HTTP da Meta com validação HMAC (`X-Hub-Signature-256`, `META_APP_SECRET`) já está implementado; o `aviso_id` no payload + o HMAC real do webhook satisfazem H5.6/H5.2 textualmente, sem necessidade de mitigação.
 
 **G9 (P3 — `link_aceite` e teste de criação).** Os testes existentes (`avisos.test.ts:53,120`) assertam `link_aceite` no formato `/aceite/<token>`. P3 troca isso por `wa.me`, mas P11 não lista explicitamente a atualização desses testes de api — só "geração de número único / expiração". Adicionar à lista de P11/P3 para não deixar teste quebrado.
 
@@ -124,4 +124,4 @@ Sensata. `opus` em P1 (máquina de estados), P2/P3 (modelagem de segurança/unic
 5. **G5 (médio):** decidir/sinalizar se reenvio após "dado incorreto" reinicia os 7 dias (recomendado: sim).
 6. **G6 (médio):** P5/P6 referenciam o telefone-alvo por `criador_papel` (receber→devedor, invertido→cobrador); testar divergência no invertido sem vazar Pix.
 7. **G7 (baixo):** enumerar efeitos no contador (feliz zera / inexistente +1 / divergente inalterado).
-8. **G8–G11 (baixos):** HMAC vs Baileys no §2; atualizar testes de api do `link_aceite` (P3/P11); guarda de status no sweep (P9); ordem de drop de colunas vs remoção do site (M5).
+8. **G8–G11 (baixos):** G8 resolvido (HMAC do webhook já implementado); atualizar testes de api do `link_aceite` (P3/P11); guarda de status no sweep (P9); ordem de drop de colunas vs remoção do site (M5).

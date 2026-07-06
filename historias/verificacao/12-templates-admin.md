@@ -73,7 +73,7 @@ O épico está fortemente implementado e em paridade com a história: uma tabela
 | Transporte entende texto + botões + mídia genericamente (abstração MensagemWhats) | [x] | `renderMensagem` em `templates/index.ts:56-75` monta texto/botoes/midia | `zap` templates.test.ts |
 | Cada módulo que envia monta o mapa de valores e chama o renderizador; nenhum monta string própria | [x] | ciclo `enviar_lembretes/index.ts:71-75`; cobrador `notificar_cobrador/index.ts:228`; webhook `service.ts:75-81` | `zap` tests |
 | Sem versão ativa → falha controlada, registrada para o owner corrigir | [x] | ciclo `marcarFalhou('sem_template_ativo')` `enviar_lembretes/index.ts:55-58`; cobrador `MOTIVO_SEM_TEMPLATE` `notificar_cobrador/index.ts:7-9,216`; surface admin `admin/repo.ts:127-155` | `notificar_cobrador.test.ts` |
-| Troca de provider (Baileys→Meta) não muda templates; transporte trocável atrás da abstração | [x] | `templates/index.ts` depende de `ClienteWhats`/`MensagemWhats` (`baileys_client`), não de provider concreto | n/a |
+| Transporte trocável atrás da abstração; provider concreto não muda templates | [x] | `templates/index.ts` depende de `ClienteWhats`/`MensagemWhats`, não do provider concreto (hoje a Meta Cloud API) | n/a |
 
 ### H12.9: Hub de navegação das mensagens 🟢
 | Critério | Status | Evidência | Teste |
@@ -107,7 +107,7 @@ O épico está fortemente implementado e em paridade com a história: uma tabela
 ## Observações
 
 - A consolidação prevista na seção "Divergências" da história (uma tabela, um editor, zap genérico) está completa: `templates_mensagem` (0024) e `templates_cobrador` (0023) foram dropadas e migradas para `templates`.
-- "Aprovação manual vs Meta" (divergência da história): o passo manual existe (`/aprovar`) e o front explica que enquanto o WhatsApp roda via Baileys a aprovação é manual (`DetalheMensagem.tsx:294-298`). Coerente com a história.
+- "Aprovação é a da Meta, sem passo manual separado" (divergência da história): não existe mais `/aprovar`; a aprovação é a submissão/aprovação do template na própria Meta, por chave (`status_meta`), refletida por webhook/reconcile. Coerente com a história.
 - "Garantia de linguagem no editor" (divergência da história): a validação roda ao salvar no backend (`admin/index.ts:138-150`, bloqueia proibida e travessão; gênero só alerta), no preview (:175-191) e no front (`DetalheMensagem.tsx:393-398`), além de CHECK no banco (0022, 0025). Defesa em profundidade presente.
 - Cobertura de teste do épico é boa: `admin.test.ts` cobre criar/aprovar/ativar/apagar, recusa de ativar não aprovada, apagar ativa (409 template_ativo), preview, paridade de valor ausente, lint de proibida e travessão, gênero, e owner-only.
 - O editor de DetalheMensagem hoje edita texto + botões; mídia existe no modelo/transporte mas não no editor de UI (comentário `DetalheMensagem.tsx:9-11`). A história não exige editor de mídia nos critérios, então não conta como [!].

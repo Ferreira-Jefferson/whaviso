@@ -1,6 +1,6 @@
 # Validação de gaps: Épico 07 — Interação do devedor
 
-> Revisão adversarial do plano `historias/planos/07-interacao-devedor.plano.md` contra a fonte da verdade `historias/07-interacao-devedor.md` e o estado real do código (grafo + leitura de `webhook_whatsapp`, `acoes_devedor`, migrations, `baileys_client`).
+> Revisão adversarial do plano `historias/planos/07-interacao-devedor.plano.md` contra a fonte da verdade `historias/07-interacao-devedor.md` e o estado real do código (grafo + leitura de `webhook_whatsapp`, `acoes_devedor`, migrations).
 
 ## 1. Veredito
 
@@ -32,7 +32,7 @@ O plano é forte: o diagnóstico "estado atual vs história" (seção 2) bate co
 
 - **[G-M4] H7.4: "horário reservado setado para `null`" depende de E6 (campo inexistente). O plano deixa como TODO até E6, o que é honesto, mas o critério da H7.4 fica não cumprido no MVP deste épico se E6 não vier antes.** O plano deve ser explícito de que H7.4 (e H7.5 novo horário) **não fecham** sem E6 H6.9 — está dito na seção 5 mas não refletido no critério de aceite do passo 4 (que só cita H7.4 sem ressalva). **Correção:** marcar no passo 4/5 que o sub-critério "zerar/pegar horário reservado" fica gated em E6.
 
-- **[G-M5] H7.1: a história fala em payload "autenticado por HMAC". O plano (seção 2 H7.1, `[~]`) documenta corretamente que o canal Baileys autentica por sessão pareada, não por HMAC HTTP, e propõe "documentar a equivalência". Bom — mas nenhum passo da seção 4 carrega essa documentação** (só o passo 15 genérico de docs). **Correção:** anexar ao passo 15 a nota explícita "HMAC da história = equivalência com canal Baileys autenticado por sessão" em PROJETO.md/CLAUDE.md, para não parecer que o critério HMAC foi ignorado.
+- **[G-M5] RESOLVIDO: H7.1 pede payload "autenticado por HMAC" e o webhook HTTP da Meta com validação HMAC (`X-Hub-Signature-256`, `META_APP_SECRET`) já está implementado.** Não há mais documentação de equivalência a anexar; o critério é satisfeito literalmente.
 
 ### Baixos
 

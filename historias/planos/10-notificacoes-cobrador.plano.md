@@ -20,7 +20,7 @@ O épico reúne **tudo que é avisado a quem gerencia o combinado** (cobrador no
 - H10.8 segurança/antiduplicação; WhatsApp é canal principal.
 - H10.9 **fila de saída: espaçamento 10 min por destinatário + coalescing (cancelamento conservador)** nas DUAS outboxes (`notificacoes_cobrador` e `envios`). **Ponto crítico, testes fortes.**
 
-**Gated 🟡 / dependente de outros épicos:** botões interativos via Baileys (risco de canal; fallback numerado, Épicos 7/8); a maioria dos eventos novos (recusa, telefone divergente, tentativas esgotadas) só dispara depois que o **Épico 5** (aceite 100% WhatsApp, anti-brute-force, estado `recusado`) e o **Épico 8** (botões confirmar/rejeitar via WhatsApp) estiverem implementados. Este plano cobre o **lado da notificação**; o evento-fonte é dono do épico citado.
+**Gated 🟡 / dependente de outros épicos:** a maioria dos eventos novos (recusa, telefone divergente, tentativas esgotadas) só dispara depois que o **Épico 5** (aceite 100% WhatsApp, anti-brute-force, estado `recusado`) e o **Épico 8** (botões confirmar/rejeitar via WhatsApp) estiverem implementados. Este plano cobre o **lado da notificação**; o evento-fonte é dono do épico citado.
 
 ---
 
@@ -77,7 +77,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 - `[x]` WhatsApp é canal principal, sem preferência que o desligue: arquitetura já é "WhatsApp sempre; painel complementar". Não há toggle de canal. Garantir que continue.
 
 ### H10.9 Fila de saída (espaçamento + coalescing) — CRÍTICO
-- `[+]` espaçamento mínimo de **10 min por destinatário** no banco: não existe. O `Pacer` (`baileys_client/ritmo.ts`) espaça **em processo** por GAP aleatório anti-bloqueio, **não** por destinatário e **não** persiste o "próximo horário liberado". Não satisfaz a história.
+- `[+]` espaçamento mínimo de **10 min por destinatário** no banco: não existe. O `Pacer` do transporte espaça **em processo** por GAP aleatório (throughput), **não** por destinatário e **não** persiste o "próximo horário liberado". Não satisfaz a história.
 - `[+]` coalescing (cancelar item ainda não enviado tornado obsoleto): só há cancelamento **no momento do drain** por reconferência de estado (`aviso_nao_em_revisao`, `aviso_nao_ativo`); não há cancelamento por **par evento/contra-evento** (opt-out↔reativação) nem antes do drain.
 - `[~]` reconferência de estado terminal descarta envio: existe (`enviar_lembretes/index.ts` e `notificar_cobrador/index.ts`), alinha parcialmente com o critério "estado terminal anula item".
 - `[+]` cada cancelamento auditável: cancelamentos hoje gravam `erro` na linha, mas não há registro de auditoria do coalescing (par evento/contra-evento).
@@ -127,7 +127,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
   - carregar dados conforme o alvo: profile (com conta) ou telefone direto (sem conta).
   - reconferência de estado por tipo (já existe para `pagamento_informado`: descartar se não está mais em `informado_pago`; estender para os demais: ex. notificação de recusa descartada se o aviso não está mais `recusado`).
   - retry **20-60s aleatório** (substituir `BACKOFF_MIN=[5,15,45]`), alinhando a H6.8/`enviar_lembretes` (que também precisa do mesmo ajuste se hoje usa minutos — verificar/alinhar).
-  - botões Confirmar / Ainda não recebi no `render` quando o tipo for `pagamento_informado` e houver template com botões (Épico 8 H8.5); fallback numerado se Baileys instável.
+  - botões Confirmar / Ainda não recebi no `render` quando o tipo for `pagamento_informado` e houver template com botões (Épico 8 H8.5); fallback numerado como resiliência geral do canal.
   - CTA discreta de criar conta (H10.7) quando alvo é `telefone_cobrador` sem `cobrador_id` (append no template via variável/variante).
 - **Fila de saída / espaçamento 10 min (H10.9) — CRÍTICO:** introduzir um **gate de espaçamento por destinatário no claim**, em banco (não no Pacer em-processo). Estratégia: na query de `reivindicar`, para cada destinatário (`cobrador_id` ou `telefone_cobrador`), só liberar uma linha se a **última enviada ao mesmo destinatário** foi há ≥ 10 min (subquery sobre `enviado_em`/`liberado_apos`). Ao enviar, gravar o timestamp que empurra o "liberado_apos" do destinatário. Mesma técnica do lado `envios` (destinatário = devedor/telefone). Manter `SKIP LOCKED`.
   - **Espaçamento ≠ Pacer:** o `Pacer` continua como anti-bloqueio do transporte; o gate de 10 min é regra de **produto** persistida no banco (sobrevive a restart, vale entre processos). Os dois coexistem.
@@ -200,8 +200,8 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 
 7. **Botões Confirmar / Ainda não recebi na notificação "já paguei" (com fallback numerado).**
    Arquivos: `apps/zap/src/modules/notificar_cobrador/render.ts`, template `cobrador.pagamento_informado`, processamento da resposta no `webhook_whatsapp` (efeito é Épico 8).
-   Critério: H10.2 (botões), H10.7 (acionável sem conta), risco de canal Baileys.
-   **Modelo: opus** — botões interativos via Baileys + fallback + idempotência da resposta; instabilidade de canal.
+   Critério: H10.2 (botões), H10.7 (acionável sem conta), resiliência de canal.
+   **Modelo: opus** (botões interativos oficiais da Meta, fallback e idempotência da resposta).
 
 8. **Fila de saída: espaçamento 10 min por destinatário no claim, em banco — DUAS outboxes.**
    Arquivos: `apps/zap/src/modules/notificar_cobrador/repo.ts` (`reivindicar`), `apps/zap/src/modules/enviar_lembretes/repo.ts` (`reivindicar`), possivelmente migration `0026`.
@@ -247,7 +247,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 
 - **Coalescing cancela o que não devia / duplica / perde envio (H10.9):** maior risco. Mitigar com coalescing **conservador** (só par evento/contra-evento explícito ou estado terminal), auditoria de cada cancelamento, e testes de corrida (evento/contra-evento quase simultâneos).
 - **Gate de 10 min por destinatário sem corrida:** 2 drainers podem liberar 2 itens do mesmo destinatário na mesma janela; o gate precisa ser atômico no claim (`SKIP LOCKED` + subquery de último envio). Teste com 2 drainers concorrentes.
-- **Botões via Baileys instáveis:** prever fallback numerado (resposta "1/2") até a Meta oficial; testar o caminho de fallback.
+- **Resiliência de canal:** além dos botões interativos oficiais da Meta, prever fallback numerado (resposta "1/2") como resiliência geral; testar o caminho de fallback.
 - **Roteamento por papel no invertido:** notificar o cobrador em vez do devedor-criador (ou vazar dado a quem não deve, H10.4). Teste por papel.
 - **Retry divergente (minutos vs 20-60s):** alinhar `notificar_cobrador` (e conferir `enviar_lembretes`) a H6.8; não confundir com o backoff de transporte do Pacer.
 - **Dedupe sem corrida (H10.8):** `unique index where status<>'cancelado'` + tratar conflito como idempotente no enfileirador.

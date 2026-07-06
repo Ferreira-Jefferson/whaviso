@@ -17,7 +17,7 @@ Login **sem e-mail/senha**, com duas portas de entrada e a identidade ancorada n
 - **H1.6 Sessão validada por JWKS na API** — 🟢 já feito.
 - **H1.7 Manter sessão e sair** — 🟢 já feito.
 
-Tudo é MVP 🟢 segundo o épico (o canal WhatsApp é viável via Baileys; Meta oficial é troca de transporte futura, fora de escopo). **Não há fatia 🟡 gated neste épico.** O que separa "fácil" de "difícil" aqui é o **modelo de sessão do login por WhatsApp** (H1.2/H1.3) e a **criação de conta no aceite** (H1.4), que esbarram em como o Supabase emite (ou não) o JWT.
+Tudo é MVP 🟢 segundo o épico (o canal WhatsApp é viável via Meta Cloud API, oficial). **Não há fatia 🟡 gated neste épico.** O que separa "fácil" de "difícil" aqui é o **modelo de sessão do login por WhatsApp** (H1.2/H1.3) e a **criação de conta no aceite** (H1.4), que esbarram em como o Supabase emite (ou não) o JWT.
 
 ---
 
@@ -90,7 +90,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 
 ### Backend zap
 - **Trilha OTP:** ajustar `hook_otp/index.ts` para variar a copy login vs cadastro (consulta `profiles.telefone` ou recebe dica do payload). Manter regra: nunca logar telefone/código. Na Fase 2 a copy vira template (E12), já previsto no MODULE.md.
-- **Trilha botão:** novo handling no `webhook_whatsapp` para os payloads `login_aceitar`/`login_negar`/`cadastro_sim`/`cadastro_nao` (precedente: `aceite`/`recusa` já existem em `webhook_whatsapp/repo.ts` e `service.ts`). Idempotência por toque duplo (claim `FOR UPDATE SKIP LOCKED` no desafio). Fallback de canal: se o botão interativo do Baileys falhar, cair para resposta numerada (risco apontado no _CONTEXTO).
+- **Trilha botão:** novo handling no `webhook_whatsapp` para os payloads `login_aceitar`/`login_negar`/`cadastro_sim`/`cadastro_nao` (precedente: `aceite`/`recusa` já existem em `webhook_whatsapp/repo.ts` e `service.ts`). Idempotência por toque duplo (claim `FOR UPDATE SKIP LOCKED` no desafio). Fallback de canal: prever resposta numerada como resiliência geral do canal (ver _CONTEXTO).
 - **Outbox de mensagens de auth (trilha botão):** as mensagens de login/cadastro com botões precisam sair pela maquinaria de envio do zap; reusar o padrão de outbox (sem importar módulo). Coalescing não é crítico aqui (volume baixo, 1 desafio por tentativa).
 
 ### Frontend
@@ -99,7 +99,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
   - Trilha botão: trocar o passo 2 por uma tela de **espera** ("Confirme no seu WhatsApp tocando em Acessar"), com polling/Realtime do desafio.
 - **H1.4 — pós-aceite:** na página de aceite (`frontend/src/modules/aceite`), após confirmar, mostrar CTA discreta "Acompanhar no painel" que leva ao login por WhatsApp (nunca obrigatória).
 - **H1.5 — read-only no free:** esconder/desabilitar o botão "Novo aviso" para plano free e exibir CTA de plano; tratar o erro `plano_sem_criacao` da API com banner + link para billing. A regra **é** da API; a UI só melhora a experiência.
-- **Limpeza de doc/copy:** revisar `frontend/src/shared/supabase/client.ts` e `schemas.ts` (comentários mencionam "Meta Cloud API" e "número Meta"; hoje é Baileys — atualizar para não confundir; sem travessão).
+- **Limpeza de doc/copy: RESOLVIDO.** O transporte hoje é mesmo a Meta Cloud API; os comentários em `frontend/src/shared/supabase/client.ts` e `schemas.ts` que mencionam "Meta Cloud API"/"número Meta" já refletem a realidade atual.
 
 ### Segurança
 - JWKS já correto (H1.6). Manter.
@@ -139,7 +139,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 
 **Passo 7 — Evento de login/cadastro negado.** Objetivo: H1.2 (Negar acesso registrado), H1.3 (Não fui eu registrado). Persistir em auditoria de auth (ou log estruturado sem PII), conforme decisão. **Modelo: sonnet** — gravação append-only simples, uma vez decidido o destino.
 
-**Passo 8 — Limpeza de docs/copy de auth.** Objetivo: invariantes E13 + coerência. Atualizar comentários "Meta/SMS" → Baileys em `client.ts`/`schemas.ts`/CLAUDE.md onde divergir do épico; revisar copy de todas as mensagens (sem travessão, sem palavras proibidas, neutra de gênero). **Modelo: sonnet** — edição de texto/comentário.
+**Passo 8: RESOLVIDO (comentários já batem com a Meta Cloud API).** Objetivo original: invariantes E13 + coerência entre comentários e transporte real. Hoje o transporte é mesmo a Meta Cloud API, então os comentários "Meta/SMS" em `client.ts`/`schemas.ts`/CLAUDE.md já refletem a realidade; segue valendo revisar a copy das mensagens (sem travessão, sem palavras proibidas, neutra de gênero). **Modelo: sonnet** (edição de texto/comentário).
 
 **Passo 9 — Testes.** Objetivo: cobrir H1.2–H1.5. Integração free-read-only, criação de conta no aceite idempotente, gate login/cadastro; (trilha botão) idempotência de toque + fallback. **Modelo: opus** — testes de idempotência/segurança/corrida; os de copy/UI podem ser sonnet.
 
@@ -162,7 +162,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 - **Free read-only (H1.5) — risco de regressão de receita/produto:** se o default continuar `pessoal`, contas novas criam de graça. Teste dedicado: conta sem assinatura → 403 ao criar (dois fluxos). **Crítico.**
 - **Criação de conta no aceite (H1.4):** telefone **não verificado** → risco de criar conta/puxar combinado de número alheio (mesma classe do backfill, memória whaviso-pagar-invertido). Mitigado por nascer free só-leitura. Teste: idempotência (reaceite não duplica conta), e que a conta criada não consegue agir além de visualizar.
 - **Trilha botão — emissão de sessão:** contraria "JWT do Supabase"; é o maior risco arquitetural. Se escolhida, exige revisão de segurança dedicada (anti-replay, expiração, token só hash).
-- **Canal Baileys (botões interativos):** instabilidade → prever **fallback numerado** (resposta "1 = Acessar / 2 = Negar"). Teste do fallback.
+- **Resiliência do canal (botões interativos):** prever **fallback numerado** (resposta "1 = Acessar / 2 = Negar") como resiliência geral. Teste do fallback.
 - **Enumeração de telefones:** `status-telefone`/envio de OTP precisa de rate-limit; teste que abuso não revela base de números.
 - **Idempotência de toque duplo** (trilha botão): claim `SKIP LOCKED` no desafio; teste de dois cliques simultâneos.
 - **Sem PII em log:** teste/grep garantindo que telefone/código nunca aparecem em log.

@@ -11,7 +11,7 @@
 - **D-HORARIO (E6):** a unicidade global de segundo do horário reservado é garantida na **lógica de alocação**, NÃO por índice único no banco (um índice único quebraria o reuso exigido na reabertura `pago→programado`, que aceita colisão). Registrar (evento/flag não-sensível) quando o espaçamento de 10min/devedor não couber.
 - **D-MIGNUM:** numeração de migrations é atribuída **sequencialmente no momento de cada etapa** (próximo livre começa em 0025). Cada etapa confere a última migration antes de criar a sua, para não colidir entre épicos.
 - **D-RECUSADO:** o estado `recusado` é introduzido em **F-STATE**; o **E5** troca a recusa do webhook de `cancelado→recusado`. E6/E7 apenas consomem.
-- **D-BAILEYS:** botões interativos via Baileys podem falhar; cada épico que depende de botão (E5/E7/E8/E10) prevê **fallback por resposta numerada**. Implementar o fallback de forma compartilhada (uma vez, no transporte) e reusar.
+- **D-FALLBACK:** como resiliência geral do canal, cada épico que depende de botão (E5/E7/E8/E10) prevê **fallback por resposta numerada**, além dos botões interativos oficiais da Meta. Implementar o fallback de forma compartilhada (uma vez, no transporte) e reusar.
 
 ## Gaps cross-épico recorrentes (fechar onde indicado)
 

@@ -186,7 +186,7 @@ Estes itens são **compartilhados com o Épico 2** (mesma máquina de estados). 
 - **Notificação ao devedor sem corrida/duplicidade** (passo 9): par recusa/pix-incorreto não pode notificar o devedor duas vezes; coordenar coalescing de E10 (H10.9).
 - **Validação de limite sem corrida** (H3.4): criar dois invertidos em paralelo no limite. Endurecimento em E11.
 - **Cobrador sem conta** (`cobrador_id` null): notificar por `telefone_cobrador`; guard para não quebrar a outbox por profile (já existe guard no `ja_paguei`, replicar nas novas notificações).
-- **Risco de canal (Baileys):** botões interativos (Aceitar/Pix incorreto/Recusar) podem ser instáveis → prever fallback por resposta numerada (E5/E6).
+- **Resiliência de canal:** além dos botões interativos oficiais da Meta (Aceitar/Pix incorreto/Recusar), prever fallback por resposta numerada (E5/E6).
 
 ---
 

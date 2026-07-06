@@ -92,7 +92,7 @@ Resumo: a infraestrutura de auth está sólida (JWKS local, conta nasce free, fr
 ## Itens que a própria história marca como 🟡/fora de escopo (com a linha da história)
 
 - Nenhum critério deste épico tem legenda 🟡; todas as histórias H1.1 a H1.7 estão marcadas 🟢 (linhas 9, 19, 30, 41, 52, 62, 71).
-- A migração para a Meta oficial é fora de escopo, mas só como **troca de transporte**, sem alterar o comportamento das histórias: "Migração para Meta oficial: é troca de transporte futura, o comportamento das histórias acima não muda." (linha 85). Ou seja, NÃO justifica deixar de implementar botão de login/aceite por causa de dependência da Meta: o canal já é Baileys (linha 4).
+- O provedor de WhatsApp é tratado como **escolha de transporte**, fora do escopo deste épico: "Provedor de WhatsApp (Meta Cloud API): é escolha de transporte, o comportamento das histórias acima não depende dele." (linha 86). O canal hoje é a Meta Cloud API (oficial), conforme a introdução do épico (linha 4).
 - Fora de escopo expresso: e-mail/senha (linha 83) e páginas de recuperação/troca de senha (linha 84). O código respeita: não há telas de senha (`Login.tsx`).
 
 ---

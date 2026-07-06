@@ -74,7 +74,7 @@ Quase tudo implementado e bem coberto por testes. A arquitetura outbox (api enfi
 | `cobrador_id` nulo: todas as notificações vão p/ `telefone_cobrador` via WhatsApp | [x] | `resolverAlvo` cai em `telefone_cobrador`/`telefone_alvo` (index.ts:67,72); roteamento no drain (repo.ts:117) | `notificar_cobrador.test.ts:131` |
 | Notificações acionáveis ("já paguei") levam botões p/ confirmar/rejeitar pelo WhatsApp | [x] | botões na chave `cobrador.pagamento_informado` valem p/ todas as versões (com/sem conta) (migration `0042:135,148`) | `templates.test.ts:36` |
 | CTA discreta de criar conta para ver tudo no painel (nunca obrigatória) | [!] | nenhum template `cobrador.*` traz CTA de criar conta (0029); `renderMensagem` não injeta CTA (templates/index.ts:56-75). O comentário em `0042:115` cita "CTA discreta de criar conta" mas é só comentário; não há texto/template/render implementado | n/a |
-| Mesmo risco de canal (botões via Baileys podem exigir fallback numerado) | [~] | infra de botões existe (baileys_client/index.ts:65); não há fallback numerado dedicado p/ a notificação ao cobrador. A própria história trata como risco "até a Meta oficial" (linha 84), não exige fallback agora | n/a |
+| Botões chegam pela Meta (oficial); fallback numerado como resiliência geral | [~] | infra de botões existe no transporte; não há fallback numerado dedicado especificamente p/ a notificação ao cobrador. A própria história já trata isso como resiliência geral, não como risco de canal (linha 84) | n/a |
 
 ### H10.8: Notificações seguras, sem ruído; WhatsApp é o canal principal
 
@@ -103,7 +103,7 @@ Quase tudo implementado e bem coberto por testes. A arquitetura outbox (api enfi
 
 ## Itens que a própria história marca como 🟡/fora de escopo (com a linha)
 
-- Linha 84 (H10.7): "Vale o mesmo risco de canal (botões via Baileys podem exigir fallback numerado até a Meta oficial...)" trata o fallback numerado como risco conhecido, não como exigência imediata. Por isso o critério de canal foi classificado [~] e não [!].
+- Linha 84 (H10.7): "Os botões chegam pela Meta (oficiais); o fallback de resposta numerada segue disponível como resiliência geral, não como workaround de risco de canal." O critério foi classificado [~] porque não há fallback numerado dedicado especificamente à notificação ao cobrador, não por seguir tratado como risco.
 - Linhas 139-143 (Fora de escopo): mensagens ao devedor (E6/7/8), efeito das ações confirmar/rejeitar (E8), aparição no painel (E9), limites de envio por plano (E11), edição dos textos (E12). Coerente com o que o código delega a esses épicos.
 
 ## Observações

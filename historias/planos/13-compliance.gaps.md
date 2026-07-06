@@ -6,7 +6,7 @@
 
 **Aprovado com ressalvas.**
 
-O plano cobre os 10 critérios H13.x, está bem ancorado no código real (a tabela de estado-atual confere em quase tudo que verifiquei) e respeita as invariantes. As ressalvas são: a lista de limpeza de travessão/proibidas está **incompleta** (omite arquivos de produto reais), a afirmação de "webhook HMAC-autenticado" está **factualmente desatualizada** sob Baileys, e faltam alguns testes/pontos finos. Nenhum gap é bloqueante, mas os dois primeiros precisam de correção antes de executar para o trabalho realmente fechar as varreduras (H13.1/H13.2).
+O plano cobre os 10 critérios H13.x, está bem ancorado no código real (a tabela de estado-atual confere em quase tudo que verifiquei) e respeita as invariantes. A ressalva é: a lista de limpeza de travessão/proibidas está **incompleta** (omite arquivos de produto reais); faltam também alguns testes/pontos finos. Nenhum gap é bloqueante, mas essa lista precisa de correção antes de executar para o trabalho realmente fechar as varreduras (H13.1/H13.2).
 
 ---
 
@@ -31,8 +31,8 @@ Correção: trocar `0018` por `0014` e `0019` na lista do passo 6; e atenção: 
 
 ### Médio
 
-**M1. Afirmação "webhook HMAC-autenticado" está desatualizada sob Baileys (H13.8).**
-A história H13.8 e o plano (tabela linha 44) repetem "payload do botão é `acao:avisoId` ... webhook HMAC-autenticado". Conferi `webhook_whatsapp/index.ts`: o inbound de botões agora vem pelo **socket do Baileys** (`whats.onBotao`), **não** há webhook HTTP da Meta nem verificação HMAC nesse caminho. O HMAC (Standard Webhooks) hoje só existe no `hook_otp/verificar_assinatura.ts` (Send SMS Hook). O ponto substantivo de H13.8 (payload leva `aviso_id`, não token) continua válido e está OK no código, mas o plano deveria registrar que "webhook HMAC" virou "transporte Baileys autenticado pelo pareamento" para não propagar uma afirmação falsa. Correção: ajustar a redação da evidência H13.8 e notar que o HMAC permanece relevante só para o `hook_otp`.
+**M1. RESOLVIDO: o webhook HMAC da Meta já está implementado (H13.8).**
+A história H13.8 e o plano (tabela linha 44) descrevem "payload do botão é `acao:avisoId` ... webhook HMAC-autenticado". O webhook HTTP da Meta com validação HMAC (`X-Hub-Signature-256`, `META_APP_SECRET`) já cobre o inbound de botões; o payload leva `aviso_id`, nunca token. Não há mais divergência a corrigir aqui.
 
 **M2. Redaction (passo 8): falta `telefone_cobrador` e o paths real precisa de verificação cuidadosa, não só append.**
 Confirmei `logger/index.ts`: redige `telefone`, `telefone_devedor`, `pix_chave`, `chave`, `token`, mas **não** `telefone_cobrador`. O plano acerta em adicioná-lo. Porém:
@@ -100,7 +100,7 @@ Todos os 10 critérios H13.x têm passo no plano. Detalhe por critério:
 - **E12 (templates):** validação ao salvar (passo 7) amarra H12.5; coerente. Atenção a não quebrar o contrato `previewMensagemResposta`/editor do front (B1).
 - **E3 (pagar invertido):** redaction de `pix_titular`/`pix_banco` "quando existirem" — coerente; o plano nota que os campos entram no E3/E7. Bom não inventar campos.
 - **E6 (`informado_pago` parar o ciclo):** o plano corretamente diz que isso é refator de E6, não de E13. Sem contradição.
-- **Sem contradição com outros épicos detectada.** A única afirmação factualmente frágil é a de HMAC (M1), herdada da própria história, que descreve o estado pré-Baileys.
+- **Sem contradição com outros épicos detectada.**
 
 ---
 
@@ -131,7 +131,7 @@ Sensata no geral. Observações:
 
 1. (C1) Completar a lista de limpeza de travessão: incluir `backend/eslint.config.mjs:15`, `backend/scripts/meta_sink.mjs`, `push_secrets.sh`, `scaffold_module.sh`; decidir o escopo da varredura.
 2. (C2) Corrigir a lista de comentários proibidos: trocar `0018` por `0014` e `0019`; manter `0006`/`0022`; não alterar o regex dos CHECKs.
-3. (M1) Atualizar a redação de H13.8: o inbound de botões é Baileys (socket), não webhook HMAC; HMAC só no `hook_otp`.
+3. (M1) RESOLVIDO: o inbound de botões já é webhook HTTP da Meta com HMAC (`X-Hub-Signature-256`); nenhuma correção de redação necessária.
 4. (M2) Passo 8/9a: adicionar `telefone_cobrador` (plano já prevê) + teste com objeto aninhado 2+ níveis; reforçar "logar só ids".
 5. (M3) Adicionar teste de invariante H13.7 (texto livre não dispara ação/estado).
 6. (M4) Precisar quais chaves são "templates do ciclo" no teste de opt-out; considerar guarda de presença de optout no salvar.

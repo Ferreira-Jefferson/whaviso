@@ -81,7 +81,7 @@ Como **cobrador sem conta** (entrei só por `telefone_cobrador`, típico do inve
 - [ ] Quando `cobrador_id` é nulo, todas as notificações deste épico vão para **`telefone_cobrador`** via WhatsApp.
 - [ ] As notificações **acionáveis** (principalmente "já paguei", H10.2) levam **botões** para confirmar/rejeitar pelo próprio WhatsApp (Épico 8 H8.5).
 - [ ] Acompanha uma **CTA discreta** de criar conta para passar a ver tudo no painel (nunca obrigatória).
-- [ ] Vale o mesmo risco de canal (botões via Baileys podem exigir fallback numerado até a Meta oficial, Épicos 7/8).
+- [ ] Os botões chegam pela Meta (oficiais); o fallback de resposta numerada (Épicos 7/8) segue disponível como resiliência geral, não como workaround de risco de canal.
 
 ---
 

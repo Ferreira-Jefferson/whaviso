@@ -66,7 +66,7 @@ Como **cobrador** (com conta ou não), quero confirmar ou rejeitar o pagamento p
 - [ ] O toque chega como webhook **autenticado por HMAC**, carregando o **`aviso_id`** (nunca o token), e só é aplicado se o telefone que respondeu **corresponde** ao alvo da notificação daquele combinado (cobrador com conta: telefone do profile; sem conta: `telefone_cobrador`); senão é ignorado, sem vazar se o combinado existe.
 - [ ] A ação é **idempotente** e vale a regra de só o último aviso agir (Épico 7 H7.7).
 - [ ] Para cobrador sem conta, há uma **CTA discreta** de criar conta junto da confirmação (nunca obrigatória).
-- [ ] **Risco do canal:** depende de botões interativos via Baileys (não oficial), que podem ser instáveis; pode exigir **fallback** (resposta numerada) até a Meta oficial (mesmo risco do Épico 7).
+- [ ] **Fallback de resposta numerada:** além dos botões interativos oficiais da Meta, existe um fallback de resposta numerada como resiliência geral do canal (mesmo mecanismo do Épico 7).
 
 ---
 

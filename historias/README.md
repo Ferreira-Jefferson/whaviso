@@ -26,8 +26,8 @@ Os **critérios de aceite** são o que será conferido contra o código na fase 
 
 ### Legenda de escopo
 
-- 🟢 **MVP**: faz parte do produto ativo (Baileys já habilita o canal WhatsApp).
-- 🟡 **Gated/Futuro**: previsto, mas ainda não ligado (depende de Meta oficial, billing real, etc.).
+- 🟢 **MVP**: faz parte do produto ativo (a Meta Cloud API, oficial, habilita o canal WhatsApp).
+- 🟡 **Gated/Futuro**: previsto, mas ainda não ligado (depende de aprovação de template na Meta, billing real, etc.).
 
 ### Legenda de validação (preenchida na fase 2)
 

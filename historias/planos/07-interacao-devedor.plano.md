@@ -7,7 +7,7 @@
 
 ## 1. Resumo do épico e escopo
 
-O devedor **não conversa**: só interage pelos **três botões** que acompanham toda mensagem do ciclo (E6): **Já paguei**, **Chave de Pag.** e **Desativar lembretes**. Cada toque chega ao `zap` pelo inbound do Baileys (canal autenticado por sessão pareada), carrega o **`aviso_id`** no `buttonId` (`acao:<avisoId>`), nunca o token. O épico define o que cada botão faz e a resposta ao devedor, mais a **idempotência**, o **roteamento ao combinado certo por `aviso_id`** (não pelo "último chat"), a regra de **só o último aviso enviado age**, e o estado novo **`desregistrado`** (opt-out reversível).
+O devedor **não conversa**: só interage pelos **três botões** que acompanham toda mensagem do ciclo (E6): **Já paguei**, **Chave de Pag.** e **Desativar lembretes**. Cada toque chega ao `zap` pelo webhook HTTP da Meta (autenticado por HMAC, `X-Hub-Signature-256`), carrega o **`aviso_id`** no `buttonId`/payload (`acao:<avisoId>`), nunca o token. O épico define o que cada botão faz e a resposta ao devedor, mais a **idempotência**, o **roteamento ao combinado certo por `aviso_id`** (não pelo "último chat"), a regra de **só o último aviso enviado age**, e o estado novo **`desregistrado`** (opt-out reversível).
 
 **MVP (🟢, tudo neste épico é 🟢):**
 - H7.1 só age por botão; texto livre: free silêncio, pago menu de opções; respeito a linguagem.
@@ -28,13 +28,13 @@ O devedor **não conversa**: só interage pelos **três botões** que acompanham
 
 Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não existe.
 
-Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service,repo,index}.ts`, `apps/zap/src/shared/baileys_client/{inbound,tipos,index}.ts`, `apps/zap/src/shared/templates/index.ts`, `apps/zap/src/modules/notificar_cobrador/{repo,render}.ts`, `apps/api/src/modules/acoes_devedor/service.ts`, migrations `0001/0003/0004/0010/0011/0012/0014/0016/0024`.
+Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service,repo,index}.ts`, `apps/zap/src/shared/meta_client/{inbound,tipos,index}.ts`, `apps/zap/src/shared/templates/index.ts`, `apps/zap/src/modules/notificar_cobrador/{repo,render}.ts`, `apps/api/src/modules/acoes_devedor/service.ts`, migrations `0001/0003/0004/0010/0011/0012/0014/0016/0024`.
 
 ### H7.1 Só age por botão (sem chat)
-- `[x]` Únicas ações = os três botões: o inbound só extrai clique (`baileys_client/inbound.ts::extrairBotao`); texto livre é descartado. Os três botões já vivem no template do ciclo (`migration 0024`, `conteudo.botoes` = `ja_paguei`/`ver_pix`/`optout`).
+- `[x]` Únicas ações = os três botões: o inbound só extrai clique (`meta_client/inbound.ts::extrairBotao`); texto livre é descartado. Os três botões já vivem no template do ciclo (`migration 0024`, `conteudo.botoes` = `ja_paguei`/`ver_pix`/`optout`).
 - `[+]` Texto livre no **plano pago** → **menu de opções** dos combinados ativos: não existe (texto livre é sempre descartado, sem distinção de plano).
 - `[x]` Texto livre no free / sem conta → silêncio: é o comportamento atual (descarte total).
-- `[~]` Toque é evento autenticado, payload com `aviso_id`: `parsearPayloadBotao` valida `acao:<uuid>`; autenticidade vem da sessão pareada (não há HMAC HTTP da Meta hoje — o épico fala em HMAC mas o canal atual é Baileys; manter a equivalência "canal autenticado", documentar).
+- `[x]` Toque é evento autenticado, payload com `aviso_id`: `parsearPayloadBotao` valida `acao:<uuid>`; autenticidade vem do webhook HTTP da Meta com validação HMAC (`X-Hub-Signature-256`).
 - `[~]` Linguagem: respostas vêm de templates (sem strings fixas no código), mas o **menu** (novo) e as respostas de **encerrado** (novas) precisam ser templates com linguagem limpa.
 
 ### H7.2 "Já paguei"
@@ -101,7 +101,7 @@ Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service
 3. **Titular + banco do Pix** (divergência H7.3): a captura é dos Épicos 2/3, mas o **dado** precisa existir para a 2ª mensagem. Acrescentar `titular` e `banco` em `chaves_pix` e propagar para o aviso. **Decisão de modelagem (sinalizar):** snapshot no `avisos` (colunas `pix_titular`/`pix_banco`, como `pix_chave` já é snapshot) vs join em `chaves_pix`. Recomendado: snapshot no aviso, coerente com `pix_chave`. Migration `0026_pix_titular_banco.sql`. **Este épico só consome**; a coleta no formulário é E2/E3. Marcar dependência.
 4. **Controle "chave entregue uma vez por combinado" e "último aviso"** (H7.3 + H7.7) — **núcleo**:
    - "Chave entregue": coluna `avisos.chave_entregue_em timestamptz null` (ou evento `solicitou_pix` consultado como marca). Recomendado: derivar de `eventos_aviso` (já existe `solicitou_pix`) **+** flag de entrega bem-sucedida. Como a entrega pode falhar (reenvio só após falha de servidor), guardar `entrega_chave_status` no aviso (`null|entregue|falhou`) é mais simples que reconstruir do evento. Migration.
-   - "Último aviso": vincular o clique ao envio que o originou. Caminho recomendado: incluir a **etapa** no `buttonId` (`acao:<avisoId>:<etapa>`) e comparar a etapa clicada com o **último envio enviado** do aviso (max `enviado_em`). Alternativa: capturar no inbound o `wamid` da mensagem **citada** (Baileys expõe `contextInfo.stanzaId`) e cruzar com `envios.wamid`. A 1ª é mais robusta (não depende de o cliente citar a mensagem). Sinalizar a decisão. Em ambos os casos: índice/consulta do "último envio" por `aviso_id`.
+   - "Último aviso": vincular o clique ao envio que o originou. Caminho recomendado: incluir a **etapa** no `buttonId` (`acao:<avisoId>:<etapa>`) e comparar a etapa clicada com o **último envio enviado** do aviso (max `enviado_em`). Alternativa: capturar no inbound o id da mensagem **citada** (a Meta expõe `context.id` na resposta) e cruzar com `envios.wamid`. A 1ª é mais robusta (não depende de o cliente citar a mensagem). Sinalizar a decisão. Em ambos os casos: índice/consulta do "último envio" por `aviso_id`.
 5. **Grants/RLS:** nenhuma tabela nova de negócio; só novas colunas em tabelas já com policy. `whaviso_zap` já tem update em `avisos`/`envios`/`eventos_aviso`/`notificacoes_cobrador` (conferir grants ao adicionar colunas — colunas herdam o grant da tabela). Não introduzir DELETE.
 
 ### 3.2 Backend api (`apps/api`)
@@ -116,7 +116,7 @@ Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service
   - **Roteamento por etapa/último aviso** (H7.7): parsear `acao:<avisoId>:<etapa>` (ou o stanzaId citado) e descartar ação de estado quando não for o último envio. Resposta de cortesia "encerrado" condicionada a plano (H7.1/H7.7).
   - **Nova ação `ativar`** (H7.5): adicionar a `ACOES_BOTAO` e a `chaveResposta` (`resposta.reativacao`, sem botão).
   - **"Chave de Pag." duas mensagens** (H7.3): após `resposta.ver_pix` (só a chave), enviar a 2ª (`resposta.ver_pix_titular`, variáveis `nome`/`banco`) com `setTimeout`/delay até 3s. **Idempotência da entrega**: só envia se `entrega_chave_status != 'entregue'`; em falha de envio (após os 3 retrys do canal) deixa reentregável. `solicitou_pix` só no 1º toque (mover a gravação do evento para condicional "primeira vez").
-  - **Texto livre → menu (pago) / silêncio (free)** (H7.1): hoje o inbound descarta texto livre. Acrescentar no inbound um caminho para **mensagem de texto** (não-botão) que: localiza combinados ativos do telefone, checa plano do cobrador/dono, e responde menu (pago) ou nada (free). **Importante:** o `baileys_client` é transporte genérico; o "menu" é negócio → expor no `ClienteWhats` um `onTexto(handler)` análogo ao `onBotao`, e implementar a regra no módulo `webhook_whatsapp`. Não colocar negócio no `baileys_client`.
+  - **Texto livre → menu (pago) / silêncio (free)** (H7.1): hoje o inbound descarta texto livre. Acrescentar no inbound um caminho para **mensagem de texto** (não-botão) que: localiza combinados ativos do telefone, checa plano do cobrador/dono, e responde menu (pago) ou nada (free). **Importante:** o `meta_client` é transporte genérico; o "menu" é negócio → expor no `ClienteWhats` um `onTexto(handler)` análogo ao `onBotao`, e implementar a regra no módulo `webhook_whatsapp`. Não colocar negócio no `meta_client`.
 - `webhook_whatsapp/repo.ts` (`aplicarAcaoBotao`):
   - opt-out: `update status='desregistrado'` (não `cancelado`); **zerar `horario_reservado`** (quando o campo existir, E6); evento `optout`.
   - reativar: `desregistrado → programado`, recriar envios (catch-up via `calcularAgendamentos` filtrando etapas ainda aplicáveis), **pegar novo horário reservado** (E6), evento `reativacao`. Notificação ao cobrador é decisão de E10 (enfileirar conforme a janela).
@@ -190,7 +190,7 @@ Cada passo: objetivo · arquivos prováveis · critério (HNN.x) · **modelo**.
    **opus** — sequência temporizada + idempotência de entrega + condicional do evento; sensível a corrida e a falha de envio.
 
 10. **zap: texto livre → menu (pago) / silêncio (free); silêncio total pós "Já paguei".**
-    Arquivos: `baileys_client/{tipos,inbound,index}.ts` (novo `onTexto`), `webhook_whatsapp/service.ts` (regra de plano + montar menu), template `resposta.menu_opcoes`. Critério: H7.1.
+    Arquivos: `meta_client/{tipos,inbound,index}.ts` (novo `onTexto`), `webhook_whatsapp/service.ts` (regra de plano + montar menu), template `resposta.menu_opcoes`. Critério: H7.1.
     **opus** — toca o transporte (novo hook genérico) + regra de plano + linguagem; risco de virar "conversa" se mal feito.
 
 11. **api: alinhar opt-out por link para `desregistrado` (e reativar, se o link for mantido).**
@@ -229,8 +229,8 @@ Cada passo: objetivo · arquivos prováveis · critério (HNN.x) · **modelo**.
 
 ## 6. Riscos e pontos de teste dedicado
 
-- **"Último aviso age" (H7.7) — maior risco:** hoje não há vínculo clique→envio. Se a solução for por etapa no `buttonId`, validar que botões de etapas anteriores ficam inertes mesmo com a etapa correta repetida; se for por stanzaId citado, validar que o Baileys entrega `contextInfo.stanzaId` de forma confiável (pode não vir se o cliente não "responder" a mensagem). **Teste dedicado** + fallback decidido.
-- **Botões interativos via Baileys instáveis** (divergência do épico): o modelo depende de botões; prever **fallback de resposta numerada** e testar cedo. Afeta H7.1..H7.7 inteiros.
+- **"Último aviso age" (H7.7), maior risco:** hoje não há vínculo clique→envio. Se a solução for por etapa no `buttonId`, validar que botões de etapas anteriores ficam inertes mesmo com a etapa correta repetida; se for pelo id da mensagem citada, validar que a Meta entrega esse dado de forma confiável (pode não vir se o cliente não "responder" a mensagem). **Teste dedicado** + fallback decidido.
+- **Fallback de resposta numerada (resiliência do canal):** além dos botões interativos oficiais da Meta, prever **fallback de resposta numerada** e testar cedo. Afeta H7.1..H7.7 inteiros.
 - **Idempotência / toque duplo:** `for update` serializa, mas a 2ª mensagem do Pix (passo 9) é fora da transação (delay até 3s) — garantir que dois toques não disparem duas sequências (marcar entrega **antes** de soltar a 2ª, ou lock por aviso). **Teste de corrida.**
 - **Entrega da chave "uma vez" vs falha de servidor:** distinguir falha de envio (reentregável) de "já entregue" sem reenviar; testar o caminho de falha confirmada após os 3 retrys (E6 H6.8).
 - **Opt-out/reativação dentro de 1 min** (anula notificação): corrida entre a reativação e a drenagem da notificação de saída por E10. **Teste de corrida coordenado com E10.**
@@ -247,4 +247,4 @@ Cada passo: objetivo · arquivos prováveis · critério (HNN.x) · **modelo**.
 2. **Onde guardar titular + banco do Pix:** snapshot em `avisos` (coerente com `pix_chave`, recomendado) vs join em `chaves_pix` no momento do toque. Confirmar.
 3. **Marca de "chave já entregue":** coluna `entrega_chave_status` no aviso (recomendado) vs derivar de `eventos_aviso`. Confirmar.
 4. **Destino do `acoes_devedor` por link na api:** alinhar para `desregistrado` (mínimo) e/ou aposentar o link se E5 remover o site. Confirmar com E5.
-5. **Fallback de canal (botões instáveis no Baileys):** ligar respostas numeradas como fallback já no MVP ou só se observarmos falha em produção? (Não é decisão de produto, é de robustez.)
+5. **Fallback de canal (resposta numerada):** ligar já no MVP como resiliência geral, ou só se observarmos falha em produção? (Não é decisão de produto, é de robustez.)

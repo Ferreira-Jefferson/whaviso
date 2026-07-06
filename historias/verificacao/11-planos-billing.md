@@ -110,7 +110,7 @@ As duas divergências de preço/modelo foram **resolvidas a favor do código** (
 - **Toda a H11.9 (mudar de plano)** marcada 🟡 (linhas 104, 107-110): "Depende do billing real (H11.7); fora do MVP".
 - **Textos finais das CTAs**: "❌ ... entram com o épico de Templates/mensagens e o design do painel" (linha 145).
 - **Mecânica de cada recurso** (recorrência, cadência, menu): "❌ ... definida nos épicos 6, 7 e 8; aqui só o liga/desliga por plano" (linha 146).
-- **Limites de envio do WhatsApp/Baileys**: "❌ ... restrição operacional do transporte (Épico 10)" (linha 147).
+- **Limites de envio do WhatsApp (Meta Cloud API)**: "❌ ... restrição operacional do transporte (Épico 10)" (linha 147).
 - **Expiração de convite (7 dias)**: "é fixa e não é alavanca de plano ... não entra no catálogo" (linha 138). Confirmado: não há coluna disso no catálogo.
 
 ## Observações

@@ -54,7 +54,7 @@ Como **owner**, quero editar variações da mesma mensagem por contexto, para qu
 Como **owner**, quero criar uma nova versão da mensagem, revisar e publicar, para mudar o texto com segurança e poder voltar atrás.
 *Critérios de aceite:*
 - [ ] Salvar uma edição **cria uma nova versão** da chave/contexto; ela **nasce pendente** (não entra no ar sozinha).
-- [ ] Há um passo de **aprovação** explícito antes de poder ativar (no MVP a aprovação é **manual**; com Meta oficial seria a aprovação do template, ver divergência).
+- [ ] Há um passo de **aprovação** explícito antes de poder ativar: o owner **submete** a versão à Meta pelo painel, e ela só fica aprovada quando a **Meta aprova o template** correspondente (webhook/reconcile refletem o veredito real).
 - [ ] **Ativar** uma versão só é permitido se ela estiver **aprovada**; ativar versão não aprovada é recusado (envelope `{ error: { code, message } }`).
 - [ ] Ativar uma versão **substitui** a ativa daquela chave/contexto; as versões antigas ficam disponíveis (histórico de versões).
 - [ ] A versão **ativa** é a única que o `zap` usa em runtime (ver H12.8); editar não afeta o ar até ativar.
@@ -87,7 +87,7 @@ Como **sistema (zap)**, quero renderizar e enviar qualquer template a partir da 
 - [ ] O transporte entende **texto + botões + mídia** de forma genérica (uma única abstração de mensagem do WhatsApp), independente da chave.
 - [ ] Cada módulo que envia (lembretes do ciclo, notificação ao cobrador, respostas do webhook, OTP) **monta o mapa de valores** e chama o renderizador; nenhum monta string própria.
 - [ ] Se a chave/contexto não tiver versão ativa, o envio falha de forma controlada (sem mandar mensagem quebrada) e fica registrado para o owner corrigir.
-- [ ] A troca do provider de WhatsApp (Baileys → Meta oficial) não muda os templates: o transporte é trocável atrás da mesma abstração (CLAUDE.md).
+- [ ] O provider de WhatsApp (Meta Cloud API) fica atrás da mesma abstração de transporte: trocar de provider não muda os templates (CLAUDE.md).
 
 ---
 
@@ -104,8 +104,8 @@ Como **owner**, quero uma tela que lista todas as mensagens do produto agrupadas
 ### H12.10: Famílias ainda sem editor 🟡
 Como **owner**, quero que as mensagens que hoje não têm chave editável sejam migradas para o mesmo modelo, para um dia editar tudo no mesmo lugar.
 *Critérios de aceite:*
-- [ ] 🟢 A família `convite.*`: o **resumo do aceite** (`convite.resumo`, botões aceitar/dado incorreto/recusar) **já é editável** no hub, sem depender da Meta (sai pelo Baileys). O convite inicial continua saindo por link `wa.me` que o criador compartilha (H5.1, por design); as demais respostas `convite.*` (pedir número, expirado, etc.) seguem como texto do fluxo e entram no editor quando precisarem.
-- [ ] 🟡 A família `conta.*` (OTP de login, boas-vindas) **ainda não tem editor**: o OTP é texto fixo no `zap` hoje (entregue por Baileys, não gated por Meta); na Fase 2 vira template editável.
+- [ ] 🟢 A família `convite.*`: o **resumo do aceite** (`convite.resumo`, botões aceitar/dado incorreto/recusar) **já é editável** no hub; o envio depende do template estar **aprovado na Meta** (gate por chave, ver Épico 5 H5.2). O convite inicial continua saindo por link `wa.me` que o criador compartilha (H5.1, por design); as demais respostas `convite.*` (pedir número, expirado, etc.) seguem como texto do fluxo e entram no editor quando precisarem.
+- [ ] 🟡 A família `conta.*`: o **OTP de login** já é um **template Meta** (categoria autenticação), com o mesmo modelo de submissão/aprovação por chave das demais famílias; falta ligar **boas-vindas** ao mesmo modelo (ainda planejado).
 - [ ] 🟡 Quando ligadas, essas famílias entram **na mesma tabela e no mesmo editor**, sem modelo paralelo.
 
 ---
@@ -114,8 +114,8 @@ Como **owner**, quero que as mensagens que hoje não têm chave editável sejam 
 
 > A consolidação de templates já foi feita no código (uma tabela, um editor, zap genérico). As divergências aqui são pontos a **confirmar/fechar** na fase de validação, não reescritas grandes.
 
-- **Aprovação manual (definitiva com Baileys):** o passo de "aprovar" (H12.5) é **manual**. Como o transporte é Baileys (número próprio), não há aprovação de template na Meta para substituí-lo: o passo manual é o modelo, não um stopgap. Só voltaria a ser a aprovação oficial se/quando migrar para a Meta.
-- **Famílias sem editor (`conta.*`):** `convite.resumo` já entrou no editor (Baileys); falta o `conta.*` (OTP/boas-vindas), hoje texto fixo no `zap`, que entra no mesmo modelo na Fase 2.
+- **Aprovação é a da Meta (não há passo manual separado):** o passo de "aprovar" (H12.5) é a própria aprovação da Meta. O owner **submete** a versão pelo painel (`/admin/mensagens/:id/submeter`); o `zap` cria/edita o template na WABA e o campo `status_meta` passa a refletir o veredito real (pendente, aprovado, rejeitado), via webhook e reconcile. Só uma versão com `status_meta='aprovado'` pode ser ativada.
+- **Famílias sem editor (`conta.*`):** `convite.resumo` já entrou no editor; o OTP (`conta.*`) também passou a ser um template Meta sujeito ao mesmo modelo de aprovação; falta só `boas-vindas`, que entra no mesmo modelo quando for ligado.
 - **Garantia de linguagem no editor:** as regras de ouro (palavras proibidas, travessão, gênero neutro) precisam ser **validadas ao salvar** o template, não só confiar no owner. Amarração com o Épico 13 (`contracts/linguagem.ts` / dicionário do front); confirmar se a validação roda no editor hoje.
 
 ### Decisões tomadas
@@ -127,7 +127,7 @@ Como **owner**, quero que as mensagens que hoje não têm chave editável sejam 
 - **Preview sem envio**, mesmo renderizador do envio real.
 - **zap genérico:** nenhuma string de negócio no código; carrega a versão ativa por chave/contexto e renderiza.
 - **Hub `/admin/templates` + editor `/admin/mensagens/:chave`**, área owner, dirigidos pelo catálogo.
-- **`convite.resumo` é editável** (Baileys); `conta.*` (OTP) entra no mesmo modelo na Fase 2. Nenhuma família depende da Meta.
+- **`convite.resumo` é editável** e sujeito ao gate de aprovação na Meta, como as demais chaves; `conta.*` (OTP) já segue o mesmo modelo (falta só `boas-vindas`).
 
 ### Decisões em aberto
 - Nenhuma pendente neste épico.
@@ -135,5 +135,5 @@ Como **owner**, quero que as mensagens que hoje não têm chave editável sejam 
 ### Fora de escopo deste épico
 - ❌ Textos finais de cada mensagem (copy): aqui é o **mecanismo** de edição, não o conteúdo.
 - ❌ Regras de linguagem/compliance em si (palavras proibidas, opt-out, gênero neutro): Épico 13.
-- ❌ Aprovação de template Meta oficial: só relevante numa futura migração para a Meta (o convite por botões já funciona via Baileys, Épico 5).
+- ❌ Critérios de revisão da Meta para aprovar um template: são definidos pela própria Meta, fora do controle deste épico (o convite por botões já funciona via Meta Cloud API, Épico 5).
 - ❌ Qual variável existe em cada chave (catálogo de conteúdo): é dado do catálogo, não história.

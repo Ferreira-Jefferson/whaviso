@@ -43,11 +43,11 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 
 ### H12.5 Versionamento e publicação — `[x]`
 - `[x]` Salvar cria nova versão; nasce `pendente`/`ativo=false` (`POST /admin/mensagens`).
-- `[x]` Passo de aprovação manual explícito (`POST /admin/mensagens/:id/aprovar`).
+- `[x]` Passo de aprovação explícito: `POST /admin/mensagens/:id/submeter` enfileira a versão para a Meta; `status_meta` reflete o veredito real (webhook/reconcile). Não existe mais `/aprovar` manual.
 - `[x]` Ativar exige aprovada (`409 template_nao_aprovado` senão).
 - `[x]` Ativar substitui a ativa da `(chave, contexto)` em transação; antigas ficam (histórico).
 - `[x]` zap usa só a ativa (`carregarTemplateAtivo … where ativo`).
-- `[~]` Divergência do épico: confirmar se a aprovação manual permanece quando voltar à Meta oficial (decisão de produto, não código agora). Ver Decisões em aberto.
+- `[x]` A aprovação (H12.5) é a própria aprovação da Meta por chave (`status_meta`), sem passo manual separado: ver Decisões em aberto (item resolvido).
 
 ### H12.6 Apagar versão (exceção de DELETE) — `[x]`
 - `[x]` DELETE físico de versão (`DELETE /admin/mensagens/:id`).
@@ -68,7 +68,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 - `[~]` "Sem versão ativa → falha controlada **e fica registrado para o owner corrigir**": parcial.
   - `enviar_lembretes`: marca `falhou` com motivo `sem_template_ativo` (registrado, owner vê em `/admin/envios`). OK.
   - `notificar_cobrador`: se não há template ativo, **silenciosamente não envia** e as linhas ficam `agendado` (gated, comentário no `index.ts`). **Não há registro visível ao owner** de que falta template. Trabalho: registrar (log estruturado sem PII + sinal no painel de envios/admin) quando uma chave usada não tem versão ativa.
-- `[x]` Troca Baileys→Meta não muda templates: transporte atrás de `ClienteWhats`.
+- `[x]` Transporte fica atrás de `ClienteWhats`: hoje é a Meta Cloud API; trocar de provider não mudaria os templates.
 
 ### H12.9 Hub de navegação — `[x]`
 - `[x]` Hub `/admin/templates` (`Templates.tsx`) com trilha do ciclo + famílias (cobrador, convite, respostas, conta).
@@ -77,13 +77,13 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 - `[~]` "Navegação reflete o catálogo (adicionar chave aparece no hub sem tela nova)": o hub é dirigido por `SECOES_MENSAGENS` (catálogo **estático do front**), não pelos templates do banco. Adicionar uma chave nova exige editar `catalogo_mensagens.ts` (1 entrada), não cria tela. Aceitável, mas a "fonte" do hub é o catálogo do front, não o backend — coerente com H12.1 `[~]`.
 
 ### H12.10 Famílias ainda sem editor 🟡 — `[x]`
-- `[x]` `convite.resumo` (resumo + 3 botões, H5.2): **agora editável** no hub (chave `convite.resumo`, variante padrão/revisão, botões aceitar/dado incorreto/recusar). Não depende mais da Meta: o resumo já sai pelo Baileys (`responderResumo`); a variável "quem recebe" foi padronizada de `nome_cobrador` para `cobrador` (migration 0063) para casar com a paleta do editor.
-- `[x]` `conta.*` (OTP): no hub como `fixo` (texto no zap, entregue por Baileys; vira template editável na Fase 2). `boas-vindas`: `planejado`.
-- `[x]` O estado `gated` ("Depende da Meta") saiu do catálogo: com Baileys (número próprio) nenhuma família depende de aprovação na Meta.
+- `[x]` `convite.resumo` (resumo + 3 botões, H5.2): **agora editável** no hub (chave `convite.resumo`, variante padrão/revisão, botões aceitar/dado incorreto/recusar). O envio depende de aprovação do template na Meta (gate por chave, como as demais); a variável "quem recebe" foi padronizada de `nome_cobrador` para `cobrador` (migration 0063) para casar com a paleta do editor.
+- `[x]` `conta.*` (OTP): já é um template Meta (categoria autenticação), sujeito ao mesmo modelo de submissão/aprovação por chave. `boas-vindas`: `planejado`.
+- `[x]` O estado `gated` ("Depende da Meta") saiu do catálogo estático por família: hoje o gate real é **por template aprovado/não aprovado por chave** (`template_meta_nao_aprovado`), o mesmo modelo para todas as famílias.
 - `[x]` Demais `convite.*` (pedir número, não encontrado, expirado, etc.) seguem como respostas fixas do fluxo; entram no editor se/quando precisarem (modelo já comporta).
 
-### Divergências do épico — fechamento
-- **Aprovação manual vs Meta:** decisão de produto, não código. Listada em aberto.
+### Divergências do épico, fechamento
+- **Aprovação é a da Meta, sem passo manual separado:** ver Decisões em aberto (item resolvido).
 - **Famílias sem editor:** corretamente gated; sem chave reservada no banco (entram quando ligar). OK.
 - **Garantia de linguagem no editor:** `[~]` validação ao salvar existe **só para palavras proibidas** (`lintLinguagem` no api + `CHECK` no banco + lint no front). **Não valida travessão (—) nem gênero**, que o épico (e E13) exigem amarrar. Trabalho: estender a validação (amarração com E13).
 
@@ -158,7 +158,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 
 O épico declara "Nenhuma pendente neste épico", mas a inspeção do código levanta duas escolhas de fechamento que a história lista como "confirmar":
 
-1. **Aprovação manual permanece com Meta oficial?** Hoje o passo "aprovar" (H12.5) é manual (herança de quando o transporte era Meta). Quando voltar à Meta oficial, a aprovação do template oficial pode substituir ou conviver com a aprovação manual. Decidir antes de migrar o transporte (não bloqueia o MVP).
+1. **Aprovação manual permanece com a Meta oficial? RESOLVIDO.** Não há mais passo manual: o antigo `/aprovar` saiu. O passo "aprovar" (H12.5) hoje É a aprovação da Meta: o owner submete a versão pelo painel (`/admin/mensagens/:id/submeter`), o `zap` cria/edita o template na WABA, e `status_meta` reflete o veredito real (webhook/reconcile). Só uma versão com `status_meta='aprovado'` pode ser ativada.
 2. **Catálogo de estrutura: front-only ou também no backend?** Hoje a "fonte única da estrutura" (chaves/variáveis/ações por chave) vive em `frontend/.../catalogo_mensagens.ts`; o backend valida só genericamente (Zod) e confia no que o front envia. Funciona, mas se outro cliente (ou o próprio zap) precisar da estrutura, ela não está server-side. Decidir se o catálogo deve subir para `@whaviso/shared`/tabela (fonte única real) ou se o front basta. Afeta H12.1 ("um catálogo da estrutura, fonte para o editor").
 
 Ambas são de produto/arquitetura, não bloqueiam o fechamento do MVP; sinalizo para não inventar a resposta.

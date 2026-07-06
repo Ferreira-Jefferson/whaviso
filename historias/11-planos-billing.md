@@ -188,4 +188,4 @@ Como **owner**, quero, no futuro, recorrência sem parecer pegadinha, para ter r
 - ❌ Gateway de pagamento, recarga automática, assinatura mensal, dunning (🟡, H11.13).
 - ❌ Textos finais das CTAs e da tela de créditos (entram com Templates/design).
 - ❌ Mecânica de cada recurso em si (recorrência, cadência, menu): definida nos Épicos 6, 7 e 8; aqui só o fato de serem universais e de cada ocorrência custar 1 envio.
-- ❌ Limites operacionais do canal WhatsApp/Baileys (capacidade de envio): restrição de transporte (Épico 10), não regra de crédito.
+- ❌ Limites operacionais do canal WhatsApp (Meta Cloud API, capacidade de envio): restrição de transporte (Épico 10), não regra de crédito.

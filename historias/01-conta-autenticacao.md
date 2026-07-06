@@ -1,7 +1,7 @@
 # Épico 1: Conta & Autenticação
 
 > Login **sem e-mail/senha**: **Google OAuth** e **WhatsApp** (código de acesso de 6 dígitos).
-> O canal WhatsApp já é viável agora via **Baileys**, então o fluxo todo é 🟢 MVP. O **Meta oficial** é só uma troca de transporte no futuro.
+> O canal WhatsApp é viável via **Meta Cloud API** (oficial), então o fluxo todo é 🟢 MVP.
 > Princípio: o número de WhatsApp é a identidade. O Whaviso envia um código de acesso no próprio WhatsApp e o usuário digita esse código para entrar ou se cadastrar.
 
 ---
@@ -33,7 +33,7 @@ Como **pessoa sem conta**, quero me cadastrar digitando o código que recebo no 
 - [ ] Informo um número que ainda não tem cadastro.
 - [ ] A tela confirma que o código verificador foi enviado para aquele WhatsApp, para confirmar o cadastro.
 - [ ] Recebo no WhatsApp a mensagem: *"Seu código de cadastro Whaviso é: «código em negrito». Caso não tenha solicitado, desconsidere esta mensagem."*
-- [ ] A mensagem de cadastro também pede para **salvar o contato do Whaviso**: como o número é próprio (Baileys), é por aqui que as mensagens seguintes (lembretes, avisos) vão chegar.
+- [ ] A mensagem de cadastro também pede para **salvar o contato do Whaviso**: como as mensagens seguintes (lembretes, avisos) chegam por esse mesmo número oficial, vale salvar o contato.
 - [ ] Ao digitar o código correto, a conta é criada e eu já acesso o sistema.
 - [ ] Nos acessos seguintes, esse número passa a receber a mensagem **de login** (H1.2), não a de cadastro.
 
@@ -83,4 +83,4 @@ Como **usuário logado**, quero permanecer logado entre visitas e poder sair, pa
 ### Fora de escopo deste épico (escopo negativo)
 - ❌ Cadastro/login por e-mail e senha (decisão de 2026-06-17).
 - ❌ Páginas de recuperação/troca de senha.
-- ❌ Migração para Meta oficial: é troca de transporte futura, o comportamento das histórias acima não muda.
+- ❌ Provedor de WhatsApp (Meta Cloud API): é escolha de transporte, o comportamento das histórias acima não depende dele.

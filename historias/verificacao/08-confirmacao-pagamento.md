@@ -67,7 +67,7 @@ Total de critérios avaliados: 40 (entre H8.1 e H8.9; H8.7 é 🟡 gated pela pr
 | Webhook HMAC, carrega `aviso_id`, valida telefone do alvo (profile/`telefone_cobrador`), senão ignora sem vazar | [x] | service.ts:42-55 parseia `acao:aviso_id`; repo.ts:474-482 roteia por `cobrador_profile_telefone` (com conta) / `telefone_cobrador` (sem) e ignora divergente | webhook/confirmacao_pagamento_e8.test.ts:71-121 |
 | Ação idempotente + só o último aviso age | [x] | repo.ts:487-488/506-507 (silencioso fora de `informado_pago`) | webhook/confirmacao_pagamento_e8.test.ts:124-136 |
 | CTA discreta de criar conta junto da confirmação (sem-conta) | [+] | NÃO existe. Só há `cobrador.pagamento_informado` contexto `padrao` (0023:18-27) com texto "confirme no painel"; sem variante sem-conta e sem CTA de criar conta. O comentário 0042:115-116 afirma que a CTA "fica no texto da própria notificação", mas o texto não a contém | (sem teste) |
-| Risco do canal: pode exigir fallback numerado | [~] | há fallback numerado para o CONVITE (service.ts:30-34, 238-243), mas NÃO para confirmar/rejeitar do cobrador; a própria história marca como risco/"pode exigir" | (sem teste) |
+| Fallback de resposta numerada como resiliência do canal | [~] | há fallback numerado para o CONVITE (service.ts:30-34, 238-243), mas NÃO para confirmar/rejeitar do cobrador; a própria história trata o fallback como resiliência geral, não como pendência | (sem teste) |
 
 ### H8.6: Reabrir um combinado pago por engano (pago → programado) 🟢
 
@@ -122,7 +122,7 @@ Total de critérios avaliados: 40 (entre H8.1 e H8.9; H8.7 é 🟡 gated pela pr
 - **Texto/canal das notificações ao cobrador** (incl. sem conta): linha 149 "❌ Texto, canal e janela das notificações ao cobrador (incl. cobrador sem conta) (Épico 10)." Por isso a wording exata fica no E10; a presença da CTA (item [+] acima) continua sendo critério da H8.5.
 - **Apresentação no painel** (`informado_pago`, fila de confirmação, progresso do recorrente): linha 150 "❌ ... aparecem no painel (Épico 9)." Daí o "quando informou" ser [~] e não [!].
 - **Empurrãozinho D+1 e parada do ciclo em si**: linha 151 "❌ ... (Épico 6)."
-- **Risco do canal Baileys/fallback** (H8.5 linha 69): a própria história diz "pode exigir fallback ... até a Meta oficial" — por isso a ausência de fallback numerado para confirmar/rejeitar do cobrador é [~], não [+].
+- **Fallback de resposta numerada** (H8.5 linha 69): a própria história trata o fallback como resiliência geral do canal, não como risco condicionado à Meta oficial; por isso a ausência de fallback numerado dedicado para confirmar/rejeitar do cobrador é [~], não [+].
 
 ## Observações
 

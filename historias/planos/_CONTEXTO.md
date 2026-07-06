@@ -14,7 +14,7 @@
 
 ## Layout do projeto (resumo)
 
-- `backend/` monorepo: `apps/api` (REST p/ SPA, :3001) · `apps/zap` (scheduler + webhook WhatsApp via Baileys, :3002) · `packages/shared` (`@whaviso/shared`) · `supabase/` (migrations+seed) · `scripts/`.
+- `backend/` monorepo: `apps/api` (REST p/ SPA, :3001) · `apps/zap` (scheduler + webhook WhatsApp via Meta Cloud API, :3002) · `packages/shared` (`@whaviso/shared`) · `supabase/` (migrations+seed) · `scripts/`.
 - `frontend/` SPA React 19 + Vite 7 + TS estrito + Tailwind v4, standalone, contratos Zod próprios, TanStack Query. **Não** importa `@whaviso/shared`.
 - Integração api↔zap só por **banco compartilhado + outbox** (`envios` p/ lembretes; `notificacoes_cobrador` p/ avisar cobrador), claim `FOR UPDATE SKIP LOCKED`, sem Redis. **Módulo nunca importa módulo** (lint barra).
 - Supabase = Postgres + Auth apenas (sem PostgREST p/ dados; RLS deny-all). Dados 100% via api. supabase-js só no login.
@@ -77,7 +77,7 @@ Transições novas a acrescentar (trigger no banco + app): `sem_aviso→{aguarda
 
 - E1: login WhatsApp por **botão** (UX melhor, mas Supabase não emite sessão de clique) **vs OTP por código** (Supabase emite JWT). Decidir antes de implementar.
 - E6 H6.10 cadência configurável e E8 H8.7 recorrência: **🟡 gated**, dependem de estudo de UX/modelagem. Plano deve separar o MVP (ciclo fixo D-2..D+1) do gated.
-- Risco de canal: botões interativos via Baileys podem ser instáveis → prever **fallback** (resposta numerada).
+- Resiliência de canal: além dos botões interativos oficiais da Meta, prever **fallback** (resposta numerada) como resiliência geral.
 
 ## Formato de saída de cada plano (`historias/planos/NN-<slug>.plano.md`)
 
