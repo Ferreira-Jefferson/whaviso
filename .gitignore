@@ -15,3 +15,4 @@ frontend/dist/
 .DS_Store
 # Graphify: mapa do codigo gerado (ferramenta de DEV, nao e dependencia do app).
 graphify-out/
+.claude/refs
