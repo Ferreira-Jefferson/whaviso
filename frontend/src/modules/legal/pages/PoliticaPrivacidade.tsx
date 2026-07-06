@@ -68,11 +68,13 @@ export default function PoliticaPrivacidadePage() {
         </Lista>
         <BaseLegal>execução de contrato (LGPD, art. 7º, V).</BaseLegal>
 
-        <Sub>2.4 Cookies e armazenamento local</Sub>
+        <Sub>2.4 Cookies e armazenamento no navegador</Sub>
         <P>
-          Usamos apenas o armazenamento necessário para manter você conectado (o token da sessão de
-          login, guardado no seu navegador). Não usamos cookies de publicidade nem ferramentas de
-          rastreamento de terceiros.
+          O Whaviso não usa cookies próprios nem ferramentas de análise, publicidade ou rastreamento
+          de terceiros. Para manter você conectado, guardamos apenas o token da sessão de login no
+          armazenamento local (localStorage) do seu navegador: ele fica no seu dispositivo, é
+          estritamente necessário para o serviço funcionar e é apagado quando você sai. O login com
+          Google pode gerar cookies no domínio do próprio Google, sob a política do Google.
         </P>
         <BaseLegal>
           legítimo interesse (LGPD, art. 7º, IX), estritamente necessário para o serviço funcionar.
