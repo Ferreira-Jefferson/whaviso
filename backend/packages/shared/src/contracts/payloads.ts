@@ -221,10 +221,10 @@ export const statusTelefoneResposta = z.object({
 export type StatusTelefoneResposta = z.infer<typeof statusTelefoneResposta>
 
 // ---- POST /v1/auth/verificar-sessao (autenticado; chamado logo após OTP login) ----
-// Detecta conta split (phone-only sem profile, mas com profile em outro user_id com
-// mesmo telefone) e retorna o magic_token para o frontend trocar a sessão. Casos:
-//   'ok': usuário phone existente (já tem profile) ou usuário Google, sem ação.
-//   'novo': phone-only sem match de profile, vai para onboarding.
+// Detecta conta split (conta phone recém-criada pelo OTP quando OUTRO user_id já é dono
+// daquele telefone) e retorna o magic_token para o frontend trocar a sessão. Casos:
+//   'ok': usuário Google (sem phone no JWT) ou phone user que já é dono do número, sem ação.
+//   'novo': número sem nenhuma outra conta dona dele, vai para onboarding.
 //   'mesclado': split detectado e resolvido, usar magic_token para trocar a sessão.
 export const verificarSessaoResposta = z.object({
   tipo: z.enum(['ok', 'novo', 'mesclado']),

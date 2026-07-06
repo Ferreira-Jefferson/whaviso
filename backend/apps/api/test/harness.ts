@@ -122,11 +122,16 @@ const envFake: EnvApi = {
 /**
  * App de teste com as rotas reais. `comoUsuario` define o uid autenticado;
  * requisição sem header `authorization` recebe 401 (mesma semântica do auth real).
+ * `phone` (E.164, opcional) simula o claim `phone` do JWT phone-OTP; o auth real
+ * o guarda SEM o '+' (comportamento do GoTrue), então o harness espelha isso.
  */
 export async function criarAppTeste(
   comoUsuario: string | null,
   admin: AdminSupabase | null = null,
+  phone: string | null = null,
 ) {
+  // Espelha o GoTrue: o claim `phone` do JWT vem sem o '+'.
+  const userPhone = phone ? phone.replace(/^\+/, '') : null
   const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>()
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
@@ -134,9 +139,11 @@ export async function criarAppTeste(
   app.decorate('pool', poolApi)
   app.decorate('env', envFake)
   app.decorate('adminSupabase', admin)
+  app.decorateRequest('userPhone', null)
   app.decorate('autenticar', async (req) => {
     if (!req.headers.authorization) throw naoAutorizado()
     req.userId = comoUsuario ?? ''
+    req.userPhone = userPhone
     await bloquearSeSuspenso(poolApi, req.userId)
   })
   // Sessão opcional: com Authorization vincula a conta; sem header, segue anônimo.

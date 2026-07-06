@@ -58,29 +58,37 @@ export const authRoutes: FastifyPluginAsync = async (raiz) => {
       schema: { response: { 200: verificarSessaoResposta } },
     },
     async (req) => {
-      const phone = req.userPhone
+      const phoneRaw = req.userPhone
 
       // Sessão Google (sem phone no JWT): nada a fazer.
-      if (!phone) return { tipo: 'ok' as const }
+      if (!phoneRaw) return { tipo: 'ok' as const }
 
-      // Verifica se já existe profile para este usuário (phone user legítimo).
-      const { rows: profileRows } = await app.pool.query<{ id: string }>(
-        `select id from public.profiles where id = $1`,
+      // O GoTrue guarda o telefone SEM o '+'; profiles.telefone é E.164 COM o '+'
+      // (constraint profiles_telefone_e164). Normaliza para as duas pontas casarem;
+      // sem isto o `where telefone = $1` abaixo nunca bate e o split some pro onboarding.
+      const phone = `+${phoneRaw.replace(/^\+/, '')}`
+
+      // O trigger handle_new_user cria um profile VAZIO (nome='', telefone=null) para TODO
+      // usuário novo em auth.users; logo a mera existência da linha NÃO distingue um phone
+      // user legítimo de uma conta phone recém-criada pelo OTP. O sinal certo é o próprio
+      // telefone: se ESTE usuário já é o dono do número, é login normal (sem split).
+      const { rows: selfRows } = await app.pool.query<{ telefone: string | null }>(
+        `select telefone from public.profiles where id = $1`,
         [req.userId],
       )
-      if (profileRows.length > 0) return { tipo: 'ok' as const }
+      if (selfRows[0]?.telefone === phone) return { tipo: 'ok' as const }
 
-      // Phone-only sem profile: procura outro usuário com mesmo telefone (conta Google).
+      // Procura OUTRA conta que já é dona deste telefone (a conta Google preexistente).
       const { rows: outroRows } = await app.pool.query<{ id: string }>(
         `select id from public.profiles where telefone = $1 and id <> $2`,
         [phone, req.userId],
       )
-      const googleUserId = outroRows[0]?.id
-      if (!googleUserId) return { tipo: 'novo' as const }
+      const contaExistente = outroRows[0]?.id
+      if (!contaExistente) return { tipo: 'novo' as const }
 
       // Split detectado. Sem admin key: trata como novo (onboarding).
       if (!app.adminSupabase) return { tipo: 'novo' as const }
-      const { magicToken } = await app.adminSupabase.mesclarContas(req.userId, googleUserId, phone)
+      const { magicToken } = await app.adminSupabase.mesclarContas(req.userId, contaExistente, phone)
 
       if (!magicToken) return { tipo: 'novo' as const }
 
