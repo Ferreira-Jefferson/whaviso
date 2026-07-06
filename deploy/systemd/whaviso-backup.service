@@ -1,0 +1,33 @@
+# whaviso: backup diario do banco Supabase cloud via pg_dump (plano FREE nao tem backup).
+# Disparado pelo whaviso-backup.timer. Instalar em /etc/systemd/system/whaviso-backup.service
+#
+# Roda como root porque precisa ler a env com a credencial do OWNER postgres (backup.env,
+# root:root 600) e escrever os dumps em /var/lib/whaviso. O script valida e gira os dumps;
+# ver deploy/scripts/backup-db.sh e a secao "Backups do banco" no deploy/README.md.
+[Unit]
+Description=whaviso: backup do banco Supabase (pg_dump)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# BACKUP_DATABASE_URL (owner postgres) + demais vars. root:root 600 (segredo alto).
+EnvironmentFile=/etc/whaviso/backup.env
+ExecStart=/opt/whaviso/app/deploy/scripts/backup-db.sh
+# Precisa ler a env do owner e escrever em /var/lib/whaviso: roda como root.
+User=root
+
+# ── Hardening (systemd sandbox) ──
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Unica area de escrita: o diretorio de backups (fora do checkout, persiste).
+ReadWritePaths=/var/lib/whaviso
+
+[Install]
+WantedBy=multi-user.target

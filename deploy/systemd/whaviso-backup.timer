@@ -1,0 +1,17 @@
+# whaviso: agenda o backup diario do banco. Instalar em /etc/systemd/system/whaviso-backup.timer
+# e habilitar:
+#   systemctl enable --now whaviso-backup.timer
+[Unit]
+Description=whaviso: agenda o backup diario do banco Supabase
+
+[Timer]
+# 1x/dia de madrugada (baixo trafego). O servidor roda em UTC (ver Fase 2 do README):
+# 06:20 UTC ~ 03:20 America/Sao_Paulo.
+OnCalendar=*-*-* 06:20:00
+# Espalha ate 20 min para nao bater sempre no mesmo minuto cravado.
+RandomizedDelaySec=20min
+# Se o VPS estava desligado na hora agendada, roda assim que voltar.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

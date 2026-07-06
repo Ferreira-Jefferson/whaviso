@@ -73,11 +73,17 @@ ufw status verbose   # so 22 + 80/443 das faixas Cloudflare; 3001/3002 fechadas 
 
 ---
 
-## 5. Validar a CSP e o login Google no site publicado  [depende do deploy do nginx]
+## 5. Validar a CSP e o login Google no site publicado  [depende do passo abaixo, NÃO é automático]
 
-A CSP foi endurecida para o Google Identity Services sem afrouxar. Precisa validar no ar.
+A CSP foi endurecida para o Google Identity Services sem afrouxar. **Importante: o `deploy.sh`/GitHub Action NUNCA toca no nginx** (só faz `git pull` + `npm ci` + build da SPA + restart de api/zap). Uma mudança em `deploy/nginx/whaviso.conf` só chega ao servidor com uma cópia manual.
 
+- [ ] Copiar o `whaviso.conf` atualizado para o servidor e recarregar:
+```bash
+cp /opt/whaviso/app/deploy/nginx/whaviso.conf /etc/nginx/sites-available/whaviso.conf
+nginx -t && systemctl reload nginx
+```
 - [ ] `curl -I https://whaviso.com` e conferir que o header `Content-Security-Policy` é o novo (com `https://accounts.google.com` em script-src/frame-src/connect-src e `object-src 'none'`).
+  > Achado em 2026-07-06: essa validação vai falhar até o bug de herança do `add_header` ser corrigido (as locations `= /index.html` e `/assets/` tinham `add_header` próprio, que cancela a herança dos headers do `server{}`). Já corrigido no código (headers repetidos nas duas locations, com comentário explicando o porquê); precisa estar na cópia que for para o servidor.
 - [ ] No navegador (DevTools > Console), fazer login com Google e confirmar ZERO violação de CSP e que o login funciona.
 - [ ] Se o GIS puxar algo de `www.gstatic.com` (alguns fluxos puxam), acrescentar `https://www.gstatic.com` ao `script-src`/`connect-src` e redeployar.
 
@@ -93,7 +99,7 @@ Itens do checklist de produção do Supabase que dependem do painel:
 - [ ] **Database > Settings > SSL**: habilitar SSL Enforcement.
 - [ ] **Network Restrictions**: limitar os IPs que acessam o banco, se viável com o pooler usado.
 - [ ] **MFA na conta Supabase** e ao menos 2 owners na organização (evita perda de acesso).
-- [ ] **PITR / backups** conforme o tamanho do banco.
+- [ ] **PITR** conforme o tamanho do banco (PITR/snapshots do Supabase seguem **indisponiveis no plano FREE**; so em planos pagos). Enquanto isso, o backup proprio abaixo (item 10) cobre o gap.
 - [ ] (Opcional) **CAPTCHA** nos fluxos de auth.
 
 ---
@@ -125,3 +131,17 @@ Registrados em [RISCOS-ACEITOS-E-DIFERIDOS.md](RISCOS-ACEITOS-E-DIFERIDOS.md), p
 - [ ] **API M2**: decisão de produto sobre o merge de conta por telefone não verificado.
 - [ ] **API L2**: fixar `algorithms` do JWT após confirmar o alg do JWKS do projeto.
 - [ ] (Qualidade) tornar os testes de integração do zap determinísticos quanto a timezone.
+
+---
+
+## 10. Backup próprio do banco (o gap de backup do plano FREE)  [depende do deploy trazer os arquivos]
+
+O plano FREE do Supabase **não tem backup nenhum** (sem PITR, sem snapshot). O gap agora tem solução **no código**: uma rotina de `pg_dump` diária rodando no VPS por systemd timer (dumps em `/var/lib/whaviso/backups`, formato custom, rotação de 14 dias). Detalhes e o passo a passo completo em [../../deploy/README.md](../../deploy/README.md), seção "Backups do banco".
+
+Passos manuais (resumo; o script `deploy/scripts/backup-db.sh` já vem no checkout após o deploy):
+- [ ] Descobrir a versão do Postgres do servidor (`select version();`) e, se for mais nova que o `postgresql-client` do VPS (o Ubuntu 24.04 traz o 16), instalar o client compatível pelo PGDG e apontar `PG_DUMP_BIN` para o binário versionado. Sem isso o dump falha com "server version mismatch".
+- [ ] Criar `/etc/whaviso/backup.env` a partir de `deploy/whaviso-backup.env.example`, com a `BACKUP_DATABASE_URL` do **owner `postgres`** (Session pooler 5432, **nunca** a 6543). Dono **root:root, modo 600** (mais restrito que api/zap.env: é a credencial do owner, acesso total).
+- [ ] Copiar as 2 units (`whaviso-backup.service` e `.timer`) para `/etc/systemd/system/`, `systemctl daemon-reload`, testar com `systemctl start whaviso-backup.service` (conferir `journalctl` + `ls -la /var/lib/whaviso/backups`) e habilitar com `systemctl enable --now whaviso-backup.timer`.
+- [ ] Guardar o procedimento de **restauração** (`deploy/scripts/restore-db.sh`) à mão: um backup que não se sabe restaurar é inútil.
+
+> O dump é **sensível** (telefones, Pix, hashes de token): diretório 700, arquivos 600. Se enviar para fora da máquina (`BACKUP_REMOTE_CMD`), o destino tem que ser privado e criptografado. **PITR segue indisponível no FREE**: esta rotina é a rede de proteção enquanto não houver plano pago.

@@ -33,6 +33,7 @@ Runbook para preparar o VPS do zero e deixar o sistema pronto para receber o pro
 - [systemd/whaviso-api.service](systemd/whaviso-api.service) , [systemd/whaviso-zap.service](systemd/whaviso-zap.service)
 - [whaviso-api.env.example](whaviso-api.env.example) (vira `/etc/whaviso/api.env`) , [whaviso-zap.env.example](whaviso-zap.env.example) (vira `/etc/whaviso/zap.env`)
 - [scripts/deploy.sh](scripts/deploy.sh) , [scripts/refresh-cloudflare-ips.sh](scripts/refresh-cloudflare-ips.sh)
+- [scripts/backup-db.sh](scripts/backup-db.sh) , [scripts/restore-db.sh](scripts/restore-db.sh) , [systemd/whaviso-backup.service](systemd/whaviso-backup.service) , [systemd/whaviso-backup.timer](systemd/whaviso-backup.timer) , [whaviso-backup.env.example](whaviso-backup.env.example) (vira `/etc/whaviso/backup.env`) , ver [Backups do banco](#backups-do-banco-plano-free-nao-tem-backup)
 
 ---
 
@@ -339,6 +340,89 @@ sudo rm -rf /var/www/whaviso && sudo mv /var/www/whaviso.old /var/www/whaviso
 ```
 
 Rollback do backend: `git checkout <sha-anterior>` em `/opt/whaviso/app` e rode o deploy de novo.
+
+---
+
+## Backups do banco (plano FREE nao tem backup)
+
+O plano FREE do Supabase NAO tem backup nenhum (sem PITR, sem snapshot automatico). Sem uma rotina propria, o banco de producao fica sem rede de protecao. Este kit inclui um backup diario proprio, de graca, rodando **no VPS** via `pg_dump` agendado por systemd timer. Os dumps ficam em `/var/lib/whaviso/backups` (fora do checkout, persiste entre deploys e reboots), em formato custom (`-Fc`), com rotacao (14 dias por padrao).
+
+O dump e **sensivel**: contem telefones, Pix e hashes de token. O script cria o diretorio 700 e os arquivos 600. Se mandar para fora da maquina (offsite via `BACKUP_REMOTE_CMD`), o destino tem que ser privado e idealmente criptografado.
+
+### Escopo do dump
+
+Dump **completo** do banco pelo owner `postgres` (o mais completo e restauravel). O dado critico e nao reconstruivel do whaviso vive em `public` (tabelas de negocio) e `auth` (usuarios do Supabase Auth), os unicos schemas que o whaviso usa (Supabase = Postgres + Auth, sem Storage/Realtime/Edge). Se algum dia o dump completo reclamar de um schema gerenciado do Supabase que o owner nao le por inteiro (raro; ex.: `vault`/`pgsodium`), limite o escopo com `BACKUP_PG_DUMP_ARGS="-n public -n auth"` no `backup.env`: isso ainda captura 100% do que e do whaviso. O owner e obrigatorio: os roles de app (`whaviso_api`/`whaviso_zap`) sao de privilegio minimo e nao leem tudo.
+
+### Ponto critico: versao do pg_dump
+
+O `pg_dump` **recusa** rodar se for mais VELHO que o servidor ("server version mismatch"). O Ubuntu 24.04 traz o `postgresql-client` 16; se o Supabase for Postgres 17+, o client 16 nao serve.
+
+1. Descubra a versao do servidor (do seu Windows ou do VPS, com a conn do owner):
+   ```bash
+   psql "postgresql://postgres.<ref>:<SENHA>@aws-0-<regiao>.pooler.supabase.com:5432/postgres" -Atc "select version();"
+   ```
+2. Instale o client compativel (>= a versao do servidor) pelo repositorio oficial PGDG:
+   ```bash
+   sudo apt install -y curl ca-certificates
+   sudo install -d /usr/share/postgresql-common/pgdg
+   sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+   . /etc/os-release
+   echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+   sudo apt update
+   sudo apt install -y postgresql-client-17     # troque 17 pela versao do servidor
+   ```
+   O binario fica em `/usr/lib/postgresql/17/bin/pg_dump`. Aponte `PG_DUMP_BIN` para ele no `backup.env`.
+
+### Conexao (pooler)
+
+Use o **Session pooler (IPv4, :5432)** ou a conexao **direta (IPv6)**, com a conn do owner `postgres`. **Nunca** o transaction pooler (:6543): ele nao suporta `pg_dump` direito. Ver o [Apendice A](#apendice-a-string-de-conexao-do-banco-ipv6-x-pooler-ipv4) sobre IPv6 x pooler.
+
+### Instalar
+
+O script `deploy/scripts/backup-db.sh` **ja vem no checkout** (`/opt/whaviso/app/...`). Falta so criar a env e instalar as 2 units:
+
+```bash
+# 1. Env (root:root 600, porque a conn do owner e altamente sensivel)
+cp /opt/whaviso/app/deploy/whaviso-backup.env.example /etc/whaviso/backup.env
+nano /etc/whaviso/backup.env     # BACKUP_DATABASE_URL (owner postgres, SESSION pooler 5432) + PG_DUMP_BIN
+chown root:root /etc/whaviso/backup.env
+chmod 600 /etc/whaviso/backup.env
+
+# 2. Units (o deploy.sh NAO instala systemd; e sempre copia manual)
+chmod +x /opt/whaviso/app/deploy/scripts/backup-db.sh /opt/whaviso/app/deploy/scripts/restore-db.sh
+cp /opt/whaviso/app/deploy/systemd/whaviso-backup.service /etc/systemd/system/
+cp /opt/whaviso/app/deploy/systemd/whaviso-backup.timer   /etc/systemd/system/
+systemctl daemon-reload
+
+# 3. Teste manual (roda o backup uma vez agora)
+systemctl start whaviso-backup.service
+journalctl -u whaviso-backup.service -n 40 --no-pager     # ver "backup OK"
+ls -la /var/lib/whaviso/backups                           # o .dump com permissao 600
+
+# 4. Habilita o timer diario
+systemctl enable --now whaviso-backup.timer
+systemctl list-timers whaviso-backup.timer --no-pager     # confere o proximo disparo
+```
+
+Se o teste (passo 3) falhar por "server version mismatch", volte ao "Ponto critico" acima, instale o client versionado e ajuste `PG_DUMP_BIN`.
+
+### Restaurar
+
+Um backup que voce nao sabe restaurar e inutil. O `deploy/scripts/restore-db.sh` faz o `pg_restore` correspondente ao formato custom. Por padrao ele so **previa** (mostra o indice do dump e o comando que rodaria) e NAO toca no banco; passe `--yes` para restaurar de verdade.
+
+```bash
+# previa (nao toca em nada): mostra o conteudo do dump
+/opt/whaviso/app/deploy/scripts/restore-db.sh /var/lib/whaviso/backups/whaviso-YYYYMMDD-HHMMSS.dump
+
+# restauracao real (DESTRUTIVA: --clean --if-exists derruba objetos existentes no destino)
+RESTORE_DATABASE_URL="postgresql://postgres.<ref>:<SENHA>@aws-0-<regiao>.pooler.supabase.com:5432/postgres" \
+  /opt/whaviso/app/deploy/scripts/restore-db.sh --yes /var/lib/whaviso/backups/whaviso-YYYYMMDD-HHMMSS.dump
+```
+
+Avisos:
+- Restaurar por cima do banco de **producao** e destrutivo. Se o objetivo e recuperar dados, restaure primeiro num projeto/banco **novo e limpo**, confira, e so entao promova.
+- Use o OWNER `postgres` no destino (`RESTORE_DATABASE_URL`), SESSION pooler (:5432) ou direta, NUNCA a 6543.
+- Para restaurar so parte, use `RESTORE_PG_RESTORE_ARGS` (ex.: `-n public` so o schema de negocio, ou `--data-only`). Veja o indice com a previa antes.
 
 ---
 
