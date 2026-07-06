@@ -15,7 +15,7 @@ import { onboardingSchema, codigoOtpSchema, paraE164, type OnboardingForm, type 
 // PATCH /perfil salva o telefone e o backfill de avisos acontece com segurança.
 export default function OnboardingPage() {
   const navigate = useNavigate()
-  const { status, profile, precisaOnboarding, role, recarregarPerfil } = useAuth()
+  const { status, profile, precisaOnboarding, role, recarregarPerfil, signOut } = useAuth()
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   // null = passo 1 (dados); string E.164 = passo 2 (código recebido no WhatsApp)
   const [telefoneVerificando, setTelefoneVerificando] = useState<string | null>(null)
@@ -123,6 +123,14 @@ export default function OnboardingPage() {
           >
             Usar outro número
           </button>
+
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="text-sm text-tinta-2 hover:text-salvia hover:underline"
+          >
+            Cancelar
+          </button>
         </form>
       </AuthCard>
     )
@@ -151,6 +159,16 @@ export default function OnboardingPage() {
         <Button type="submit" loading={formDados.formState.isSubmitting} className="w-full">
           Enviar código
         </Button>
+
+        {/* Cancelar o onboarding: sem completar o cadastro não há conta utilizável, então
+            cancelar encerra a sessão; ao deslogar, o guard desta página leva a /entrar. */}
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="text-sm text-tinta-2 hover:text-salvia hover:underline"
+        >
+          Cancelar
+        </button>
       </form>
     </AuthCard>
   )
