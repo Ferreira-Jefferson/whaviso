@@ -13,3 +13,12 @@ alter role whaviso_zap with password 'whaviso_zap_dev';
 -- O template de aviso ao COBRADOR ("pagamento informado") agora vive na tabela
 -- unificada `templates` (chave 'cobrador.pagamento_informado'), semeado pela
 -- migration 0023. Não há mais seed de templates_cobrador (tabela aposentada).
+
+-- APENAS TESTE/DEV: as migrations entregam os templates com status_meta='pendente'
+-- (a 0068 zerou as aprovações fantasmas da era Baileys; a aprovação real agora vem
+-- da Meta). Em PRODUÇÃO isso é o correto, e este seed NÃO roda lá (o db push pula o
+-- seed). Nos testes, porém, o drainer só envia template aprovado; aprovamos aqui os
+-- templates ativos para exercitar o caminho de envio. Os testes que verificam o gating
+-- de template não-aprovado (notificar_cobrador / notificar_billing) definem o
+-- status_meta que precisam no próprio setup, então não dependem deste default.
+update public.templates set status_meta = 'aprovado' where ativo and status_meta <> 'aprovado';

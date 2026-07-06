@@ -69,13 +69,16 @@ Nenhuma vai para o bundle de produção (a api e o zap rodam via `tsx`; o fronte
 
 ---
 
-## 4. Nota sobre os testes (para não assustar ao rodar `npm test`)
+## 4. Falha de CI investigada e corrigida (testes do ciclo x migration 0068)
 
-Ao rodar `npm test` no backend nesta máquina (Windows, timezone America/Sao_Paulo), 13 testes de integração do zap falham (drainer, webhook, créditos). Foi confirmado que são falhas PRÉ-EXISTENTES, NÃO causadas por esta rodada:
-- Elas falham identicamente com as migrations novas (0069/0070) removidas.
-- Nenhum dos arquivos de código exercitados por esses testes (`enviar_lembretes/*`, `webhook_whatsapp/*`, `shared/creditos/*`) foi modificado nesta rodada.
-- A causa é sensibilidade a relógio/timezone: o harness insere `agendado_para = new Date()` e a comparação `agendado_para <= now()` do claim depende do timezone da sessão do Postgres local (UTC-3 na máquina vs UTC no banco). O CI roda em UTC e passa.
+Ao commitar esta rodada, o gate do CI ficou vermelho em ~13 testes de integração do zap (drainer, webhook, créditos), com "expected 0 to be 1". Investigado a fundo (o gate já vinha vermelho no commit ANTERIOR, com os mesmos testes, logo NÃO é regressão desta rodada). Causa raiz:
 
-O único cluster de teste que ESTA rodada tocou (`hook_otp`) foi ajustado e passa (6/6, incluindo o novo teste anti-replay que trava a regra de frescor). A validação da migration `0070` foi feita direto na produção (cloud), confirmando que o `whaviso_zap` tem exatamente os privilégios de coluna certos.
+- A migration `0068_templates_reset_meta_sync` (parte da migração Baileys -> Meta) zera as aprovações fantasmas: deixa todos os templates com `status_meta='pendente'`, porque a aprovação real agora vem da Meta (que ainda está sendo configurada). Em PRODUÇÃO isso é o correto.
+- O drainer (`enviar_lembretes/index.ts`) corretamente NÃO envia template com `status_meta != 'aprovado'` (devolve "aguardando template"), então `processarEnviosDevidos` retorna 0.
+- Os testes de integração (`enviar_lembretes`, `ciclo_horario`, `cadastro_pix_e14`, `interacao_devedor`, `creditos_disparo`) foram escritos quando os templates vinham 'aprovado' e NÃO aprovam o template no próprio setup, então recebiam 0 e falhavam. Bug de setup de teste desatualizado, não de produto.
 
-Sugestão (fora do escopo desta rodada): tornar os testes do drainer determinísticos quanto ao tempo (fixar o clock, ou setar o timezone da sessão de teste para UTC via a connection string do teste), para eles passarem localmente também.
+Correção aplicada (test-only, sem tocar produção): `backend/supabase/seed.sql` agora aprova os templates ativos (`update templates set status_meta='aprovado' where ativo`). O seed roda no `validate_migrations` (local) e no bootstrap do CI, mas o `db push` NÃO roda o seed, então a produção continua corretamente com os templates 'pendente' até a aprovação real na Meta. Os testes que verificam o gating de template não-aprovado (`notificar_cobrador`/`notificar_billing`) definem o `status_meta` que precisam no próprio setup, então não dependem deste default. Depois do fix, a suíte completa passa (api 175, zap 200, shared 42; zero falhas).
+
+Nota: a origem do `status_meta='aprovado'` que existia em produção NÃO foi um teste tocando o banco de produção (os testes rodam só no `whaviso_dev` local) nem uma migration "de teste" vazada. Foi resíduo legítimo da era Baileys: os templates eram inseridos como 'aprovado' (ver comentário na migration 0048) e o painel antigo "aprovava" gravando `status_meta='aprovado'` direto no banco (ver comentário na 0066). A 0068 é a reversão correta desse estado para o modelo da Meta.
+
+O cluster `hook_otp` (o único que ESTA rodada de fato tocou, por causa do frescor de timestamp) foi ajustado à parte e passa 6/6, incluindo o novo teste anti-replay. A validação da migration `0070` foi feita direto na produção (cloud), confirmando que o `whaviso_zap` tem exatamente os privilégios de coluna certos.
