@@ -17,8 +17,11 @@ alter role whaviso_zap with password 'whaviso_zap_dev';
 -- APENAS TESTE/DEV: as migrations entregam os templates com status_meta='pendente'
 -- (a 0068 zerou as aprovações fantasmas da era Baileys; a aprovação real agora vem
 -- da Meta). Em PRODUÇÃO isso é o correto, e este seed NÃO roda lá (o db push pula o
--- seed). Nos testes, porém, o drainer só envia template aprovado; aprovamos aqui os
--- templates ativos para exercitar o caminho de envio. Os testes que verificam o gating
--- de template não-aprovado (notificar_cobrador / notificar_billing) definem o
--- status_meta que precisam no próprio setup, então não dependem deste default.
-update public.templates set status_meta = 'aprovado' where ativo and status_meta <> 'aprovado';
+-- seed). Nos testes, o drainer do CICLO (tabela `envios`) só envia template aprovado;
+-- aprovamos aqui SÓ os templates do ciclo para exercitar o caminho de envio.
+-- Escopo restrito a 'ciclo.%' de propósito: as notificações (tabela `notificacoes_cobrador`)
+-- são drenadas GLOBALMENTE, então aprovar `cobrador.*`/`devedor.*` aqui faria uma notificação
+-- residual de um teste virar enviável e poluir o dreno de outro (ex.: o gating do
+-- notificar_cobrador). Os testes de notificação aprovam o template que precisam no próprio
+-- setup, de forma local e revertida no fim (ver cadastro_pix_e14 / notificar_*).
+update public.templates set status_meta = 'aprovado' where ativo and chave like 'ciclo.%' and status_meta <> 'aprovado';

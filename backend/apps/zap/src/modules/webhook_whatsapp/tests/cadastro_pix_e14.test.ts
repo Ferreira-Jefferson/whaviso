@@ -2,7 +2,7 @@
 // (Gatilho A, com a notificação de aceite SEGURADA), pedido pelo devedor (Gatilho B),
 // wizard etapa a etapa, corrigir anterior, finalização (grava chave + snapshot + notifica
 // devedor), botão no lembrete e idempotência. Integração com whaviso_dev.
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { processarBotao, processarTexto } from '../service'
 import { processarEnviosDevidos } from '../../enviar_lembretes'
@@ -20,7 +20,25 @@ const TEL_COBRADOR = '+5511960002222'
 const TEL_DEVEDOR = '+5511970001111'
 const FUTURO = '2026-12-15'
 
+// A notificação ao devedor (devedor.pix_chave_recebida) é enviada por template Meta, que a
+// migration 0068 deixa 'pendente' (aprovação real vem da Meta). Aprovamos SÓ durante este
+// arquivo para exercitar o envio, e revertemos no fim para não vazar aprovação a outros
+// testes que drenam `notificacoes_cobrador` (o dreno é global; ver seed.sql).
+async function aprovarPixChaveRecebida(aprovado: boolean): Promise<void> {
+  await poolSuper.query(
+    `update public.templates
+        set status_meta=(case when $1 then 'aprovado' else 'pendente' end)::status_meta_template
+      where chave='devedor.pix_chave_recebida'`,
+    [aprovado],
+  )
+}
+
+beforeAll(async () => {
+  await aprovarPixChaveRecebida(true)
+})
+
 afterAll(async () => {
+  await aprovarPixChaveRecebida(false)
   await encerrarPools()
 })
 
