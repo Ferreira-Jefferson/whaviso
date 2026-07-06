@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Button, Field, Input, Banner } from '@/shared/ui'
 import { enviarCodigoWhatsapp, verificarCodigoWhatsapp, completarMesclagem } from '@/shared/supabase'
-import { mensagemDeErroAuth, statusTelefone, verificarSessao } from '@/shared/auth'
+import { mensagemDeErroAuth, nextSeguro, statusTelefone, verificarSessao } from '@/shared/auth'
 import { AuthCard } from '../components/AuthCard'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import {
@@ -25,7 +25,7 @@ const WHATSAPP_LOGIN_ATIVO = true
 export default function LoginPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const next = params.get('next')
+  const next = nextSeguro(params.get('next'))
   // Quem chega pelos botões de "Criar conta" traz ?modo=cadastro: muda só a copy
   // do passo 1 (cadastrar x entrar). O passo 2 do OTP decide login/cadastro pelo
   // status real do número, então não depende disso.

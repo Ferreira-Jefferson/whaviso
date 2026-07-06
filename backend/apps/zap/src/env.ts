@@ -2,6 +2,10 @@ import { z } from 'zod'
 
 export const envSchema = z.object({
   PORT: z.coerce.number().int().default(3002),
+  // Bind em loopback por padrão (defesa em profundidade): o nginx do mesmo host faz proxy
+  // p/ 127.0.0.1:3002, então o zap não precisa escutar em 0.0.0.0. Configurável (ZAP_HOST)
+  // caso um dia rode com proxy remoto; o default 127.0.0.1 aceita normalmente o curl local.
+  HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().min(1, 'string de conexão do pooler (user whaviso_zap)'),
   SCHEDULER_INTERVAL_MS: z.coerce.number().int().min(1000).default(30_000),
   LOG_LEVEL: z.string().default('info'),

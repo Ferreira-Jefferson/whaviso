@@ -25,7 +25,12 @@ export const supabase = createClient(url, publishableKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // Nenhum fluxo de auth aqui depende de token na URL: Google usa
+    // signInWithIdToken (GIS devolve o id_token direto, sem redirect),
+    // WhatsApp usa OTP (verifyOtp), e o merge usa o token_hash vindo no CORPO
+    // da resposta de /auth/verificar-sessao. Desligar reduz a superfície: o
+    // cliente não processa tokens vindos no fragmento da URL.
+    detectSessionInUrl: false,
   },
 })
 

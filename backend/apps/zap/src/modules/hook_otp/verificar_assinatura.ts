@@ -11,6 +11,11 @@ interface CabecalhosWebhook {
   assinatura: string | undefined
 }
 
+// Tolerância de frescor do webhook-timestamp (padrão Standard Webhooks): rejeita fora
+// de +-5 min, cortando replay de um payload assinado capturado (o timestamp entra no
+// conteúdo assinado, então não pode ser adulterado sem invalidar a assinatura).
+const TOLERANCIA_TIMESTAMP_S = 5 * 60
+
 function chaveDoSegredo(secret: string): Buffer {
   const base64 = secret.replace(/^v1,/, '').replace(/^whsec_/, '')
   return Buffer.from(base64, 'base64')
@@ -31,6 +36,12 @@ export function assinaturaValida(
   secret: string,
 ): boolean {
   if (!cab.id || !cab.timestamp || !cab.assinatura) return false
+
+  // Frescor: o timestamp (Unix em segundos) precisa estar dentro da janela de tolerância.
+  const ts = Number(cab.timestamp)
+  if (!Number.isFinite(ts)) return false
+  const agoraS = Math.floor(Date.now() / 1000)
+  if (Math.abs(agoraS - ts) > TOLERANCIA_TIMESTAMP_S) return false
 
   const conteudo = `${cab.id}.${cab.timestamp}.${rawBody.toString('utf8')}`
   const esperado = createHmac('sha256', chaveDoSegredo(secret)).update(conteudo).digest('base64')

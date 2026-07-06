@@ -14,6 +14,7 @@ import { iniciarScheduler } from './scheduler'
 // Fonte única local: o .env da raiz traz vars prefixadas por serviço (ZAP_*).
 // Em prod o host pode definir PORT/DATABASE_URL direto; o alias só preenche se faltarem.
 if (process.env.ZAP_PORT && !process.env.PORT) process.env.PORT = process.env.ZAP_PORT
+if (process.env.ZAP_HOST && !process.env.HOST) process.env.HOST = process.env.ZAP_HOST
 if (process.env.ZAP_DATABASE_URL && !process.env.DATABASE_URL)
   process.env.DATABASE_URL = process.env.ZAP_DATABASE_URL
 // O .env único traz APP_URL (origem do SPA, sem prefixo): reaproveita para a CTA de
@@ -100,4 +101,5 @@ const encerrar = async () => {
 process.on('SIGINT', () => void encerrar())
 process.on('SIGTERM', () => void encerrar())
 
-await app.listen({ port: env.PORT, host: '0.0.0.0' })
+// Bind em loopback por padrão (nginx faz proxy p/ 127.0.0.1:3002); configurável por ZAP_HOST.
+await app.listen({ port: env.PORT, host: env.HOST })

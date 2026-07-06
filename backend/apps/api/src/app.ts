@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import rateLimit from '@fastify/rate-limit'
 import cors from '@fastify/cors'
+import helmet from '@fastify/helmet'
 import {
   serializerCompiler,
   validatorCompiler,
@@ -36,7 +37,13 @@ export interface DepsApi {
 export async function criarApp(deps: DepsApi) {
   const app = Fastify({
     loggerInstance: deps.logger,
-    trustProxy: true,
+    // Só confia no proxy do loopback: a api binda em 127.0.0.1 e o nginx (mesmo host)
+    // faz o proxy pelo loopback, anexando o IP real do cliente ao final do X-Forwarded-For
+    // (via $proxy_add_x_forwarded_for; o IP real já vem do CF-Connecting-IP resolvido pelo
+    // real_ip do nginx). Com 'loopback', req.ip volta a ser esse IP real (último hop não
+    // confiável do XFF), restaurando o rate-limit por IP. 'true' confiaria na cadeia toda,
+    // deixando o cliente forjar o IP e burlar o limite.
+    trustProxy: 'loopback',
   }).withTypeProvider<ZodTypeProvider>()
 
   app.setValidatorCompiler(validatorCompiler)
@@ -52,7 +59,21 @@ export async function criarApp(deps: DepsApi) {
       : null,
   )
 
-  await app.register(cors, { origin: deps.env.APP_URL, credentials: true })
+  // Cabeçalhos de segurança mínimos p/ API JSON: nosniff, frameguard DENY, no-referrer.
+  // Sem CSP aqui (a api só devolve JSON; a CSP da SPA vive no nginx). COEP/CORP desligados
+  // p/ não interferir no consumo por XHR/fetch da SPA.
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    // HSTS é do edge (nginx/Cloudflare já mandam em api.whaviso.com); não duplicar aqui.
+    hsts: false,
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'no-referrer' },
+  })
+  // Auth é 100% via header Authorization: Bearer (não cookie), então CSRF não se aplica
+  // e credentials seria inútil. origin restrito à origem única do APP_URL.
+  await app.register(cors, { origin: deps.env.APP_URL })
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
   await app.register(authPlugin, { supabaseUrl: deps.env.SUPABASE_URL, pool: deps.pool })
 

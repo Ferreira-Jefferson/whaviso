@@ -1,5 +1,10 @@
 import fp from 'fastify-plugin'
-import type { FastifyPluginAsync, FastifyRequest, preHandlerHookHandler } from 'fastify'
+import type {
+  FastifyPluginAsync,
+  FastifyReply,
+  FastifyRequest,
+  preHandlerHookHandler,
+} from 'fastify'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import type { Pool } from '@whaviso/shared/db'
 import type { RoleUsuario } from '@whaviso/shared/contracts'
@@ -51,7 +56,11 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
     const header = req.headers.authorization
     if (!header?.startsWith('Bearer ')) throw naoAutorizado()
     try {
-      const { payload } = await jwtVerify(header.slice('Bearer '.length), jwks, { issuer })
+      const { payload } = await jwtVerify(header.slice('Bearer '.length), jwks, {
+        issuer,
+        // Supabase sempre emite tokens de usuário com aud=authenticated.
+        audience: 'authenticated',
+      })
       if (!payload.sub) throw new Error('sem sub')
       req.userId = payload.sub
       req.userPhone = typeof payload.phone === 'string' ? payload.phone : null
@@ -60,9 +69,11 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
     }
   }
 
-  app.decorate('autenticar', async (req: FastifyRequest) => {
+  app.decorate('autenticar', async (req: FastifyRequest, reply: FastifyReply) => {
     await verificar(req)
     await bloquearSeSuspenso(opcoes.pool, req.userId)
+    // Resposta autenticada carrega dados de conta: nunca cachear (proxy/browser).
+    reply.header('cache-control', 'no-store')
   })
 
   // Sessão opcional: usado por rotas públicas que VINCULAM a conta quando há login
@@ -71,7 +82,10 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
     const header = req.headers.authorization
     if (!header?.startsWith('Bearer ')) return
     try {
-      const { payload } = await jwtVerify(header.slice('Bearer '.length), jwks, { issuer })
+      const { payload } = await jwtVerify(header.slice('Bearer '.length), jwks, {
+        issuer,
+        audience: 'authenticated',
+      })
       if (payload.sub) {
         req.userId = payload.sub
         await bloquearSeSuspenso(opcoes.pool, req.userId)
@@ -82,7 +96,7 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
   })
 
   app.decorate('requireRole', (role: RoleUsuario) => {
-    return async (req: FastifyRequest) => {
+    return async (req: FastifyRequest, reply: FastifyReply) => {
       await verificar(req)
       const { rows } = await opcoes.pool.query<{ role: RoleUsuario; suspenso: boolean }>(
         'select role, suspenso from public.profiles where id = $1',
@@ -92,6 +106,7 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
         throw new HttpError(403, 'conta_suspensa', 'Conta suspensa; contate o administrador.')
       }
       if (rows[0]?.role !== role) throw proibido()
+      reply.header('cache-control', 'no-store')
     }
   })
 }

@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^10.0.0",
     "@whaviso/shared": "*",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.0",

@@ -63,12 +63,17 @@ export const perfilRoutes: FastifyPluginAsync = async (raiz) => {
     '/perfil',
     { preHandler: app.autenticar, schema: { body: atualizarPerfilBody, response: { 200: perfilSchema } } },
     async (req) => {
+      // Whitelist explícita de colunas editáveis: o nome da coluna nunca vem do body cru
+      // (evita mass-assignment / injeção de coluna se o schema mudar). Mesmo padrão de
+      // avisos/service.ts (camposEditados).
+      const COLS_EDITAVEIS = ['nome', 'telefone'] as const
       const campos: string[] = []
       const valores: unknown[] = [req.userId]
-      for (const [k, v] of Object.entries(req.body)) {
+      for (const coluna of COLS_EDITAVEIS) {
+        const v = req.body[coluna]
         if (v === undefined) continue
         valores.push(v)
-        campos.push(`${k} = $${valores.length}`)
+        campos.push(`${coluna} = $${valores.length}`)
       }
       const { telefone } = req.body
       return comTransacao(app.pool, async (cli) => {

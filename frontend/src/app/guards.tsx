@@ -5,7 +5,7 @@
 //   owner acessa tudo; perfil incompleto → /onboarding.
 import type { ReactNode } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router'
-import { useAuth, homeDoPapel, useTemVinculoDevedor } from '@/shared/auth'
+import { useAuth, homeDoPapel, nextSeguro, useTemVinculoDevedor } from '@/shared/auth'
 import { Spinner } from '@/shared/ui'
 import type { RoleUsuario } from '@/shared/contracts'
 
@@ -45,7 +45,7 @@ export function RedirectSeLogado({ children }: { children: ReactNode }) {
 
   if (status === 'logado') {
     if (precisaOnboarding) return <Navigate to="/onboarding" replace />
-    const next = params.get('next')
+    const next = nextSeguro(params.get('next'))
     return <Navigate to={next || homeDoPapel(role)} replace />
   }
   // 'carregando' ou 'deslogado': renderiza a página pública (sem splash, para

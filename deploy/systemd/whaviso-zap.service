@@ -14,7 +14,7 @@ Type=simple
 User=whaviso
 Group=whaviso
 WorkingDirectory=/opt/whaviso/app/backend/apps/zap
-EnvironmentFile=/etc/whaviso/whaviso.env
+EnvironmentFile=/etc/whaviso/zap.env
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/env npm run start
 Restart=on-failure

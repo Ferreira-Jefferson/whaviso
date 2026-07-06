@@ -52,7 +52,13 @@ export function tratadorDeErros(
     return
   }
 
-  req.log.error({ err: erro }, 'erro não tratado')
+  // Loga só message/code/name, nunca o objeto de erro inteiro: erros do pg carregam
+  // props próprias (detail, where, internalQuery...) que a redaction por PATH do pino
+  // não cobre e podem echoar dado sensível. A resposta ao cliente segue genérica.
+  req.log.error(
+    { err_message: erro.message, err_code: erro.code, err_name: erro.name },
+    'erro não tratado',
+  )
   void reply.status(500).send({
     error: { code: 'erro_interno', message: 'Erro interno' },
   })

@@ -3,6 +3,7 @@
 // phone_id válidos. O inbound (botões/texto/recibos de status) chega por WEBHOOK HTTP,
 // montado por montarRotaWebhook; o cliente só DESPACHA aos handlers que o app-root ligou
 // (onBotao/onTexto/onStatus). A regra de negócio segue no módulo webhook_whatsapp.
+import { createHash, timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import type { Logger } from '@whaviso/shared/logger'
 import type { Pool } from '@whaviso/shared/db'
@@ -33,6 +34,21 @@ export interface DepsClienteMeta {
 }
 
 const TIPO_MIDIA = { imagem: 'image', video: 'video', audio: 'audio', documento: 'document' } as const
+
+// Corpo do webhook da Meta é pequeno (poucos KB); 128KB cobre com folga e barra corpos
+// gigantes de flood antes de bufferizar e computar HMAC. Ver ACHADO 4 da auditoria.
+const WEBHOOK_BODY_LIMIT = 128 * 1024
+
+/**
+ * Compara dois segredos em tempo constante (hasheia ambos p/ 32 bytes fixos e usa
+ * timingSafeEqual), evitando vazar o verify token por timing no handshake do webhook.
+ * Mesmo cuidado já aplicado à assinatura em verificar_assinatura.ts.
+ */
+function segredoConfere(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a, 'utf8').digest()
+  const hb = createHash('sha256').update(b, 'utf8').digest()
+  return timingSafeEqual(ha, hb)
+}
 
 /** Traduz a MensagemWhats no body do Graph: template, interactive, mídia ou texto. */
 export function montarBody(m: MensagemWhats): Record<string, unknown> {
@@ -164,21 +180,30 @@ export function criarClienteMeta(opcoes: OpcoesMeta, deps: DepsClienteMeta): Cli
     // Handshake de verificação (Meta valida a URL ecoando o challenge).
     app.get('/webhook/whatsapp', async (req, reply) => {
       const q = req.query as Record<string, string | undefined>
-      if (q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === opcoes.verifyToken) {
+      const token = q['hub.verify_token']
+      if (q['hub.mode'] === 'subscribe' && token && segredoConfere(token, opcoes.verifyToken)) {
         return reply.type('text/plain').send(q['hub.challenge'] ?? '')
       }
       return reply.status(403).send()
     })
     // Eventos: valida assinatura -> 200 imediato -> processa em background.
-    app.post('/webhook/whatsapp', async (req, reply) => {
-      const rawBody = (req as { rawBody?: Buffer }).rawBody
-      const assinatura = req.headers['x-hub-signature-256'] as string | undefined
-      if (!rawBody || !assinaturaMetaValida(rawBody, assinatura, opcoes.appSecret)) {
-        return reply.status(401).send()
-      }
-      void processarWebhook(rawBody)
-      return reply.status(200).send()
-    })
+    // bodyLimit apertado (corpo da Meta é pequeno) e rate limit por IP mais generoso que o
+    // global: a Meta pode entregar em rajada legítima e 429 forçaria reentrega (pior).
+    app.post(
+      '/webhook/whatsapp',
+      { bodyLimit: WEBHOOK_BODY_LIMIT, config: { rateLimit: { max: 600, timeWindow: '1 minute' } } },
+      async (req, reply) => {
+        const assinatura = req.headers['x-hub-signature-256'] as string | undefined
+        // Rejeita cedo o que nem traz assinatura (flood sem header): não toca no rawBody.
+        if (!assinatura) return reply.status(401).send()
+        const rawBody = (req as { rawBody?: Buffer }).rawBody
+        if (!rawBody || !assinaturaMetaValida(rawBody, assinatura, opcoes.appSecret)) {
+          return reply.status(401).send()
+        }
+        void processarWebhook(rawBody)
+        return reply.status(200).send()
+      },
+    )
   }
 
   return {

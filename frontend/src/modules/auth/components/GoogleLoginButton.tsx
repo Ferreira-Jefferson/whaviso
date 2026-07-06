@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Button } from '@/shared/ui'
 import { signInWithGoogleIdToken } from '@/shared/supabase'
-import { mensagemDeErroAuth } from '@/shared/auth'
+import { mensagemDeErroAuth, nextSeguro } from '@/shared/auth'
 
 // Login com Google via Google Identity Services (GIS): o consentimento roda na NOSSA
 // origem e devolve um id_token (sem redirect pro supabase.co), que entregamos ao
@@ -90,7 +90,7 @@ function IconeGoogle() {
 export function GoogleLoginButton({ onErro }: { onErro: (msg: string) => void }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const next = params.get('next')
+  const next = nextSeguro(params.get('next'))
   const moldura = useRef<HTMLDivElement>(null)
   const alvoGis = useRef<HTMLDivElement>(null)
 

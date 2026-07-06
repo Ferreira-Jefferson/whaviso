@@ -287,6 +287,7 @@ export function clienteWhatsFake(
 export function envZapFake(over: Partial<EnvZap> = {}): EnvZap {
   return {
     PORT: 0,
+    HOST: '127.0.0.1',
     DATABASE_URL: 'x',
     SCHEDULER_INTERVAL_MS: 30_000,
     LOG_LEVEL: 'silent',

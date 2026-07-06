@@ -85,6 +85,14 @@ jobs:
           psql -v ON_ERROR_STOP=1 -q -d whaviso_dev -f backend/supabase/seed.sql
           echo ">> banco whaviso_dev pronto"
 
+      - name: Cobertura de RLS (defesa em profundidade)
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: whaviso_dev
+        run: bash backend/scripts/check_rls_coverage.sh whaviso_dev
+
       - name: Backend, instalar dependencias
         working-directory: backend
         run: npm ci

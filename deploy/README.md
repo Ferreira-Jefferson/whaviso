@@ -31,7 +31,7 @@ Runbook para preparar o VPS do zero e deixar o sistema pronto para receber o pro
 
 - [nginx/whaviso-http.conf](nginx/whaviso-http.conf) , [nginx/whaviso.conf](nginx/whaviso.conf)
 - [systemd/whaviso-api.service](systemd/whaviso-api.service) , [systemd/whaviso-zap.service](systemd/whaviso-zap.service)
-- [whaviso.env.example](whaviso.env.example) (vira `/etc/whaviso/whaviso.env`)
+- [whaviso-api.env.example](whaviso-api.env.example) (vira `/etc/whaviso/api.env`) , [whaviso-zap.env.example](whaviso-zap.env.example) (vira `/etc/whaviso/zap.env`)
 - [scripts/deploy.sh](scripts/deploy.sh) , [scripts/refresh-cloudflare-ips.sh](scripts/refresh-cloudflare-ips.sh)
 
 ---
@@ -40,7 +40,7 @@ Runbook para preparar o VPS do zero e deixar o sistema pronto para receber o pro
 
 - IP do VPS (painel da Hostinger) e a senha/credencial de root do primeiro acesso.
 - Sua chave SSH publica (no Windows): `Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub`. Se nao tiver, crie: `ssh-keygen -t ed25519`.
-- O arquivo `secrets/production.env` do repo (esta no seu Windows; e **gitignored**, entao **nao** vem no clone). Dele saem os segredos do `/etc/whaviso/whaviso.env`.
+- O arquivo `secrets/production.env` do repo (esta no seu Windows; e **gitignored**, entao **nao** vem no clone). Dele saem os segredos dos `/etc/whaviso/api.env` e `/etc/whaviso/zap.env`.
 - Acesso ao painel da Cloudflare (dominio `.com` ja esta la) e ao painel da registro.br (`.com.br`).
 
 ---
@@ -217,18 +217,22 @@ ssh -o StrictHostKeyChecking=accept-new -T git@github.com   # aceita o host (ok 
 git clone git@github.com:Ferreira-Jefferson/whaviso.git /opt/whaviso/app
 ```
 
-### 6a. Env de producao do servidor (`/etc/whaviso/whaviso.env`)
+### 6a. Env de producao do servidor (dois arquivos, um por servico)
+
+Cada servico le SO os seus segredos: a api em `/etc/whaviso/api.env`, o zap em `/etc/whaviso/zap.env`. Separar evita que um processo carregue no ambiente os segredos do outro (comprometer a api nao expoe a conn string do `whaviso_zap` nem os `META_*`, e vice-versa).
 
 ```bash
-cp /opt/whaviso/app/deploy/whaviso.env.example /etc/whaviso/whaviso.env
-nano /etc/whaviso/whaviso.env
+cp /opt/whaviso/app/deploy/whaviso-api.env.example /etc/whaviso/api.env
+cp /opt/whaviso/app/deploy/whaviso-zap.env.example /etc/whaviso/zap.env
+nano /etc/whaviso/api.env    # API_DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+nano /etc/whaviso/zap.env    # ZAP_DATABASE_URL, META_*, SUPABASE_SERVICE_ROLE_KEY, (SEND_CODE_HOOK_SECRET)
 ```
 
-Preencha os segredos **copiando do seu `secrets/production.env` local** (no Windows; ele e gitignored e nao veio no clone): `API_DATABASE_URL`, `ZAP_DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Sobre as strings de banco, veja o **Apendice A** antes de colar. Depois:
+Preencha os segredos **copiando do seu `secrets/production.env` local** (no Windows; ele e gitignored e nao veio no clone): `API_DATABASE_URL` (api), `ZAP_DATABASE_URL` (zap), `SUPABASE_SERVICE_ROLE_KEY` (**nos dois** por enquanto: a chave e usada pela api e pelo zap; ver nota no `whaviso-zap.env.example`) e os `META_*` (zap). Sobre as strings de banco, veja o **Apendice A** antes de colar. Depois trave as permissoes dos dois:
 
 ```bash
-chown root:whaviso /etc/whaviso/whaviso.env
-chmod 640 /etc/whaviso/whaviso.env
+chown root:whaviso /etc/whaviso/api.env /etc/whaviso/zap.env
+chmod 640 /etc/whaviso/api.env /etc/whaviso/zap.env
 ```
 
 ### 6b. Env de build do frontend (valores publicos)
@@ -290,7 +294,7 @@ journalctl -u whaviso-zap -n 30 --no-pager       # zap subindo
 
 ## Fase 10: conexao com o WhatsApp (Meta Cloud API)
 
-Nao ha pareamento nem QR: o zap fala com a Meta Cloud API por HTTP e a conexao e por **credenciais** (`META_*` no `/etc/whaviso/whaviso.env`). Basta as vars estarem preenchidas (token, phone number id, app secret, verify token) que o zap sobe conectado; sem as essenciais ele encerra com mensagem clara no log. O runbook de operacao da Meta (verificacao da empresa, registro do numero, System User, webhook e templates) esta em [META_CLOUD_API.md](META_CLOUD_API.md).
+Nao ha pareamento nem QR: o zap fala com a Meta Cloud API por HTTP e a conexao e por **credenciais** (`META_*` no `/etc/whaviso/zap.env`). Basta as vars estarem preenchidas (token, phone number id, app secret, verify token) que o zap sobe conectado; sem as essenciais ele encerra com mensagem clara no log. O runbook de operacao da Meta (verificacao da empresa, registro do numero, System User, webhook e templates) esta em [META_CLOUD_API.md](META_CLOUD_API.md).
 
 ---
 
@@ -301,8 +305,9 @@ ufw status verbose                       # so 22 (OpenSSH) e 80/443 das faixas d
 sshd -T | grep -E 'permitrootlogin|passwordauthentication'   # no / no
 fail2ban-client status sshd              # jail ativa
 systemctl is-enabled unattended-upgrades # enabled
-ss -tlnp | grep -E '3001|3002'           # escutam local; o firewall bloqueia de fora
-stat -c '%a %U:%G' /etc/whaviso/whaviso.env          # 640 root:whaviso
+ss -tlnp | grep -E '3001|3002'           # bindam em 127.0.0.1 (nao 0.0.0.0); so o nginx alcanca
+stat -c '%a %U:%G' /etc/whaviso/api.env              # 640 root:whaviso
+stat -c '%a %U:%G' /etc/whaviso/zap.env              # 640 root:whaviso
 stat -c '%a' /etc/ssl/cloudflare/whaviso-origin.key  # 600
 ```
 
@@ -363,7 +368,7 @@ O Send SMS Hook do Supabase (nuvem) entrega o codigo chamando `/hooks/send-code`
 Para ligar:
 
 1. Garanta que o `nginx/whaviso.conf` atualizado esta no servidor e recarregue: `nginx -t && systemctl reload nginx`.
-2. Defina `SEND_CODE_HOOK_SECRET` (formato `v1,whsec_...`) em `/etc/whaviso/whaviso.env` e reinicie o zap: `systemctl restart whaviso-zap`.
+2. Defina `SEND_CODE_HOOK_SECRET` (formato `v1,whsec_...`) em `/etc/whaviso/zap.env` e reinicie o zap: `systemctl restart whaviso-zap`.
 3. No painel do Supabase (Authentication > Hooks > Send SMS hook): tipo **HTTPS**, URL `https://api.whaviso.com/hooks/send-code`, e cole o **mesmo** segredo. Habilite tambem o provider **Phone**. Sem o secret batendo nos dois lados, o zap responde 503/401 e nada e entregue.
 
 ## Apendice C: limpeza pendente (referencias a Vercel)

@@ -90,8 +90,8 @@ O OTP de login por telefone é um template **AUTHENTICATION** (`META_OTP_TEMPLAT
 
 ## 6. [VPS] Env do zap
 
-No `/etc/whaviso/whaviso.env` (o zap lê o prefixo próprio). As 4 primeiras são **exigidas no
-boot**: sem elas o zap encerra com mensagem clara.
+No `/etc/whaviso/zap.env` (env do zap; a api tem o seu em `/etc/whaviso/api.env`). As 4
+primeiras são **exigidas no boot**: sem elas o zap encerra com mensagem clara.
 
 | Var | O que é |
 |---|---|

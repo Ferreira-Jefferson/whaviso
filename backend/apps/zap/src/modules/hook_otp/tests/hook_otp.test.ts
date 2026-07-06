@@ -22,6 +22,12 @@ function assinar(id: string, ts: string, corpo: string): string {
   return 'v1,' + createHmac('sha256', CHAVE).update(`${id}.${ts}.${corpo}`).digest('base64')
 }
 
+/** Timestamp Unix (s) atual, como string. Os vetores precisam ser recentes para
+ * passar no check de frescor anti-replay (janela de +-5 min). */
+function tsAgora(): string {
+  return Math.floor(Date.now() / 1000).toString()
+}
+
 afterAll(async () => {
   await encerrarPools()
 })
@@ -29,7 +35,7 @@ afterAll(async () => {
 describe('hook_otp: assinaturaValida', () => {
   it('aceita assinatura correta e rejeita corpo adulterado / headers faltando', () => {
     const id = 'msg_1'
-    const ts = '1718600000'
+    const ts = tsAgora()
     const corpo = '{"sms":{"otp":"123456"}}'
     const sig = assinar(id, ts, corpo)
     const cab = { id, timestamp: ts, assinatura: sig }
@@ -38,6 +44,15 @@ describe('hook_otp: assinaturaValida', () => {
     expect(assinaturaValida(Buffer.from(corpo + 'x'), cab, SECRET)).toBe(false)
     expect(assinaturaValida(Buffer.from(corpo), { ...cab, id: undefined }, SECRET)).toBe(false)
   })
+
+  it('rejeita timestamp fora da janela de frescor (anti-replay)', () => {
+    const id = 'msg_velho'
+    const corpo = '{"sms":{"otp":"123456"}}'
+    // Assinatura correta, mas timestamp de 10 min atras: fora da tolerancia de +-5 min.
+    const tsVelho = (Math.floor(Date.now() / 1000) - 600).toString()
+    const cab = { id, timestamp: tsVelho, assinatura: assinar(id, tsVelho, corpo) }
+    expect(assinaturaValida(Buffer.from(corpo), cab, SECRET)).toBe(false)
+  })
 })
 
 describe('hook_otp: POST /hooks/send-code (integração)', () => {
@@ -45,7 +60,7 @@ describe('hook_otp: POST /hooks/send-code (integração)', () => {
     const { app, whats } = await montar()
     const corpo = JSON.stringify({ user: { phone: '+5511999998888' }, sms: { otp: '654321' } })
     const id = 'msg_ok'
-    const ts = '1718600001'
+    const ts = tsAgora()
     const r = await app.inject({
       method: 'POST',
       url: '/hooks/send-code',
@@ -104,7 +119,7 @@ describe('hook_otp: POST /hooks/send-code (integração)', () => {
     const { app } = await montar()
     const corpo = JSON.stringify({ user: {}, sms: {} })
     const id = 'msg_vazio'
-    const ts = '1718600002'
+    const ts = tsAgora()
     const r = await app.inject({
       method: 'POST',
       url: '/hooks/send-code',

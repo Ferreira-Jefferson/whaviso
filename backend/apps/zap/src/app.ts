@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import rateLimit from '@fastify/rate-limit'
 import {
   serializerCompiler,
   validatorCompiler,
@@ -27,8 +28,11 @@ export interface DepsZap {
 
 export async function criarApp(deps: DepsZap) {
   const app = Fastify({
+    // Só o nginx do mesmo host faz proxy do loopback (ver deploy/nginx/whaviso.conf:
+    // proxy_pass http://127.0.0.1:3002); confiar só no proxy loopback evita que um
+    // X-Forwarded-For forjado corrompa o IP do cliente (e o rate limit por IP abaixo).
+    trustProxy: 'loopback',
     loggerInstance: deps.logger,
-    trustProxy: true,
   }).withTypeProvider<ZodTypeProvider>()
 
   app.setValidatorCompiler(validatorCompiler)
@@ -50,7 +54,19 @@ export async function criarApp(deps: DepsZap) {
   app.decorate('env', deps.env)
   app.decorate('whats', deps.whats)
 
-  app.get('/healthz', async () => ({ ok: true, servico: 'zap', whatsapp: deps.whats.status() }))
+  // Rate limit por IP nos endpoints públicos (defesa contra flood; o zap é daemon único
+  // sempre-ligado e crítico). Limite GENEROSO de propósito: o webhook da Meta pode chegar
+  // em rajada legítima (recibos de status após um tick), então preferimos não devolver 429
+  // a tráfego real. A rota do webhook sobe o limite ainda mais (ver montarRotaWebhook).
+  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' })
+
+  // Health público minimalista: só liveness e se o transporte está conectado. NÃO expõe o
+  // número do WhatsApp do negócio (PII / reconhecimento) mesmo que status() o traga.
+  app.get('/healthz', async () => ({
+    ok: true,
+    servico: 'zap',
+    whatsapp: { conectado: deps.whats.status().conectado },
+  }))
 
   // Send SMS Hook do Supabase (OTP). O inbound do WhatsApp (botões/texto/status) chega
   // pela rota /webhook/whatsapp, montada pelo server.ts via whats.montarRotaWebhook(app).
