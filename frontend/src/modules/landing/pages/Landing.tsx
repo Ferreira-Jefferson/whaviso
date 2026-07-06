@@ -442,13 +442,11 @@ function RodapeMarketing() {
             Entrar
           </Link>
         </div>
-        {/* Identificacao legal da empresa responsavel pela marca Whaviso. Alem de
-            transparencia ao usuario, e o que a revisao de nome de exibicao da Meta
-            procura no site (marca + razao social + CNPJ batendo com o portfolio
-            empresarial verificado). */}
-        <p className="mt-6 border-t border-linha pt-6 text-center text-xs text-tinta-2">
-          Whaviso é um serviço de 56.883.976 Jefferson Cristian Tertuliano
-          Cavalcante Ferreira (MEI), CNPJ 56.883.976/0001-04, Caçapava/SP, Brasil.
+        {/* Identificacao legal discreta (transparencia ao usuario). A razao social
+            completa + o grounding que a revisao de nome de exibicao da Meta le vivem
+            no HTML cru (JSON-LD e <noscript> em index.html), nao aqui. */}
+        <p className="mt-5 text-center text-[10px] leading-relaxed text-tinta-2 opacity-60">
+          CNPJ 56.883.976/0001-04 · Caçapava/SP, Brasil.
         </p>
       </div>
     </footer>
