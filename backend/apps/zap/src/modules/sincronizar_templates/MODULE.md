@@ -1,8 +1,8 @@
 # sincronizar_templates
 
 ## Propósito
-Mantém os templates do whaviso em dia com a Meta Cloud API, substituindo o "aprovar" manual
-da era Baileys. Três funções:
+Mantém os templates do whaviso em dia com a Meta Cloud API. O status_meta reflete o veredito
+real da Meta (ninguém aprova na mão). Três funções:
 - `submeterPendentes(deps)`: claim (`FOR UPDATE SKIP LOCKED`) das versões marcadas `meta_acao='criar'`
   (a api enfileira), cria/edita o template na WABA via Graph e grava `meta_template_id` +
   `status_meta` inicial. EDIT quando já há `meta_template_id` para o nome; CREATE no primeiro.

@@ -3,7 +3,7 @@
 //
 // Único uso aqui (H1.4 / E5 H5.3): criar a conta do convidado por baixo dos panos no
 // ACEITE pelo WhatsApp, por TELEFONE confirmado (`phone` + `phone_confirm: true`). No
-// inbound do Baileys NÃO há sessão de login (G3); por isso o vínculo é sempre por
+// inbound do WhatsApp (webhook da Meta) NÃO há sessão de login (G3); por isso o vínculo é sempre por
 // telefone, e a conta-no-aceite gera/recupera o profile do convidado para que o aviso
 // passe a apontar para o `profile.id` (não fica órfão). O JWT continua sendo do
 // Supabase (este endpoint só CRIA o usuário em auth.users; a sessão nasce no login por

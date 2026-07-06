@@ -224,7 +224,7 @@ export interface WhatsFake extends ClienteWhats {
 /**
  * ClienteWhats fake configurável. `comportamento` decide o retorno/erro de cada
  * envio (ex.: lançar ErroEnvio para testar os ramos do drainer). Não toca a rede
- * nem importa o Baileys real (sem banner/socket nos testes).
+ * nem importa o provider real da Meta (sem rede/HTTP nos testes).
  */
 export function clienteWhatsFake(
   comportamento?: (m: MensagemWhats) => { wamid: string },

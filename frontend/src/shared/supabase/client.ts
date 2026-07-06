@@ -7,8 +7,8 @@
 // sem o SMTP limitado do Supabase:
 //   1. Google via Identity Services + signInWithIdToken (o consentimento roda na NOSSA
 //      origem, não redireciona pro supabase.co → o Google mostra o nosso app).
-//   2. WhatsApp OTP (phone auth + Send SMS Hook; o nosso `zap` entrega o código via
-//      Baileys, pelo nosso número). A entrega não depende da Meta.
+//   2. WhatsApp OTP (phone auth + Send SMS Hook; o nosso `zap` entrega o código pela
+//      Meta Cloud API, via template AUTHENTICATION).
 import { createClient, type Session } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
@@ -44,7 +44,7 @@ export async function signInWithGoogleIdToken(idToken: string, nonce: string) {
 
 /**
  * Envia um código de login pelo WhatsApp. O Supabase gera o OTP e o Send SMS
- * Hook o entrega pelo nosso número (via Baileys, no `zap`). `telefone` em E.164.
+ * Hook o entrega pela Meta Cloud API (template AUTHENTICATION, no `zap`). `telefone` em E.164.
  */
 export async function enviarCodigoWhatsapp(telefone: string) {
   return supabase.auth.signInWithOtp({ phone: telefone })

@@ -53,6 +53,6 @@ list_host_keys() {
 case "$TARGET" in
   vercel) push_vercel ;;
   api)    list_host_keys api API_DATABASE_URL SUPABASE_URL APP_URL ;;
-  zap)    list_host_keys zap ZAP_DATABASE_URL META_TOKEN META_PHONE_NUMBER_ID META_WABA_ID META_APP_SECRET META_VERIFY_TOKEN META_GRAPH_URL META_API_VERSION ;;
+  zap)    list_host_keys zap ZAP_DATABASE_URL META_ACCESS_TOKEN META_PHONE_NUMBER_ID META_WABA_ID META_APP_SECRET META_VERIFY_TOKEN META_GRAPH_URL META_API_VERSION ;;
   *)      echo "Uso: bash scripts/push_secrets.sh <vercel|api|zap>" >&2; exit 1 ;;
 esac

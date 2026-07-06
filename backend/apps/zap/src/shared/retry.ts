@@ -5,9 +5,9 @@
 // Antes cada repo tinha seu BACKOFF_MIN=[5,15,45] (minutos). Centralizado aqui para
 // os dois alinharem e não divergirem de novo.
 //
-// Não confundir com o GAP anti-bloqueio do transporte (baileys_client/ritmo.ts): o
-// Pacer espaça envios para não tomar ban; este retry é a repetição de UMA mensagem
-// que falhou transitoriamente.
+// Não confundir com o rate-limit da própria Meta Cloud API (que espaça/limita os
+// envios no lado dela); este retry é a repetição de UMA mensagem que falhou
+// transitoriamente.
 
 /** Número máximo de TENTATIVAS de envio (a 1a + 2 reagendamentos). */
 export const MAX_TENTATIVAS = 3

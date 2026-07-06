@@ -8,20 +8,17 @@ import { useWhatsappSessao, type WhatsappStatus } from '../api'
 import { ChatTeste } from '../components/ChatTeste'
 
 const ROTULO_STATUS: Record<WhatsappStatus, string> = {
-  desconectado: 'Desconectado',
-  aguardando_qr: 'Conectando',
+  desconectado: 'Não associado',
   conectado: 'Conectado',
 }
 
 const ESTILO_STATUS: Record<WhatsappStatus, string> = {
   desconectado: 'bg-papel-2 text-tinta-2',
-  aguardando_qr: 'bg-ambar-claro text-ambar',
   conectado: 'bg-salvia-claro text-folha',
 }
 
 const LUZ_STATUS: Record<WhatsappStatus, string> = {
   desconectado: 'bg-tinta-2/50',
-  aguardando_qr: 'bg-ambar',
   conectado: 'bg-salvia',
 }
 
@@ -59,12 +56,12 @@ export default function ConexaoPage() {
                   ? `Número ${data.numero}`
                   : status === 'conectado'
                     ? 'Conectado via API oficial da Meta'
-                    : 'Não conectado'}
+                    : 'O número não está associado a nenhum WhatsApp'}
               </p>
               <p className="text-sm text-tinta-2">
                 {status === 'conectado'
                   ? 'Pronto para enviar e receber pela Meta Cloud API.'
-                  : 'Verifique as credenciais da Meta (token e número) no servidor.'}
+                  : 'Registre o número na Meta Cloud API e configure o token e o número no servidor.'}
               </p>
             </div>
           </div>

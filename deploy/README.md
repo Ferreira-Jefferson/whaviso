@@ -8,7 +8,7 @@ Runbook para preparar o VPS do zero e deixar o sistema pronto para receber o pro
 - **Dominio canonico:** `whaviso.com`. `whaviso.com.br` e os `www.*` fazem **301** para ele.
 - **Borda:** **Cloudflare na frente dos dois dominios** (proxied / nuvem laranja). SSL **Full (strict)**, certificado de **origem** da Cloudflare no nginx. O IP do VPS fica escondido.
 - **O que roda no VPS:** nginx (SPA estatica + proxy da api) e dois servicos Node via systemd (`api` :3001, `zap` :3002). Banco e Auth ficam no Supabase cloud.
-- **O zap e um daemon de instancia unica** (segura o socket do WhatsApp/Baileys e um lock). Nunca rode duas copias. Sessao do Baileys persiste em `/var/lib/whaviso`.
+- **O zap e um daemon de instancia unica.** Ele fala com a Meta Cloud API por HTTP (sem socket, sem QR): a conexao e por credenciais (`META_*` no env). Segue como instancia unica (scheduler + inbound por webhook); nao rode duas copias.
 
 ## Topologia
 
@@ -65,8 +65,8 @@ chown -R deploy:deploy /home/deploy/.ssh
 # usuario de SERVICO (sem shell), dono do app e dos servicos
 adduser --system --group --home /opt/whaviso --shell /usr/sbin/nologin whaviso
 
-# diretorios
-mkdir -p /opt/whaviso /var/lib/whaviso/auth_baileys /etc/whaviso /var/www
+# diretorios (/var/lib/whaviso = area de escrita de runtime do zap)
+mkdir -p /opt/whaviso /var/lib/whaviso /etc/whaviso /var/www
 chown -R whaviso:whaviso /opt/whaviso /var/lib/whaviso
 chmod 750 /var/lib/whaviso
 ```
@@ -283,32 +283,14 @@ Verifique:
 ```bash
 systemctl status whaviso-api whaviso-zap --no-pager
 curl -fsS 127.0.0.1:3001/healthz                 # api respondendo localmente
-journalctl -u whaviso-zap -n 30 --no-pager       # zap subindo + linha do QR
+journalctl -u whaviso-zap -n 30 --no-pager       # zap subindo
 ```
 
 ---
 
-## Fase 10: parear o WhatsApp (Baileys, 1o boot)
+## Fase 10: conexao com o WhatsApp (Meta Cloud API)
 
-A sessao do WhatsApp ainda nao existe. O jeito mais simples de parear sem precisar da tela de admin e por **pairing code**:
-
-```bash
-# em /etc/whaviso/whaviso.env, defina temporariamente:
-#   WHATS_PHONE=55SEUNUMERO        (so digitos, com DDI)
-#   WHATS_USE_PAIRING=true
-systemctl restart whaviso-zap
-journalctl -u whaviso-zap -f      # aparece "codigo de pareamento do WhatsApp"
-# no celular: WhatsApp > Aparelhos conectados > Conectar aparelho > Conectar com numero > digite o codigo
-```
-
-Alternativa por **QR**: o zap grava `qr.png` em `/var/lib/whaviso/qr.png` e tambem na tabela `whats_sessao` (a tela de admin da SPA mostra o QR, botao Conectar). Para pegar a imagem:
-
-```bash
-# no seu Windows:
-scp deploy@SEU_IP:/var/lib/whaviso/qr.png .     # se faltar permissao, copie via sudo no servidor antes
-```
-
-Quando conectar, os logs mostram `WhatsApp conectado`. A sessao fica em disco e **nao** precisa reescanear a cada restart.
+Nao ha pareamento nem QR: o zap fala com a Meta Cloud API por HTTP e a conexao e por **credenciais** (`META_*` no `/etc/whaviso/whaviso.env`). Basta as vars estarem preenchidas (token, phone number id, app secret, verify token) que o zap sobe conectado; sem as essenciais ele encerra com mensagem clara no log. O runbook de operacao da Meta (verificacao da empresa, registro do numero, System User, webhook e templates) esta em [META_CLOUD_API.md](META_CLOUD_API.md).
 
 ---
 

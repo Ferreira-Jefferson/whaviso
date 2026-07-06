@@ -16,10 +16,4 @@ dist/
 supabase/.temp/
 supabase/.branches/
 
-# sessão do WhatsApp (Baileys): chaves da sessão, lock de instância e QR. NUNCA
-# versionar (auth_baileys/ guarda as credenciais; na VPS precisa persistir).
-auth_baileys/
-.baileys.lock
-qr.png
-
 .DS_Store

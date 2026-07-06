@@ -1,11 +1,11 @@
-# whaviso zap (scheduler + WhatsApp/Baileys, :3002).
+# whaviso zap (scheduler + WhatsApp via Meta Cloud API, :3002).
 # Instalar em /etc/systemd/system/whaviso-zap.service
 #
-# IMPORTANTE: instancia UNICA. O zap segura o socket do WhatsApp e um lock de
-# arquivo (.baileys.lock). Nunca rode duas copias: dois processos na mesma sessao
-# causam o erro 440. Por isso nada de escala horizontal aqui.
+# IMPORTANTE: instancia UNICA. O zap fala com a Meta Cloud API por HTTP (sem socket,
+# sem QR, sem lock de sessao) e recebe o inbound por webhook. Ainda assim rode UMA
+# so copia: o scheduler drena a outbox e nao deve competir consigo mesmo.
 [Unit]
-Description=whaviso zap (scheduler + WhatsApp :3002)
+Description=whaviso zap (scheduler + WhatsApp via Meta Cloud API :3002)
 After=network-online.target
 Wants=network-online.target
 
@@ -20,7 +20,7 @@ ExecStart=/usr/bin/env npm run start
 Restart=on-failure
 RestartSec=10
 
-# A sessao do Baileys (e o lock e o qr.png) vivem aqui e PRECISAM persistir
+# Area de escrita de runtime do zap, fora do checkout (que fica imutavel). Persiste
 # entre deploys e reboots. Nao apague este diretorio.
 ReadWritePaths=/var/lib/whaviso
 

@@ -224,7 +224,7 @@ Conexão de marketing: *"Para quem já se cansou de cobrar na mão."*
 
 ## 11. Funcionalidades pendentes / gated
 
-Existem no produto mas ainda **não estão ligadas** (dependem em geral da migração do transporte de WhatsApp de Baileys para a Meta Cloud API oficial):
+Existem no produto mas ainda **não estão ligadas** (dependem em geral de aprovação e verificação na Meta Cloud API oficial, o transporte de WhatsApp):
 
 1. **Auto-envio do convite** como template Meta com botões Aceitar/Recusar: hoje o convite é compartilhado por link `wa.me` e o aceite acontece dentro do WhatsApp (por botão ou número de convite).
 2. **Backfill por telefone no signup** (puxar combinados de um número ao criar conta): depende de **OTP de telefone** entregue a +55, gated por verificação Meta; ligar sem verificação abriria risco de sequestro de combinados.

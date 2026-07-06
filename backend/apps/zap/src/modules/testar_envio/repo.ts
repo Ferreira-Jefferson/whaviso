@@ -6,8 +6,8 @@ export interface TesteClaim {
   texto: string
 }
 
-// Lote pequeno: o envio Baileys é serializado pelo ritmo anti-bloqueio. O mini-chat
-// é de baixíssimo volume (uma pessoa testando), então 5 sobra.
+// Lote pequeno: o mini-chat é de baixíssimo volume (uma pessoa testando), então 5
+// sobra (a Meta tem rate-limit próprio, não precisamos serializar aqui).
 const LIMITE_CLAIM = 5
 
 /** Claim atômico das mensagens de saída agendadas (FOR UPDATE SKIP LOCKED). */

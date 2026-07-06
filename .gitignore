@@ -13,10 +13,5 @@ backend/supabase/.branches/
 # build estático do frontend
 frontend/dist/
 .DS_Store
-# sessão do WhatsApp (Baileys): chaves da sessão, lock de instância e QR. NUNCA
-# versionar (auth_baileys/ guarda as credenciais; na VPS precisa persistir).
-auth_baileys/
-.baileys.lock
-qr.png
 # Graphify: mapa do codigo gerado (ferramenta de DEV, nao e dependencia do app).
 graphify-out/

@@ -160,8 +160,8 @@ export function useAtivarMensagem() {
 }
 
 // Submete a versão à Meta para validação (a api enfileira meta_acao='criar'; o zap cria o
-// template na WABA e o status_meta passa a refletir o veredito real). Substitui o antigo
-// "aprovar" manual (resíduo da era Baileys).
+// template na WABA e o status_meta passa a refletir o veredito real). O painel nunca liga
+// status_meta na mão: a Meta é quem decide.
 const submeterMensagemResposta = z.object({
   id: z.uuid(),
   status_meta: z.string(),
@@ -195,8 +195,8 @@ export type { Template }
 // ---- Conexão do WhatsApp (Meta Cloud API) --------------------------------
 // O transporte vive no `zap`, que valida token+phone_id (env) e grava o status na
 // sessão (whats_sessao). A api só reflete o status/numero. Não há QR nem comando: a
-// conexão é por credenciais. O status 'aguardando_qr' fica no enum só por dados legados.
-const whatsappStatus = z.enum(['desconectado', 'aguardando_qr', 'conectado'])
+// conexão é por credenciais. 'desconectado' = o número não está associado a nenhum WhatsApp.
+const whatsappStatus = z.enum(['desconectado', 'conectado'])
 const whatsappSessaoResposta = z.object({
   status: whatsappStatus,
   numero: z.string().nullable(),
@@ -221,8 +221,8 @@ export function useWhatsappSessao() {
 
 // ---- Mini-chat de teste do WhatsApp (diagnóstico) ------------------------
 // O owner cadastra um número de teste e troca mensagens de TEXTO com ele para checar
-// se o número conectado envia/recebe. A api enfileira a saída; o zap envia/recebe pelo
-// Baileys (mesma fila/transporte das automáticas, porém sem template).
+// se o número conectado envia/recebe. A api enfileira a saída; o zap envia/recebe pela
+// Meta Cloud API (mesma fila/transporte das automáticas, porém sem template).
 const testeNumeroResposta = z.object({ telefone: z.string().nullable() })
 type TesteNumeroResposta = z.infer<typeof testeNumeroResposta>
 

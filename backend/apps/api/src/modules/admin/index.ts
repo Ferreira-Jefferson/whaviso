@@ -228,8 +228,8 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
   // Submissão à Meta: o owner enfileira a versão para a Meta VALIDAR (a api não fala com a
   // Meta; só marca meta_acao='criar'). O zap drena (sincronizar_templates), cria/edita o
   // template na WABA e o status_meta passa a refletir o veredito REAL (pendente em análise,
-  // aprovado/rejeitado via webhook/reconcile). Substitui o "aprovar" manual da era Baileys:
-  // ninguém liga status_meta na mão. Só submete o que ainda não foi aprovado.
+  // aprovado/rejeitado via webhook/reconcile): o painel nunca liga status_meta na mão, a
+  // Meta é quem decide. Só submete o que ainda não foi aprovado.
   app.post(
     '/admin/mensagens/:id/submeter',
     { preHandler: owner, schema: { params: idParam } },
@@ -491,13 +491,15 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
   // Status atual da conexão (status + número de exibição).
   app.get('/admin/whatsapp', { preHandler: owner }, async () => {
     const { rows } = await app.pool.query<{
-      status: 'desconectado' | 'aguardando_qr' | 'conectado'
+      status: string
       numero: string | null
       atualizado_em: Date
     }>(`select status, numero, atualizado_em from public.whats_sessao where id = 1`)
     const s = rows[0]
     if (!s) return { status: 'desconectado' as const, numero: null, atualizado_em: null }
-    return { status: s.status, numero: s.numero, atualizado_em: s.atualizado_em }
+    // Só 'conectado'/'desconectado' hoje; qualquer valor legado da tabela cai em 'desconectado'.
+    const status = s.status === 'conectado' ? ('conectado' as const) : ('desconectado' as const)
+    return { status, numero: s.numero, atualizado_em: s.atualizado_em }
   })
 
   // ---- Mini-chat de teste do WhatsApp (diagnóstico) ------------------------

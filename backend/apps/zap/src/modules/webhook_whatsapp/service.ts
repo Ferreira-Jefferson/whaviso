@@ -31,7 +31,7 @@ type AcaoBotaoPayload = (typeof ACOES_BOTAO)[number]
 const ETAPAS = ['d_menos_2', 'd_menos_1', 'd', 'd_mais_1'] as const
 type EtapaPayload = (typeof ETAPAS)[number]
 
-// D-BAILEYS: fallback por resposta NUMERADA quando os botões interativos não chegam.
+// D-FALLBACK: fallback por resposta NUMERADA quando os botões interativos não chegam.
 // O convidado responde "1"/"2"/"3" e mapeamos para a ação do convite. A ordem segue a do
 // resumo (1 Aceitar, 2 Algum dado incorreto, 3 Recusar). Compartilhado (uma vez aqui).
 const FALLBACK_NUMERADO: Record<string, repo.AcaoBotao> = {
@@ -71,7 +71,7 @@ export interface DepsInbound {
 
 /**
  * Recibo de entrega da Meta (sent/delivered/read/failed): atualiza envios.entrega_status
- * pelo wamid. O Baileys não dá esse sinal (onStatus no-op); com a Meta passa a dar.
+ * pelo wamid, sinal que vem dos recibos de status da Meta (statuses[] no webhook).
  */
 export async function processarStatus(deps: DepsInbound, evento: EventoStatus): Promise<void> {
   await repo.atualizarEntrega(deps.pool, evento.wamid, evento.status, evento.erro)
@@ -100,7 +100,7 @@ async function responder(
 }
 
 /**
- * Processa um clique de botão vindo do socket do Baileys. Aplica a ação ao aviso
+ * Processa um clique de botão vindo do webhook da Meta. Aplica a ação ao aviso
  * (idempotente por estado) e responde a confirmação na janela de 24h. Cliques
  * desconhecidos são ignorados sem efeito; em estado terminal/já-respondido o convite
  * recebe resposta informativa sem reprocessar (H5.6/H5.7).
@@ -278,7 +278,7 @@ export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Pr
   // convite/menu (H14.4): um número durante o wizard é dado da etapa, não convite.
   if (await tratarTextoWizard(deps, telefone, evento.texto)) return
 
-  // Fallback numerado (D-BAILEYS): "1"/"2"/"3" só agem se houver convite pendente p/ o
+  // Fallback numerado (D-FALLBACK): "1"/"2"/"3" só agem se houver convite pendente p/ o
   // telefone (senão é texto livre qualquer, ignorado pela regra de negócio).
   const acaoFallback = FALLBACK_NUMERADO[evento.texto.trim()]
   if (acaoFallback) {

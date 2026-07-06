@@ -105,9 +105,9 @@ export const SECOES_MENSAGENS: SecaoMensagens[] = [
     mensagens: [
       {
         // Resumo do combinado + 3 botões (aceitar / dado incorreto / recusar), enviado ao
-        // convidado quando ele abre o convite no WhatsApp (H5.2). Editável: o transporte é o
-        // Baileys (número próprio), não depende de template aprovado na Meta. A variante
-        // 'revisao' inclui a chave Pix para o cobrador conferir no fluxo invertido.
+        // convidado quando ele abre o convite no WhatsApp (H5.2). Editável: o corpo é um
+        // template aprovado na Meta (Cloud API). A variante 'revisao' inclui a chave Pix
+        // para o cobrador conferir no fluxo invertido.
         nome: 'Convite (Aceitar ou Recusar)',
         destinatario: 'Convidado',
         quando: 'Ao abrir o convite no WhatsApp',
@@ -204,8 +204,8 @@ export const SECOES_MENSAGENS: SecaoMensagens[] = [
         nome: 'Código de acesso',
         destinatario: 'Conta',
         quando: 'Login por telefone',
-        // Entregue pelo nosso WhatsApp (Baileys via Send SMS Hook), não pela Meta.
-        // Texto fixo no zap hoje; na Fase 2 vira template editável no admin.
+        // Entregue pelo nosso WhatsApp via Send SMS Hook (Meta Cloud API, template
+        // AUTHENTICATION registrado à parte na Meta).
         estado: 'fixo',
       },
       {

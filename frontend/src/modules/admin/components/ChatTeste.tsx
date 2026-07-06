@@ -2,7 +2,7 @@
 // para enviar mensagens de texto a um número de teste e ver as respostas, checando se
 // o aparelho conectado realmente envia/recebe. O número de teste é cadastrado pelo
 // menu de três pontos do cabeçalho. Toda a entrega é pelo backend (api enfileira, zap
-// envia pelo Baileys); este componente é só a interface. Sem regra de negócio aqui.
+// envia pela Meta Cloud API); este componente é só a interface. Sem regra de negócio aqui.
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, CheckCheck, Clock, MoreVertical, Send } from 'lucide-react'
 import { Button, Dialog, PhoneInput, Spinner, cn } from '@/shared/ui'

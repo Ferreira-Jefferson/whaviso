@@ -16,7 +16,7 @@ Leia sob demanda: regras de produto/negócio → [historias/](historias/) (fonte
 
 `node`/`npm` estão no PATH do Windows (User + Machine): rode no **PowerShell** numa sessão nova, ou no **Bash**, tanto faz (o `concurrently` usa o `cmd.exe`, sempre presente no PowerShell). Se uma sessão antiga não achar o `npm`, reabra o terminal.
 
-**Subir tudo localmente (raiz):** `npm run dev` sobe **api (:3001) + front (:5173)** juntos via `concurrently`. `npm run dev:all` inclui o `zap` (que sobe sem credenciais Meta: o WhatsApp é via Baileys, pareado por QR no 1º boot, ver `WHATS_*` no `.env`). Primeira vez / após clone: `npm install` na raiz (pega o `concurrently`) + `npm run install:all` (deps do backend e do front). A raiz é só um lançador; `backend/` e `frontend/` seguem independentes.
+**Subir tudo localmente (raiz):** `npm run dev` sobe **api (:3001) + front (:5173)** juntos via `concurrently`. `npm run dev:all` inclui o `zap` (WhatsApp via Meta Cloud API oficial: a conexão é por credenciais `META_*` no `.env`, sem QR nem pareamento; sem as vars essenciais o zap encerra no boot). Primeira vez / após clone: `npm install` na raiz (pega o `concurrently`) + `npm run install:all` (deps do backend e do front). A raiz é só um lançador; `backend/` e `frontend/` seguem independentes.
 
 **Backend** (rode de dentro de `backend/`):
 ```bash
@@ -30,7 +30,7 @@ bash scripts/validate_migrations.sh whaviso_dev   # recria o banco de DEV (Postg
 # Mudança de schema OU de dados de catálogo (ex.: planos) só aparece no app depois de aplicar no CLOUD via `supabase db push`
 # (session pooler 5432; ver memória [[whaviso-dev-db]]). O seed NÃO roda no cloud → dados de catálogo vão em MIGRATION (upsert), não no seed.
 npm run dev:api          # :3001  (CORS liberado p/ APP_URL)
-npm run dev:zap          # :3002  (WhatsApp via Baileys; pareie pelo QR no 1º boot, ver WHATS_* no .env)
+npm run dev:zap          # :3002  (WhatsApp via Meta Cloud API; conexão por credenciais META_* no .env, sem QR)
 curl 127.0.0.1:3001/healthz   # use 127.0.0.1 (há outro app no ::1 desta máquina)
 ./scripts/scaffold_module.sh <api|zap> <nome>     # novo módulo (depois: 1 linha em src/routes.ts)
 ```
@@ -57,7 +57,7 @@ Decisões de **engenharia**. Não são regra de negócio (essas estão em `histo
 
 - Supabase = **Postgres + Auth apenas**. Sem Edge Functions; sem PostgREST p/ dados (RLS deny-all p/ anon/authenticated). Frontend usa `supabase-js` só p/ login; dados 100% via `api`.
 - Backend: só Node.js; Fastify + TS estrito + Zod; runtime `tsx` (sem build/emit). JWT do Supabase validado localmente via JWKS na api.
-- WhatsApp **por enquanto via Baileys** (não oficial, roda no próprio `zap`), com migração futura para a **Meta Cloud API oficial** prevista. Isole o provider atrás de uma interface de envio no `zap` para a troca ser pontual. Evite Z-API/Evolution. (Quais recursos dependem da Meta oficial é regra de produto, ver `historias/`.)
+- WhatsApp via **Meta Cloud API oficial** (canal sancionado para mensagem de negócio: templates aprovados + janela de 24h; inbound por webhook), rodando no próprio `zap`. O provider fica isolado atrás da interface `ClienteWhats` no `zap` (`shared/meta_client/`) para que trocar de versão ou detalhe do transporte seja pontual. Evite provedores não oficiais (Z-API/Evolution). (Quais recursos dependem de aprovação/verificação na Meta é regra de produto, ver `historias/`.)
 - Frontend: **React 19 + Vite 7 + TS estrito + Tailwind v4**, SPA puro; estado de servidor via TanStack Query; contratos Zod **próprios** (não compartilha pacote com o backend).
 - Integração entre serviços = banco compartilhado + outbox (`envios`, `notificacoes_cobrador`): quem produz só **enfileira**, o consumidor **drena/envia**, com claim `FOR UPDATE SKIP LOCKED`. Sem fila/Redis.
 - Roles de privilégio mínimo (`whaviso_api`/`whaviso_zap`); **sem DELETE em auditoria/negócio** (tabelas de negócio mudam de estado, nunca somem; auditoria é append-only). **Exceção:** `templates` é configuração, não auditoria → `whaviso_api` tem DELETE só nessa tabela (com guarda na api).

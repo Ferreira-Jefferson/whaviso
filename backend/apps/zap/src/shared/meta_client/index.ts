@@ -122,7 +122,7 @@ export function criarClienteMeta(opcoes: OpcoesMeta, deps: DepsClienteMeta): Cli
       const r = await saudeGraph(opcoes)
       conectado = true
       numero = r.numero
-      await gravarSessao(deps.pool, { status: 'conectado', numero: r.numero ?? null, qr: null }).catch(
+      await gravarSessao(deps.pool, { status: 'conectado', numero: r.numero ?? null }).catch(
         () => undefined,
       )
       deps.logger.info({ numero: r.numero }, 'WhatsApp (Meta Cloud API) pronto')
@@ -186,7 +186,7 @@ export function criarClienteMeta(opcoes: OpcoesMeta, deps: DepsClienteMeta): Cli
     parar: async () => undefined,
     desconectar: async () => {
       conectado = false
-      await gravarSessao(deps.pool, { status: 'desconectado', numero: null, qr: null }).catch(
+      await gravarSessao(deps.pool, { status: 'desconectado', numero: null }).catch(
         () => undefined,
       )
     },

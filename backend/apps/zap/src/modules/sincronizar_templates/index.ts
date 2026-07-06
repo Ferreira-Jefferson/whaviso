@@ -1,7 +1,7 @@
 // Sincroniza os templates do whaviso com a Meta Cloud API:
 //  - submeterPendentes: a api enfileira (meta_acao='criar'); aqui drenamos, criamos/editamos
-//    o template na WABA (Graph) e gravamos meta_template_id + status. Substitui o "aprovar"
-//    manual da era Baileys: ninguém liga status_meta na mão; a Meta é quem decide.
+//    o template na WABA (Graph) e gravamos meta_template_id + status. O painel nunca liga
+//    status_meta na mão: a Meta é quem decide.
 //  - reconciliarTemplates: GET na lista da WABA e reflete o status REAL (rede de segurança
 //    para webhooks perdidos; corrige 'aprovado' fantasma de seeds que a Meta não tem).
 //  - processarStatusTemplate: aplica o webhook message_template_status_update (tempo real).

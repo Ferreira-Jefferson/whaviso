@@ -16,7 +16,7 @@ afterAll(async () => {
   await encerrarPools()
 })
 
-// Inbound de botões pelo socket do Baileys: o evento traz buttonId "acao:avisoId".
+// Inbound de botões pelo webhook da Meta: o evento traz buttonId "acao:avisoId".
 // A lógica de estado (aplicarAcaoBotao) é a mesma; muda só o transporte de entrada.
 function evento(acao: string, avisoId: string) {
   return { wamid: 'w_' + acao, telefone: '+5511999998888', buttonId: `${acao}:${avisoId}` }
