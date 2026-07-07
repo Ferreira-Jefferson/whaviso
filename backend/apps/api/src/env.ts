@@ -2,6 +2,10 @@ import { z } from 'zod'
 
 export const envSchema = z.object({
   PORT: z.coerce.number().int().default(3001),
+  // Bind em loopback por padrão (defesa em profundidade): o nginx do mesmo host faz proxy
+  // p/ 127.0.0.1:3001, então a api não precisa escutar em 0.0.0.0. Configurável (API_HOST)
+  // caso um dia rode com proxy remoto; o default 127.0.0.1 aceita o curl local normalmente.
+  HOST: z.string().default('127.0.0.1'),
   DATABASE_URL: z.string().min(1, 'string de conexão do pooler (user whaviso_api)'),
   SUPABASE_URL: z.url(),
   APP_URL: z.url().describe('origem do SPA (usada pelo CORS)'),

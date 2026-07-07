@@ -7,6 +7,7 @@ import { criarApp } from './app'
 // Fonte única local: o .env da raiz traz vars prefixadas por serviço (API_*).
 // Em prod o host pode definir PORT/DATABASE_URL direto; o alias só preenche se faltarem.
 if (process.env.API_PORT && !process.env.PORT) process.env.PORT = process.env.API_PORT
+if (process.env.API_HOST && !process.env.HOST) process.env.HOST = process.env.API_HOST
 if (process.env.API_DATABASE_URL && !process.env.DATABASE_URL)
   process.env.DATABASE_URL = process.env.API_DATABASE_URL
 
@@ -24,4 +25,5 @@ const encerrar = async () => {
 process.on('SIGINT', () => void encerrar())
 process.on('SIGTERM', () => void encerrar())
 
-await app.listen({ port: env.PORT, host: '0.0.0.0' })
+// Bind em loopback por padrão (nginx faz proxy p/ 127.0.0.1:3001); configurável por API_HOST.
+await app.listen({ port: env.PORT, host: env.HOST })

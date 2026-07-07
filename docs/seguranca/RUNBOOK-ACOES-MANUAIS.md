@@ -17,9 +17,12 @@ Sugestão de cadência: um passo por vez, confirmando cada um antes do próximo.
 - [x] **Passo 1 (deploy do hardening)** e **Passo 5 (nginx/CSP)**: no ar. CSP/HSTS/X-Frame-Options ativos no documento (confirmado por curl); login Google validado com **zero violação de CSP**.
 - [x] **Passo 6 (painel Supabase)**: rate limits, Refresh Token Rotation + Reuse Detection, OTP expiry (Phone 600s/Email 3600s), anonymous OFF, SSL Enforcement, MFA (2 fatores). Detalhes no passo 6.
 - [x] **Passo 10 (backup próprio do banco)**: instalado e no ar no VPS (pg_dump 17, timer diário). Detalhes no passo 10.
-- [ ] **Ainda NÃO pushado/deployado**: commit `6562627` na `development` (frontend: GIS init única + `@hookform/resolvers` 5.4.0 para zod v4, elimina 2 avisos de console do login). Push + deploy quando quiser, junto com a troca de fonte em andamento.
+- [x] **Frontend (avisos de console) DEPLOYADO**: commit `6562627` (GIS init única + `@hookform/resolvers` 5.4.0 para zod v4) foi para produção junto com a fonte Lora e o rodapé, no deploy de 2026-07-07 (main = `094ed31`).
+- [ ] **Pendente de deploy**: correção do bind da api (`0.0.0.0` -> `127.0.0.1`, ver passo 4) e estas atualizações do runbook. Uncommitted na `development`.
 
-**Ainda pendente por você (detalhado abaixo):** passo 2 (dividir env por serviço), passo 3 (rotacionar segredos), passo 4 (conferir firewall/bind), passo 7 (Meta, quando ativar), passo 8 (deps de dev), passo 9 (follow-ups de engenharia).
+- [x] **Passo 2 (dividir env por serviço)**: `api.env`/`zap.env` separados no VPS, `whaviso.env` único removido; api e zap rodando com os próprios segredos.
+
+**Ainda pendente por você (detalhado abaixo):** passo 3 (rotacionar segredos), passo 4 (conferir firewall/bind), passo 7 (Meta, quando ativar), passo 8 (deps de dev), passo 9 (follow-ups de engenharia).
 
 ---
 
@@ -37,11 +40,11 @@ As correções de código (helmet, trustProxy, bind 127.0.0.1, rate limit do zap
 
 ---
 
-## 2. Servidor (VPS): dividir o EnvironmentFile por serviço  [depende do deploy trazer os *.example]
+## 2. Servidor (VPS): dividir o EnvironmentFile por serviço  ✅ CONCLUÍDO 2026-07-07
 
 Reduz o raio de impacto (M1): hoje um arquivo único dá a cada processo os segredos do outro.
 
-- [ ] Copiar os dois novos exemplos para os arquivos reais e preencher os valores:
+- [x] Feito: `api.env` e `zap.env` gerados por `grep` do `whaviso.env` (preserva os valores exatos, sem digitar segredo), 640 root:whaviso. Os units novos (que apontam para eles) foram copiados à mão para `/etc/systemd/system/` (o deploy NÃO instala systemd), `daemon-reload` + restart, api e zap confirmados de pé (healthz OK, zap conectado à Meta). Comando de referência original abaixo:
 ```bash
 cp /opt/whaviso/app/deploy/whaviso-api.env.example /etc/whaviso/api.env
 cp /opt/whaviso/app/deploy/whaviso-zap.env.example /etc/whaviso/zap.env
@@ -51,11 +54,11 @@ chown root:whaviso /etc/whaviso/api.env /etc/whaviso/zap.env
 chmod 640 /etc/whaviso/api.env /etc/whaviso/zap.env
 systemctl daemon-reload && systemctl restart whaviso-api whaviso-zap
 ```
-- [ ] Depois de confirmar que os dois serviços subiram, remover o env único antigo:
+- [x] Após confirmar os dois serviços de pé, removidos o `whaviso.env` único **e** o `whaviso.env.bak` antigo (segredos velhos em texto puro):
 ```bash
-rm -f /etc/whaviso/whaviso.env
+rm -f /etc/whaviso/whaviso.env /etc/whaviso/whaviso.env.bak
 ```
-> Os `.service` já apontam para os arquivos novos (`api.env`/`zap.env`) via o deploy do systemd.
+> ATENÇÃO (aprendido em 2026-07-07): o `deploy.sh` NÃO instala systemd nem nginx. Os `.service` (e o nginx.conf, e os units do backup) são sempre **cópia manual** para `/etc/systemd/system/` + `daemon-reload`. A nota antiga dizia que vinham pelo deploy, o que estava errado.
 
 ---
 
@@ -63,23 +66,21 @@ rm -f /etc/whaviso/whaviso.env
 
 Faça idealmente junto com o passo 2 (já vai editar os env).
 
-- [ ] **`SUPABASE_SERVICE_ROLE_KEY`** (a mais importante: bypassa RLS + Admin API): no painel Supabase (Settings > API), regenerar; atualizar em **api.env E zap.env** (as duas cópias); reiniciar os dois serviços.
-- [ ] **`META_APP_SECRET` e `META_ACCESS_TOKEN`**: no App / System User da Meta, gerar novo; atualizar `zap.env`; reiniciar o zap.
-- [ ] **`SEND_CODE_HOOK_SECRET`**: gerar novo `v1,whsec_...`; colar no painel Supabase (Authentication > Hooks > Send SMS) E no `zap.env` (os dois lados têm que bater); reiniciar o zap.
+- [x] **`SUPABASE_SERVICE_ROLE_KEY`** (a mais importante: bypassa RLS + Admin API): no painel Supabase (Settings > API), regenerar; atualizar em **api.env E zap.env** (as duas cópias); reiniciar os dois serviços.
+- [x] **`META_APP_SECRET` e `META_ACCESS_TOKEN`**: no App / System User da Meta, gerar novo; atualizar `zap.env`; reiniciar o zap.
+- [x] **`SEND_CODE_HOOK_SECRET`**: gerar novo `v1,whsec_...`; colar no painel Supabase (Authentication > Hooks > Send SMS) E no `zap.env` (os dois lados têm que bater); reiniciar o zap.
 
 > Enquanto o H1 (tirar a service_role do zap) não for feito, a service_role vive nos dois env e deve ser rotacionada nos dois juntos.
 
 ---
 
-## 4. Firewall e bind das portas  [depende do deploy para o bind]
+## 4. Firewall e bind das portas  🟡 ufw OK; bind da api corrigido, aguardando deploy (2026-07-07)
 
-- [ ] Após o deploy, confirmar que api e zap escutam só em loopback:
+- [x] **ufw verificado (2026-07-07)**: default deny incoming; 22/SSH aberto; 80/443 só das faixas Cloudflare (IPv4+IPv6); 3001/3002 fora do allow (fechadas de fora). Correto.
+- [ ] **bind**: a verificação de 2026-07-07 achou a **api em `0.0.0.0:3001`** (o zap já em `127.0.0.1:3002`). Não estava exposto (o ufw bloqueia a 3001), mas faltava a defesa em profundidade. **Corrigido no código** (`apps/api/src/env.ts` + `server.ts`: a api passa a bindar `127.0.0.1` por padrão, configurável por `API_HOST`, espelhando o zap). Precisa de **deploy** para valer; depois re-rodar e confirmar que os DOIS estão em loopback:
 ```bash
-ss -tlnp | grep -E '3001|3002'   # deve mostrar 127.0.0.1, nao 0.0.0.0
-```
-- [ ] Confirmar o ufw:
-```bash
-ufw status verbose   # so 22 + 80/443 das faixas Cloudflare; 3001/3002 fechadas de fora
+ss -tlnp | grep -E ':3001|:3002'   # ambos devem mostrar 127.0.0.1
+ufw status verbose                 # so 22 + 80/443 das faixas Cloudflare
 ```
 
 ---
