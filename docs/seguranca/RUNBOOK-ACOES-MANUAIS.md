@@ -1,6 +1,6 @@
 # Runbook: ações manuais de segurança (só o dono aplica)
 
-Companheiro de [AUDITORIA-SEGURANCA.md](AUDITORIA-SEGURANCA.md) e [RISCOS-ACEITOS-E-DIFERIDOS.md](RISCOS-ACEITOS-E-DIFERIDOS.md). Lista o que precisa ser feito FORA do código (servidor, chaves, painel Supabase, deploy). Cada passo diz se depende do deploy. Data: 2026-07-06.
+Companheiro de [AUDITORIA-SEGURANCA.md](AUDITORIA-SEGURANCA.md) e [RISCOS-ACEITOS-E-DIFERIDOS.md](RISCOS-ACEITOS-E-DIFERIDOS.md). Lista o que precisa ser feito FORA do código (servidor, chaves, painel Supabase, deploy). Cada passo diz se depende do deploy. Data: 2026-07-06. **Atualizado em 2026-07-07** (ver o bloco de status no passo 0).
 
 Sugestão de cadência: um passo por vez, confirmando cada um antes do próximo.
 
@@ -10,7 +10,16 @@ Sugestão de cadência: um passo por vez, confirmando cada um antes do próximo.
 
 - [x] **Migrations 0069 e 0070 aplicadas no Supabase cloud** (`supabase db push`, pooler session 5432) e verificadas em produção: o role `whaviso_zap` tem exatamente os privilégios de coluna corretos em `envios`/`creditos_carteira` (e NÃO tem nas colunas da api); `anon`/`authenticated` não têm mais SELECT nas tabelas via PostgREST.
 - [x] **Banco de teste local (`whaviso_dev`) recriado** com todas as migrations (validate_migrations) e check de cobertura de RLS passando.
-- [x] **Correções de código aplicadas na branch `development`** (frontend, api, zap, nginx, systemd, CI), lint e typecheck passando. NÃO commitado nem deployado ainda (decisão sua).
+- [x] **Hardening de segurança commitado e DEPLOYADO em produção (2026-07-07)** (frontend, api, zap, nginx, systemd, CI): gate + deploy da GitHub Action verdes.
+
+### Concluído em 2026-07-07 (esta rodada)
+
+- [x] **Passo 1 (deploy do hardening)** e **Passo 5 (nginx/CSP)**: no ar. CSP/HSTS/X-Frame-Options ativos no documento (confirmado por curl); login Google validado com **zero violação de CSP**.
+- [x] **Passo 6 (painel Supabase)**: rate limits, Refresh Token Rotation + Reuse Detection, OTP expiry (Phone 600s/Email 3600s), anonymous OFF, SSL Enforcement, MFA (2 fatores). Detalhes no passo 6.
+- [x] **Passo 10 (backup próprio do banco)**: instalado e no ar no VPS (pg_dump 17, timer diário). Detalhes no passo 10.
+- [ ] **Ainda NÃO pushado/deployado**: commit `6562627` na `development` (frontend: GIS init única + `@hookform/resolvers` 5.4.0 para zod v4, elimina 2 avisos de console do login). Push + deploy quando quiser, junto com a troca de fonte em andamento.
+
+**Ainda pendente por você (detalhado abaixo):** passo 2 (dividir env por serviço), passo 3 (rotacionar segredos), passo 4 (conferir firewall/bind), passo 7 (Meta, quando ativar), passo 8 (deps de dev), passo 9 (follow-ups de engenharia).
 
 ---
 
@@ -18,9 +27,11 @@ Sugestão de cadência: um passo por vez, confirmando cada um antes do próximo.
 
 As correções de código (helmet, trustProxy, bind 127.0.0.1, rate limit do zap, CSP do nginx, healthz sem número, etc.) só passam a valer em produção depois do deploy.
 
-- [ ] Revisar o diff na `development` e commitar (as convenções do repo: sem travessão, sem menção a IA; commit no seu nome).
-- [ ] Deploy para produção (branch `main`, via a GitHub Action / o fluxo `/deploy`).
-- [ ] **Importante:** o deploy TEM que rodar `npm ci`/`npm install` no servidor, porque foram adicionadas 2 dependências de runtime: `@fastify/helmet` (api) e `@fastify/rate-limit` (zap). Sem isso, os serviços não sobem.
+- [x] Revisado e commitado (commit `dea8652` + follow-ups `1dfd8b5`/`ae283d3`/`7581c78`), no seu nome, sem travessão/IA.
+- [x] Deploy para produção (branch `main`, GitHub Action): gate + deploy verdes em 2026-07-07.
+- [x] O deploy rodou `npm ci` no servidor (as 2 deps de runtime `@fastify/helmet` e `@fastify/rate-limit` subiram; api/zap no ar).
+
+> Pendente relacionado: o commit `6562627` (frontend, avisos de console do login) está na `development` e ainda NÃO foi para a `main`/produção. Quando for, mesmo fluxo (`/deploy`).
 
 > As migrations já estão no cloud (passo 0), então aqui é só código. Se fizer pelo `/deploy`, ele detecta que não há migration pendente e segue direto para o deploy do código.
 
@@ -73,33 +84,32 @@ ufw status verbose   # so 22 + 80/443 das faixas Cloudflare; 3001/3002 fechadas 
 
 ---
 
-## 5. Validar a CSP e o login Google no site publicado  [depende do passo abaixo, NÃO é automático]
+## 5. Validar a CSP e o login Google no site publicado  ✅ CONCLUÍDO 2026-07-07
 
 A CSP foi endurecida para o Google Identity Services sem afrouxar. **Importante: o `deploy.sh`/GitHub Action NUNCA toca no nginx** (só faz `git pull` + `npm ci` + build da SPA + restart de api/zap). Uma mudança em `deploy/nginx/whaviso.conf` só chega ao servidor com uma cópia manual.
 
-- [ ] Copiar o `whaviso.conf` atualizado para o servidor e recarregar:
+- [x] `whaviso.conf` copiado e recarregado no servidor:
 ```bash
 cp /opt/whaviso/app/deploy/nginx/whaviso.conf /etc/nginx/sites-available/whaviso.conf
 nginx -t && systemctl reload nginx
 ```
-- [ ] `curl -I https://whaviso.com` e conferir que o header `Content-Security-Policy` é o novo (com `https://accounts.google.com` em script-src/frame-src/connect-src e `object-src 'none'`).
-  > Achado em 2026-07-06: essa validação vai falhar até o bug de herança do `add_header` ser corrigido (as locations `= /index.html` e `/assets/` tinham `add_header` próprio, que cancela a herança dos headers do `server{}`). Já corrigido no código (headers repetidos nas duas locations, com comentário explicando o porquê); precisa estar na cópia que for para o servidor.
-- [ ] No navegador (DevTools > Console), fazer login com Google e confirmar ZERO violação de CSP e que o login funciona.
-- [ ] Se o GIS puxar algo de `www.gstatic.com` (alguns fluxos puxam), acrescentar `https://www.gstatic.com` ao `script-src`/`connect-src` e redeployar.
+- [x] `curl -I https://whaviso.com`: CSP nova + HSTS + X-Frame-Options confirmados no documento. O bug de herança do `add_header` (as locations `= /index.html` e `/assets/` cancelavam os headers do `server{}`) foi corrigido no commit `1dfd8b5` e já está no ar. (Nos assets, o Cloudflare pode servir cópias em cache de antes do reload; renova sozinho no próximo deploy ou com Purge cache. Não é gap de segurança: o CSP do documento é o que vale.)
+- [x] Login com Google validado no DevTools: **ZERO violação de CSP** (o hardening não quebrou o login). Avisos residuais (GIS init 2x, ZodError) tratados no commit `6562627`; o `Cross-Origin-Opener-Policy` é do lado do Google (accounts.google.com), benigno, nada a fazer.
+- [ ] (Condicional, não ocorreu) Se algum dia o GIS puxar algo de `www.gstatic.com`, acrescentar ao `script-src`/`connect-src` e redeployar.
 
 ---
 
-## 6. Painel do Supabase (configuração, não código)  [independe de deploy]
+## 6. Painel do Supabase (configuração, não código)  ✅ CONCLUÍDO 2026-07-07 (2 exceções abaixo)
 
 Itens do checklist de produção do Supabase que dependem do painel:
 
-- [ ] **Authentication > Rate Limits**: revisar os limites de ENVIO e de VERIFICAÇÃO de OTP/SMS. É a proteção real de brute-force do login (o OTP é validado pelo Supabase, não pela api).
-- [ ] **Tokens/Sessão**: manter o TTL do access token (JWT) curto (ex.: 3600s); manter **Refresh Token Rotation** ligada e, se disponível, **Reuse Detection** (invalida a família ao detectar reuso de refresh token roubado).
-- [ ] **OTP expiry** <= 3600s.
-- [ ] **Database > Settings > SSL**: habilitar SSL Enforcement.
-- [ ] **Network Restrictions**: limitar os IPs que acessam o banco, se viável com o pooler usado.
-- [ ] **MFA na conta Supabase** e ao menos 2 owners na organização (evita perda de acesso).
-- [ ] **PITR** conforme o tamanho do banco (PITR/snapshots do Supabase seguem **indisponiveis no plano FREE**; so em planos pagos). Enquanto isso, o backup proprio abaixo (item 10) cobre o gap.
+- [x] **Authentication > Rate Limits**: revisados; mantidos os defaults seguros (verificação de OTP 30/5min por IP; envio de SMS 30/h global). É a proteção real de brute-force do login (o OTP é validado pelo Supabase, não pela api).
+- [x] **Tokens/Sessão**: **Refresh Token Rotation** + **Reuse Detection** ligados ("Detect and revoke potentially compromised refresh tokens" = ON, reuse interval 10s). Access token TTL no default (3600s).
+- [x] **OTP expiry** <= 3600s: Phone 600s, Email 3600s.
+- [x] **Database > Settings > SSL**: SSL Enforcement **ligado**.
+- [ ] **Network Restrictions**: **risco aceito (2026-07-07), NÃO aplicar** por ora, o IPv4 do VPS muda (quebraria api/zap e o `db push`) e o comportamento com o pooler é inconsistente. Rever só com IP de saída estático.
+- [x] **MFA na conta Supabase**: ligado, **2 fatores TOTP** configurados. (2º owner na org: só se houver 2ª pessoa de confiança; senão o essencial, não perder acesso, está coberto pela recuperação do GitHub, que é o provedor de login da conta Supabase, garanta 2FA + recovery codes no GitHub.)
+- [x] **Backup diário** cobrindo o gap: ver passo 10 (instalado e no ar). **PITR/snapshots seguem indisponíveis no plano FREE.**
 - [ ] (Opcional) **CAPTCHA** nos fluxos de auth.
 
 ---
@@ -134,14 +144,14 @@ Registrados em [RISCOS-ACEITOS-E-DIFERIDOS.md](RISCOS-ACEITOS-E-DIFERIDOS.md), p
 
 ---
 
-## 10. Backup próprio do banco (o gap de backup do plano FREE)  [depende do deploy trazer os arquivos]
+## 10. Backup próprio do banco (o gap de backup do plano FREE)  ✅ CONCLUÍDO 2026-07-07
 
 O plano FREE do Supabase **não tem backup nenhum** (sem PITR, sem snapshot). O gap agora tem solução **no código**: uma rotina de `pg_dump` diária rodando no VPS por systemd timer (dumps em `/var/lib/whaviso/backups`, formato custom, rotação de 14 dias). Detalhes e o passo a passo completo em [../../deploy/README.md](../../deploy/README.md), seção "Backups do banco".
 
-Passos manuais (resumo; o script `deploy/scripts/backup-db.sh` já vem no checkout após o deploy):
-- [ ] Descobrir a versão do Postgres do servidor (`select version();`) e, se for mais nova que o `postgresql-client` do VPS (o Ubuntu 24.04 traz o 16), instalar o client compatível pelo PGDG e apontar `PG_DUMP_BIN` para o binário versionado. Sem isso o dump falha com "server version mismatch".
-- [ ] Criar `/etc/whaviso/backup.env` a partir de `deploy/whaviso-backup.env.example`, com a `BACKUP_DATABASE_URL` do **owner `postgres`** (Session pooler 5432, **nunca** a 6543). Dono **root:root, modo 600** (mais restrito que api/zap.env: é a credencial do owner, acesso total).
-- [ ] Copiar as 2 units (`whaviso-backup.service` e `.timer`) para `/etc/systemd/system/`, `systemctl daemon-reload`, testar com `systemctl start whaviso-backup.service` (conferir `journalctl` + `ls -la /var/lib/whaviso/backups`) e habilitar com `systemctl enable --now whaviso-backup.timer`.
-- [ ] Guardar o procedimento de **restauração** (`deploy/scripts/restore-db.sh`) à mão: um backup que não se sabe restaurar é inútil.
+Passos manuais (**concluídos em 2026-07-07**; o script `deploy/scripts/backup-db.sh` já vem no checkout após o deploy):
+- [x] Versão do Postgres do servidor descoberta: **17.6**. Como o Ubuntu 24.04 traz o `postgresql-client` 16 (que recusaria dumpar um servidor 17), instalado o **postgresql-client-17 pelo PGDG**; `PG_DUMP_BIN=/usr/lib/postgresql/17/bin/pg_dump`.
+- [x] `/etc/whaviso/backup.env` criado a partir do exemplo, com a `BACKUP_DATABASE_URL` do **owner `postgres`** (Session pooler 5432, **nunca** a 6543). Dono **root:root, modo 600**.
+- [x] Units `whaviso-backup.service` e `.timer` copiados, `daemon-reload`, **teste manual OK** (dump validado, ~460K) e **timer habilitado** (`enable --now`; NEXT ~06:20 UTC / 03:20 BRT diário, rotação 14 dias).
+- [x] Procedimento de **restauração** documentado no próprio `deploy/scripts/restore-db.sh` (guia numerado de 6 passos + `-h` reimprime). Restore ainda não exercitado (só validação de integridade do dump via `pg_restore --list`); teste real de restauração num projeto novo fica como exercício futuro opcional.
 
 > O dump é **sensível** (telefones, Pix, hashes de token): diretório 700, arquivos 600. Se enviar para fora da máquina (`BACKUP_REMOTE_CMD`), o destino tem que ser privado e criptografado. **PITR segue indisponível no FREE**: esta rotina é a rede de proteção enquanto não houver plano pago.

@@ -1,27 +1,55 @@
 #!/usr/bin/env bash
 # whaviso: restauracao de um dump gerado pelo backup-db.sh (formato custom -> pg_restore).
-# Rode A MAO, com cuidado. NAO e chamado por nenhum timer. Ver a secao "Backups do banco"
-# em deploy/README.md.
+# Rode A MAO, com cuidado. NAO e chamado por nenhum timer. Companheiro do backup-db.sh e
+# da secao "Backups do banco" em deploy/README.md.
 #
 # Por padrao este script so PREVIA: mostra o indice (TOC) do dump e o comando que rodaria,
-# SEM tocar no banco. Passe --yes para restaurar de verdade.
+# SEM tocar em banco nenhum. Passe --yes (e a RESTORE_DATABASE_URL) para restaurar de verdade.
+# Rode com -h para reimprimir este guia.
 #
-# USO:
-#   # previa (nao toca em nada): so precisa do arquivo
-#   /opt/whaviso/app/deploy/scripts/restore-db.sh /var/lib/whaviso/backups/whaviso-YYYYMMDD-HHMMSS.dump
+# ===================== COMO RESTAURAR (passo a passo) =====================
+# Um restore costuma acontecer meses depois, no susto. Leia os 6 passos inteiros
+# antes de comecar; nunca pule os passos 3 a 5.
 #
-#   # restauracao real (DESTRUTIVA no destino): exige RESTORE_DATABASE_URL e --yes
-#   RESTORE_DATABASE_URL="postgresql://postgres.<ref>:<SENHA>@aws-0-<regiao>.pooler.supabase.com:5432/postgres" \
-#     /opt/whaviso/app/deploy/scripts/restore-db.sh --yes /var/lib/whaviso/backups/whaviso-YYYYMMDD-HHMMSS.dump
+# 1) ESCOLHA O DUMP. Liste e pegue o mais recente (ou o da data desejada):
+#      ls -la /var/lib/whaviso/backups
+#    Os nomes sao whaviso-AAAAMMDD-HHMMSS.dump (horario America/Sao_Paulo).
+#
+# 2) PREVIA (nao toca em nada): confere que o indice lista as tabelas de public
+#    (negocio) e auth (usuarios):
+#      /opt/whaviso/app/deploy/scripts/restore-db.sh /var/lib/whaviso/backups/whaviso-AAAAMMDD-HHMMSS.dump
+#
+# 3) NAO restaure por cima da PRODUCAO. O restore e destrutivo (--clean derruba os
+#    objetos existentes). Crie um destino NOVO e vazio para conferir primeiro: um
+#    projeto Supabase novo, ou um banco Postgres limpo. Pegue a connection string do
+#    OWNER `postgres` do destino (Session pooler 5432, ou conexao direta IPv6).
+#
+# 4) RESTAURE no destino novo (precisa de --yes E da RESTORE_DATABASE_URL do destino):
+#      RESTORE_DATABASE_URL="postgresql://postgres.<ref>:<SENHA>@aws-1-us-east-1.pooler.supabase.com:5432/postgres" \
+#        /opt/whaviso/app/deploy/scripts/restore-db.sh --yes /var/lib/whaviso/backups/whaviso-AAAAMMDD-HHMMSS.dump
+#    Se o pg_restore nao estiver no PATH, aponte o binario versionado (o script deriva o
+#    pg_restore do mesmo diretorio do PG_DUMP_BIN):
+#      PG_DUMP_BIN=/usr/lib/postgresql/17/bin/pg_dump  (prefixe na mesma linha)
+#
+# 5) CONFIRA o destino antes de confiar nele: contagem das tabelas principais e um
+#    spot-check dos dados mais recentes. Ex.:
+#      psql "<RESTORE_DATABASE_URL>" -c "select count(*) from public.avisos;"
+#
+# 6) SO ENTAO PROMOVA: aponte o app para o destino restaurado (troque as connection
+#    strings em /etc/whaviso/api.env e zap.env) e reinicie:
+#      systemctl restart whaviso-api whaviso-zap
+#    Se restaurou no mesmo projeto, apenas valide o app.
+# ==========================================================================
+#
+# RESTAURAR SO PARTE: use RESTORE_PG_RESTORE_ARGS (ex.: "-n public" so o schema de
+# negocio, "-t public.avisos" so uma tabela, ou "--data-only" so os dados). Veja o
+# indice na previa (passo 2) antes de escolher.
 #
 # AVISOS:
-#   - O padrao usa --clean --if-exists: ele DERRUBA os objetos existentes no destino antes de
-#     recriar. Restaurar por cima do banco de PRODUCAO e destrutivo. Para recuperar dados,
-#     restaure primeiro num projeto/banco NOVO e limpo, confira, e so entao promova.
+#   - --clean --if-exists DERRUBA os objetos existentes no destino antes de recriar.
 #   - Use o OWNER `postgres` no destino (RESTORE_DATABASE_URL): precisa recriar objetos.
 #   - SESSION POOLER (:5432) ou conexao direta (IPv6); NUNCA o transaction pooler (:6543).
-#   - Para restaurar so parte, use RESTORE_PG_RESTORE_ARGS (ex.: "-n public" so o schema de
-#     negocio, ou "--data-only"). Veja o indice com a previa antes.
+#   - pg_restore tem que ser >= a versao do servidor de ORIGEM do dump (aqui: Postgres 17).
 set -euo pipefail
 
 PG_RESTORE_BIN="${PG_RESTORE_BIN:-}"
