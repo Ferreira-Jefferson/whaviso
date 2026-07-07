@@ -19,8 +19,8 @@ function IconeFacebook({ className }: { className?: string }) {
 export function RodapeSite() {
   return (
     <footer className="border-t border-linha">
-      <div className="mx-auto w-full max-w-5xl px-4 py-8">
-        <div className="flex flex-col items-center gap-4 text-center">
+      <div className="mx-auto w-full max-w-5xl px-4 py-6">
+        <div className="flex flex-col items-center gap-3 text-center">
           <Link to="/" className="inline-flex items-center gap-2 text-salvia">
             <BellLogo className="size-5 text-dourado" />
             <span className="font-display font-semibold">whaviso</span>
@@ -43,7 +43,7 @@ export function RodapeSite() {
             </Link>
           </nav>
         </div>
-        <p className="mt-6 text-center text-[10px] leading-relaxed text-tinta-2 opacity-60">
+        <p className="mt-3 text-center text-[10px] leading-relaxed text-tinta-2 opacity-60">
           CNPJ 56.883.976/0001-04 · Caçapava/SP, Brasil.
         </p>
       </div>
