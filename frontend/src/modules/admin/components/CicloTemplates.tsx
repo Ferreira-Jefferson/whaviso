@@ -51,10 +51,12 @@ interface InfoEtapa {
 function resumoEtapa(etapa: EtapaEnvio, templates: Template[]): InfoEtapa {
   // Conta só o contexto 'padrao' (a variante 'revisao' é editada à parte).
   const daEtapa = templates.filter((t) => t.chave === `ciclo.${etapa}` && t.contexto === 'padrao')
-  const ativo = daEtapa.find((t) => t.ativo) ?? null
-  const propostas = daEtapa.filter((t) => !t.ativo).length
-  const situacao: Situacao = ativo ? 'ativo' : daEtapa.length > 0 ? 'proposta' : 'vazio'
-  return { etapa, situacao, versaoAtiva: ativo?.versao ?? null, propostas }
+  // "No ar" (verde) exige a versão ativa E aprovada na Meta; sem aprovação o envio
+  // fica gated (E12), então a versão conta como aguardando (âmbar), não como no ar.
+  const noAr = daEtapa.find((t) => t.ativo && t.status_meta === 'aprovado') ?? null
+  const propostas = daEtapa.filter((t) => !(t.ativo && t.status_meta === 'aprovado')).length
+  const situacao: Situacao = noAr ? 'ativo' : daEtapa.length > 0 ? 'proposta' : 'vazio'
+  return { etapa, situacao, versaoAtiva: noAr?.versao ?? null, propostas }
 }
 
 function textoStatus(info: InfoEtapa): string {

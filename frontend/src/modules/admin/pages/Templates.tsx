@@ -36,7 +36,8 @@ export default function TemplatesPage() {
 }
 
 // Situação viva de cada chave a partir dos templates unificados: ativo (tem versão
-// no ar), proposta (só versões aguardando aprovação) ou vazio (chave sem versão).
+// ativa E aprovada na Meta, ou seja, de fato no ar), proposta (tem versões, mas
+// nenhuma ativa-e-aprovada, então segue aguardando a Meta) ou vazio (sem versão).
 // Retorna undefined enquanto carrega, para a lista não piscar um estado errado.
 function construirResumo(
   mensagens: Template[] | undefined,
@@ -51,7 +52,9 @@ function construirResumo(
   return (chave) => {
     const arr = porChave.get(chave)
     if (!arr || arr.length === 0) return 'vazio'
-    return arr.some((t) => t.ativo) ? 'ativo' : 'proposta'
+    // "No ar" (verde) exige a versão ativa E aprovada na Meta; enquanto a Meta não
+    // aprova, o envio fica gated (E12), então a chave mostra "aguardando aprovação".
+    return arr.some((t) => t.ativo && t.status_meta === 'aprovado') ? 'ativo' : 'proposta'
   }
 }
 
