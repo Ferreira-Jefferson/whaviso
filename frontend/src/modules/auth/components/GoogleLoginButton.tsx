@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams, type NavigateFunction } from 'react-router'
 import { Button } from '@/shared/ui'
 import { signInWithGoogleIdToken } from '@/shared/supabase'
 import { mensagemDeErroAuth, nextSeguro } from '@/shared/auth'
@@ -33,6 +33,18 @@ declare global {
 }
 
 const SRC_GSI = 'https://accounts.google.com/gsi/client'
+
+// O GIS e um singleton por pagina: initialize() (e o nonce) valem para a pagina toda.
+// Inicializamos UMA vez so; senao o GIS avisa "initialize() is called multiple times" a
+// cada montagem do botao (ex.: voltar do passo do codigo para o passo 1). A callback e
+// registrada uma vez e le a acao de login atual por este objeto de modulo, atualizado a
+// cada render, entao nao precisamos re-inicializar quando navigate/next/onErro mudam.
+let gisInicializado = false
+const acaoLogin: {
+  navigate: NavigateFunction | null
+  next: string | null
+  onErro: (msg: string) => void
+} = { navigate: null, next: null, onErro: () => {} }
 
 function carregarGsi(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -94,6 +106,14 @@ export function GoogleLoginButton({ onErro }: { onErro: (msg: string) => void })
   const moldura = useRef<HTMLDivElement>(null)
   const alvoGis = useRef<HTMLDivElement>(null)
 
+  // Mantem a acao de login (compartilhada no modulo) sempre com os valores atuais, sem
+  // dep array: roda a cada render. A callback unica do GIS le daqui no momento do clique.
+  useEffect(() => {
+    acaoLogin.navigate = navigate
+    acaoLogin.next = next ?? null
+    acaoLogin.onErro = onErro
+  })
+
   useEffect(() => {
     let cancelado = false
     async function montar() {
@@ -110,20 +130,26 @@ export function GoogleLoginButton({ onErro }: { onErro: (msg: string) => void })
       }
       if (cancelado || !window.google || !alvoGis.current) return
 
-      const { cru, hash } = await gerarNonce()
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        nonce: hash,
-        callback: async (resposta) => {
-          const { error } = await signInWithGoogleIdToken(resposta.credential, cru)
-          if (error) {
-            onErro(mensagemDeErroAuth(error))
-            return
-          }
-          // O AuthProvider resolve o perfil; os guards levam à home/onboarding.
-          navigate(next ?? '/app', { replace: true })
-        },
-      })
+      // Inicializa o GIS uma vez por pagina; nas montagens seguintes so re-renderiza o botao.
+      if (!gisInicializado) {
+        const { cru, hash } = await gerarNonce()
+        if (cancelado || !window.google) return
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          nonce: hash,
+          callback: async (resposta) => {
+            const { error } = await signInWithGoogleIdToken(resposta.credential, cru)
+            if (error) {
+              acaoLogin.onErro(mensagemDeErroAuth(error))
+              return
+            }
+            // O AuthProvider resolve o perfil; os guards levam à home/onboarding.
+            acaoLogin.navigate?.(acaoLogin.next ?? '/app', { replace: true })
+          },
+        })
+        gisInicializado = true
+      }
+      if (cancelado || !alvoGis.current) return
       alvoGis.current.innerHTML = ''
       // Largura = a da moldura (botão do app), p/ o clique cobrir todo o botão visível.
       const largura = Math.min(400, Math.round(moldura.current?.offsetWidth ?? 320))
@@ -133,7 +159,7 @@ export function GoogleLoginButton({ onErro }: { onErro: (msg: string) => void })
     return () => {
       cancelado = true
     }
-  }, [navigate, next, onErro])
+  }, [onErro])
 
   return (
     <div ref={moldura} className="relative w-full">
