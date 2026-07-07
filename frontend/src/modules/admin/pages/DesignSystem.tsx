@@ -197,7 +197,7 @@ export default function DesignSystemPage() {
 
       <Secao titulo="Tipografia">
         <Card className="flex flex-col gap-3">
-          <p className="font-display text-3xl text-tinta">Fraunces · display</p>
+          <p className="font-display text-3xl text-tinta">Lora · display</p>
           <p className="text-base text-tinta">
             Karla · texto corrido (font-sans). O tom é de papelaria fina, nunca fintech.
           </p>

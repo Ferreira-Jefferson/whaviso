@@ -52,7 +52,7 @@ src/
 
 ## Design System: "Calmo Editorial"
 
-Papel/creme + verde-sálvia profundo + serifa humanista (Fraunces) + sans (Karla). Tokens de cor via `@theme` em `src/index.css`. Botões pill, hairlines em vez de sombras, grain de papel sutil, motion discreto com `prefers-reduced-motion` respeitado. Ícones lucide stroke 1.75.
+Papel/creme + verde-sálvia profundo + serifa humanista (Lora) + sans (Karla). Tokens de cor via `@theme` em `src/index.css`. Botões pill, hairlines em vez de sombras, grain de papel sutil, motion discreto com `prefers-reduced-motion` respeitado. Ícones lucide stroke 1.75.
 
 ## Guards (estado atual)
 

@@ -1,8 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
-// Fontes self-hosted (@fontsource): Fraunces (display) + Karla (corpo).
-import '@fontsource-variable/fraunces'
+// Fontes self-hosted (@fontsource): Lora (display) + Karla (corpo).
+import '@fontsource-variable/lora'
 import '@fontsource/karla/400.css'
 import '@fontsource/karla/500.css'
 import '@fontsource/karla/700.css'

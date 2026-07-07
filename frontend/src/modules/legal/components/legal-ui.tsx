@@ -1,5 +1,5 @@
 // Blocos de apresentacao das paginas legais (co-locados no modulo legal). Estilo
-// alinhado ao design system "Calmo Editorial": titulo em Fraunces (salvia), corpo
+// alinhado ao design system "Calmo Editorial": titulo em Lora (salvia), corpo
 // em Karla (tinta-2), secoes numeradas. Sem regra de negocio aqui, so tipografia.
 import { type ReactNode, useEffect } from 'react'
 
