@@ -113,6 +113,7 @@ export async function aceitarAvisoDireto(avisoId: string, devedorUid?: string): 
 
 const envFake: EnvApi = {
   PORT: 0,
+  HOST: '127.0.0.1',
   DATABASE_URL: 'x',
   SUPABASE_URL: 'http://localhost',
   APP_URL: 'http://app.local',
