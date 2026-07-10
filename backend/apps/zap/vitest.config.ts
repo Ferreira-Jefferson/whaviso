@@ -21,5 +21,9 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     pool: 'forks',
     fileParallelism: false,
+    // Limpa a trava de idempotência do webhook (webhook_eventos_processados) antes de cada
+    // teste: os testes reusam wamids fixos entre casos/arquivos, e sem o reset a dedup por
+    // wamid faria um caso posterior ser ignorado. Ver test/setup.ts.
+    setupFiles: ['./test/setup.ts'],
   },
 })

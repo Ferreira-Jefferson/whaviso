@@ -64,6 +64,28 @@ export interface DepsInbound {
 }
 
 /**
+ * Idempotência de reentrega (M-DEDUP): a Meta REENTREGA o mesmo evento se não vê o 200 a
+ * tempo (o POST responde 200 e processa em background), inclusive em paralelo. Reivindica o
+ * wamid ANTES de processar (claim-first): INSERT ... ON CONFLICT DO NOTHING; retorna true na
+ * primeira vez e false se o wamid já foi visto. Torna o processamento de botão/texto
+ * at-most-once por evento e fecha a corrida read-then-write da entrega da chave Pix (dois
+ * envios simultâneos da mesma mensagem). Trade-off aceito: um crash exatamente entre o claim
+ * e o processamento perde AQUELE evento (raro; um novo toque do devedor, com novo wamid,
+ * recupera). Marcar só após o sucesso reabriria justamente a corrida de duplo envio.
+ *
+ * NÃO se aplica aos recibos de status (processarStatus): esses já são idempotentes por wamid
+ * (atualizarEntrega) e a reentrega de um status ainda deve reatualizar o estado de entrega.
+ */
+async function reivindicarEvento(pool: Pool, wamid: string): Promise<boolean> {
+  const { rows } = await pool.query<{ wamid: string }>(
+    `insert into public.webhook_eventos_processados (wamid) values ($1)
+       on conflict (wamid) do nothing returning wamid`,
+    [wamid],
+  )
+  return rows.length > 0
+}
+
+/**
  * Recibo de entrega da Meta (sent/delivered/read/failed): atualiza envios.entrega_status
  * pelo wamid, sinal que vem dos recibos de status da Meta (statuses[] no webhook).
  */
@@ -100,6 +122,8 @@ async function responder(
  * recebe resposta informativa sem reprocessar (H5.6/H5.7).
  */
 export async function processarBotao(deps: DepsInbound, evento: EventoBotao): Promise<void> {
+  // M-DEDUP: ignora a reentrega do mesmo evento (claim-first pelo wamid).
+  if (!(await reivindicarEvento(deps.pool, evento.wamid))) return
   const info = parsearPayloadBotao(evento.buttonId)
   if (!info) return
   const telefone = normalizarTelefone(evento.telefone)
@@ -259,6 +283,8 @@ async function garantirContaNoAceite(
  * Nunca loga telefone/Pix (regra de ouro).
  */
 export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Promise<void> {
+  // M-DEDUP: ignora a reentrega do mesmo evento (claim-first pelo wamid).
+  if (!(await reivindicarEvento(deps.pool, evento.wamid))) return
   const telefone = normalizarTelefone(evento.telefone)
   if (!telefone) return
 

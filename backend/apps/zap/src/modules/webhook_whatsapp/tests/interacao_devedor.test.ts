@@ -38,9 +38,11 @@ describe('E7 interação do devedor', () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
     const deps = { pool: poolSuper, logger, whats }
+    // Dois toques reais = dois wamids distintos (a dedup por wamid não os funde): a corrida
+    // é resolvida pela máquina de estados (FOR UPDATE), não pela dedup.
     await Promise.all([
-      processarBotao(deps, botao('ja_paguei', avisoId)),
-      processarBotao(deps, botao('ja_paguei', avisoId)),
+      processarBotao(deps, { ...botao('ja_paguei', avisoId), wamid: 'w_jp_a' }),
+      processarBotao(deps, { ...botao('ja_paguei', avisoId), wamid: 'w_jp_b' }),
     ])
     const aviso = await poolSuper.query(`select status from public.avisos where id=$1`, [avisoId])
     expect(aviso.rows[0].status).toBe('informado_pago')
@@ -103,9 +105,13 @@ describe('E7 interação do devedor', () => {
     await processarBotao({ pool: poolSuper, logger, whats }, botao('ver_pix', avisoId))
     const entrega = await poolSuper.query(`select entrega_chave_status from public.avisos where id=$1`, [avisoId])
     expect(entrega.rows[0].entrega_chave_status).toBeNull() // reentregável
-    // Re-tap reentrega (agora sem falha): marca entregue.
+    // Re-tap reentrega (agora sem falha): marca entregue. É um NOVO toque = novo wamid (a
+    // dedup por wamid só barra a reentrega do MESMO evento, não um toque posterior real).
     const whats2 = clienteWhatsFake()
-    await processarBotao({ pool: poolSuper, logger, whats: whats2 }, botao('ver_pix', avisoId))
+    await processarBotao(
+      { pool: poolSuper, logger, whats: whats2 },
+      { ...botao('ver_pix', avisoId), wamid: 'w_ver_pix_retap' },
+    )
     expect(whats2.enviadas).toHaveLength(2)
     const entrega2 = await poolSuper.query(`select entrega_chave_status from public.avisos where id=$1`, [avisoId])
     expect(entrega2.rows[0].entrega_chave_status).toBe('entregue')
@@ -115,6 +121,34 @@ describe('E7 interação do devedor', () => {
       [avisoId],
     )
     expect(ev.rows[0].n).toBe(1)
+    await limpar(cobradorId)
+  })
+
+  // --- M-DEDUP: reentrega do MESMO wamid pela Meta não reprocessa ----------------------
+  it('M-DEDUP: reentrega do MESMO wamid não reentrega a chave (dedup por wamid)', async () => {
+    const { cobradorId, avisoId } = await criarAvisoPendente({
+      dataCombinada: '2026-12-15',
+      pixChave: 'chave@pix.com',
+    })
+    await poolSuper.query(`update public.avisos set pix_titular='Fulano', pix_banco='Banco X' where id=$1`, [avisoId])
+    let n = 0
+    // A 2ª mensagem de envio (titular+banco) do 1º processamento estoura: fica reentregável
+    // (entrega null). Isso valida que a dedup, e não a marcação de entrega, é quem barra.
+    const whats = clienteWhatsFake(() => {
+      n++
+      if (n === 2) throw new Error('falha de envio após retrys')
+      return { wamid: `w_${n}` }
+    })
+    const evento = botao('ver_pix', avisoId) // wamid fixo: a MESMA entrega chegando 2x
+    await processarBotao({ pool: poolSuper, logger, whats }, evento)
+    const e1 = await poolSuper.query(`select entrega_chave_status from public.avisos where id=$1`, [avisoId])
+    expect(e1.rows[0].entrega_chave_status).toBeNull() // reentregável, mas...
+    // Reentrega do MESMO evento (mesmo wamid): a dedup ignora, NÃO reenvia nada.
+    const whats2 = clienteWhatsFake()
+    await processarBotao({ pool: poolSuper, logger, whats: whats2 }, evento)
+    expect(whats2.enviadas).toHaveLength(0) // dedup barrou a reentrega
+    const e2 = await poolSuper.query(`select entrega_chave_status from public.avisos where id=$1`, [avisoId])
+    expect(e2.rows[0].entrega_chave_status).toBeNull() // segue reentregável para um NOVO toque
     await limpar(cobradorId)
   })
 

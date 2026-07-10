@@ -14,14 +14,17 @@ alter role whaviso_zap with password 'whaviso_zap_dev';
 -- unificada `templates` (chave 'cobrador.pagamento_informado'), semeado pela
 -- migration 0023. Não há mais seed de templates_cobrador (tabela aposentada).
 
--- APENAS TESTE/DEV: as migrations entregam os templates com status_meta='pendente'
--- (a 0068 zerou as aprovações fantasmas da era Baileys; a aprovação real agora vem
--- da Meta). Em PRODUÇÃO isso é o correto, e este seed NÃO roda lá (o db push pula o
--- seed). Nos testes, o drainer do CICLO (tabela `envios`) só envia template aprovado;
--- aprovamos aqui SÓ os templates do ciclo para exercitar o caminho de envio.
--- Escopo restrito a 'ciclo.%' de propósito: as notificações (tabela `notificacoes_cobrador`)
--- são drenadas GLOBALMENTE, então aprovar `cobrador.*`/`devedor.*` aqui faria uma notificação
--- residual de um teste virar enviável e poluir o dreno de outro (ex.: o gating do
--- notificar_cobrador). Os testes de notificação aprovam o template que precisam no próprio
--- setup, de forma local e revertida no fim (ver cadastro_pix_e14 / notificar_*).
-update public.templates set status_meta = 'aprovado' where ativo and chave like 'ciclo.%' and status_meta <> 'aprovado';
+-- APENAS TESTE/DEV: em PRODUÇÃO o status/ativação real vem da Meta e este seed NÃO roda lá
+-- (o db push pula o seed). Nos testes, TODO dreno do zap (envios, notificacoes_cobrador,
+-- notificacoes_billing) e as réplicas na janela de 24h só usam template com ativo=true (e o
+-- ciclo/notificações também exigem status_meta='aprovado'). As migrations recentes deixaram
+-- o catálogo INATIVO/pendente de propósito para produção: a 0068 zerou aprovações fantasmas
+-- da era Baileys, a 0072 reescreveu textos (re-submissão => pendente) e a 0073 rebaixou a
+-- ativo=false tudo que não estava aprovado. Sem reativar aqui, a suíte inteira (e o gate de
+-- testes do CI) fica vermelha porque nada é enviável.
+--
+-- Então, SÓ no dev/test, restauramos o catálogo para enviável (ativo + aprovado). É seguro:
+-- cada teste limpa suas linhas de outbox pelo cascade de `limpar` (delete em auth.users ->
+-- avisos -> notificacoes_cobrador), então uma notificação residual não vaza para o dreno de
+-- outro teste, e nenhum teste depende de "template inativo => não envia".
+update public.templates set ativo = true, status_meta = 'aprovado';
