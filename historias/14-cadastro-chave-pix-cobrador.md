@@ -138,7 +138,7 @@ Como **owner**, quero que todo o fluxo respeite as regras de ouro, para manter c
 
 ### Decisões em aberto
 - **Janela de expiração da sessão:** tempo exato de inatividade até encerrar a sessão (e disparar a notificação de aceite de fallback do Gatilho A) a definir na implementação.
-- **Rótulo final do botão de pedido:** "Solicitar chave Pix" é provisório; o texto é editável pelo owner (Épico 12) e pode evitar a palavra "Pix" por precaução de canal, como o **[Chave Pix]** (Épico 7).
+- **Rótulo final do botão de pedido:** "Solicitar chave Pix" é provisório; o texto é editável pelo owner (Épico 12). A precaução de evitar a palavra "Pix" no rótulo (época do WhatsApp não oficial) não existe mais desde a migração para a Meta Cloud API oficial (Épico 7).
 
 ### Fora de escopo deste épico
 - ❌ Captura da chave **na criação** do combinado (Épicos 2 e 3) e edição da chave pelo painel.

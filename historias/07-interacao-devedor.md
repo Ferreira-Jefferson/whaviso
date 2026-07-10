@@ -37,7 +37,7 @@ Como **devedor**, quero avisar que paguei com um toque, para que quem vai recebe
 ### H7.3: Tocar "Chave Pix" (ver o Pix) 🟢
 Como **devedor**, quero ver a chave Pix com o nome e o banco de quem recebe, para copiar, conferir o destinatário e pagar com segurança.
 *Critérios de aceite:*
-- [ ] O botão **Chave Pix** aparece em **todas as etapas** (o Pix é obrigatório nos dois fluxos, Épico 6); o rótulo **não contém a palavra "Pix"** (precaução de bloqueio), editável pelo owner (Épico 12).
+- [ ] O botão **Chave Pix** aparece em **todas as etapas** (o Pix é obrigatório nos dois fluxos, Épico 6); o rótulo **pode conter a palavra "Pix"** (a precaução de bloqueio era da época do WhatsApp não oficial, resolvida com a migração para a Meta Cloud API oficial), editável pelo owner (Épico 12).
 - [ ] A chave salva pelo cobrador inclui **nome do titular** e **banco**; esses dados compõem a resposta.
 - [ ] Ao tocar, o Whaviso envia **duas mensagens em sequência** (intervalo de até **3 segundos** entre elas):
   - [ ] **1ª:** só a chave, fácil de copiar, ex.: *"Chave de pagamento: [chave]"*.

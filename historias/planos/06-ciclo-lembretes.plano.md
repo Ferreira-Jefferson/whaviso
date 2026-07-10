@@ -40,7 +40,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 ### H6.2 Etapas, textos e botões
 - `[x]` Textos base D-2/D-1/D/D+1 estão na migration 0024 (templates `ciclo.<etapa>`), batem com a história.
 - `[!]` **Botões NÃO são fixos:** `enviar_lembretes/index.ts` remove `ver_pix` quando não há `pix_chave`. História: três botões sempre (Pix é obrigatório nos dois fluxos). A supressão deixa de existir.
-- `[!]` Rótulo do botão Pix hoje é **"Ver chave Pix"** (migration 0024); história pede **"Chave Pix"** (precaução de bloqueio). Rótulo de opt-out hoje é "Não quero mais lembretes"; história usa "Desativar lembretes". Editável pelo owner (E12).
+- `[!]` Rótulo do botão Pix hoje é **"Ver chave Pix"** (migration 0024); história pede **"Chave Pix"**. Rótulo de opt-out hoje é "Não quero mais lembretes"; história usa "Desativar lembretes". Editável pelo owner (E12).
 - `[x]` Valor em reais (`formatarValorBr`) e data em SP (`formatarDataBr`).
 - `[x]` Textos vêm de `templates`, zap é só transporte (`shared/templates`).
 - `[x]` Nenhuma mensagem coleta texto livre (`inbound.ts` só lê botão).
@@ -266,7 +266,7 @@ Modelo: **sonnet** — apenas registro; a construção real espera decisão de U
 ## 7. Decisões em aberto (não inventadas — confirmar com o humano)
 
 1. **H6.10 cadência configurável (🟡):** modelagem de dados da cadência custom (datas avulsas / semanal / mensal) e layout clean exigem estudo de UX. Manter MVP fixo D-2..D+1; não construir agora.
-2. **Confirmar bloqueio do WhatsApp por "Pix" em rótulo (H6.2):** se o WhatsApp não bloquear "Pix", reavaliar se "Chave Pix" é mesmo necessário. Como decidir o texto é do owner (E12), o padrão default ("Chave Pix") é seguro, mas vale validar.
+2. **Bloqueio do WhatsApp por "Pix" em rótulo (H6.2): RESOLVIDO.** A migração para a Meta Cloud API oficial e aprovada não bloqueia o termo; "Chave Pix" é o padrão (editável pelo owner, E12).
 3. **Fallback de resposta numerada: RESOLVIDO.** Os botões hoje são os interactive buttons oficiais da Meta; o fallback de resposta numerada no corpo da mensagem já está no MVP como resiliência geral do canal.
 4. **Ordem dos épicos / donos dos estados:** `pausado`/`aguardando_aprovacao_aviso_editado` são donos de E2/E3 e `recusado`/`desregistrado` de E5/E7. Definir se a migration de estados do ciclo (P1) cria todos de uma vez ou só os que E6 precisa reconhecer, para o trigger de encerramento não quebrar quando os outros épicos chegarem.
 5. **Comportamento da pausa na outbox:** ao pausar, **cancelar** os envios pendentes e recriá-los ao retomar, **ou** mantê-los e barrar no disparo pela reconferência de estado? A história pede que ao retomar valha "a etapa aplicável à data" (recriar parece mais limpo). Confirmar a estratégia antes de P7.

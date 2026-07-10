@@ -2,8 +2,9 @@
 --
 -- 1) RÓTULOS DOS BOTÕES (H6.2/H6.3, divergências): os TRÊS botões aparecem em TODAS as
 --    etapas do ciclo. Atualiza os rótulos no `conteudo.botoes` dos templates `ciclo.*`:
---      ver_pix : "Ver chave Pix" -> "Chave Pix"  (rótulo SEM a palavra "Pix",
---                precaução contra bloqueio do WhatsApp por termo sensível).
+--      ver_pix : "Ver chave Pix" -> "Chave Pix"  (a precaução de evitar a palavra "Pix"
+--                era da época do WhatsApp não oficial; resolvida com a migração para a
+--                Meta Cloud API oficial e aprovada, que não bloqueia o termo).
 --      optout  : "Não quero mais lembretes" -> "Desativar lembretes".
 --    (Rótulos são editáveis pelo owner via E12; aqui só atualizamos o padrão de catálogo.)
 --

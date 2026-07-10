@@ -46,7 +46,7 @@ Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service
 - `[x]` Evento append-only (`ja_paguei_devedor`).
 
 ### H7.3 "Chave Pix" (ver o Pix)
-- `[!]` Rótulo "não contém Pix": o template (0024) e o front (`catalogo_mensagens.ts`) usam "Ver chave Pix" / "Ver Pix". Diverge da regra "o rótulo não contém a palavra Pix". Rótulo editável pelo owner (E12) já existe.
+- `[x]` Rótulo pode conter "Pix" (regra de evitar o termo, da época do WhatsApp não oficial, resolvida com a Meta Cloud API oficial): o template (0024) e o front (`catalogo_mensagens.ts`) usam "Ver chave Pix" / "Ver Pix". Rótulo editável pelo owner (E12) já existe.
 - `[!]` **Titular + banco**: a chave salva é só `avisos.pix_chave` (text) e `chaves_pix` tem `chave/tipo/rotulo`, **sem titular nem banco**. A 2ª mensagem (titular + banco) não tem dados. (Divergência do épico; captura em E2/E3.)
 - `[!]` **Duas mensagens em sequência (até 3s)**: hoje envia **uma** mensagem (`resposta.ver_pix` com `{pix_chave}`). Não há 2ª mensagem nem o intervalo.
 - `[~]` `solicitou_pix` só no 1º toque: o evento é gravado **a cada toque** (repo linha 114), não "só no primeiro". Diverge.

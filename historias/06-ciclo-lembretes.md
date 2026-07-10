@@ -29,7 +29,7 @@ Como **devedor**, quero receber lembretes curtos e claros nas datas certas, para
 - [ ] **D (no dia), confirmação.** Texto base: *"Oi, [nome]. Hoje é o dia: [motivo], R$ X."*
 - [ ] **D+1 (1 dia depois), último aviso.** Texto base: *"Oi, [nome]. Último aviso: [motivo], R$ X."*
 - [ ] **Os três botões aparecem em todas as etapas** (inclusive D-2): **Já paguei**, **Chave Pix** e **Desativar lembretes**. Não há etapa sem botão nem botão condicional.
-- [ ] **A palavra "Pix" não vai no rótulo do botão:** o padrão é **"Chave Pix"** (precaução contra bloqueio do WhatsApp por termo sensível). O Pix existe sempre, porque é obrigatório nos dois fluxos (ver H6.divergências e Épicos 2/3).
+- [ ] **O rótulo do botão pode conter a palavra "Pix":** o padrão é **"Chave Pix"**. A precaução de evitar o termo (época do WhatsApp não oficial via Baileys, risco de bloqueio) não existe mais desde a migração para a Meta Cloud API oficial e aprovada. O Pix existe sempre, porque é obrigatório nos dois fluxos (ver H6.divergências e Épicos 2/3).
 - [ ] O **valor** é exibido em reais (vindo de centavos) e a **data** no fuso `America/Sao_Paulo`.
 - [ ] Os textos são o **padrão**; rótulos e conteúdo são **editáveis pelo owner** via templates (Épico 12). O `zap` é só o transporte.
 - [ ] Nenhuma mensagem coleta texto livre: o devedor só interage por botão (Épico 7).
@@ -148,7 +148,7 @@ Como **criador**, quero definir se o combinado se repete (e em quais datas) e qu
 - **Renomear `pendente` → `programado`:** o estado pós-aceite no ciclo passa a se chamar `programado` (palavra que descreve o que está acontecendo). Já varrido nas histórias (épicos 2, 3, 5). Falta no **código** (máquina de estados: trigger no banco + app) e no **PROJETO.md/CLAUDE.md**.
 - **`informado_pago` PARA o ciclo (inversão):** CLAUDE.md/PROJETO.md dizem "estado não-terminal, lembretes continuam". A história muda isso: ao informar pagamento, **os lembretes normais param**; a **única** mensagem possível depois é o **empurrãozinho de D+1** (se o cobrador não confirmou). Continua não-terminal (volta a `programado` se rejeitado), mas não dispara o ciclo normal. Refatoração no scheduler + textos.
 - **Três botões fixos em toda etapa:** hoje o desenho (PROJETO.md §3.3) faz os botões variarem por etapa (Já paguei só de D, Ver Pix só com chave). Passa a ser **sempre os três** (Já paguei / Chave Pix / Desativar lembretes) em todas as etapas. Conferir o código do `zap`.
-- **Rótulo sem a palavra "Pix":** o botão de Pix usa **"Chave Pix"** por precaução de bloqueio do WhatsApp. **Confirmar** se o WhatsApp realmente bloqueia "Pix" em rótulo; se não bloquear, reavaliar o texto. Rótulo editável pelo owner (Épico 12).
+- **Rótulo pode conter "Pix":** o botão usa **"Chave Pix"**. A precaução de evitar o termo era da época do WhatsApp não oficial (Baileys); resolvida com a migração para a Meta Cloud API oficial e aprovada, que não bloqueia o termo. Rótulo editável pelo owner (Épico 12).
 - **Pix obrigatório nos dois fluxos:** decorre de "Chave Pix" sempre presente. O Épico 2 (H2.1) dizia Pix **opcional** no fluxo receber; passa a ser **obrigatório** (já atualizado no Épico 2). No invertido já era obrigatório (Épico 3).
 - **Pausa por estados novos:** o ciclo precisa respeitar `pausado` e `aguardando_aprovacao_aviso_editado` (Épico 2/3), que ainda não existem na máquina de estados.
 - **Horário reservado por segundo (H6.9):** mecanismo novo de alocação de um segundo único por combinado na janela 8-18, com liberação (`null`) ao encerrar. Precisa de campo no `aviso`/`envios` e da lógica de busca de segundo livre. Não existe hoje.
@@ -159,7 +159,7 @@ Como **criador**, quero definir se o combinado se repete (e em quais datas) e qu
 ### Decisões tomadas
 - **Renomear estado para `programado`** (no lugar de `pendente`).
 - **Três botões sempre presentes:** Já paguei, Chave Pix (Pix), Desativar lembretes, em todas as etapas. Pix é obrigatório nos dois fluxos.
-- **Rótulo do botão de Pix sem a palavra "Pix"** (padrão "Chave Pix"), por precaução de bloqueio do WhatsApp.
+- **Rótulo do botão de Pix pode conter "Pix"** (padrão "Chave Pix"); a precaução de evitar o termo era da época do WhatsApp não oficial (Baileys), resolvida com a migração para a Meta Cloud API oficial.
 - **`informado_pago` para os lembretes**, com exceção do **empurrãozinho de D+1** se o cobrador não confirmar; ao clicar Já paguei, o **cobrador é notificado**.
 - **Cobrador não recebe notificação por envio** do ciclo normal (só em eventos do devedor).
 - **Horário de disparo (H6.9):** janela 08:00:00-18:00:00, um segundo único por combinado, busca a partir do horário do aceite avançando segundo a segundo (com wrap e fallback aleatório), liberação do segundo (`null`) ao encerrar/sair.
@@ -179,7 +179,7 @@ Como **criador**, quero definir se o combinado se repete (e em quais datas) e qu
 
 ### Decisões em aberto
 - ~~**H6.10 (cadência configurável)**~~ **resolvida (2026-06-25):** design de UX e schema acima (recorrência por período/datas específicas + cadência por subconjunto de etapas; tabela `aviso_ocorrencias` + `envios.ocorrencia_id`).
-- **Confirmar bloqueio do WhatsApp por "Pix" em rótulo** (H6.2): valida se "Chave Pix" é mesmo necessário.
+- ~~**Confirmar bloqueio do WhatsApp por "Pix" em rótulo** (H6.2)~~ **resolvida (2026-07-10):** a precaução era da época do WhatsApp não oficial (Baileys); com a migração para a Meta Cloud API oficial e aprovada, o termo não é bloqueado e "Chave Pix" é o padrão.
 
 ### Fora de escopo deste épico
 - ❌ O que cada botão faz quando tocado (Já paguei / Chave Pix / Desativar lembretes) e o evento `solicitou_pix` (Épico 7).
