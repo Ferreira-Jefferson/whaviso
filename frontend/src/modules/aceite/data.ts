@@ -1,5 +1,5 @@
 // Estado de servidor do módulo aceite (TanStack Query): fala SEMPRE pela `api` REST;
-// nunca SELECT anônimo (risco nº 2). O aceite do CONVITE saiu para o WhatsApp (E5: sem
+// nunca SELECT anônimo (risco nº 2). O aceite do combinado saiu para o WhatsApp (E5: sem
 // site); aqui ficam só as ações do devedor por link (`/v1/acao/:token`), que são de E7.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api_client'

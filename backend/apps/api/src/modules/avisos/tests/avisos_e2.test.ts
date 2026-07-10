@@ -3,7 +3,6 @@
 // pausar/reativar, cancelar com notificação ao devedor, limite de edições por plano.
 // Integração com whaviso_dev (app real + DB). Confronta com a história 02.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { sha256Hex } from '../../../shared/tokens'
 import {
   aceitarAvisoDireto,
   criarAppTeste,
@@ -81,47 +80,20 @@ describe('E2 H2.1/H2.2: criar + Pix obrigatório + convite de 6 dígitos', () =>
     expect(body.aviso.pix_banco).toBe('Banco Exemplo')
   })
 
-  it('H2.2/H5.0: gera número xxx-xxx (reserva), sem link/mensagem manual; só o HASH persiste', async () => {
+  it('H5.0: a criação no modo enviar não devolve número nem link/mensagem manual', async () => {
     const app = await criarAppTeste(uid)
     const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
     await app.close()
     const body = r.json()
-    // Formato xxx-xxx (hífen só visual).
-    expect(body.numero_convite).toMatch(/^\d{3}-\d{3}$/)
-    // E5 H5.0: o Whaviso envia o convite direto; a api não devolve mais mensagem pronta nem
-    // link wa.me para o criador compartilhar.
+    // E5: o Whaviso envia o combinado direto ao convidado (com botões); a api devolve só o
+    // aviso, sem número de convite, mensagem pronta ou link wa.me.
+    expect(body.numero_convite).toBeUndefined()
     expect(body.mensagem_convite).toBeUndefined()
     expect(body.link_whatsapp).toBeUndefined()
     expect(JSON.stringify(body)).not.toContain('wa.me/')
-
-    // O CLARO nunca persiste: o banco guarda só o hash sha256 do número (6 dígitos).
-    const corrido = body.numero_convite.replace('-', '')
-    const { rows } = await poolSuper.query<{ convite_hash: string | null }>(
-      `select convite_hash from public.avisos where id = $1`,
-      [body.aviso.id],
-    )
-    expect(rows[0]!.convite_hash).toBe(sha256Hex(corrido))
-    // O número em claro NÃO aparece em nenhuma coluna textual do aviso.
-    const todo = await poolSuper.query<{ t: string }>(
-      `select coalesce(nome_devedor,'')||coalesce(motivo,'')||coalesce(pix_chave,'')||coalesce(convite_hash,'') as t
-       from public.avisos where id = $1`,
-      [body.aviso.id],
-    )
-    expect(todo.rows[0]!.t).not.toContain(corrido)
   })
 
-  it('H2.2: contador de tentativas (anti-brute-force) nasce em 0 (efeito é E5)', async () => {
-    const app = await criarAppTeste(uid)
-    const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
-    await app.close()
-    const { rows } = await poolSuper.query<{ convite_tentativas: number }>(
-      `select convite_tentativas from public.avisos where id = $1`,
-      [r.json().aviso.id],
-    )
-    expect(rows[0]!.convite_tentativas).toBe(0)
-  })
-
-  it('H2.2: evento convite_gerado é gravado', async () => {
+  it('H5.0: evento combinado_gerado é gravado', async () => {
     const app = await criarAppTeste(uid)
     const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
     await app.close()
@@ -129,51 +101,7 @@ describe('E2 H2.1/H2.2: criar + Pix obrigatório + convite de 6 dígitos', () =>
       `select tipo from public.eventos_aviso where aviso_id = $1`,
       [r.json().aviso.id],
     )
-    expect(rows.map((x) => x.tipo)).toContain('convite_gerado')
-  })
-
-  it('H2.2: telefones DIFERENTES podem ter o MESMO número (unicidade é por par)', async () => {
-    // Força colisão controlada: insere a mão dois avisos com telefones distintos e o
-    // MESMO convite_hash; o índice parcial (telefone, hash) permite.
-    const hash = sha256Hex('123456')
-    const ins = async (tel: string) =>
-      poolSuper.query(
-        `insert into public.avisos
-           (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
-            motivo, valor_centavos, data_combinada, pix_chave, pix_titular, pix_banco, convite_hash)
-         values ($1,'receber','cobrador','aguardando_aceite','Maria',$2,'aluguel',9900,'2026-12-15','k@pix','Titular','Banco',$3)`,
-        [uid, tel, hash],
-      )
-    await ins('+5511900000001')
-    await expect(ins('+5511900000002')).resolves.toBeDefined()
-  })
-
-  it('H2.2: MESMO telefone NÃO pode repetir o número (unicidade por telefone)', async () => {
-    const hash = sha256Hex('654321')
-    const ins = async () =>
-      poolSuper.query(
-        `insert into public.avisos
-           (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
-            motivo, valor_centavos, data_combinada, pix_chave, pix_titular, pix_banco, convite_hash)
-         values ($1,'receber','cobrador','aguardando_aceite','Maria','+5511933330000','aluguel',9900,'2026-12-15','k@pix','Titular','Banco',$2)`,
-        [uid, hash],
-      )
-    await ins()
-    await expect(ins()).rejects.toMatchObject({ code: '23505' })
-  })
-
-  it('H2.2: geração sob corrida no MESMO telefone — N criações não colidem', async () => {
-    // 5 criações concorrentes para o mesmo telefone_devedor: o loop de retry + índice
-    // único garantem 5 números DISTINTOS (nenhuma colisão persiste).
-    const app = await criarAppTeste(uid)
-    const reqs = Array.from({ length: 5 }, () =>
-      app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() }),
-    )
-    const res = await Promise.all(reqs)
-    await app.close()
-    expect(res.every((r) => r.statusCode === 201)).toBe(true)
-    const numeros = res.map((r) => r.json().numero_convite)
-    expect(new Set(numeros).size).toBe(numeros.length) // todos distintos
+    expect(rows.map((x) => x.tipo)).toContain('combinado_gerado')
   })
 
   it('H2.4: em aguardando_aceite NENHUM envio é criado', async () => {
@@ -387,9 +315,9 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     const r = await appC.inject({ method: 'POST', url: `/v1/avisos/${id}/cancelar`, headers: AUTH })
     await appC.close()
     expect(r.statusCode).toBe(200)
-    // E5 H5.0: o convite (convite_enviar) é enfileirado na criação; isso é esperado. O que
+    // E5: o combinado (combinado_enviar) é enfileirado na criação; isso é esperado. O que
     // NÃO deve acontecer é uma notificação de CANCELAMENTO ao devedor (ele não estava no
-    // combinado). O convite pendente é superado no dreno (aviso saiu de aguardando_aceite).
+    // combinado). O envio pendente é superado no dreno (aviso saiu de aguardando_aceite).
     const notifs = await notifsAoDevedor(id)
     expect(notifs.some((n) => n.tipo === 'aviso_cancelado')).toBe(false)
   })

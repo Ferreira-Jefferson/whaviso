@@ -2,7 +2,6 @@
 // (H6.9: unicidade global, 10min/devedor, fallback registrado), liberação em terminal vs
 // suspensão, informado_pago para o ciclo + empurrãozinho de D+1, três botões em toda etapa.
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { sha256ConviteHex } from '@whaviso/shared/contracts'
 import {
   JANELA_INICIO_SEG,
   JANELA_FIM_SEG,
@@ -61,7 +60,6 @@ describe('G1: ciclo COMPLETO no fluxo INVERTIDO (cobrador_id null)', () => {
   it('aceitar invertido cria 4 envios e o drainer ENVIA (não descarta por falta de cobrador)', async () => {
     const { devedorId, avisoId } = await criarConviteInvertido({
       dataCombinada: futuro,
-      conviteHash: sha256ConviteHex('246810'),
     })
     usados.push(devedorId)
     const whats = clienteWhatsFake()
@@ -99,7 +97,6 @@ describe('H6.9: alocação do horário reservado', () => {
   it('aceite aloca um segundo na janela 08-18 + grava _orig', async () => {
     const { devedorId, avisoId } = await criarConviteInvertido({
       dataCombinada: futuro,
-      conviteHash: sha256ConviteHex('112233'),
     })
     usados.push(devedorId)
     await processarBotao({ pool: poolSuper, logger, whats: clienteWhatsFake() }, {
@@ -137,7 +134,6 @@ describe('H6.9: alocação do horário reservado', () => {
     const { devedorId, avisoId } = await criarConviteInvertido({
       dataCombinada: futuro,
       telefoneDevedor: T,
-      conviteHash: sha256ConviteHex('445566'),
     })
     usados.push(devedorId)
     await processarBotao({ pool: poolSuper, logger, whats: clienteWhatsFake() }, {

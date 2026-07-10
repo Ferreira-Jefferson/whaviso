@@ -308,7 +308,7 @@ async function pularOferta(deps: DepsWizard, telefone: string, avisoId: string):
     if (!origem) return false
     if (origem === 'aceite') {
       const alvo = await carregarAvisoAlvo(cli, avisoId)
-      if (alvo) await enfileirarNotificacao(cli, alvo, 'convite_aceito')
+      if (alvo) await enfileirarNotificacao(cli, alvo, 'combinado_aceito')
     }
     return true
   })
@@ -409,7 +409,7 @@ export async function expirarSessoesPix(deps: { pool: Pool; logger: LogLike }): 
     for (const r of rows) {
       if (r.origem === 'aceite') {
         const alvo = await carregarAvisoAlvo(cli, r.aviso_id)
-        if (alvo) await enfileirarNotificacao(cli, alvo, 'convite_aceito')
+        if (alvo) await enfileirarNotificacao(cli, alvo, 'combinado_aceito')
       }
     }
     return rows.length

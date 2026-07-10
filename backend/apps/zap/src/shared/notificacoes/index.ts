@@ -11,11 +11,9 @@ import type { PoolClient } from '@whaviso/shared/db'
 
 export type TipoNotificacao =
   | 'pagamento_informado'
-  | 'convite_aceito'
-  | 'convite_dado_incorreto'
-  | 'convite_recusado'
-  | 'convite_telefone_divergente'
-  | 'convite_tentativas_esgotadas'
+  | 'combinado_aceito'
+  | 'combinado_dado_incorreto'
+  | 'combinado_recusado'
   | 'optout'
   | 'reativacao'
   // E2: estado do combinado ao DEVEDOR + edição recusada ao COBRADOR.
@@ -63,8 +61,8 @@ function resolverAlvo(
 
 const EVENTO_FONTE: Partial<Record<TipoNotificacao, string>> = {
   pagamento_informado: 'ja_paguei_devedor',
-  convite_aceito: 'aceite',
-  convite_recusado: 'recusado',
+  combinado_aceito: 'aceite',
+  combinado_recusado: 'recusado',
   optout: 'optout',
   reativacao: 'reativado',
   aviso_pausado: 'pausado',

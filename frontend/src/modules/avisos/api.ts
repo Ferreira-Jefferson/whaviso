@@ -297,8 +297,8 @@ export function useReativarAviso(id: string) {
 
 /**
  * POST /v1/avisos/:id/ativar (H4.3): ativa uma anotação da agenda (sem_aviso ->
- * aguardando_aceite), gera o convite. Pode levar dados faltantes (telefone/Pix) no corpo.
- * Resposta = formato da criação (aviso + convite). PESSIMISTA.
+ * aguardando_aceite), envia o combinado. Pode levar dados faltantes (telefone/Pix) no corpo.
+ * Resposta = formato da criação (só o aviso). PESSIMISTA.
  */
 export function useAtivarAviso(id: string) {
   const qc = useQueryClient()

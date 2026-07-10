@@ -436,7 +436,7 @@ export default function PainelPage() {
                   ? 'Combinados encerrados aparecem aqui.'
                   : grupo === 'agenda'
                     ? 'Anotações na agenda (nada enviado ainda) aparecem aqui.'
-                    : 'Crie seu primeiro combinado para gerar o convite.'
+                    : 'Crie seu primeiro combinado para enviar.'
             }
             acao={
               buscaUrl || (grupo !== 'ativos' && grupo !== 'todos') ? undefined : (

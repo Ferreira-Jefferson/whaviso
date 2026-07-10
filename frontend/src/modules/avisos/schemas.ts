@@ -1,11 +1,11 @@
 // Schema Zod do formulário de criar aviso. Valida contra os contratos da api
 // (centavos int, E.164, data YYYY-MM-DD) com mensagens amigáveis pt-BR.
 //
-// Dois fluxos, ambos com convite/aceite pelo WhatsApp:
-//  - receber: convido o DEVEDOR (nome_devedor + telefone_devedor). O Pix é meu.
-//  - pagar (invertido): EU sou o devedor e convido o COBRADOR (nome_devedor agora
+// Dois fluxos, ambos com combinado/aceite pelo WhatsApp:
+//  - receber: mando o combinado ao DEVEDOR (nome_devedor + telefone_devedor). O Pix é meu.
+//  - pagar (invertido): EU sou o devedor e mando o combinado ao COBRADOR (nome_devedor agora
 //    é o nome da pessoa que vou pagar + telefone_devedor é o WhatsApp dela). O Pix
-//    é dela (posso pré-preencher). Telefone obrigatório nos DOIS (vai o convite).
+//    é dela (posso pré-preencher). Telefone obrigatório nos DOIS (vai o combinado).
 import { z } from 'zod'
 import { telefoneE164 } from '@/shared/contracts'
 
@@ -19,7 +19,7 @@ export const MAX_MOTIVO_CARACTERES = 50
 export const novoAvisoSchema = z
   .object({
     direcao: z.enum(['receber', 'pagar']),
-    // H4.1: `enviar` gera o convite agora; `agenda` só anota (nasce sem_aviso, sem
+    // H4.1: `enviar` envia o combinado agora; `agenda` só anota (nasce sem_aviso, sem
     // envio). No modo agenda telefone e Pix são opcionais (cobrados só ao ativar).
     modo: z.enum(['enviar', 'agenda']),
     nome_devedor: z
@@ -40,7 +40,7 @@ export const novoAvisoSchema = z
     data_combinada: z
       .string()
       .regex(DATA_ISO, 'Escolha a data do combinado.'),
-    // E.164 ou null (PhoneInput emite null enquanto incompleto). Alvo do convite.
+    // E.164 ou null (PhoneInput emite null enquanto incompleto). Alvo do combinado.
     telefone_devedor: telefoneE164.nullable(),
     pix_chave: z.string().trim().max(140, 'Chave Pix muito longa.').optional(),
     // Titular + banco da chave (H2.1): obrigatórios no RECEBER (Pix obrigatório); no
@@ -50,7 +50,7 @@ export const novoAvisoSchema = z
   })
   // No modo agenda telefone e Pix são opcionais (H4.1): só obrigatórios ao enviar.
   .refine((v) => v.modo === 'agenda' || v.telefone_devedor !== null, {
-    message: 'Informe o WhatsApp para enviar o convite.',
+    message: 'Informe o WhatsApp para enviar o combinado.',
     path: ['telefone_devedor'],
   })
   // H2.1: Pix obrigatório no receber (chave + titular + banco). No invertido (pagar) a

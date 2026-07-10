@@ -50,13 +50,13 @@ interface ConfigTipo {
 const PADRAO = (): ContextoTemplate => 'padrao'
 
 const CONFIG: Record<string, ConfigTipo> = {
-  // E5 H5.0: o CONVITE que o Whaviso manda ao CONVIDADO (o Whaviso inicia a conversa).
-  // Reusa o template `convite.resumo` (resumo + 3 botões aceite/dado_incorreto/recusa),
+  // E5: o COMBINADO que o Whaviso manda ao CONVIDADO (o Whaviso inicia a conversa).
+  // Usa o template `combinado.resumo` (resumo + 3 botões aceite/dado_incorreto/recusa),
   // variante 'revisao' no invertido (criador = devedor: inclui a chave Pix para o
   // cobrador conferir). Só sai enquanto o combinado segue aguardando aceite; se já foi
-  // respondido/expirou/encerrou antes do envio, supera (não manda convite obsoleto).
-  convite_enviar: {
-    chave: 'convite.resumo',
+  // respondido/expirou/encerrou antes do envio, supera (não manda combinado obsoleto).
+  combinado_enviar: {
+    chave: 'combinado.resumo',
     contexto: (d) => (d.criador_papel === 'devedor' ? 'revisao' : 'padrao'),
     aindaValida: (d) => d.aviso_status === 'aguardando_aceite',
   },
@@ -68,14 +68,12 @@ const CONFIG: Record<string, ConfigTipo> = {
   },
   // Aceite: no invertido (criador = devedor) o alvo é o devedor-criador e a mensagem
   // diz que a chave Pix foi confirmada (variante 'revisao', M3).
-  convite_aceito: {
-    chave: 'cobrador.convite_aceito',
+  combinado_aceito: {
+    chave: 'cobrador.combinado_aceito',
     contexto: (d) => (d.criador_papel === 'devedor' ? 'revisao' : 'padrao'),
   },
-  convite_dado_incorreto: { chave: 'cobrador.convite_dado_incorreto', contexto: PADRAO },
-  convite_recusado: { chave: 'cobrador.convite_recusado', contexto: PADRAO },
-  convite_telefone_divergente: { chave: 'cobrador.convite_telefone_divergente', contexto: PADRAO },
-  convite_tentativas_esgotadas: { chave: 'cobrador.convite_tentativas_esgotadas', contexto: PADRAO },
+  combinado_dado_incorreto: { chave: 'cobrador.combinado_dado_incorreto', contexto: PADRAO },
+  combinado_recusado: { chave: 'cobrador.combinado_recusado', contexto: PADRAO },
   // H10.5 opt-out: reconferência conservadora do PAR (C2). A linha é agendada +1min; se
   // o devedor REATIVA antes de a linha sair, o aviso volta a 'programado' (ou
   // 'informado_pago') e o opt-out vira OBSOLETO. Mesmo na corrida em que o drainer já

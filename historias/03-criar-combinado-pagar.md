@@ -1,9 +1,9 @@
 # Épico 3: Criar combinado (fluxo pagar invertido)
 
 > Fluxo **pagar invertido**: quem cria é o **devedor** (vai pagar) e convida o **cobrador** (vai receber e confirma os dados, inclusive a chave Pix).
-> É o espelho do Épico 2: mesma maquinaria de convite/aceite, mesmas regras de edição/cancelamento/pausa, mas com os papéis trocados na criação.
+> É o espelho do Épico 2: mesma maquinaria de combinado/aceite, mesmas regras de edição/cancelamento/pausa, mas com os papéis trocados na criação.
 > O combinado nasce em **aguardando_aceite** e **não dispara lembrete** até o cobrador confirmar (Épico 5).
-> Quem recebe os lembretes continua sendo o **devedor** (a si mesmo): `telefone_devedor` é sempre o alvo dos lembretes; `telefone_cobrador` é o alvo do convite neste fluxo.
+> Quem recebe os lembretes continua sendo o **devedor** (a si mesmo): `telefone_devedor` é sempre o alvo dos lembretes; `telefone_cobrador` é o alvo do combinado (o envio inicial) neste fluxo.
 > Convenções de sempre: dinheiro em **centavos** (int), datas em **America/Sao_Paulo**.
 
 ---
@@ -11,9 +11,9 @@
 ### H3.1: Cadastrar um combinado a pagar 🟢
 Como **devedor**, quero cadastrar um combinado que eu vou pagar e convidar quem vai receber, para ser lembrado dos meus compromissos antes de vencerem.
 *Critérios de aceite:*
-- [ ] Informo: **nome de quem recebe** (cobrador), **motivo**, **valor**, **data combinada**, **telefone do cobrador** (alvo do convite).
+- [ ] Informo: **nome de quem recebe** (cobrador), **motivo**, **valor**, **data combinada**, **telefone do cobrador** (alvo do combinado).
 - [ ] O **nome de quem paga** (devedor) é o do próprio criador (pré-preenchido a partir da conta).
-- [ ] Posso informar a **chave Pix** de quem recebe (para onde vou pagar), mas ela é **opcional** no fluxo invertido: o devedor nem sempre conhece a chave de quem vai receber. Se eu informar, ela vai no convite para o cobrador **conferir e confirmar** (ou apontar como incorreta), ver H3.3, e o cobrador valida/ajusta o **nome do titular** e o **banco** (usados na resposta de Pix ao devedor, Épico 7 H7.3). Se eu **não** informar, o combinado nasce sem chave e o **cobrador informa a própria chave depois**, de forma guiada (Épico 14).
+- [ ] Posso informar a **chave Pix** de quem recebe (para onde vou pagar), mas ela é **opcional** no fluxo invertido: o devedor nem sempre conhece a chave de quem vai receber. Se eu informar, ela vai no combinado para o cobrador **conferir e confirmar** (ou apontar como incorreta), ver H3.3, e o cobrador valida/ajusta o **nome do titular** e o **banco** (usados na resposta de Pix ao devedor, Épico 7 H7.3). Se eu **não** informar, o combinado nasce sem chave e o **cobrador informa a própria chave depois**, de forma guiada (Épico 14).
 - [ ] O combinado nasce com `criador_papel = devedor` e **sem cobrador vinculado** (`cobrador_id` nulo); o cobrador entra denormalizado por `nome_cobrador` / `telefone_cobrador`.
 - [ ] O valor é exibido em reais, mas persiste em **centavos** (int).
 - [ ] A data é interpretada em **America/Sao_Paulo**; o banco guarda em UTC.
@@ -23,25 +23,21 @@ Como **devedor**, quero cadastrar um combinado que eu vou pagar e convidar quem 
 
 ---
 
-### H3.2: Gerar o convite ao cobrador (número de 6 dígitos + mensagem com link) 🟢
-Como **devedor**, quero receber uma mensagem pronta com número de convite e link para enviar ao cobrador, para ele confirmar os dados e informar a chave Pix.
+### H3.2: Enviar o combinado ao cobrador pelo WhatsApp 🟢
+Como **devedor**, quero que o combinado seja enviado direto ao WhatsApp do cobrador, para ele conferir os dados, confirmar a chave Pix e responder com um toque.
 *Critérios de aceite:*
-- [ ] Vale a **mesma mecânica da H2.2**, mas o convite é direcionado ao **cobrador** (não ao devedor).
-- [ ] O número de 6 dígitos é gerado, exibido como `xxx-xxx` (hífen só visual) e salvo apenas como **hash**.
-- [ ] **Unicidade:** dois Avisos com o **mesmo telefone de cobrador** não podem ter o mesmo número de convite.
-- [ ] **Anti-brute-force:** no máximo **3 tentativas** de validação por convidado.
-- [ ] O devedor recebe uma **mensagem completa** (introdução + número de convite + link), não só o link.
-- [ ] O **link** leva o cobrador ao **WhatsApp do Whaviso**, com mensagem inicial pré-preenchida: *"Oi, aqui é [nome do devedor], meu convite é o xxx-xxx"*.
-- [ ] **Validação no aceite:** o Whaviso localiza o combinado confrontando **número de convite + telefone do cobrador** (Épico 5).
-- [ ] **Fallback sem número:** se o cobrador mandar mensagem sem o número, o Whaviso pede o número de convite (igual H2.2).
-- [ ] A tela oferece forma fácil de **copiar/compartilhar** a mensagem inteira.
+- [ ] Vale a **mesma mecânica da H2.2**, mas o combinado é enviado ao **cobrador** (não ao devedor).
+- [ ] Ao criar/ativar no modo enviar, o combinado nasce em **`aguardando_aceite`** e o Whaviso envia o **resumo + botões** direto ao WhatsApp do cobrador (Meta Cloud API).
+- [ ] O resumo traz os dados do combinado **e a chave Pix** (quando informada) para o cobrador conferir, com os botões de resposta (Épico 5).
+- [ ] O combinado é localizado pelo próprio envio (o `aviso_id` viaja no payload do botão), não por número que o cobrador precise digitar.
+- [ ] Enquanto o cobrador não responde, **nenhum lembrete** é enviado ao devedor.
 
 ---
 
 ### H3.3: Cobrador confere os dados e a chave Pix e responde com um toque 🟢
 Como **cobrador convidado**, quero conferir o combinado (inclusive a chave Pix) e responder com um botão, para confirmar, apontar erro ou recusar sem complicação.
 *Critérios de aceite:*
-- [ ] A mensagem de convite mostra os dados do combinado **e a chave Pix** para o cobrador conferir.
+- [ ] A mensagem do combinado mostra os dados **e a chave Pix** para o cobrador conferir.
 - [ ] O cobrador responde por **botão** (nomes finalizados no Épico 5; ideias: **Aceitar / tudo certo**, **Chave Pix incorreta**, **Recusar combinado**).
 - [ ] **Aceitar:** o combinado sai de `aguardando_aceite` para `programado` e o ciclo de lembretes ao **devedor** é ativado (Épico 6).
 - [ ] **Chave Pix incorreta:** o combinado **não** é aceito nem recusado; é só um sinal de "algum dado incorreto" (sem texto livre). O **devedor é notificado** para revisar e reenviar; o cobrador vê uma resposta neutra, ex.: *"Certo, vamos comunicar sua resposta."*
@@ -77,7 +73,7 @@ Como **devedor criador**, quero editar, cancelar ou pausar o combinado que criei
 
 > A maioria deste épico **já existe** (migration `0017`): `cobrador_id` nullable, `criador_papel`, `nome_cobrador`/`telefone_cobrador`, aceite genérico por papel, painel por papel, CTA de criar conta. Ver memória `whaviso-pagar-invertido`.
 
-- **Convite por número de 6 dígitos** (em vez de token): mesma divergência da H2.2, agora também por **telefone do cobrador**. Hoje o convite é compartilhado por link `wa.me` + página pública; precisa migrar para o número + validação por WhatsApp (Épico 5).
+- **Envio direto do combinado (em vez de token/link):** mesma divergência da H2.2, agora ao **telefone do cobrador**. Hoje o combinado é compartilhado por link `wa.me` + página pública; passa a ser enviado direto ao WhatsApp do cobrador pela Meta Cloud API, com aceite por botão (Épico 5).
 - **Novos estados** (`aguardando_aprovacao_aviso_editado`, `pausado`): mesma divergência do Épico 2, valem igual aqui.
 - **Aceite via site:** a página pública `/aceite/:token` (que no invertido serve para o cobrador adicionar o Pix) entra na dívida técnica de **mover o aceite 100% para o WhatsApp** (ver README e Épico 5).
 - **Quem informa o Pix muda:** hoje (migration `0017`) o **cobrador preenche** o Pix ao confirmar. Pela história, o **devedor informa** o Pix na criação (H3.1) e o cobrador só **confirma ou aponta como incorreto** por botão (H3.3). É refatoração.
@@ -85,10 +81,10 @@ Como **devedor criador**, quero editar, cancelar ou pausar o combinado que criei
 - **Backfill por telefone:** ao criar conta/salvar telefone, o sistema vincula combinados pelo número (`PATCH /perfil`). Hoje roda **sem verificação de posse** do número (risco aceito); quando houver verificação (OTP), condicionar o backfill a ela. Tratado no Épico 1/10, citado aqui por afetar o vínculo do cobrador convidado.
 
 ### Decisões tomadas
-- **Pix opcional no convite invertido (decisão revista):** o devedor pode criar/enviar o convite ao cobrador **sem** a chave, porque nem sempre conhece a chave de quem vai receber (migration `0047`). Se informar, o cobrador confere e confirma ou aponta como incorreta (H3.3); se não informar, o cobrador **informa a própria chave depois**, de forma guiada (Épico 14).
+- **Pix opcional no combinado invertido (decisão revista):** o devedor pode criar/enviar o combinado ao cobrador **sem** a chave, porque nem sempre conhece a chave de quem vai receber (migration `0047`). Se informar, o cobrador confere e confirma ou aponta como incorreta (H3.3); se não informar, o cobrador **informa a própria chave depois**, de forma guiada (Épico 14).
 
 ### Fora de escopo deste épico
-- ❌ Aceite/recusa e validação do número de convite no WhatsApp (Épico 5).
+- ❌ Aceite/recusa pelo cobrador no WhatsApp (Épico 5).
 - ❌ Disparo e textos dos lembretes ao devedor (Épico 6).
 - ❌ Confirmação de pagamento e notificação ao cobrador (Épicos 7 e 9).
 - ❌ Cadastro da chave pelo cobrador **depois** do aceite, quando o invertido nasce sem chave (Épico 14).

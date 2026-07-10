@@ -57,7 +57,7 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 | 2 | Criar combinado (fluxo receber) | [02-criar-combinado-receber.md](02-criar-combinado-receber.md) | escrito |
 | 3 | Criar combinado (fluxo pagar invertido) | [03-criar-combinado-pagar.md](03-criar-combinado-pagar.md) | escrito |
 | 4 | Modo agenda (cadastrar sem enviar e ativar depois) | [04-modo-agenda.md](04-modo-agenda.md) | escrito |
-| 5 | Convite & Aceite pelo WhatsApp | [05-convite-aceite.md](05-convite-aceite.md) | escrito |
+| 5 | Combinado & Aceite pelo WhatsApp | [05-convite-aceite.md](05-convite-aceite.md) | escrito |
 | 6 | Ciclo de lembretes (D-2 a D+1) | [06-ciclo-lembretes.md](06-ciclo-lembretes.md) | escrito |
 | 7 | Interação do devedor (Já paguei / Chave Pix / Desativar) | [07-interacao-devedor.md](07-interacao-devedor.md) | escrito |
 | 8 | Confirmação de pagamento (informado_pago) | [08-confirmacao-pagamento.md](08-confirmacao-pagamento.md) | escrito |
@@ -70,7 +70,8 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 
 ## Dívidas técnicas levantadas durante a escrita
 
-- **Remover aceite via site:** página pública `/aceite/:token` e a rota `POST` pública de aceite devem sair do código. O aceite passa a ser **100% pelo WhatsApp** (ver Épico 5). *Pendente de execução na fase de implementação.*
+- ~~**Remover aceite via site:**~~ **feito:** a página pública `/aceite/:token` e a rota `POST` pública saíram; o aceite é **100% pelo WhatsApp** (ver Épico 5).
+- **De "convite" para "combinado enviado direto para aceite" (2026-07-10):** com a Meta Cloud API oficial o Whaviso **inicia a conversa** mandando o combinado (resumo + botões) direto ao convidado. Removida toda a maquinaria do **número de convite** (número de 6 dígitos, `convite_hash`, tabela `convite_tentativas_telefone`, anti-brute-force, telefone divergente, kernel `contracts/convite.ts`, templates de fallback por número). A **etapa de aceite fica** (o combinado nasce em `aguardando_aceite`; o ciclo só ativa no aceite). Vocabulário `convite.* → combinado.*` (templates, evento `combinado_gerado`, notificações, outbox `combinado_enviar`). *Implementado em código, api/zap/front/histórias; migration `0076` a aplicar no cloud.*
 - ~~**Estudo de UX da cadência configurável (H6.10)**~~ **resolvido (2026-06-25):** recorrência (por período mensal/semanal ou datas específicas) + cadência (subconjunto de etapas), via revelação progressiva no formulário de criar, **disponível para todos** (sem trava de plano: o modelo virou carteira de créditos, cada ocorrência custa 1 envio, ver Épico 11 reescrito). Schema decidido (tabela `aviso_ocorrencias` + `envios.ocorrencia_id`, geração lazy). Ver Épico 6 H6.10 (Decisões) e Épico 8 H8.7. *Em implementação backend + frontend.*
 - **Renomear estado `pendente` → `programado`:** já aplicado nas histórias (épicos 2, 3, 5 e 6). Falta a varredura no **código** (máquina de estados: trigger no banco + app) e em **PROJETO.md/CLAUDE.md** (ver Épico 6). *Pendente na fase de implementação.*
 - **Fila de saída com espaçamento de 10 min + cancelamento (Épico 10 H10.9):** ponto **crítico**. Espaçar envios ao mesmo destinatário e anular itens superados (par opt-out/reativação, item obsoleto por estado terminal), nas duas outboxes, só com banco (sem Redis). Exige **testes dedicados** de corrida para não cancelar o que não devia. Soma-se à distância de 10 min por devedor no agendamento (Épico 6 H6.9). *Pendente.*

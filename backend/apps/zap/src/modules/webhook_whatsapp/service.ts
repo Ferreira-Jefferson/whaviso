@@ -1,11 +1,5 @@
 import { z } from 'zod'
 import type { Pool } from '@whaviso/shared/db'
-import {
-  extrairNumeroConvite,
-  gerarNumeroConvite,
-  sha256ConviteHex,
-} from '@whaviso/shared/contracts'
-import { formatarDataBr, formatarValorBr } from '@whaviso/shared/datas'
 import type { ClienteWhats, EventoBotao, EventoStatus, EventoTexto } from '../../shared/whats'
 import type { AdminSupabase } from '../../shared/supabase_admin'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
@@ -32,7 +26,7 @@ const ETAPAS = ['d_menos_2', 'd_menos_1', 'd', 'd_mais_1'] as const
 type EtapaPayload = (typeof ETAPAS)[number]
 
 // D-FALLBACK: fallback por resposta NUMERADA quando os botões interativos não chegam.
-// O convidado responde "1"/"2"/"3" e mapeamos para a ação do convite. A ordem segue a do
+// O convidado responde "1"/"2"/"3" e mapeamos para a ação do combinado. A ordem segue a do
 // resumo (1 Aceitar, 2 Algum dado incorreto, 3 Recusar). Compartilhado (uma vez aqui).
 const FALLBACK_NUMERADO: Record<string, repo.AcaoBotao> = {
   '1': 'aceite',
@@ -252,34 +246,32 @@ async function garantirContaNoAceite(
 }
 
 /**
- * H5.1: processa a 1ª mensagem de TEXTO do convidado (número de convite) e o fallback
- * numerado (1/2/3). Sem login no inbound (G3): o vínculo é sempre por telefone.
+ * Processa uma mensagem de TEXTO do devedor/convidado. Sem login no inbound (G3): o
+ * vínculo é sempre por telefone. Como o Whaviso INICIA a conversa mandando o combinado
+ * com botões (E5), não há mais caminho de "número de convite": o texto só cobre o
+ * fallback numerado dos botões e o menu do devedor já ativo.
  *
  * Ramos:
- *  - texto = "1"/"2"/"3" e há convite pendente para o telefone → fallback de botão (H5.2).
- *  - sem número de 6 dígitos → pede o número (H5.1 fallback).
- *  - número não bate com NENHUM convite → conta tentativa (H5.1/H5.9).
- *  - número bate, status terminal/expirado → informativo, NÃO conta tentativa (G1/H5.7).
- *  - número bate, em aguardando_aceite, telefone bate → resumo + botões, zera contador (H5.2).
- *  - número bate, telefone NÃO bate → divergente, avisa as 2 pontas, NÃO conta (H5.8).
- * Nunca loga telefone/Pix/número (regra de ouro).
+ *  - número de teste / wizard de Pix ativo → tratados antes (não entram aqui).
+ *  - texto = "1"/"2"/"3" e há combinado pendente de aceite p/ o telefone → age como botão.
+ *  - qualquer outro texto: se o telefone tem combinado acionável → menu de opções; senão
+ *    fica em SILÊNCIO (não vira conversa nem gasta envio).
+ * Nunca loga telefone/Pix (regra de ouro).
  */
 export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Promise<void> {
   const telefone = normalizarTelefone(evento.telefone)
   if (!telefone) return
 
   // Mini-chat de teste (sandbox): o número de teste do painel conversa SÓ com o chat
-  // de teste do admin (capturado em testar_envio). Não entra na máquina de estados de
-  // convite/devedor, então não recebe "pedir número de convite" nem menu automático.
+  // de teste do admin (capturado em testar_envio). Não entra na máquina de estados.
   if (await ehNumeroDeTeste(deps.pool, telefone)) return
 
   // E14: se há um wizard de chave ATIVO para o telefone, o texto é dado da etapa atual
-  // (titular/banco/chave ou resposta numerada do tipo). Precede a detecção de número de
-  // convite/menu (H14.4): um número durante o wizard é dado da etapa, não convite.
+  // (titular/banco/chave ou resposta numerada do tipo).
   if (await tratarTextoWizard(deps, telefone, evento.texto)) return
 
-  // Fallback numerado (D-FALLBACK): "1"/"2"/"3" só agem se houver convite pendente p/ o
-  // telefone (senão é texto livre qualquer, ignorado pela regra de negócio).
+  // Fallback numerado (D-FALLBACK): "1"/"2"/"3" agem como os botões do combinado, mas só
+  // se houver um combinado pendente de aceite p/ o telefone (senão é texto livre qualquer).
   const acaoFallback = FALLBACK_NUMERADO[evento.texto.trim()]
   if (acaoFallback) {
     const pendente = await repo.localizarConvitePendentePorTelefone(deps.pool, telefone)
@@ -287,103 +279,15 @@ export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Pr
     return
   }
 
-  const numero = extrairNumeroConvite(evento.texto)
-  if (!numero) {
-    // H7.1 / E11 H11.2: texto LIVRE de um DEVEDOR (sem chat/IA). Se o telefone tem
-    // combinado(s) ATIVO(s) que ainda aceitam ação (programado) -> menu de opções (G-C1:
-    // nunca lista informado_pago/desregistrado/terminais). O menu é UNIVERSAL (a resposta é
-    // réplica, não lembrete: NÃO consome crédito). Só se NÃO houver combinado é que caímos
-    // no fluxo de convite (pedir o número, E5).
-    const combinados = await repo.listarCombinadosParaMenu(deps.pool, telefone)
-    if (combinados.length > 0) {
-      // É um DEVEDOR com combinado(s) acionável(is). Menu liberado para todos; botões
-      // amarrados ao 1o acionável.
-      await responder(deps, telefone, 'resposta.menu_opcoes', { refId: combinados[0]!.id })
-      return
-    }
-    // Sem combinado acionável. Pede o número quando há convite PENDENTE para o telefone
-    // (convidado que tirou o número do texto, H5.1) OU quando o telefone é DESCONHECIDO
-    // (não é alvo de nenhum aviso). Se é um devedor CONHECIDO sem combinado acionável (ex.:
-    // único em informado_pago/terminal/desregistrado), fica em SILÊNCIO (H7.1/G-C1: não
-    // gasta envio nem vira conversa).
-    const pendente = await repo.localizarConvitePendentePorTelefone(deps.pool, telefone)
-    const conhecido = await repo.telefoneEhDevedorConhecido(deps.pool, telefone)
-    if (pendente || !conhecido) await responder(deps, telefone, 'convite.pedir_numero')
-    return
+  // H7.1 / E11 H11.2: texto LIVRE de um DEVEDOR (sem chat/IA). Se o telefone tem
+  // combinado(s) ATIVO(s) que ainda aceitam ação (programado) -> menu de opções (G-C1:
+  // nunca lista informado_pago/desregistrado/terminais). O menu é UNIVERSAL (réplica, não
+  // consome crédito). Sem combinado acionável, fica em SILÊNCIO: o Whaviso já inicia a
+  // conversa mandando o combinado com botões (E5), então não há mais "pedir número".
+  const combinados = await repo.listarCombinadosParaMenu(deps.pool, telefone)
+  if (combinados.length > 0) {
+    await responder(deps, telefone, 'resposta.menu_opcoes', { refId: combinados[0]!.id })
   }
-
-  const aviso = await repo.localizarPorNumeroHash(deps.pool, sha256ConviteHex(numero))
-
-  // Número não bate com nenhum convite → conta tentativa (H5.1/H5.9).
-  if (!aviso) {
-    await processarErroNumero(deps, telefone)
-    return
-  }
-
-  // Número bate mas o convite NÃO está mais em aguardando_aceite (terminal/expirado/já
-  // respondido): informativo, SEM contar tentativa (G1/H5.7).
-  if (aviso.status !== 'aguardando_aceite') {
-    await responder(deps, telefone, 'convite.ja_respondido')
-    return
-  }
-
-  // Convite expirado por prazo de 7 dias (H5.7): informativo, sem reprocessar.
-  if (aviso.convite_expira_em && aviso.convite_expira_em.getTime() < Date.now()) {
-    await responder(deps, telefone, 'convite.expirado')
-    return
-  }
-
-  // Telefone DIVERGENTE (número existe, telefone não bate): H5.8. NÃO conta tentativa.
-  if (repo.telefoneAlvo(aviso) !== telefone) {
-    await repo.notificarTelefoneDivergente(deps.pool, aviso)
-    await responder(deps, telefone, 'convite.telefone_divergente')
-    return
-  }
-
-  // Caminho feliz (H5.2): zera o contador e responde o resumo + botões.
-  await repo.zerarTentativaTelefone(deps.pool, telefone)
-  await responderResumo(deps, telefone, aviso)
-}
-
-/** Conta um erro de número e responde conforme o desfecho (H5.9). */
-async function processarErroNumero(deps: DepsInbound, telefone: string): Promise<void> {
-  const r = await repo.contarErroNumero(deps.pool, telefone, () => sha256ConviteHex(gerarNumeroConvite()))
-  if (r.tipo === 'conta') {
-    await responder(deps, telefone, 'convite.nao_encontrado')
-    return
-  }
-  if (r.tipo === 'esgotado_cadastrado') {
-    // Criador já foi notificado dentro da transação; orienta quem tentou a aguardar.
-    await responder(deps, telefone, 'convite.tentativas_cadastrado')
-    return
-  }
-  // Não cadastrado: bloqueado, mensagem diferente, sem notificar criador algum.
-  await responder(deps, telefone, 'convite.bloqueado')
-}
-
-/**
- * H5.2: monta o resumo (quem cobra/paga, motivo, valor, data; no invertido a chave Pix)
- * e os 3 botões (rótulos do template, E12). No invertido usa a variante 'revisao' (inclui
- * a chave Pix para o cobrador conferir). Botão carrega `aviso_id` no payload.
- */
-async function responderResumo(deps: DepsInbound, telefone: string, a: repo.AvisoConvite): Promise<void> {
-  const invertido = a.criador_papel === 'devedor'
-  // `cobrador` = "quem vai receber" (mesmo nome de variável do ciclo/billing e da paleta do
-  // editor; a coluna do banco é nome_cobrador). Padronizado para o template ser editável em
-  // /admin/mensagens/convite.resumo sem variável órfã (ver migration 0063).
-  const valores: Record<string, string> = {
-    cobrador: a.nome_cobrador ?? '',
-    nome_devedor: a.nome_devedor,
-    motivo: a.motivo,
-    valor: formatarValorBr(a.valor_centavos),
-    data: formatarDataBr(a.data_combinada),
-  }
-  if (invertido) valores.pix_chave = a.pix_chave ?? ''
-  await responder(deps, telefone, 'convite.resumo', {
-    valores,
-    refId: a.id,
-    contexto: invertido ? 'revisao' : 'padrao',
-  })
 }
 
 /** Normaliza o telefone do inbound (só dígitos) para o formato E.164 (+DDI...). */

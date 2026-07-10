@@ -1,8 +1,7 @@
-// Tela de sucesso após criar um aviso (H2.2 / E5 H5.0). O aceite é 100% pelo WhatsApp e,
-// agora, o WHAVISO INICIA A CONVERSA: assim que o combinado entra no modo enviar, ele manda
-// o convite (resumo + botões) direto para o WhatsApp do convidado. Não há mais link/mensagem
-// para o criador compartilhar à mão. O número de convite (xxx-xxx) fica só como reserva
-// (caso a pessoa precise localizar o combinado pelo número, H5.1).
+// Tela de sucesso após criar um aviso (H2.1 / E5). O aceite é 100% pelo WhatsApp e o
+// WHAVISO INICIA A CONVERSA: assim que o combinado entra no modo enviar, ele manda o
+// combinado (resumo + botões) direto para o WhatsApp do convidado. Não há mais link/mensagem
+// para o criador compartilhar à mão, nem número de convite.
 // Linguagem segue as Regras de Ouro: sempre combinado/lembrete (ver linguagem.ts).
 import { Link } from 'react-router'
 import { CheckCircle2, Plus } from 'lucide-react'
@@ -16,22 +15,22 @@ interface AvisoCriadoProps {
 }
 
 export function AvisoCriado({ resultado, onNovo }: AvisoCriadoProps) {
-  const { aviso, numero_convite } = resultado
+  const { aviso } = resultado
   const ehReceber = aviso.direcao === 'receber'
-  // H4.1: anotação de agenda (nada enviado): sem convite gerado.
+  // H4.1: anotação de agenda (nada enviado): combinado não enviado ainda.
   const ehAgenda = aviso.status === 'sem_aviso'
 
-  // Quem recebe o convite: receber → devedor; pagar invertido → cobrador.
+  // Quem recebe o combinado: receber → devedor; pagar invertido → cobrador.
   const nomeConvidado = ehReceber ? aviso.nome_devedor : (aviso.nome_cobrador ?? '')
 
   return (
     <div className="animate-rise">
       <PageHeader
-        titulo={ehAgenda ? 'Salvo na agenda' : 'Convite enviado'}
+        titulo={ehAgenda ? 'Salvo na agenda' : 'Combinado enviado'}
         descricao={
           ehAgenda
-            ? 'Nada foi enviado. Ative quando quiser para o Whaviso mandar o convite.'
-            : 'O Whaviso já mandou o convite pelo WhatsApp. É só aguardar a pessoa confirmar.'
+            ? 'Nada foi enviado. Ative quando quiser para o Whaviso mandar o combinado.'
+            : 'O Whaviso já mandou o combinado pelo WhatsApp. É só aguardar a pessoa confirmar.'
         }
       />
 
@@ -56,7 +55,7 @@ export function AvisoCriado({ resultado, onNovo }: AvisoCriadoProps) {
             <p className="text-sm text-tinta-2">
               Este combinado ficou só na sua agenda. Ninguém recebeu nada. Quando quiser
               avisar a pessoa, abra o detalhe e toque em <strong className="font-medium">Ativar</strong>:
-              o Whaviso manda o convite na hora.
+              o Whaviso manda o combinado na hora.
             </p>
             <Link
               to={`/app/avisos/${aviso.id}`}
@@ -65,27 +64,14 @@ export function AvisoCriado({ resultado, onNovo }: AvisoCriadoProps) {
               Ativar quando quiser
             </Link>
           </div>
-        ) : /* E5 H5.0: o Whaviso já enviou o convite direto ao convidado. */ (
+        ) : /* E5: o Whaviso já enviou o combinado direto ao convidado. */ (
           <div className="flex flex-col gap-4 border-t border-linha pt-4">
             <p className="text-sm text-tinta-2">
-              O convite foi enviado para o WhatsApp de{' '}
+              O combinado foi enviado para o WhatsApp de{' '}
               <strong className="font-medium text-tinta">{nomeConvidado}</strong>. A pessoa
-              vai ver o resumo do combinado e responder por lá com um toque. O combinado entra
-              no ciclo de lembretes assim que ela confirmar.
+              vai ver o resumo e responder por lá com um toque. O combinado entra no ciclo de
+              lembretes assim que ela confirmar.
             </p>
-
-            {/* Número de convite como RESERVA (H5.1): caso a pessoa não receba a mensagem,
-                ela pode falar com o Whaviso informando este número. */}
-            {numero_convite && (
-              <div className="rounded-card border border-linha bg-areia/40 p-3">
-                <p className="mb-0.5 text-xs text-tinta-2">
-                  Número de convite (caso precise localizar o combinado)
-                </p>
-                <p className="font-mono text-lg font-semibold tracking-wider text-tinta tabular-nums">
-                  {numero_convite}
-                </p>
-              </div>
-            )}
           </div>
         )}
 

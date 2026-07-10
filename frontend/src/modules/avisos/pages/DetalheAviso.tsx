@@ -134,7 +134,7 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   // só SINALIZA a janela e oferece o "desfazer". Marcamos a confirmação local recente
   // para mostrar a affordance; some quando o usuário sai/relê.
   const [confirmadoAgora, setConfirmadoAgora] = useState(false)
-  // H4.3: resultado da ativação (convite gerado): reusa a tela de "convite pronto".
+  // H4.3: resultado da ativação (combinado enviado): reusa a tela de "combinado enviado".
   const [resultadoAtivar, setResultadoAtivar] = useState<CriarAvisoResposta | null>(null)
 
   // H4.x: anotação de agenda (modo agenda). Ações: ativar / editar / descartar / pago.
@@ -171,7 +171,7 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const podeReengajar = ehReceber && aviso.status === 'programado'
   const podeAtivar = ehAgenda
 
-  // H4.3: tela de "convite pronto" após ativar uma anotação da agenda.
+  // H4.3: tela de "combinado enviado" após ativar uma anotação da agenda.
   if (resultadoAtivar) {
     return <AvisoCriado resultado={resultadoAtivar} onNovo={() => setResultadoAtivar(null)} />
   }
@@ -207,7 +207,7 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
                 <p className="font-medium text-tinta">Só na agenda, nada enviado</p>
                 <p className="mt-0.5 text-sm text-tinta-2">
                   Este combinado está só na sua agenda: ninguém recebeu nada. Edite à
-                  vontade, ative para gerar o convite, marque como recebido se já fechou,
+                  vontade, ative para enviar o combinado, marque como recebido se já fechou,
                   ou descarte.
                 </p>
               </div>
@@ -366,18 +366,18 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
           <Card className="flex flex-col gap-3">
             <h2 className="text-lg text-salvia">Ações</h2>
 
-            {/* H4.3: ativar a anotação (gera o convite). Exige plano (envia). */}
+            {/* H4.3: ativar a anotação (envia o combinado). Exige plano (envia). */}
             {podeAtivar && (
               <Button onClick={() => setAtivando(true)} className="w-full">
                 <Send strokeWidth={1.75} className="size-4" />
-                Ativar e gerar convite
+                Ativar e enviar combinado
               </Button>
             )}
 
             {/* E11 H11.9: sem saldo, antecipa a CTA de recarga (a API ainda barra na ativação). */}
             {ehAgenda && semSaldo && (
               <Banner tom="info">
-                Você está sem saldo de envios. Para ativar e enviar o convite,{' '}
+                Você está sem saldo de envios. Para ativar e enviar o combinado,{' '}
                 <Link to="/app/creditos" className="font-medium underline">
                   recarregue créditos
                 </Link>
@@ -735,9 +735,9 @@ function AtivarModal({
       aria-label="Ativar combinado"
     >
       <Card className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto">
-        <h2 className="text-lg text-salvia">Ativar e gerar convite</h2>
+        <h2 className="text-lg text-salvia">Ativar e enviar combinado</h2>
         <p className="text-sm text-tinta-2">
-          Confira os dados de contato e a chave Pix. Ao ativar, geramos o convite para a
+          Confira os dados de contato e a chave Pix. Ao ativar, enviamos o combinado para a
           pessoa confirmar.
         </p>
 

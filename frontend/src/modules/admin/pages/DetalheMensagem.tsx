@@ -8,7 +8,7 @@
 //
 // Escopo atual (família resposta.*): editor de TEXTO + paleta de variáveis da
 // chave. Botões e mídia já existem no modelo/transporte, mas o editor deles entra
-// junto com as famílias que os usam (ciclo, convite); aqui as respostas não têm.
+// junto com as famílias que os usam (ciclo, combinado); aqui as respostas não têm.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { AlertTriangle, ArrowLeft, Bold, CheckCircle2, Copy, Italic, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
@@ -449,7 +449,7 @@ const ROTULO_PADRAO: Record<AcaoBotaoTemplate, string> = {
   ativar: 'Ativar lembretes',
   aceite: 'Aceitar',
   recusa: 'Recusar combinado',
-  // 3ª opção do aceite (E5): no convite.resumo, "Algum dado está incorreto" (no invertido o
+  // 3ª opção do aceite (E5): no combinado.resumo, "Algum dado está incorreto" (no invertido o
   // owner costuma trocar por "Chave Pix incorreta").
   dado_incorreto: 'Algum dado está incorreto',
   // Confirmação de pagamento (E8): quem recebe confirma ou nega o recebimento.

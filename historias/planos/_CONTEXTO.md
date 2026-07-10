@@ -24,7 +24,7 @@
 - Sem travessão; sem palavras proibidas (dívida/devendo/atraso/cobrança/inadimplência) em código, copy, banco, erros da API. Vocabulário: aviso/lembrete/combinado.
 - Mensagens **neutras quanto a gênero**.
 - Dinheiro em **centavos** (int); datas de negócio em **America/Sao_Paulo** (banco UTC); etapa/agendamento calculados no **servidor**, nunca no cliente.
-- Tokens/números de convite só como **hash sha256**; claro nunca persiste nem loga. Botão do WhatsApp leva **`aviso_id`** no payload (webhook HMAC).
+- Tokens só como **hash sha256**; claro nunca persiste nem loga. Botão do WhatsApp leva **`aviso_id`** no payload (webhook HMAC).
 - **Nunca logar** telefone/Pix/titular/banco/token.
 - Erros da API: envelope `{ error: { code, message } }`. JWT validado localmente por JWKS.
 - **Sem DELETE** de negócio/auditoria (`eventos_aviso` append-only; estados, não apagar). Exceção: tabela `templates` (owner apaga versões, nunca a ativa).
@@ -40,10 +40,10 @@ Transições novas a acrescentar (trigger no banco + app): `sem_aviso→{aguarda
 | # | Épico | Tema / o que introduz |
 |---|---|---|
 | 1 | Conta & Autenticação | Google OAuth + WhatsApp (botão/OTP, decisão em aberto), free read-only, conta-no-aceite, JWKS |
-| 2 | Criar combinado (receber) | criação cobrador→devedor, convite 6 dígitos (hash), Pix obrigatório, editar c/ reaprovação, pausar/cancelar |
+| 2 | Criar combinado (receber) | criação cobrador→devedor, Pix obrigatório, editar c/ reaprovação, pausar/cancelar |
 | 3 | Criar combinado (pagar invertido) | espelho de E2, papéis trocados; devedor informa Pix, cobrador confere; cobrador sem conta |
 | 4 | Modo agenda | estado `sem_aviso`, separar "criar" de "gerar convite", free mantém agenda |
-| 5 | Convite & Aceite (WhatsApp) | aceite 100% WhatsApp (remover site), validação número+telefone, anti-brute-force 3 tentativas, `recusado`, telefone divergente |
+| 5 | Combinado & Aceite (WhatsApp) | Whaviso envia o combinado direto ao convidado (sem número/site), aceite 100% WhatsApp por botão, `recusado` |
 | 6 | Ciclo de lembretes | scheduler D-2..D+1, horário reservado por segundo + 10min/devedor, retry 3x, catch-up, `informado_pago` para o ciclo, cadência configurável (🟡 H6.10) |
 | 7 | Interação do devedor | 3 botões (Já paguei/Chave Pix/Desativar), `desregistrado` reversível, só último aviso age, idempotência |
 | 8 | Confirmação de pagamento | `informado_pago→pago/programado`, marcar direto, reabrir, janela 1min, recorrência por ocorrência (🟡), botão WhatsApp p/ qualquer cobrador |
@@ -56,9 +56,9 @@ Transições novas a acrescentar (trigger no banco + app): `sem_aviso→{aguarda
 ## Dependências entre épicos (para coerência dos planos)
 
 - **Fundações (implementar antes):** E13 (linguagem) · E12 (templates) · E11 (planos) · E1 (auth) · máquina de estados.
-- E2/E3 dependem de: E1 (limites), E11 (alavancas), máquina de estados, E12 (mensagem de convite).
+- E2/E3 dependem de: E1 (limites), E11 (alavancas), máquina de estados, E12 (template do combinado).
 - E4 depende de: E2/E3 (criação), `sem_aviso`, E11 (free cria agenda).
-- E5 depende de: E2/E3 (número de convite), E12 (rótulos de botão), E1 (conta no aceite).
+- E5 depende de: E2/E3 (criação), E12 (template `combinado.resumo` + rótulos de botão), E1 (conta no aceite).
 - E6 depende de: E5 (aceite ativa ciclo), E12 (textos), máquina de estados; alimenta E9 (status).
 - E7 depende de: E6 (botões nas mensagens), E12, `desregistrado`, E10 (notificar cobrador).
 - E8 depende de: E7 (já paguei), E10 (notificar c/ botões), E6 (horário reservado), recorrência 🟡.

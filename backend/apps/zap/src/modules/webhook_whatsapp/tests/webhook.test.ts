@@ -199,7 +199,7 @@ describe('inbound de botões (integração)', () => {
       `select tipo from public.notificacoes_cobrador where aviso_id=$1`,
       [conviteId],
     )
-    expect(notif.rows.map((r: { tipo: string }) => r.tipo)).toContain('convite_recusado')
+    expect(notif.rows.map((r: { tipo: string }) => r.tipo)).toContain('combinado_recusado')
     // Resposta neutra ao convidado (resposta.recusa), sem palavra proibida.
     expect(whats.enviadas).toHaveLength(1)
     expect(whats.enviadas[0]!.texto.toLowerCase()).not.toMatch(/d[ií]vida|cobran|atras/)

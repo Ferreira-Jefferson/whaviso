@@ -149,7 +149,7 @@ describe('E14 H14.2: oferta no aceite (Gatilho A), aceite segurado', () => {
     // Sessão de oferta criada e notificação de aceite SEGURADA (não enfileirada).
     expect((await sessaoStatus(avisoId))!.etapa).toBe('oferta')
     const notif = await poolSuper.query(
-      `select tipo from public.notificacoes_cobrador where aviso_id=$1 and tipo='convite_aceito'`,
+      `select tipo from public.notificacoes_cobrador where aviso_id=$1 and tipo='combinado_aceito'`,
       [avisoId],
     )
     expect(notif.rowCount).toBe(0)
@@ -163,7 +163,7 @@ describe('E14 H14.2: oferta no aceite (Gatilho A), aceite segurado', () => {
 
     expect((await sessaoStatus(avisoId))!.status).toBe('cancelada')
     const notif = await poolSuper.query(
-      `select tipo from public.notificacoes_cobrador where aviso_id=$1 and tipo='convite_aceito'`,
+      `select tipo from public.notificacoes_cobrador where aviso_id=$1 and tipo='combinado_aceito'`,
       [avisoId],
     )
     expect(notif.rowCount).toBe(1)

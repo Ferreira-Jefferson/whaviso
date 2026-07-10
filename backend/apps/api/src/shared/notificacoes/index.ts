@@ -16,15 +16,13 @@
 import type { PoolClient } from '@whaviso/shared/db'
 
 export type TipoNotificacao =
-  // E5 H5.0: o Whaviso INICIA a conversa mandando o convite (resumo + botões) ao
-  // CONVIDADO assim que o combinado entra em aguardando_aceite (não é ao criador).
-  | 'convite_enviar'
+  // E5: o Whaviso INICIA a conversa mandando o combinado (resumo + botões) ao CONVIDADO
+  // assim que ele entra em aguardando_aceite (não é ao criador).
+  | 'combinado_enviar'
   | 'pagamento_informado'
-  | 'convite_aceito'
-  | 'convite_dado_incorreto'
-  | 'convite_recusado'
-  | 'convite_telefone_divergente'
-  | 'convite_tentativas_esgotadas'
+  | 'combinado_aceito'
+  | 'combinado_dado_incorreto'
+  | 'combinado_recusado'
   | 'optout'
   | 'reativacao'
   // E2: notificações ao DEVEDOR (quem recebe os lembretes) sobre o ESTADO do combinado.
@@ -90,11 +88,11 @@ function resolverAlvo(
  */
 const EVENTO_FONTE: Partial<Record<TipoNotificacao, string>> = {
   pagamento_informado: 'ja_paguei_devedor',
-  convite_aceito: 'aceite',
-  convite_recusado: 'recusado',
+  combinado_aceito: 'aceite',
+  combinado_recusado: 'recusado',
   // E3 H3.3: o devedor-criador é notificado quando o cobrador aponta dado/chave
   // incorreta (sinal `pix_incorreto`). Cada novo sinal = nova ocorrência.
-  convite_dado_incorreto: 'pix_incorreto',
+  combinado_dado_incorreto: 'pix_incorreto',
   optout: 'optout',
   reativacao: 'reativado',
   // E2: o evento-fonte conta as ocorrências p/ a dedupe_key (cada novo evento = nova
@@ -236,15 +234,15 @@ export async function enfileirarNotificacaoDevedor(
 }
 
 /**
- * E5 H5.0: enfileira o CONVITE ao CONVIDADO (o NÃO criador do combinado) assim que ele
- * entra em `aguardando_aceite`. O Whaviso inicia a conversa: o `zap` drena e manda o
- * template `convite.resumo` (resumo + 3 botões) direto ao WhatsApp do convidado.
+ * E5: enfileira o COMBINADO ao CONVIDADO (o NÃO criador) assim que ele entra em
+ * `aguardando_aceite`. O Whaviso inicia a conversa: o `zap` drena e manda o template
+ * `combinado.resumo` (resumo + 3 botões) direto ao WhatsApp do convidado.
  *  - receber  (criador = cobrador): convidado = devedor  -> telefone_devedor.
  *  - invertido (criador = devedor):  convidado = cobrador -> telefone_cobrador.
  * No aguardando_aceite o convidado quase sempre NÃO tem conta (ela nasce no aceite,
  * H5.3), então o alvo é por TELEFONE; se já existir profile (raro), roteia por ele.
  * Sem alvo possível (nem conta nem telefone), NÃO enfileira. Idempotente por dedupe_key
- * (um convite por combinado). NUNCA loga telefone (só roteia o canal).
+ * (um envio por combinado). NUNCA loga telefone (só roteia o canal).
  */
 export async function enfileirarConvite(
   cli: PoolClient,
@@ -256,13 +254,13 @@ export async function enfileirarConvite(
   const telefoneAlvo = cobradorId ? null : ehReceber ? aviso.telefone_devedor : aviso.telefone_cobrador
   if (!cobradorId && !telefoneAlvo) return { enfileirado: false }
 
-  const ocorrencia = await ocorrenciaAtual(cli, aviso.id, 'convite_enviar')
-  const dedupeKey = `${aviso.id}:convite_enviar:${ocorrencia}`
+  const ocorrencia = await ocorrenciaAtual(cli, aviso.id, 'combinado_enviar')
+  const dedupeKey = `${aviso.id}:combinado_enviar:${ocorrencia}`
 
   const { rowCount } = await cli.query(
     `insert into public.notificacoes_cobrador
        (aviso_id, tipo, alvo_papel, cobrador_id, telefone_alvo, dedupe_key, agendar_para)
-     values ($1, 'convite_enviar', $2, $3, $4, $5, now())
+     values ($1, 'combinado_enviar', $2, $3, $4, $5, now())
      on conflict (dedupe_key) where (dedupe_key is not null and status <> 'cancelado') do nothing`,
     [aviso.id, alvoPapel, cobradorId, telefoneAlvo, dedupeKey],
   )

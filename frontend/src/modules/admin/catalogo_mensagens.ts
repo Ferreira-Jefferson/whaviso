@@ -98,21 +98,21 @@ export const SECOES_MENSAGENS: SecaoMensagens[] = [
     ],
   },
   {
-    id: 'convite',
-    titulo: 'Convite e aceite',
-    descricao: 'Mensagens da etapa de convite, antes de o ciclo de lembretes começar.',
+    id: 'combinado',
+    titulo: 'Combinado e aceite',
+    descricao: 'Mensagens do envio do combinado para aceite, antes de o ciclo de lembretes começar.',
     variante: 'lista',
     mensagens: [
       {
-        // Resumo do combinado + 3 botões (aceitar / dado incorreto / recusar), enviado ao
-        // convidado quando ele abre o convite no WhatsApp (H5.2). Editável: o corpo é um
-        // template aprovado na Meta (Cloud API). A variante 'revisao' inclui a chave Pix
-        // para o cobrador conferir no fluxo invertido.
-        nome: 'Convite (Aceitar ou Recusar)',
+        // Resumo do combinado + 3 botões (aceitar / dado incorreto / recusar), enviado
+        // direto ao convidado pelo Whaviso (H5.0/H5.2). Editável: o corpo é um template
+        // aprovado na Meta (Cloud API). A variante 'revisao' inclui a chave Pix para o
+        // cobrador conferir no fluxo invertido.
+        nome: 'Combinado (Aceitar ou Recusar)',
         destinatario: 'Convidado',
-        quando: 'Ao abrir o convite no WhatsApp',
+        quando: 'Ao receber o combinado no WhatsApp',
         estado: 'fixo',
-        chave: 'convite.resumo',
+        chave: 'combinado.resumo',
         variaveis: ['cobrador', 'nome_devedor', 'motivo', 'valor', 'data', 'pix_chave'],
         acoes: ['aceite', 'dado_incorreto', 'recusa'],
         temRevisao: true,

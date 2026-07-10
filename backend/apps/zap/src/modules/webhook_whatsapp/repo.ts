@@ -65,7 +65,7 @@ export interface ResultadoBotao {
   /** H7.3: titular e banco da chave (2a mensagem do Pix). Nunca logados. */
   pixTitular?: string | null
   pixBanco?: string | null
-  /** Para escolher o template de resposta ao convidado (resposta.* / convite.ja_respondido). */
+  /** Para escolher o template de resposta ao convidado (resposta.* / combinado.ja_respondido). */
   chaveResposta?: string
   /** H5.3: presente só no ACEITE aplicado e quando o convidado ainda não tem profile. */
   conta?: ContaConvidado
@@ -88,8 +88,6 @@ export interface ResultadoBotao {
    */
   ofertaPix?: { para: string; nomeDevedor: string }
 }
-
-const MAX_TENTATIVAS = 3
 
 // Estados em que os botões do DEVEDOR ainda fazem sentido (porta de entrada das ações do
 // ciclo). `programado`/`informado_pago` aceitam ja_paguei/ver_pix/optout; `desregistrado`
@@ -166,75 +164,9 @@ function mapearConvite(l: Record<string, unknown>): AvisoConvite {
 }
 
 /**
- * Localiza um aviso pelo HASH do número de convite, INDEPENDENTE do status (G1). O
- * índice único parcial só vale para `aguardando_aceite`, então o mesmo hash pode reaparecer
- * em terminais antigos: critério determinístico = o `aguardando_aceite` vence; se não houver,
- * o terminal/respondido mais recente. Assim o ramo "terminal/expirado" (H5.7) responde
- * informativo SEM contar tentativa, em vez de cair em "número inexistente".
- */
-export async function localizarPorNumeroHash(
-  ex: Pool | PoolClient,
-  conviteHash: string,
-): Promise<AvisoConvite | null> {
-  const { rows } = await ex.query(
-    `select ${SEL_CONVITE} from public.avisos a
-       left join public.profiles p on p.id = a.cobrador_id
-     where a.convite_hash = $1
-     order by (a.status = 'aguardando_aceite') desc, a.criado_em desc
-     limit 1`,
-    [conviteHash],
-  )
-  return rows[0] ? mapearConvite(rows[0]) : null
-}
-
-/** Telefone-alvo do convite por papel (receber→devedor, invertido→cobrador). */
-export function telefoneAlvo(a: AvisoConvite): string | null {
-  return a.criador_papel === 'cobrador' ? a.telefone_devedor : a.telefone_cobrador
-}
-
-/** Papel do convidado (oposto do criador). */
-export function papelConvidado(a: AvisoConvite): 'cobrador' | 'devedor' {
-  return a.criador_papel === 'cobrador' ? 'devedor' : 'cobrador'
-}
-
-export interface TentativaTelefone {
-  erros: number
-  bloqueado: boolean
-}
-
-/**
- * Lê/cria a linha de tentativas de um telefone COM LOCK (FOR UPDATE), serializando
- * mensagens simultâneas do mesmo número (anti-brute-force sem corrida, H5.9). Faz upsert
- * para garantir a linha antes do lock.
- */
-export async function lerTentativaParaUpdate(
-  cli: PoolClient,
-  telefone: string,
-): Promise<TentativaTelefone> {
-  await cli.query(
-    `insert into public.convite_tentativas_telefone (telefone) values ($1)
-     on conflict (telefone) do nothing`,
-    [telefone],
-  )
-  const { rows } = await cli.query<{ erros: number; bloqueado: boolean }>(
-    `select erros, bloqueado from public.convite_tentativas_telefone where telefone=$1 for update`,
-    [telefone],
-  )
-  return rows[0] ?? { erros: 0, bloqueado: false }
-}
-
-/** Zera o contador de um telefone (acerto: H5.1/G7). */
-export async function zerarTentativa(cli: PoolClient, telefone: string): Promise<void> {
-  await cli.query(
-    `update public.convite_tentativas_telefone
-        set erros=0, bloqueado=false, atualizado_em=now() where telefone=$1`,
-    [telefone],
-  )
-}
-
-/**
- * Convite PENDENTE (aguardando_aceite) cujo alvo é este telefone, SEM lock (leitura). Usado
- * pelo fallback numerado (1/2/3): só age se houver um convite pendente para o telefone.
+ * Combinado PENDENTE (aguardando_aceite) cujo alvo é este telefone, SEM lock (leitura).
+ * Usado pelo fallback numerado (1/2/3): só age se houver um combinado pendente de aceite
+ * para o telefone.
  */
 export async function localizarConvitePendentePorTelefone(
   ex: Pool | PoolClient,
@@ -251,128 +183,6 @@ export async function localizarConvitePendentePorTelefone(
     [telefone],
   )
   return rows[0] ? mapearConvite(rows[0]) : null
-}
-
-/**
- * Este telefone é alvo de lembretes (telefone_devedor) de ALGUM aviso, em qualquer estado?
- * Distingue um devedor conhecido (texto livre → menu/silêncio, H7.1) de um número
- * desconhecido (texto sem o convite → pede o número, H5.1).
- */
-export async function telefoneEhDevedorConhecido(pool: Pool, telefone: string): Promise<boolean> {
-  const { rows } = await pool.query<{ existe: boolean }>(
-    `select exists(select 1 from public.avisos where telefone_devedor=$1) as existe`,
-    [telefone],
-  )
-  return rows[0]?.existe ?? false
-}
-
-/** Zera o contador de tentativas de um telefone (acerto: H5.1/G7), fora de transação. */
-export async function zerarTentativaTelefone(pool: Pool, telefone: string): Promise<void> {
-  await pool.query(
-    `update public.convite_tentativas_telefone
-        set erros=0, bloqueado=false, atualizado_em=now() where telefone=$1`,
-    [telefone],
-  )
-}
-
-/** Há convite PENDENTE (aguardando_aceite) cujo alvo (por papel) é este telefone? COM lock. */
-async function temConvitePendente(cli: PoolClient, telefone: string): Promise<AvisoConvite | null> {
-  const { rows } = await cli.query(
-    `select ${SEL_CONVITE} from public.avisos a
-       left join public.profiles p on p.id = a.cobrador_id
-     where a.status='aguardando_aceite'
-       and ((a.criador_papel='cobrador' and a.telefone_devedor=$1)
-            or (a.criador_papel='devedor' and a.telefone_cobrador=$1))
-     order by a.criado_em desc
-     limit 1
-     for update of a`,
-    [telefone],
-  )
-  return rows[0] ? mapearConvite(rows[0]) : null
-}
-
-/** Regenera o número de convite de um aviso (novo hash; invalida o anterior, H5.9). */
-async function regenerarNumero(cli: PoolClient, avisoId: string, novoHash: string): Promise<void> {
-  await cli.query(`update public.avisos set convite_hash=$2 where id=$1`, [avisoId, novoHash])
-}
-
-export type ResultadoErro =
-  | { tipo: 'conta'; erros: number } // ainda dentro das 3; só contou
-  | { tipo: 'esgotado_cadastrado'; aviso: AvisoConvite } // regenerou + notificou criador
-  | { tipo: 'esgotado_bloqueado' } // telefone não cadastrado: bloqueou
-
-/**
- * Conta um erro de número (número que não bate com NENHUM convite, H5.1/H5.9) para um
- * telefone, em transação com FOR UPDATE. Ao cruzar 3 erros: se o telefone JÁ é alvo de
- * convite pendente → gera NOVO número (invalida o anterior), reseta o contador, notifica
- * o criador (na MESMA transação que detecta o 3º erro, evitando notificação dupla); senão
- * → bloqueia o telefone. `gerarHash` produz o novo hash (CSPRNG/aleatório na borda).
- */
-export async function contarErroNumero(
-  pool: Pool,
-  telefone: string,
-  gerarHash: () => string,
-): Promise<ResultadoErro> {
-  return comTransacao(pool, async (cli) => {
-    const atual = await lerTentativaParaUpdate(cli, telefone)
-    // Já bloqueado: não conta de novo, segue bloqueado (idempotente).
-    if (atual.bloqueado) return { tipo: 'esgotado_bloqueado' }
-
-    const erros = atual.erros + 1
-    if (erros < MAX_TENTATIVAS) {
-      await cli.query(
-        `update public.convite_tentativas_telefone
-            set erros=$2, atualizado_em=now() where telefone=$1`,
-        [telefone, erros],
-      )
-      return { tipo: 'conta', erros }
-    }
-
-    // 3º erro: decide pelo cadastro do telefone.
-    const pendente = await temConvitePendente(cli, telefone)
-    if (pendente) {
-      // Cadastrado: regenera o número, zera o contador e notifica o criador (na MESMA
-      // transação, então a 4ª mensagem não conta de novo nem dispara 2ª notificação).
-      await regenerarNumero(cli, pendente.id, gerarHash())
-      await zerarTentativa(cli, telefone)
-      await enfileirarNotificacao(
-        cli,
-        notificacaoAlvo(pendente),
-        'convite_tentativas_esgotadas',
-      )
-      return { tipo: 'esgotado_cadastrado', aviso: pendente }
-    }
-    // Não cadastrado: bloqueia (até um novo combinado ser criado, G4 na api).
-    await cli.query(
-      `update public.convite_tentativas_telefone
-          set erros=$2, bloqueado=true, atualizado_em=now() where telefone=$1`,
-      [telefone, erros],
-    )
-    return { tipo: 'esgotado_bloqueado' }
-  })
-}
-
-/** Campos de roteamento para a outbox (criador do combinado). */
-export function notificacaoAlvo(a: AvisoConvite) {
-  return {
-    id: a.id,
-    criador_papel: a.criador_papel,
-    cobrador_id: a.cobrador_id,
-    devedor_profile_id: a.devedor_profile_id,
-    telefone_cobrador: a.telefone_cobrador,
-    telefone_devedor: a.telefone_devedor,
-  }
-}
-
-/**
- * H5.8: telefone divergente (número existe, telefone não bate). NÃO consome tentativa
- * (não chama contarErroNumero). Notifica o CRIADOR para conferir/reenviar; a resposta
- * neutra ao convidado é montada no service (não revela dado algum do combinado).
- */
-export async function notificarTelefoneDivergente(pool: Pool, a: AvisoConvite): Promise<void> {
-  await comTransacao(pool, async (cli) => {
-    await enfileirarNotificacao(cli, notificacaoAlvo(a), 'convite_telefone_divergente')
-  })
 }
 
 /**
@@ -551,7 +361,7 @@ export async function aplicarAcaoBotao(
           novoStatus: aviso.status,
           telefone: telConvidado,
           pixChave: null,
-          chaveResposta: 'convite.ja_respondido',
+          chaveResposta: 'combinado.ja_respondido',
         }
       }
 
@@ -564,19 +374,19 @@ export async function aplicarAcaoBotao(
         )
         // E11 H11.5: convite recusado DEVOLVE a reserva (nada disparou; só o aceito é cobrado).
         await devolverReservaNaoAceito(cli, avisoId)
-        await enfileirarNotificacao(cli, alvoNotif, 'convite_recusado')
+        await enfileirarNotificacao(cli, alvoNotif, 'combinado_recusado')
         return { aplicado: true, novoStatus: 'recusado', telefone: telConvidado, pixChave: null, chaveResposta: 'resposta.recusa' }
       }
 
       if (acao === 'dado_incorreto') {
         // H5.4: não aceita nem recusa (segue aguardando_aceite); evento + notifica criador.
         // Evento `pix_incorreto` (mesmo sinal usado no invertido); EVENTO_FONTE de
-        // 'convite_dado_incorreto' na outbox mapeia para ele.
+        // 'combinado_dado_incorreto' na outbox mapeia para ele.
         await cli.query(
           `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'pix_incorreto',$2)`,
           [avisoId, papelConv],
         )
-        await enfileirarNotificacao(cli, alvoNotif, 'convite_dado_incorreto')
+        await enfileirarNotificacao(cli, alvoNotif, 'combinado_dado_incorreto')
         return { aplicado: true, novoStatus: aviso.status, telefone: telConvidado, pixChave: null, chaveResposta: 'resposta.dado_incorreto' }
       }
 
@@ -639,7 +449,7 @@ export async function aplicarAcaoBotao(
         if (criada) ofertaPix = { para: telConvidado, nomeDevedor: aviso.nome_devedor }
       }
       if (!ofertaPix) {
-        await enfileirarNotificacao(cli, alvoNotif, 'convite_aceito')
+        await enfileirarNotificacao(cli, alvoNotif, 'combinado_aceito')
       }
       // H5.3: a conta-no-aceite (criar conta FREE + vincular profile) roda FORA desta
       // transação (chamada de rede ao GoTrue), só quando o convidado ainda não tem

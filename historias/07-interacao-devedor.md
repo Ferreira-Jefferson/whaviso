@@ -56,7 +56,7 @@ Como **devedor**, quero parar de receber os lembretes de um combinado com um toq
 - [ ] Ao tocar, o combinado entra no estado **`desregistrado`** e **nenhum lembrete** é enviado a partir daí.
 - [ ] **Abrangência:** afeta **somente este combinado**; os outros combinados do mesmo número seguem normalmente.
 - [ ] O **horário reservado** do combinado é setado para **`null`** (Épico 6 H6.9), liberando aquele segundo para outros combinados.
-- [ ] O devedor recebe uma mensagem de confirmação que **contém um botão "Ativar lembretes"** (para voltar atrás), ex.: *"Pronto, você não vai mais receber lembretes do combinado xxx-xxx. Mudou de ideia? Toque em Ativar lembretes."*
+- [ ] O devedor recebe uma mensagem de confirmação que **contém um botão "Ativar lembretes"** (para voltar atrás), ex.: *"Pronto, você não vai mais receber lembretes deste combinado. Mudou de ideia? Toque em Ativar lembretes."*
 - [ ] **Notificação ao cobrador com atraso:** o aviso ao cobrador (Épico 10) é enviado **só 1 minuto depois**, porque nesse intervalo o devedor pode reativar; se reativar dentro do minuto, a notificação **não** é enviada.
 - [ ] `desregistrado` **não apaga** o combinado do banco (regra de não-DELETE); o evento de saída é registrado (auditoria).
 - [ ] `desregistrado` **não é terminal**: o devedor pode reativar (H7.5).
@@ -64,14 +64,14 @@ Como **devedor**, quero parar de receber os lembretes de um combinado com um toq
 ---
 
 ### H7.5: Reativar lembretes (voltar a um combinado desregistrado) 🟢
-Como **devedor**, quero voltar a receber os lembretes que eu havia desativado, para retomar o combinado sem precisar de um novo convite.
+Como **devedor**, quero voltar a receber os lembretes que eu havia desativado, para retomar o combinado sem precisar de um novo envio.
 *Critérios de aceite:*
 - [ ] O botão **Ativar lembretes** (da mensagem da H7.4) tira o combinado de **`desregistrado` → `programado`** e o ciclo volta a valer.
 - [ ] Como o horário reservado foi zerado (e outro combinado pode tê-lo tomado), a reativação **pega um novo horário reservado** seguindo a regra de timestamp (Épico 6 H6.9).
-- [ ] A mensagem de confirmação da reativação **não tem nenhum botão**, ex.: *"Você está novamente registrado no combinado xxx-xxx."*
+- [ ] A mensagem de confirmação da reativação **não tem nenhum botão**, ex.: *"Você está novamente registrado neste combinado."*
 - [ ] **Notificação ao cobrador conforme o estado:**
   - [ ] Se reativar **dentro do 1 minuto** (a notificação de saída ainda não foi enviada): nada é notificado ao cobrador (saída e volta se anulam).
-  - [ ] Se reativar **depois** de a notificação de saída já ter sido enviada: o cobrador recebe **uma nova notificação** informando que a pessoa se registrou de novo no combinado xxx-xxx (Épico 10).
+  - [ ] Se reativar **depois** de a notificação de saída já ter sido enviada: o cobrador recebe **uma nova notificação** informando que a pessoa se registrou de novo neste combinado (Épico 10).
 - [ ] A reativação retoma o ciclo pela **etapa aplicável à data** (catch-up, Épico 6 H6.7).
 - [ ] A reativação é registrada como evento (auditoria).
 
@@ -104,7 +104,7 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 
 - **Pix com titular + banco:** a chave salva pelo cobrador passa a guardar **nome do titular** e **banco**, usados na 2ª mensagem da H7.3. A captura do Pix nos Épicos 2 (H2.1) e 3 (H3.1) precisa coletar esses campos (já atualizado lá). Pode justificar um cadastro de "chaves salvas" do cobrador.
 - **Entrega da chave uma vez por combinado:** muda o comportamento "cada toque reenvia"; agora só o 1º toque entrega e registra `solicitou_pix`, com reenvio só em falha confirmada de servidor.
-- **Estado `desregistrado` (opt-out reversível):** hoje o opt-out cai em `cancelado` (PROJETO.md §4) e seria terminal. Passa a ser **estado próprio, reversível** pelo devedor (botão Ativar lembretes), distinto de `pausado` (quem pausa é o criador), `cancelado` (criador cancela) e `recusado` (convidado recusa o convite). Novas transições: `programado → desregistrado` (sair) e `desregistrado → programado` (reativar).
+- **Estado `desregistrado` (opt-out reversível):** hoje o opt-out cai em `cancelado` (PROJETO.md §4) e seria terminal. Passa a ser **estado próprio, reversível** pelo devedor (botão Ativar lembretes), distinto de `pausado` (quem pausa é o criador), `cancelado` (criador cancela) e `recusado` (convidado recusa o combinado). Novas transições: `programado → desregistrado` (sair) e `desregistrado → programado` (reativar).
 - **Notificação ao cobrador com atraso de 1 minuto:** o aviso de opt-out ao cobrador espera 1 min para absorver uma reativação rápida; e a reativação pós-notificação gera uma 2ª notificação. Lógica nova de janela/agendamento de notificação (Épico 10).
 - **Só o último aviso age (H7.7):** exige que o payload do botão identifique **o aviso/etapa**, e que o sistema saiba qual é o último envio do combinado, para invalidar botões de mensagens antigas. Não existe hoje.
 - **Menu de opções para texto livre:** resposta automática ao texto livre do devedor, **disponível para todas as contas** (não há mais distinção de plano; modelo de carteira de créditos, Épico 11). A resposta do menu é uma réplica dentro da janela de atendimento, não um lembrete, então **não consome crédito de envio**. Lógica nova.

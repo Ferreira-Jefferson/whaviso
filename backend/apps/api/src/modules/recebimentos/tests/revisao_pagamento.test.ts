@@ -80,7 +80,7 @@ describe('recebimentos: revisão de pagamento (informado_pago)', () => {
       `select count(*)::int as n from public.eventos_aviso where aviso_id=$1 and tipo='ja_paguei_devedor'`, [id])
     expect(ev.rows[0].n).toBe(1)
     // Enfileirou o aviso "pagamento informado" ao cobrador (outbox; o zap envia o
-    // WhatsApp). Filtra pelo tipo: o aceite anterior também enfileira 'convite_aceito'.
+    // WhatsApp). Filtra pelo tipo: o aceite anterior também enfileira 'combinado_aceito'.
     const notif = await poolSuper.query(
       `select count(*)::int as n from public.notificacoes_cobrador
        where aviso_id=$1 and status='agendado' and tipo='pagamento_informado'`, [id])

@@ -1,9 +1,9 @@
 # Épico 10: Notificações ao cobrador
 
-> Reúne **tudo que é avisado a quem gerencia o combinado** (em geral o cobrador; no fluxo invertido, também o devedor-criador): respostas ao convite, "já paguei", opt-out/reativação e problemas de convite. As mensagens **ao devedor** (lembretes, confirmações, Pix) ficam nos Épicos 6/7/8; aqui o alvo é **o lado que precisa saber/agir**.
+> Reúne **tudo que é avisado a quem gerencia o combinado** (em geral o cobrador; no fluxo invertido, também o devedor-criador): respostas ao combinado, "já paguei", opt-out/reativação. As mensagens **ao devedor** (lembretes, confirmações, Pix) ficam nos Épicos 6/7/8; aqui o alvo é **o lado que precisa saber/agir**.
 > **Arquitetura (decidida, CLAUDE.md):** a `api` apenas **enfileira** a notificação na outbox `notificacoes_cobrador`; o `zap` **drena e envia** (claim `FOR UPDATE SKIP LOCKED`, sem Redis). A `api` nunca envia WhatsApp direto; o `zap` é o transporte.
 > **Dois alvos de canal:** quem **tem conta** vê no **painel** (bloco "precisa de você", Épico 9 H9.2) e pode receber também no **WhatsApp**; quem **não tem conta** (cobrador convidado no invertido) só pode ser avisado pelo **WhatsApp** (`telefone_cobrador`), com CTA discreta de criar conta.
-> **Regra de ouro deste épico:** durante o ciclo normal de lembretes, o cobrador **não** recebe nada ("o aviso D-2 saiu" não existe); só **eventos do devedor** e problemas de convite geram notificação (Épico 6 H6.5).
+> **Regra de ouro deste épico:** durante o ciclo normal de lembretes, o cobrador **não** recebe nada ("o aviso D-2 saiu" não existe); só **eventos do devedor** geram notificação (Épico 6 H6.5).
 > Convenções de sempre: sem travessão, sem palavras proibidas, **neutras quanto a gênero**; **nunca** logar telefone/Pix/token; texto vindo de `templates` (Épico 12).
 
 ---
@@ -32,8 +32,8 @@ Como **cobrador**, quero ser avisado na hora que o devedor diz que pagou, para c
 
 ---
 
-### H10.3: Notificar as respostas ao convite (aceite, dado incorreto, recusa) 🟢
-Como **criador**, quero saber como o convidado respondeu ao convite, para acompanhar e agir se preciso.
+### H10.3: Notificar as respostas ao combinado (aceite, dado incorreto, recusa) 🟢
+Como **criador**, quero saber como o convidado respondeu ao combinado, para acompanhar e agir se preciso.
 *Critérios de aceite:*
 - [ ] **Aceite** (Épico 5 H5.3): o criador é notificado de que o combinado foi aceito e entrou no ciclo. No invertido, inclui que a **chave Pix foi confirmada**.
 - [ ] **Algum dado incorreto / chave Pix incorreta** (Épico 5 H5.4): o criador é notificado para **revisar e reenviar**; a notificação **não** traz texto livre do convidado (não existe), só o sinal.
@@ -44,23 +44,13 @@ Como **criador**, quero saber como o convidado respondeu ao convite, para acompa
 
 ---
 
-### H10.4: Notificar problemas de convite (telefone divergente, tentativas esgotadas) 🟢
-Como **criador**, quero ser avisado quando o convite não consegue ser validado, para corrigir o número e reenviar.
-*Critérios de aceite:*
-- [ ] **Telefone divergente** (Épico 5 H5.8): quando o número de convite confere mas o telefone de quem respondeu não bate, o criador é notificado, ex.: *"O WhatsApp de quem tentou abrir este combinado não bate com o que você cadastrou. Confira o número e reenvie o convite."*
-- [ ] **3 tentativas esgotadas, telefone cadastrado** (Épico 5 H5.9): o criador é notificado de que a pessoa está com dificuldade, e que um **novo número de validação** foi gerado para reenviar.
-- [ ] **3 tentativas, telefone não cadastrado** (Épico 5 H5.9): **não** há notificação a criador algum (não há convite associado).
-- [ ] As notificações **não revelam** dados do combinado a quem não deve, e nada sensível vai a log.
-
----
-
 ### H10.5: Notificar opt-out (com atraso de 1 minuto) e reativação 🟢
 Como **cobrador**, quero saber quando o devedor desativa os lembretes e quando volta atrás, para acompanhar sem ser avisado de uma saída que se desfez em seguida.
 *Critérios de aceite:*
 - [ ] Ao o devedor tocar **Desativar lembretes** (`desregistrado`, Épico 7 H7.4), a notificação ao cobrador é **agendada para ~1 minuto depois**, não enviada na hora.
 - [ ] Se, **dentro desse 1 minuto**, o devedor **reativa** (Épico 7 H7.5), a notificação de saída é **cancelada** e o cobrador **não recebe nada** (a saída e a volta se anulam).
 - [ ] Se o minuto passa e a notificação de saída é enviada, e **depois** o devedor reativa, o cobrador recebe **uma nova notificação** informando que a pessoa **voltou** ao combinado.
-- [ ] As notificações de opt-out/reativação identificam o **combinado** (ex.: "do combinado xxx-xxx") e usam linguagem neutra, sem tom acusatório.
+- [ ] As notificações de opt-out/reativação identificam o **combinado** (ex.: "deste combinado") e usam linguagem neutra, sem tom acusatório.
 - [ ] A janela de 1 minuto é controlada pelo agendamento da outbox (não por estado preso no front); o cancelamento dentro da janela é idempotente.
 
 ---
@@ -69,7 +59,7 @@ Como **cobrador**, quero saber quando o devedor desativa os lembretes e quando v
 Como **cobrador**, quero não ser bombardeado a cada lembrete enviado ao devedor, para só receber o que exige minha atenção.
 *Critérios de aceite:*
 - [ ] O cobrador **não** recebe notificação a cada envio do ciclo (não existe "o aviso D-2 foi enviado"), Épico 6 H6.5.
-- [ ] As únicas notificações ao cobrador são **eventos do devedor** (já paguei, dado incorreto, recusa, opt-out, reativação) e **problemas de convite** (H10.4).
+- [ ] As únicas notificações ao cobrador são **eventos do devedor** (já paguei, dado incorreto, recusa, opt-out, reativação).
 - [ ] Falhas de **entrega dos lembretes** ao devedor não viram notificação ativa ao cobrador; ficam visíveis no **status de envio** do painel (Épico 9 H9.7).
 - [ ] Quando vários eventos do mesmo combinado/devedor acontecem em sequência, o cobrador não recebe uma rajada: vale o espaçamento e o cancelamento da **fila de saída** (H10.9).
 
@@ -115,7 +105,6 @@ Como **sistema (zap)**, quero uma fila simples (sem Redis) que espace os envios 
 - **Notificação de opt-out atrasada 1 min + reativação (H10.5):** janela de agendamento nova; o cancelamento da notificação dentro da janela e a 2ª notificação (volta) não existem hoje.
 - **"Já paguei" com botões de ação para qualquer cobrador (H10.2/H10.7):** notificar com **Confirmar / Ainda não recebi** e processar a resposta por WhatsApp (não só painel) é construção nova, ligada ao Épico 8 H8.5.
 - **Cobrador sem conta notificado por `telefone_cobrador` (H10.7):** hoje as notificações pressupõem `profile`; é preciso rotear por `telefone_cobrador` quando `cobrador_id` é nulo (também citado nos Épicos 3/5/8).
-- **Problemas de convite (H10.4):** notificações de telefone divergente (H5.8) e tentativas esgotadas (H5.9) são comportamento novo do Épico 5.
 - **Silêncio no ciclo (H10.6):** confirmar que nada é notificado por envio de lembrete (alinhado ao Épico 6 H6.5).
 - **Conteúdo via templates (Épico 12):** os textos das notificações ao cobrador entram na tabela `templates` unificada, garantidos neutros/sem proibidas.
 - **Fila de saída com espaçamento de 10 min + cancelamento (H10.9):** comportamento novo sobre as outboxes, valendo para as duas filas (cobrador e devedor). O coalescing (par opt-out/reativação se anulando, item obsoleto por estado terminal) e o intervalo de 10 min entre envios ao mesmo destinatário não existem hoje e são **ponto crítico** (exigem testes fortes).
@@ -124,7 +113,7 @@ Como **sistema (zap)**, quero uma fila simples (sem Redis) que espace os envios 
 ### Decisões tomadas
 - **Arquitetura:** `api` enfileira em `notificacoes_cobrador`, `zap` drena (`SKIP LOCKED`) e envia; retry 3x/20-60s; nunca loga dado sensível.
 - **Canais por alvo:** com conta = painel (+ WhatsApp); sem conta = só WhatsApp (`telefone_cobrador`) com CTA de criar conta.
-- **Eventos que notificam:** aceite, dado incorreto, recusa, telefone divergente, tentativas esgotadas (cadastrado), "já paguei", opt-out (atraso 1 min), reativação.
+- **Eventos que notificam:** aceite, dado incorreto, recusa, "já paguei", opt-out (atraso 1 min), reativação.
 - **"Já paguei" notifica na hora, com botões Confirmar / Ainda não recebi** para qualquer cobrador.
 - **Opt-out atrasa 1 minuto** (cancela se reativar dentro do minuto; 2ª notificação se reativar depois).
 - **Silêncio no ciclo normal:** nenhuma notificação por envio de lembrete; falha de lembrete só no status do painel.

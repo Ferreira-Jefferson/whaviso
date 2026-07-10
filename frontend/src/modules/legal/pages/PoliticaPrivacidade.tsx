@@ -60,7 +60,7 @@ export default function PoliticaPrivacidadePage() {
         <Sub>2.3 Uso da plataforma</Sub>
         <Lista>
           <li>
-            Eventos do combinado (aceite do convite, aviso de "já paguei", saída dos lembretes,
+            Eventos do combinado (aceite do combinado, aviso de "já paguei", saída dos lembretes,
             confirmação de pagamento) e o histórico de mensagens enviadas, para acompanhar o
             andamento no painel.
           </li>

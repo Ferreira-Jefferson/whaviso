@@ -112,24 +112,20 @@ export const criarAvisoBody = z
   // PATCH /avisos/:id. Por isso NÃO há refine de pix no `pagar` (o receber segue exigindo).
 export type CriarAvisoBody = z.infer<typeof criarAvisoBody>
 
-// Resposta da criação (H2.2): devolve o aviso e o NÚMERO DE CONVITE em claro (xxx-xxx;
-// única vez que sai). E5 H5.0: o Whaviso ENVIA o convite direto ao convidado (não há
-// mais compartilhamento manual), então a api NÃO devolve mais mensagem pronta nem link
-// wa.me; o número fica só como identificador de RESERVA (H5.1). No modo agenda (nada
-// enviado) o número vem null.
+// Resposta da criação (H2.1): devolve só o aviso. E5: o Whaviso ENVIA o combinado direto
+// ao convidado (resumo + botões, sem compartilhamento manual), e o antigo NÚMERO de
+// convite foi removido junto com o caminho de localização por número; não há mais nada
+// para o criador repassar.
 export const criarAvisoResposta = z.object({
   aviso: avisoSchema,
-  numero_convite: z.string().nullable(),
 })
 export type CriarAvisoResposta = z.infer<typeof criarAvisoResposta>
 
 // ---- POST /v1/avisos/:id/ativar (H4.3) ----
-// Ativa uma anotação da agenda: sem_aviso -> aguardando_aceite. GERA o número de
-// convite (mesma mecânica da criação) e devolve a mensagem pronta UMA vez (claro nunca
-// persiste). Telefone/Pix faltantes podem vir no corpo (preenchidos no momento de
-// ativar); se ainda assim faltarem, o serviço recusa com `dado_obrigatorio_ativacao`.
-// A resposta tem o MESMO formato da criação (aviso + convite), pois o front reaproveita
-// a tela de "convite pronto".
+// Ativa uma anotação da agenda: sem_aviso -> aguardando_aceite. O Whaviso envia o
+// combinado direto ao convidado (resumo + botões). Telefone/Pix faltantes podem vir no
+// corpo (preenchidos no momento de ativar); se ainda assim faltarem, o serviço recusa
+// com `dado_obrigatorio_ativacao`. A resposta tem o MESMO formato da criação (só o aviso).
 export const ativarAvisoBody = z
   .object({
     telefone_devedor: telefoneE164.nullish(),

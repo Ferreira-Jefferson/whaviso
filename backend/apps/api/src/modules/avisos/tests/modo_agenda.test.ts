@@ -82,21 +82,20 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     expect(r.statusCode).toBe(201)
     const body = r.json()
     expect(body.aviso.status).toBe('sem_aviso')
-    expect(body.numero_convite).toBeNull()
-    // Modo agenda: nada é enviado, então NÃO enfileira convite ao convidado (E5 H5.0).
+    expect(body.numero_convite).toBeUndefined()
+    // Modo agenda: nada é enviado, então NÃO enfileira o combinado ao convidado (E5).
     const { rows: convites } = await poolSuper.query(
-      `select 1 from public.notificacoes_cobrador where aviso_id=$1 and tipo='convite_enviar'`,
+      `select 1 from public.notificacoes_cobrador where aviso_id=$1 and tipo='combinado_enviar'`,
       [body.aviso.id],
     )
     expect(convites).toHaveLength(0)
 
     const id = body.aviso.id
-    const hashes = await poolSuper.query<{ ac: string | null; co: string | null; ak: string | null }>(
-      `select aceite_token_hash as ac, convite_hash as co, acao_token_hash as ak from public.avisos where id = $1`,
+    const hashes = await poolSuper.query<{ ac: string | null; ak: string | null }>(
+      `select aceite_token_hash as ac, acao_token_hash as ak from public.avisos where id = $1`,
       [id],
     )
     expect(hashes.rows[0]!.ac).toBeNull()
-    expect(hashes.rows[0]!.co).toBeNull()
     expect(hashes.rows[0]!.ak).toBeNull()
 
     const envios = await poolSuper.query<{ n: string }>(
@@ -183,7 +182,7 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     })
     expect(ativar.statusCode).toBe(200)
     expect(ativar.json().aviso.status).toBe('aguardando_aceite')
-    expect(ativar.json().numero_convite).toMatch(/^\d{3}-\d{3}$/)
+    expect(ativar.json().numero_convite).toBeUndefined()
 
     // Agenda (balde único, H11.4) ainda conta o item ativado (não libera o slot).
     const agenda2 = await poolSuper.query<{ n: number }>(`select public.contar_agenda($1) as n`, [uid])
@@ -194,7 +193,7 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     await app.close()
   })
 
-  it('H4.3: ativar gera convite + grava hash do número (claro não persiste)', async () => {
+  it('H4.3: ativar transita para aguardando_aceite e enfileira o combinado ao convidado', async () => {
     const app = await criarAppTeste(uid)
     const criado = await app.inject({
       method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoReceber({ modo: 'agenda' }),
@@ -203,17 +202,21 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     const ativar = await app.inject({ method: 'POST', url: `/v1/avisos/${id}/ativar`, headers: AUTH, payload: {} })
     expect(ativar.statusCode).toBe(200)
 
-    // Só o HASH persiste (64 hex); o número claro não está no banco.
-    const row = await poolSuper.query<{ co: string | null; status: string }>(
-      `select convite_hash as co, status from public.avisos where id = $1`,
+    const row = await poolSuper.query<{ status: string }>(
+      `select status from public.avisos where id = $1`,
       [id],
     )
-    expect(row.rows[0]!.co).toMatch(/^[0-9a-f]{64}$/)
     expect(row.rows[0]!.status).toBe('aguardando_aceite')
+    // E5: a ativação enfileira o envio do combinado ao convidado (combinado_enviar).
+    const { rows: convites } = await poolSuper.query(
+      `select 1 from public.notificacoes_cobrador where aviso_id=$1 and tipo='combinado_enviar'`,
+      [id],
+    )
+    expect(convites).toHaveLength(1)
 
     const eventos = await tiposEventos(id)
     expect(eventos).toContain('ativado:cobrador')
-    expect(eventos).toContain('convite_gerado:cobrador')
+    expect(eventos).toContain('combinado_gerado:cobrador')
     await app.close()
   })
 

@@ -383,7 +383,7 @@ export default function DesignSystemPage() {
         <EmptyState
           icone={<Inbox strokeWidth={1.5} className="size-10" />}
           titulo="Nenhum aviso por aqui"
-          descricao="Crie seu primeiro combinado para gerar o convite."
+          descricao="Crie seu primeiro combinado para enviar."
           acao={<Button>Novo aviso</Button>}
         />
       </Secao>

@@ -84,7 +84,7 @@ export default function NovoAvisoPage() {
   })
 
   const direcao = watch('direcao')
-  // H4.1: o modo (gerar convite agora x só salvar) não é mais um seletor à parte;
+  // H4.1: o modo (enviar o combinado agora x só salvar) não é mais um seletor à parte;
   // ele é definido pelo botão de ação clicado no rodapé do formulário.
   const modo = watch('modo')
   // Contador ao vivo do "Sobre o quê" (caracteres). O maxLength já trava a digitação
@@ -93,7 +93,7 @@ export default function NovoAvisoPage() {
   const ehReceber = direcao === 'receber'
 
   // Cada botão escolhe o modo e dispara o submit. O schema valida conforme o modo
-  // (telefone/Pix só obrigatórios ao gerar o convite), então setamos antes de validar.
+  // (telefone/Pix só obrigatórios ao enviar o combinado), então setamos antes de validar.
   function salvar(modoEscolhido: 'enviar' | 'agenda') {
     setValue('modo', modoEscolhido)
     void handleSubmit(onSubmit)()
@@ -168,7 +168,7 @@ export default function NovoAvisoPage() {
     <div className="animate-rise">
       <PageHeader
         titulo="Novo aviso"
-        descricao="Combine os detalhes. No fim, gere o convite ou só salve o combinado."
+        descricao="Combine os detalhes. No fim, envie o combinado ou só salve."
         acoes={
           <Button variante="ghost" onClick={() => navigate('/app')}>
             <ArrowLeft strokeWidth={1.75} className="size-4" />
@@ -216,8 +216,8 @@ export default function NovoAvisoPage() {
 
           <p className="-mt-2 text-xs text-tinta-2">
             {ehReceber
-              ? 'A outra pessoa recebe um convite no WhatsApp para revisar e confirmar o combinado.'
-              : 'Quem vai receber recebe um convite para confirmar; os lembretes chegam para você.'}
+              ? 'A outra pessoa recebe o combinado no WhatsApp para revisar e confirmar.'
+              : 'Quem vai receber recebe o combinado para confirmar; os lembretes chegam para você.'}
           </p>
 
           <Field
@@ -233,7 +233,7 @@ export default function NovoAvisoPage() {
 
           <Field
             label={ehReceber ? 'WhatsApp de quem vai pagar' : 'WhatsApp de quem vai receber'}
-            dica="Necessário para gerar o convite. Sem ele, dá para só salvar."
+            dica="Necessário para enviar o combinado. Sem ele, dá para só salvar."
             erro={errors.telefone_devedor?.message}
           >
             <Controller
@@ -354,7 +354,7 @@ export default function NovoAvisoPage() {
             {semSaldo && (
               <Banner tom="info">
                 Você está sem saldo de envios. Pode salvar na agenda agora e ativar depois;
-                para gerar o convite e enviar lembretes,{' '}
+                para enviar o combinado e os lembretes,{' '}
                 <Link to="/app/creditos" className="font-medium underline">
                   recarregue créditos
                 </Link>
@@ -385,7 +385,7 @@ export default function NovoAvisoPage() {
                 loading={isSubmitting && modo === 'enviar'}
                 onClick={() => salvar('enviar')}
               >
-                Salvar e gerar convite
+                Salvar e enviar combinado
               </Button>
             </div>
           </div>

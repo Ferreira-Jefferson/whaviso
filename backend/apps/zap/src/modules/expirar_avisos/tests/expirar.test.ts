@@ -49,9 +49,9 @@ describe('expirar_avisos (integração)', () => {
     const { rows } = await poolSuper.query<{ id: string }>(
       `insert into public.avisos
          (cobrador_id, direcao, status, nome_devedor, telefone_devedor, motivo, valor_centavos,
-          data_combinada, pix_chave, convite_hash, convite_expira_em)
+          data_combinada, pix_chave, convite_expira_em)
        values ($1,'receber','aguardando_aceite','Maria','+5511999998888','mensalidade',9900,
-          '2026-12-15','cobrador@pix.com',null, now() - interval '1 day')
+          '2026-12-15','cobrador@pix.com', now() - interval '1 day')
        returning id`,
       [cobradorId],
     )
@@ -68,9 +68,9 @@ describe('expirar_avisos (integração)', () => {
     const { rows } = await poolSuper.query<{ id: string }>(
       `insert into public.avisos
          (cobrador_id, direcao, status, nome_devedor, telefone_devedor, motivo, valor_centavos,
-          data_combinada, pix_chave, convite_hash, convite_expira_em)
+          data_combinada, pix_chave, convite_expira_em)
        values ($1,'receber','aguardando_aceite','Maria','+5511999998888','mensalidade',9900,
-          '2026-12-15','cobrador@pix.com',null, now() + interval '7 days')
+          '2026-12-15','cobrador@pix.com', now() + interval '7 days')
        returning id`,
       [cobradorId],
     )

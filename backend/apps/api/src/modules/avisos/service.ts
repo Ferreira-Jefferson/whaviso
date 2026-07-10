@@ -3,10 +3,6 @@ import { comTransacao } from '@whaviso/shared/db'
 import { aceiteExpiraEm, conviteExpiraEm, expandirOcorrencias } from '@whaviso/shared/datas'
 import type { RecorrenciaCfg } from '@whaviso/shared/datas'
 import { reprogramarCiclo } from '@whaviso/shared/datas/horario'
-import {
-  formatarNumeroConvite,
-  gerarNumeroConvite,
-} from '@whaviso/shared/contracts'
 import type {
   AtivarAvisoBody,
   Aviso,
@@ -34,51 +30,6 @@ import * as repo from './repo'
 
 export interface AvisoCriado {
   aviso: Aviso
-  /**
-   * Número de convite em claro (xxx-xxx); única vez que sai. null no agenda.
-   * E5 H5.0: com o auto-envio do convite (o Whaviso inicia a conversa), este número
-   * deixa de ser para compartilhamento manual e vale só como identificador de RESERVA
-   * (caso a pessoa precise localizar o combinado pelo número, H5.1). A api não devolve
-   * mais mensagem pronta nem link wa.me.
-   */
-  numero_convite: string | null
-}
-
-// Quantas vezes regenerar o número de convite ao colidir (unicidade por telefone). Com
-// 1M de espaço e poucos avisos por telefone, a colisão é raríssima; 10 tentativas é
-// folga enorme. Esgotando, o erro é amigável (cobrador tenta de novo).
-const MAX_TENTATIVAS_CONVITE = 10
-
-/**
- * Gera um número de convite de 6 dígitos com RETRY de unicidade POR TELEFONE (loop
- * curto: gera, tenta gravar, em colisão 23505 regenera). `gravar` faz o INSERT (criar)
- * ou o UPDATE (ativar) com o hash do número; em colisão joga UNIQUE_VIOLATION. A
- * unicidade certa é garantida pelo índice parcial do alvo (telefone_devedor no receber,
- * telefone_cobrador no invertido). Retorna a linha gravada + o número em claro (que sai
- * UMA vez na resposta; nunca persiste).
- */
-async function gerarConviteComRetry(
-  cli: PoolClient,
-  gravar: (conviteHash: string) => Promise<Aviso>,
-): Promise<{ aviso: Aviso; numeroClaro: string }> {
-  for (let tentativa = 0; tentativa < MAX_TENTATIVAS_CONVITE; tentativa++) {
-    const numero = gerarNumeroConvite()
-    const conviteHash = sha256Hex(numero)
-    try {
-      await cli.query('savepoint sp_convite')
-      const aviso = await gravar(conviteHash)
-      await cli.query('release savepoint sp_convite')
-      return { aviso, numeroClaro: numero }
-    } catch (e) {
-      const code = (e as { code?: string }).code
-      if (code === repo.UNIQUE_VIOLATION) {
-        await cli.query('rollback to savepoint sp_convite')
-        continue // colisão do número para este telefone: regenera
-      }
-      throw e
-    }
-  }
-  throw conflito('convite_indisponivel', 'Não foi possível gerar o convite. Tente novamente.')
 }
 
 // E11 H11.2: cadência configurável, recorrência, menu e informado_pago são UNIVERSAIS
@@ -193,7 +144,7 @@ export async function criarAviso(
       pix_banco: body.pix_banco ?? null,
     }
 
-    // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM convite e SEM envio. ----
+    // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM envio. ----
     if (ehAgenda) {
       const aviso = await repo.inserirAviso(cli, {
         ...camposComuns,
@@ -202,7 +153,6 @@ export async function criarAviso(
         aceite_token_hash: null,
         aceite_token_expira_em: null,
         acao_token_hash: null,
-        convite_hash: null,
         convite_expira_em: null,
       })
       // Materializa as N ocorrências já na agenda (free PODE montar um recorrente na
@@ -213,31 +163,27 @@ export async function criarAviso(
         direcao: body.direcao,
         modo: 'agenda',
       })
-      return { aviso, numero_convite: null }
+      return { aviso }
     }
 
-    // ---- Modo ENVIAR: gera o convite (aguardando_aceite). O aceite é 100% pelo
-    // WhatsApp (E5): não há mais link/página de aceite; o convidado responde com o
-    // número de 6 dígitos. Mantemos os hashes de token (acao_token_hash é de E7) por
+    // ---- Modo ENVIAR: nasce aguardando_aceite. O aceite é 100% pelo WhatsApp (E5): o
+    // Whaviso manda o combinado direto ao convidado, que responde por botão; não há
+    // link/página de aceite. Mantemos os hashes de token (acao_token_hash é de E7) por
     // compatibilidade, sem expor link de site.
     const aceiteHash = sha256Hex(gerarToken())
     const acaoHash = sha256Hex(gerarToken())
     // H5.7: expiração FIXA de 7 dias (igual p/ todos os planos), não derivada da data.
     const conviteExpira = conviteExpiraEm()
 
-    // H2.2 / H3.2: número de convite de 6 dígitos com retry de unicidade por telefone.
-    const { aviso, numeroClaro } = await gerarConviteComRetry(cli, (conviteHash) =>
-      repo.inserirAviso(cli, {
-        ...camposComuns,
-        ...colunasRec,
-        status: 'aguardando_aceite',
-        aceite_token_hash: aceiteHash,
-        aceite_token_expira_em: aceiteExpiraEm(body.data_combinada),
-        acao_token_hash: acaoHash,
-        convite_hash: conviteHash,
-        convite_expira_em: conviteExpira,
-      }),
-    )
+    const aviso = await repo.inserirAviso(cli, {
+      ...camposComuns,
+      ...colunasRec,
+      status: 'aguardando_aceite',
+      aceite_token_hash: aceiteHash,
+      aceite_token_expira_em: aceiteExpiraEm(body.data_combinada),
+      acao_token_hash: acaoHash,
+      convite_expira_em: conviteExpira,
+    })
 
     // E8 H8.7: materializa as N ocorrências do recorrente (lazy no ciclo: só a 1ª vira
     // mini-ciclo, gerado pelo zap no aceite). Datas em America/Sao_Paulo.
@@ -249,22 +195,18 @@ export async function criarAviso(
     // de comprar créditos). O consumo só vem no disparo; o não aceito devolve a reserva.
     await reservarCreditos(cli, uid, custoCreditos, aviso.id)
 
-    // G4/H5.9: criar um novo combinado DESBLOQUEIA o telefone-alvo (limpa o anti-brute-force).
-    await repo.limparBloqueioTelefone(cli, [telefoneDevedor, camposComuns.telefone_cobrador])
-
     await repo.inserirEvento(cli, aviso.id, 'criado', criadorPapel, {
       direcao: body.direcao,
       modo: 'enviar',
     })
-    // H2.2/H3.2: evento de geração do convite (sem o número/hash nos detalhes).
-    await repo.inserirEvento(cli, aviso.id, 'convite_gerado', criadorPapel)
+    // Evento de geração do combinado (marco de quando o Whaviso enviou para aceite).
+    await repo.inserirEvento(cli, aviso.id, 'combinado_gerado', criadorPapel)
 
-    // E5 H5.0: o Whaviso INICIA a conversa. Enfileira o convite (resumo + botões) ao
-    // CONVIDADO na MESMA transação; o zap drena e manda o template convite.resumo. Não
-    // há mais compartilhamento manual (link/mensagem) pelo criador.
+    // E5: o Whaviso INICIA a conversa. Enfileira o combinado (resumo + botões) ao
+    // CONVIDADO na MESMA transação; o zap drena e manda o template combinado.resumo.
     await enfileirarConvite(cli, aviso)
 
-    return { aviso, numero_convite: formatarNumeroConvite(numeroClaro) }
+    return { aviso }
   })
 }
 
@@ -350,29 +292,26 @@ export async function ativarAviso(
     const acaoHash = sha256Hex(gerarToken())
     const conviteExpira = conviteExpiraEm() // H5.7: 7 dias fixo a partir da ativação.
 
-    const { aviso: ativado, numeroClaro } = await gerarConviteComRetry(cli, (conviteHash) =>
-      repo.ativarAviso(
-        cli,
-        id,
-        {
-          telefone_devedor: telefoneDevedorAtivo,
-          nome_cobrador: ehReceber ? null : (body.nome_cobrador ?? aviso.nome_cobrador),
-          telefone_cobrador: ehReceber ? null : telefoneCobradorAtivo,
-          pix_chave: pixAtivo,
-          pix_titular: pixTitularAtivo,
-          pix_banco: pixBancoAtivo,
-        },
-        {
-          aceite_token_hash: aceiteHash,
-          aceite_token_expira_em: aceiteExpiraEm(aviso.data_combinada),
-          acao_token_hash: acaoHash,
-          convite_hash: conviteHash,
-          convite_expira_em: conviteExpira,
-        },
-        rec?.colunas,
-        // Cadência (vale p/ simples também): grava o que veio no corpo; undefined = mantém.
-        body.cadencia_etapas ? [...body.cadencia_etapas] : undefined,
-      ),
+    const ativado = await repo.ativarAviso(
+      cli,
+      id,
+      {
+        telefone_devedor: telefoneDevedorAtivo,
+        nome_cobrador: ehReceber ? null : (body.nome_cobrador ?? aviso.nome_cobrador),
+        telefone_cobrador: ehReceber ? null : telefoneCobradorAtivo,
+        pix_chave: pixAtivo,
+        pix_titular: pixTitularAtivo,
+        pix_banco: pixBancoAtivo,
+      },
+      {
+        aceite_token_hash: aceiteHash,
+        aceite_token_expira_em: aceiteExpiraEm(aviso.data_combinada),
+        acao_token_hash: acaoHash,
+        convite_expira_em: conviteExpira,
+      },
+      rec?.colunas,
+      // Cadência (vale p/ simples também): grava o que veio no corpo; undefined = mantém.
+      body.cadencia_etapas ? [...body.cadencia_etapas] : undefined,
     )
 
     // Recorrência redefinida na ativação: materializa as N ocorrências (idempotente).
@@ -384,18 +323,15 @@ export async function ativarAviso(
     // transação: se a reserva falhar, o rollback desfaz a transição.
     await reservarCreditos(cli, uid, custoCreditos, id)
 
-    // G4/H5.9: ativar um combinado DESBLOQUEIA o telefone-alvo (anti-brute-force).
-    await repo.limparBloqueioTelefone(cli, [telefoneDevedorAtivo, telefoneCobradorAtivo])
-
-    // Evento de ativação (ator = papel do criador). + convite_gerado, espelho da criação.
+    // Evento de ativação (ator = papel do criador). + combinado_gerado, espelho da criação.
     await repo.inserirEvento(cli, id, 'ativado', aviso.criador_papel)
-    await repo.inserirEvento(cli, id, 'convite_gerado', aviso.criador_papel)
+    await repo.inserirEvento(cli, id, 'combinado_gerado', aviso.criador_papel)
 
-    // E5 H5.0: espelho da criação. O Whaviso envia o convite ao CONVIDADO direto (o
-    // ativado já tem os telefones resolvidos); sem compartilhamento manual pelo criador.
+    // E5: espelho da criação. O Whaviso envia o combinado ao CONVIDADO direto (o ativado
+    // já tem os telefones resolvidos); sem compartilhamento manual pelo criador.
     await enfileirarConvite(cli, ativado)
 
-    return { aviso: ativado, numero_convite: formatarNumeroConvite(numeroClaro) }
+    return { aviso: ativado }
   })
 }
 

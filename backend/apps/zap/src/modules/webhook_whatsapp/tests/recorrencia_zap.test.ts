@@ -3,7 +3,6 @@
 // WhatsApp avança a ocorrência (k<N: volta a programado, NÃO vira pago) e fecha no fim.
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import { sha256ConviteHex } from '@whaviso/shared/contracts'
 import { processarBotao } from '../service'
 import { clienteWhatsFake, encerrarPools, limpar, poolSuper } from '../../../../test/harness'
 
@@ -40,13 +39,13 @@ async function criarConviteRecorrente(numeroOcorrencias: number): Promise<{ cobr
   const { rows } = await poolSuper.query<{ id: string }>(
     `insert into public.avisos
        (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
-        motivo, valor_centavos, data_combinada, pix_chave, convite_hash, convite_expira_em,
+        motivo, valor_centavos, data_combinada, pix_chave, convite_expira_em,
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo, ocorrencias_total, ocorrencia_atual)
      values ($1,'receber','cobrador','aguardando_aceite','Maria',$2,'mensalidade',9900,
-             '2026-12-10','cobrador@pix.com',$3, now() + interval '7 days',
-             'periodo','mensal',1,$4,1)
+             '2026-12-10','cobrador@pix.com', now() + interval '7 days',
+             'periodo','mensal',1,$3,1)
      returning id`,
-    [cobradorId, TEL, sha256ConviteHex('123456'), numeroOcorrencias],
+    [cobradorId, TEL, numeroOcorrencias],
   )
   const avisoId = rows[0]!.id
   // Materializa as N ocorrências (datas mensais a partir de 2026-12-10).

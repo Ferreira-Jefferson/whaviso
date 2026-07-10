@@ -152,7 +152,7 @@ const PASSOS = [
     icone: CalendarClock,
     titulo: 'Você combina os detalhes',
     texto:
-      'Cadastre o nome, o valor, a data e/ou sua chave Pix. Geramos um convite para a outra pessoa revisar e confirmar.',
+      'Cadastre o nome, o valor, a data e/ou sua chave Pix. Enviamos o combinado para a outra pessoa revisar e confirmar.',
   },
   {
     icone: MessageSquare,

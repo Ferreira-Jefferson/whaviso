@@ -50,7 +50,7 @@ export type RecorrenciaInput = z.infer<typeof recorrenciaInput>
 export const criarAvisoBody = z
   .object({
     direcao: direcaoAviso,
-    // H4.1: `enviar` gera convite agora; `agenda` só anota (nasce sem_aviso, sem envio).
+    // H4.1: `enviar` envia o combinado agora; `agenda` só anota (nasce sem_aviso, sem envio).
     modo: z.enum(['enviar', 'agenda']).default('enviar'),
     nome_devedor: z.string().trim().min(1).max(120),
     telefone_devedor: telefoneE164.nullish(),
@@ -92,22 +92,21 @@ export const criarAvisoBody = z
     message: 'informe o banco da chave Pix',
     path: ['pix_banco'],
   })
-  // No invertido (pagar) a chave Pix é OPCIONAL ao gerar o convite: o cobrador (quem vai
+  // No invertido (pagar) a chave Pix é OPCIONAL ao enviar o combinado: o cobrador (quem vai
   // receber) pode informar/ajustar depois. Sem refine de Pix aqui (espelha o backend).
 export type CriarAvisoBody = z.infer<typeof criarAvisoBody>
 
 export const criarAvisoResposta = z.object({
+  // E5: o Whaviso ENVIA o combinado direto ao convidado (resumo + botões), sem
+  // compartilhamento manual; a api devolve só o aviso.
   aviso: avisoSchema,
-  // E5 H5.0: o Whaviso ENVIA o convite direto ao convidado (não há mais compartilhamento
-  // manual), então não vem mais mensagem pronta nem link wa.me. Sobra o número de convite
-  // em claro (xxx-xxx), só como identificador de RESERVA (H5.1). null no modo agenda.
-  numero_convite: z.string().nullable(),
 })
 export type CriarAvisoResposta = z.infer<typeof criarAvisoResposta>
 
 // ---- POST /v1/avisos/:id/ativar (H4.3) ----
-// Ativa uma anotação da agenda (sem_aviso -> aguardando_aceite), gera o convite e
-// devolve o MESMO formato da criação. Dados faltantes (telefone/Pix) podem vir no corpo.
+// Ativa uma anotação da agenda (sem_aviso -> aguardando_aceite): o Whaviso envia o
+// combinado ao convidado. Devolve o MESMO formato da criação (só o aviso). Dados
+// faltantes (telefone/Pix) podem vir no corpo.
 export const ativarAvisoBody = z
   .object({
     telefone_devedor: telefoneE164.nullish(),

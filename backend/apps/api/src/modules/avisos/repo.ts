@@ -115,14 +115,9 @@ export interface NovoAviso {
   aceite_token_hash: string | null
   aceite_token_expira_em: Date | null
   acao_token_hash: string | null
-  /** Hash sha256 do número de convite de 6 dígitos (H2.2). null no agenda/invertido. */
-  convite_hash: string | null
-  /** E5/H5.7: expiração FIXA de 7 dias do convite (now()+7d). null no agenda. */
+  /** E5/H5.7: expiração FIXA de 7 dias do combinado em aguardando_aceite (now()+7d). null no agenda. */
   convite_expira_em: Date | null
 }
-
-/** Código Postgres de violação de unicidade (usado no retry de geração do convite). */
-export const UNIQUE_VIOLATION = '23505'
 
 export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso> {
   const { rows } = await ex.query<LinhaAviso>(
@@ -132,9 +127,9 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
         valor_centavos, data_combinada, pix_chave, pix_titular, pix_banco,
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
         ocorrencias_total, ocorrencia_atual, cadencia_etapas,
-        aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_hash, convite_expira_em)
+        aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26)
+             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
@@ -145,7 +140,7 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
       novo.ocorrencias_total ?? null, novo.ocorrencia_atual ?? null,
       novo.cadencia_etapas ?? null,
       novo.aceite_token_hash, novo.aceite_token_expira_em, novo.acao_token_hash,
-      novo.convite_hash, novo.convite_expira_em,
+      novo.convite_expira_em,
     ],
   )
   return mapear(rows[0]!)
@@ -322,8 +317,8 @@ export interface DadosAtivacao {
 
 /**
  * ATIVA a anotação (H4.3) numa só query, sob o lock já tomado: completa os dados
- * faltantes (telefone/Pix da outra ponta), grava os HASHES do convite (claro nunca
- * persiste) e transita sem_aviso -> aguardando_aceite. O CHECK `status<>'sem_aviso'`
+ * faltantes (telefone/Pix da outra ponta), grava os hashes de token e a expiração de 7
+ * dias, e transita sem_aviso -> aguardando_aceite. O CHECK `status<>'sem_aviso'`
  * passa a EXIGIR o destino, então telefone/Pix já devem estar consistentes aqui (o
  * serviço valida antes com mensagem amigável). Retorna a linha atualizada.
  */
@@ -335,7 +330,6 @@ export async function ativarAviso(
     aceite_token_hash: string
     aceite_token_expira_em: Date
     acao_token_hash: string
-    convite_hash: string
     convite_expira_em: Date
   },
   // Recorrência definida (ou redefinida) na ativação (E6 H6.10). undefined = mantém o que
@@ -355,17 +349,16 @@ export async function ativarAviso(
        pix_chave = coalesce($5, pix_chave),
        pix_titular = coalesce($6, pix_titular),
        pix_banco = coalesce($7, pix_banco),
-       recorrencia_tipo = case when $13::boolean then $14 else recorrencia_tipo end,
-       recorrencia_freq = case when $13::boolean then $15 else recorrencia_freq end,
-       recorrencia_intervalo = case when $13::boolean then coalesce($16,1) else recorrencia_intervalo end,
-       ocorrencias_total = case when $13::boolean then $17 else ocorrencias_total end,
-       ocorrencia_atual = case when $13::boolean then $18 else ocorrencia_atual end,
-       cadencia_etapas = case when $19::boolean then $20::etapa_envio[] else cadencia_etapas end,
+       recorrencia_tipo = case when $12::boolean then $13 else recorrencia_tipo end,
+       recorrencia_freq = case when $12::boolean then $14 else recorrencia_freq end,
+       recorrencia_intervalo = case when $12::boolean then coalesce($15,1) else recorrencia_intervalo end,
+       ocorrencias_total = case when $12::boolean then $16 else ocorrencias_total end,
+       ocorrencia_atual = case when $12::boolean then $17 else ocorrencia_atual end,
+       cadencia_etapas = case when $18::boolean then $19::etapa_envio[] else cadencia_etapas end,
        aceite_token_hash = $8,
        aceite_token_expira_em = $9,
        acao_token_hash = $10,
-       convite_hash = $11,
-       convite_expira_em = $12
+       convite_expira_em = $11
      where id = $1
      returning ${COLS}`,
     [
@@ -379,7 +372,6 @@ export async function ativarAviso(
       convite.aceite_token_hash,
       convite.aceite_token_expira_em,
       convite.acao_token_hash,
-      convite.convite_hash,
       convite.convite_expira_em,
       recorrencia !== undefined,
       recorrencia?.recorrencia_tipo ?? null,
@@ -426,26 +418,6 @@ export async function listarOcorrencias(ex: Executor, avisoId: string): Promise<
     [avisoId],
   )
   return rows
-}
-
-/**
- * E5/H5.9 (G4): ao criar/ativar um combinado para um telefone, LIMPA o bloqueio e zera o
- * contador anti-brute-force desse telefone ("bloqueado até que um novo combinado seja
- * enviado"). Idempotente (no-op se o telefone nunca tentou). Sem PII em log. Recebe os
- * telefones-alvo possíveis (devedor e/ou cobrador); ignora nulos.
- */
-export async function limparBloqueioTelefone(
-  ex: Executor,
-  telefones: (string | null)[],
-): Promise<void> {
-  const alvos = telefones.filter((t): t is string => !!t)
-  if (alvos.length === 0) return
-  await ex.query(
-    `update public.convite_tentativas_telefone
-        set erros = 0, bloqueado = false, atualizado_em = now()
-      where telefone = any($1)`,
-    [alvos],
-  )
 }
 
 /** Aviso como CRIADOR com FOR UPDATE (serializa editar/pausar/cancelar concorrentes). */

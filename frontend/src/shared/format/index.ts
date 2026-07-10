@@ -180,7 +180,7 @@ export const ROTULO_TIPO_CHAVE: Record<TipoChavePix, string> = {
 // Linguagem das Regras de Ouro: só "aviso/lembrete/combinado" (ver linguagem.ts).
 export const ROTULO_EVENTO: Record<TipoEvento, string> = {
   criado: 'Combinado criado',
-  convite_gerado: 'Convite gerado',
+  combinado_gerado: 'Combinado enviado',
   aceite: 'Combinado aceito',
   ativado: 'Lembretes ativados',
   editado: 'Combinado editado',
@@ -203,7 +203,7 @@ export const ROTULO_EVENTO: Record<TipoEvento, string> = {
   cancelado_criador: 'Combinado cancelado',
   expirado: 'Encerrado sem confirmação',
   solicitou_pix: 'Pediu a chave Pix',
-  recusado: 'Convite recusado',
+  recusado: 'Combinado recusado',
 }
 
 // ---- Rótulos do ator de um evento ----

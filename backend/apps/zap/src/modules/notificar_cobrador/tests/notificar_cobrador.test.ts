@@ -127,25 +127,25 @@ describe('notificar_cobrador: gating por template (H12.8)', () => {
 
 describe('notificar_cobrador: convite ao convidado (E5 H5.0)', () => {
   afterAll(async () => {
-    // Volta o convite.resumo ao estado semeado pela migration 0067 (pendente p/ re-aprovar).
+    // Volta o combinado.resumo ao estado semeado pela migration 0067 (pendente p/ re-aprovar).
     await poolSuper.query(
-      `update public.templates set status_meta='pendente'::status_meta_template where chave='convite.resumo'`,
+      `update public.templates set status_meta='pendente'::status_meta_template where chave='combinado.resumo'`,
     )
   })
 
-  it('receber: o Whaviso manda o convite (template convite.resumo) ao DEVEDOR com os 3 botões', async () => {
+  it('receber: o Whaviso manda o combinado (template combinado.resumo) ao DEVEDOR com os 3 botões', async () => {
     const { cobradorId, avisoId } = await criarConviteReceber({ dataCombinada: futuro, telefoneDevedor: '+5511977776666' })
-    await ativarTemplate('convite.resumo', true)
+    await ativarTemplate('combinado.resumo', true)
     const notifId = await enfileirar(avisoId, {
       telefoneAlvo: '+5511977776666',
       alvoPapel: 'devedor',
-      tipo: 'convite_enviar',
+      tipo: 'combinado_enviar',
     })
     // Isolamento: o banco whaviso_dev é compartilhado (a api roda antes e deixa convites
     // pendentes de outros avisos). Zera os convites de OUTROS avisos para o dreno ser
     // determinístico (só a minha linha sai neste lote).
     await poolSuper.query(
-      `delete from public.notificacoes_cobrador where tipo='convite_enviar' and aviso_id<>$1`,
+      `delete from public.notificacoes_cobrador where tipo='combinado_enviar' and aviso_id<>$1`,
       [avisoId],
     )
 
@@ -170,11 +170,11 @@ describe('notificar_cobrador: convite ao convidado (E5 H5.0)', () => {
   it('convite obsoleto (combinado já saiu de aguardando_aceite): supera sem enviar', async () => {
     // Fixture nasce 'programado' (já aceito): aindaValida exige aguardando_aceite.
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: futuro, telefone: '+5511977775555' })
-    await ativarTemplate('convite.resumo', true)
+    await ativarTemplate('combinado.resumo', true)
     const notifId = await enfileirar(avisoId, {
       telefoneAlvo: '+5511977775555',
       alvoPapel: 'devedor',
-      tipo: 'convite_enviar',
+      tipo: 'combinado_enviar',
     })
     const whats = clienteWhatsFake(() => ({ wamid: 'x' }))
 

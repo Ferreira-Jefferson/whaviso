@@ -46,7 +46,7 @@ export type RoleUsuario = z.infer<typeof roleUsuario>
 
 export const tipoEvento = z.enum([
   'criado',
-  'convite_gerado',
+  'combinado_gerado',
   'aceite',
   'ativado',
   'editado',
@@ -98,7 +98,7 @@ export type ContextoTemplate = z.infer<typeof contextoTemplate>
 // inteiro) e a tela de templates deixa de carregar.
 //
 // E5: 'dado_incorreto' é a terceira opção do aceite (aceitar / algum dado incorreto /
-// recusar). Emitida hoje no template convite.resumo (editável em /admin/mensagens),
+// recusar). Emitida hoje no template combinado.resumo (editável em /admin/mensagens),
 // enviado pelo zap via Meta Cloud API como template aprovado.
 export const acaoBotaoTemplate = z.enum([
   'ja_paguei',

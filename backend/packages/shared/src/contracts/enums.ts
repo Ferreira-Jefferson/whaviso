@@ -43,7 +43,7 @@ export type RoleUsuario = z.infer<typeof roleUsuario>
 
 export const tipoEvento = z.enum([
   'criado',
-  'convite_gerado',
+  'combinado_gerado',
   'aceite',
   'ativado',
   'editado',
@@ -96,7 +96,7 @@ export type ContextoTemplate = z.infer<typeof contextoTemplate>
 // templates não carregar.
 //
 // E5: 'dado_incorreto' é a terceira opção do aceite (aceitar / algum dado incorreto /
-// recusar). Emitida no template convite.resumo, enviado pelo zap via Meta Cloud API
+// recusar). Emitida no template combinado.resumo, enviado pelo zap via Meta Cloud API
 // (template aprovado, botões quick_reply); o webhook trata o toque (H5.4).
 export const acaoBotaoTemplate = z.enum([
   'ja_paguei',

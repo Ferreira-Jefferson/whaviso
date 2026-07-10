@@ -19,13 +19,15 @@ a fronteira do lint impede o painel de importar este módulo, por isso o `useAvi
   refaz **por prefixo de string**, sem importação cruzada. O `useAvisos` (listagem,
   `GET /v1/avisos`, envelope paginado `{ itens, total, page, per_page }`) vive em
   `modules/painel/api.ts`.
-- `schemas.ts`: schema do formulário. `direcao=pagar` é lembrete a si mesmo:
-  SEM aceite/WhatsApp, telefone não exigido, nasce `programado`, `link_aceite=null`.
-  `direcao=receber` exige telefone (E.164) e a resposta traz `link_aceite`.
+- `schemas.ts`: schema do formulário. No modo `enviar` o combinado nasce em
+  `aguardando_aceite` e o Whaviso manda o resumo + botões direto ao convidado (E5, sem
+  link/mensagem para o criador). `direcao=receber` exige o telefone do devedor; no
+  invertido (`pagar`), o do cobrador.
 - `pages/NovoAviso.tsx`: formulário dinâmico por direção; trata
   `limite_plano_atingido` (HTTP 422) com upsell.
-- `components/AvisoCriado.tsx`: sucesso: CopyLinkButton + wa.me (receber) ou
-  confirmação simples (pagar).
+- `components/AvisoCriado.tsx`: tela de sucesso: confirma que o Whaviso enviou o
+  combinado ao convidado pelo WhatsApp (ou, na agenda, CTA para ativar depois). A
+  resposta da criação traz só o aviso (sem número de convite).
 
 ## Estado (Fase 4 entregue: detalhe + ciclo + ações)
 

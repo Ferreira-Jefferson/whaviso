@@ -77,7 +77,7 @@ export default function TermosUsoPage() {
           </li>
           <li>O saldo comprado não expira.</li>
           <li>
-            O crédito só é consumido quando o lembrete de fato é enviado. Um convite não aceito
+            O crédito só é consumido quando o lembrete de fato é enviado. Um combinado não aceito
             devolve o crédito ao seu saldo.
           </li>
         </Lista>

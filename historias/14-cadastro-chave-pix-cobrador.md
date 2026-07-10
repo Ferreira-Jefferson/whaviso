@@ -54,7 +54,7 @@ Como **cobrador**, quero informar minha chave em passos curtos, um por mensagem,
   - [ ] **3. Chave:** ex.: *"Informe a sua chave pix."* (texto livre), com botão **[Corrigir anterior]**.
 - [ ] Cada resposta de texto do cobrador **avança** para a etapa seguinte e guarda o valor parcial.
 - [ ] **[Corrigir anterior]** volta **uma etapa**, mantendo o que já foi preenchido nas outras, e repete a pergunta daquela etapa.
-- [ ] Enquanto a sessão está ativa, **texto livre do cobrador é interpretado como resposta da etapa atual**, e não como número de convite nem comando de menu (Épico 7, H7.1).
+- [ ] Enquanto a sessão está ativa, **texto livre do cobrador é interpretado como resposta da etapa atual**, e não como comando de menu (Épico 7, H7.1).
 - [ ] As mensagens do wizard são neutras quanto a gênero e sem palavras proibidas; chave, titular e banco **nunca** vão para log.
 
 ---

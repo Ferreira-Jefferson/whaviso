@@ -128,7 +128,7 @@ function CicloEditavel({
   )
 }
 
-// Título de uma seção de templates (ciclo de lembretes, convite, respostas...).
+// Título de uma seção de templates (ciclo de lembretes, combinado, respostas...).
 function TituloSecao({
   id,
   titulo,
