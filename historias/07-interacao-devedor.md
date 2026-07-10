@@ -1,6 +1,6 @@
-# Épico 7: Interação do devedor (Já paguei / Chave de Pag. / Desativar lembretes)
+# Épico 7: Interação do devedor (Já paguei / Chave Pix / Desativar lembretes)
 
-> O devedor **não conversa**: não existe chat humano, IA, nem Pix automático. Ele só interage pelos **três botões** que acompanham toda mensagem do ciclo (Épico 6): **Já paguei**, **Chave de Pag.** e **Desativar lembretes**.
+> O devedor **não conversa**: não existe chat humano, IA, nem Pix automático. Ele só interage pelos **três botões** que acompanham toda mensagem do ciclo (Épico 6): **Já paguei**, **Chave Pix** e **Desativar lembretes**.
 > Cada toque chega ao `zap` como um evento de webhook **autenticado por HMAC**, carregando o **`aviso_id`** (e o identificador do aviso/etapa) no payload, nunca o token, para o Whaviso saber exatamente de qual combinado e de qual mensagem se trata.
 > **Regra central:** só os botões do **último aviso enviado** do combinado têm efeito; botões de mensagens anteriores ficam inertes (ver H7.7).
 > Este épico cobre **o que cada botão faz** e a resposta que o devedor recebe. As notificações ao cobrador ficam no Épico 10; a confirmação do pagamento, no Épico 8; a abrangência/compliance do opt-out, no Épico 13.
@@ -11,10 +11,10 @@
 ### H7.1: O devedor só age por botão (sem chat) 🟢
 Como **devedor**, quero responder com um toque e não ter que digitar nada, para resolver o combinado sem conversa.
 *Critérios de aceite:*
-- [ ] As únicas ações possíveis para o devedor são os botões **Já paguei**, **Chave de Pag.** e **Desativar lembretes**.
+- [ ] As únicas ações possíveis para o devedor são os botões **Já paguei**, **Chave Pix** e **Desativar lembretes**.
 - [ ] Não há chat humano, IA, nem Pix automático: o Whaviso **não responde livremente** a texto do devedor.
 - [ ] Se o devedor **digita texto livre**:
-  - [ ] **Texto livre do devedor:** a conta responde com um **menu de opções** com as ações disponíveis (Já paguei / Chave de Pag. / Desativar lembretes) referente ao(s) combinado(s) ativo(s). **Disponível para todas as contas** (não há distinção de plano; modelo de créditos, Épico 11). O menu é resposta a texto, não um lembrete, e **não consome crédito de envio**.
+  - [ ] **Texto livre do devedor:** a conta responde com um **menu de opções** com as ações disponíveis (Já paguei / Chave Pix / Desativar lembretes) referente ao(s) combinado(s) ativo(s). **Disponível para todas as contas** (não há distinção de plano; modelo de créditos, Épico 11). O menu é resposta a texto, não um lembrete, e **não consome crédito de envio**.
   - [ ] O menu é um **conjunto fechado de opções, não um chat**: o Whaviso não conversa (Épico 13 H13.7). Fora dos botões/menu, silêncio.
 - [ ] Cada toque de botão é um evento de webhook **autenticado por HMAC**; o payload traz o **`aviso_id`** e o identificador do aviso/etapa, nunca o token nem dado sensível.
 - [ ] Toda resposta respeita as regras de linguagem (neutra de gênero, sem palavras proibidas).
@@ -34,17 +34,17 @@ Como **devedor**, quero avisar que paguei com um toque, para que quem vai recebe
 
 ---
 
-### H7.3: Tocar "Chave de Pag." (ver o Pix) 🟢
+### H7.3: Tocar "Chave Pix" (ver o Pix) 🟢
 Como **devedor**, quero ver a chave Pix com o nome e o banco de quem recebe, para copiar, conferir o destinatário e pagar com segurança.
 *Critérios de aceite:*
-- [ ] O botão **Chave de Pag.** aparece em **todas as etapas** (o Pix é obrigatório nos dois fluxos, Épico 6); o rótulo **não contém a palavra "Pix"** (precaução de bloqueio), editável pelo owner (Épico 12).
+- [ ] O botão **Chave Pix** aparece em **todas as etapas** (o Pix é obrigatório nos dois fluxos, Épico 6); o rótulo **não contém a palavra "Pix"** (precaução de bloqueio), editável pelo owner (Épico 12).
 - [ ] A chave salva pelo cobrador inclui **nome do titular** e **banco**; esses dados compõem a resposta.
 - [ ] Ao tocar, o Whaviso envia **duas mensagens em sequência** (intervalo de até **3 segundos** entre elas):
   - [ ] **1ª:** só a chave, fácil de copiar, ex.: *"Chave de pagamento: [chave]"*.
   - [ ] **2ª:** o titular e o banco, ex.: *"Em nome de [nome], banco [banco]."*
 - [ ] O evento **`solicitou_pix`** é registrado **apenas no primeiro toque** (sinal de intenção, visível no painel, Épico 9); toques seguintes não registram de novo.
 - [ ] A chave é entregue **uma única vez por combinado**: depois de entregue, novos toques **não reenviam** (a pessoa já tem a chave). **Exceção:** se o servidor detectar **falha de envio mesmo após os 3 retrys** (Épico 6 H6.8), a entrega pode ser refeita.
-- [ ] Tocar "Chave de Pag." **não muda o estado** do combinado.
+- [ ] Tocar "Chave Pix" **não muda o estado** do combinado.
 - [ ] A chave, o nome e o banco **nunca** aparecem em log.
 
 ---
@@ -91,7 +91,7 @@ Como **sistema (zap)**, quero mapear cada toque ao combinado exato pelo `aviso_i
 Como **devedor**, quero que valha o que está mais recente, para não acionar por engano um botão de uma mensagem antiga.
 *Critérios de aceite:*
 - [ ] Apenas os botões do **último aviso enviado** do combinado têm efeito; tocar um botão de uma mensagem **anterior** do mesmo combinado **não dispara ação de estado**.
-- [ ] Isso vale para os três botões, inclusive **Chave de Pag.** (entrega uma vez por combinado, e só pelo último aviso).
+- [ ] Isso vale para os três botões, inclusive **Chave Pix** (entrega uma vez por combinado, e só pelo último aviso).
 - [ ] Se o combinado já está em **estado terminal** (`pago`, `cancelado`, `recusado`, `expirado`), tocar qualquer botão **não reabre** o combinado nem dispara ação.
 - [ ] Nesses casos o devedor recebe uma resposta neutra, ex.: *"Este combinado já foi encerrado, não há mais nada a fazer por aqui."*
 - [ ] Se o `aviso_id` for inválido/desconhecido, o toque é ignorado **sem vazar** se o combinado existe ou não.
@@ -113,10 +113,10 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 ### Decisões tomadas
 - **Texto livre:** todas as contas recebem um menu de opções (não há distinção de plano; modelo de créditos, Épico 11). Depois de "Já paguei", nem isso (silêncio total para aquele combinado).
 - **"Já paguei" idempotente e silencioso na repetição** (não reenvia nada).
-- **"Chave de Pag." entrega duas mensagens** (chave; depois titular + banco, até 3s de intervalo), **uma vez por combinado**, `solicitou_pix` só no 1º toque, reenvio só em falha de servidor.
+- **"Chave Pix" entrega duas mensagens** (chave; depois titular + banco, até 3s de intervalo), **uma vez por combinado**, `solicitou_pix` só no 1º toque, reenvio só em falha de servidor.
 - **Opt-out = estado `desregistrado`, reversível** (botão Ativar lembretes), só o combinado em questão, libera o horário reservado.
 - **Reativação** pega novo horário reservado, mensagem sem botão, e notifica o cobrador só se a notificação de saída já tiver saído; notificação de saída atrasada em **1 minuto**.
-- **Só os botões do último aviso agem** (H7.7); "Chave de Pag." após encerrado: nada (só uma vez por combinado, só no último aviso).
+- **Só os botões do último aviso agem** (H7.7); "Chave Pix" após encerrado: nada (só uma vez por combinado, só no último aviso).
 
 ### Decisões em aberto
 - Nenhuma pendente neste épico.

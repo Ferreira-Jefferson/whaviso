@@ -1,4 +1,4 @@
--- E7 (Interação do devedor): controle de ENTREGA da chave de pagamento (H7.3) e
+-- E7 (Interação do devedor): controle de ENTREGA da chave pix (H7.3) e
 -- templates novos das respostas/menu deste épico (H7.1/H7.3/H7.5/H7.7).
 --
 -- O grosso da fundação de E7 já veio antes:
@@ -27,7 +27,7 @@
 -- DML, segura em auto-commit por statement.
 
 -- ---------------------------------------------------------------------------------------
--- 1) Status de entrega da chave de pagamento (H7.3 / G-C3).
+-- 1) Status de entrega da chave pix (H7.3 / G-C3).
 --    NULL      = ainda não entregue (ou entrega parcial que falhou -> reentregável);
 --    'entregue'= as DUAS mensagens (chave; titular+banco) saíram com sucesso.
 --    Reenvio só acontece quando NÃO está 'entregue'. Não altera o estado do aviso.
@@ -37,7 +37,7 @@ alter table public.avisos add column if not exists entrega_chave_status text
     check (entrega_chave_status is null or entrega_chave_status = 'entregue');
 
 comment on column public.avisos.entrega_chave_status is
-  'E7/H7.3: marca a entrega da chave de pagamento uma vez por combinado. NULL = reentregável; entregue = as duas mensagens (chave; titular+banco) saíram. Nunca guarda a chave.';
+  'E7/H7.3: marca a entrega da chave pix uma vez por combinado. NULL = reentregável; entregue = as duas mensagens (chave; titular+banco) saíram. Nunca guarda a chave.';
 
 -- O zap (webhook) marca a entrega; a api tem update amplo (0008). Acrescenta a coluna
 -- à lista de UPDATE do zap.
@@ -88,7 +88,7 @@ select 'resposta.menu_opcoes', 'resposta_menu_opcoes',
          'texto', 'Como posso ajudar com este combinado? Toque em uma das opções abaixo. 🙂',
          'botoes', jsonb_build_array(
            jsonb_build_object('acao','ja_paguei','rotulo','Já paguei'),
-           jsonb_build_object('acao','ver_pix','rotulo','Chave de Pag.'),
+           jsonb_build_object('acao','ver_pix','rotulo','Chave Pix'),
            jsonb_build_object('acao','optout','rotulo','Desativar lembretes')
          )
        ),

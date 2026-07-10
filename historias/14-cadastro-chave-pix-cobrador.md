@@ -1,6 +1,6 @@
-# Épico 14: Cadastro da chave de pagamento pelo cobrador (fluxo invertido)
+# Épico 14: Cadastro da chave pix pelo cobrador (fluxo invertido)
 
-> No **fluxo pagar invertido** (criador = devedor, que convida o cobrador) a chave de pagamento é **opcional** ao criar e ao aceitar: o devedor nem sempre conhece a chave de quem vai receber. Este épico cobre o caminho para o **cobrador informar a própria chave depois**, pelo WhatsApp, de forma guiada, e essa chave **chegar ao devedor** e ficar **vinculada ao combinado**.
+> No **fluxo pagar invertido** (criador = devedor, que convida o cobrador) a chave pix é **opcional** ao criar e ao aceitar: o devedor nem sempre conhece a chave de quem vai receber. Este épico cobre o caminho para o **cobrador informar a própria chave depois**, pelo WhatsApp, de forma guiada, e essa chave **chegar ao devedor** e ficar **vinculada ao combinado**.
 > A coleta acontece por um **fluxo guiado (wizard)**, uma etapa por mensagem, porque chave, titular, banco e tipo em texto livre solto geram variações impossíveis de tratar. Cada etapa avança com a resposta, oferece **corrigir a anterior** e termina numa **confirmação consolidada**.
 > Dois gatilhos abrem o fluxo: uma **oferta no aceite** (opt-in por botão) e um **pedido do devedor** (botão no lembrete). Nunca é automático nem obrigatório.
 > O cobrador, ao **aceitar**, já ganha conta automática (Épico 5, H5.3), então no momento do wizard ele tem perfil e a chave pode ir para o cadastro de chaves dele e ser reaproveitada em combinados futuros.
@@ -20,10 +20,10 @@ Como **sistema (zap)**, quero abrir o cadastro de chave só nos combinados inver
 ---
 
 ### H14.2: Oferta no aceite (Gatilho A, opt-in por botão) 🟢
-Como **cobrador**, quero, logo ao aceitar um combinado sem chave, ser convidado a informar minha chave de pagamento, para que quem vai me pagar já receba a chave junto.
+Como **cobrador**, quero, logo ao aceitar um combinado sem chave, ser convidado a informar minha chave pix, para que quem vai me pagar já receba a chave junto.
 *Critérios de aceite:*
 - [ ] O aceite acontece normalmente (Épico 5): o combinado vai de **`aguardando_aceite` → `programado`**. Este épico **não** altera a máquina de estados do aceite.
-- [ ] Quando o combinado é invertido **e sem chave**, a resposta ao cobrador **não** é a confirmação simples de aceite: ele recebe a **oferta**, ex.: *"Combinado confirmado! Quer informar sua chave de pagamento agora? Ela fica vinculada a este combinado para [devedor] te pagar com mais agilidade."* com os botões **[Informar chave]** e **[Agora não]**.
+- [ ] Quando o combinado é invertido **e sem chave**, a resposta ao cobrador **não** é a confirmação simples de aceite: ele recebe a **oferta**, ex.: *"Combinado confirmado! Quer informar sua chave pix agora? Ela fica vinculada a este combinado para [devedor] te pagar com mais agilidade."* com os botões **[Informar chave]** e **[Agora não]**.
 - [ ] A **notificação de aceite ao devedor** (Épico 10) só é enviada **depois** que o cobrador resolve a oferta:
   - [ ] Se o cobrador toca **[Informar chave]**: começa o wizard (H14.4); ao concluir, o devedor recebe **uma** notificação que junta aceite + chave (H14.7).
   - [ ] Se o cobrador toca **[Agora não]** (ou a sessão expira sem concluir, H14.8): o devedor recebe a **notificação de aceite normal**, e a chave poderá ser pedida depois pelo Gatilho B (H14.3).
@@ -34,10 +34,10 @@ Como **cobrador**, quero, logo ao aceitar um combinado sem chave, ser convidado 
 ---
 
 ### H14.3: Pedido pelo devedor (Gatilho B, botão no lembrete) 🟢
-Como **devedor**, quero pedir a chave de pagamento de quem vai receber quando ela ainda não foi informada, para conseguir pagar.
+Como **devedor**, quero pedir a chave pix de quem vai receber quando ela ainda não foi informada, para conseguir pagar.
 *Critérios de aceite:*
 - [ ] Enquanto o combinado invertido estiver **sem chave**, o lembrete que vai ao **devedor** (Épico 6) mostra um botão extra **[Solicitar chave Pix]** (rótulo editável pelo owner, Épico 12, sem a palavra "Pix" se o owner preferir).
-- [ ] O botão **substitui** o **[Chave de Pag.]** enquanto não há chave (não há o que mostrar); quando a chave passa a existir, volta o **[Chave de Pag.]** normal (Épico 7, H7.3) e o **[Solicitar chave Pix]** some.
+- [ ] O botão **substitui** o **[Chave Pix]** enquanto não há chave (não há o que mostrar); quando a chave passa a existir, volta o **[Chave Pix]** normal (Épico 7, H7.3) e o **[Solicitar chave Pix]** some.
 - [ ] Ao tocar **[Solicitar chave Pix]**, o **cobrador** recebe a mesma oferta do Gatilho A (H14.2), no telefone dele; e o **devedor** recebe uma resposta neutra, ex.: *"Vamos pedir a chave a quem vai receber. Assim que ela chegar, você recebe aqui."*
 - [ ] O pedido registra o evento **`pix_solicitada`** (auditoria, append-only), visível no painel (Épico 9).
 - [ ] **Idempotente:** tocar de novo enquanto o pedido já está em aberto **não** dispara nova oferta repetida nem eventos duplicados.
@@ -51,7 +51,7 @@ Como **cobrador**, quero informar minha chave em passos curtos, um por mensagem,
 - [ ] Iniciado o fluxo (por **[Informar chave]**), o Whaviso pede **uma informação por mensagem**, nesta ordem:
   - [ ] **1. Titular:** ex.: *"Informe o nome do titular da chave."* (texto livre).
   - [ ] **2. Instituição:** ex.: *"Informe a instituição financeira (banco)."* (texto livre), com botão **[Corrigir anterior]**.
-  - [ ] **3. Chave:** ex.: *"Informe a sua chave de pagamento."* (texto livre), com botão **[Corrigir anterior]**.
+  - [ ] **3. Chave:** ex.: *"Informe a sua chave pix."* (texto livre), com botão **[Corrigir anterior]**.
 - [ ] Cada resposta de texto do cobrador **avança** para a etapa seguinte e guarda o valor parcial.
 - [ ] **[Corrigir anterior]** volta **uma etapa**, mantendo o que já foi preenchido nas outras, e repete a pergunta daquela etapa.
 - [ ] Enquanto a sessão está ativa, **texto livre do cobrador é interpretado como resposta da etapa atual**, e não como número de convite nem comando de menu (Épico 7, H7.1).
@@ -88,9 +88,9 @@ Como **cobrador**, quero que minha chave fique salva e chegue a quem vai me paga
   - [ ] A chave é salva no **cadastro de chaves do cobrador** (perfil), com titular, banco e tipo, para reuso futuro.
   - [ ] O combinado guarda o **snapshot** da chave (chave, titular, banco), passando a ter chave para todos os efeitos (Épico 7, H7.3).
   - [ ] Registra o evento **`pix_cadastrada`** (auditoria, append-only), visível no painel (Épico 9).
-- [ ] O **devedor é notificado** com a chave (Épico 10), ex.: *"[cobrador] enviou a chave de pagamento do combinado [referência]: [chave]. Em nome de [titular], banco [banco]."*. Se o fluxo veio do Gatilho A (aceite), essa notificação **junta** o aceite e a chave numa só mensagem.
+- [ ] O **devedor é notificado** com a chave (Épico 10), ex.: *"[cobrador] enviou a chave pix do combinado [referência]: [chave]. Em nome de [titular], banco [banco]."*. Se o fluxo veio do Gatilho A (aceite), essa notificação **junta** o aceite e a chave numa só mensagem.
 - [ ] O **cobrador** recebe uma confirmação neutra, ex.: *"Chave salva e enviada a [devedor]. Obrigado!"*.
-- [ ] A partir daí o lembrete do devedor para de mostrar **[Solicitar chave Pix]** e o **[Chave de Pag.]** passa a entregar a chave (Épico 7, H7.3).
+- [ ] A partir daí o lembrete do devedor para de mostrar **[Solicitar chave Pix]** e o **[Chave Pix]** passa a entregar a chave (Épico 7, H7.3).
 - [ ] **Idempotente:** confirmar de novo (clique duplo, mensagem repetida) **não** grava duas chaves, não duplica evento nem notificação.
 - [ ] A chave, o titular, o banco e os telefones **nunca** aparecem em log.
 
@@ -124,7 +124,7 @@ Como **owner**, quero que todo o fluxo respeite as regras de ouro, para manter c
 
 - **Primeiro estado conversacional de várias etapas.** Hoje o webhook do `zap` é event-driven por combinado (cada toque é resolvido na hora, sem memória entre mensagens). O wizard introduz uma **sessão** com etapa atual e dados parciais, persistida no banco. É a primeira conversa multi-etapa do produto.
 - **Chave de pagamento opcional no invertido.** Decorre da decisão recente (Épico 3, Pix opcional na criação/aceite do invertido). Antes a chave era obrigatória; agora pode faltar, e este épico cobre o preenchimento posterior.
-- **Botão no lembrete do devedor condicionado ao estado da chave.** O lembrete passa a mostrar **[Solicitar chave Pix]** no lugar de **[Chave de Pag.]** enquanto o combinado invertido está sem chave (Épico 6 e 7 tocados, ver cross-refs).
+- **Botão no lembrete do devedor condicionado ao estado da chave.** O lembrete passa a mostrar **[Solicitar chave Pix]** no lugar de **[Chave Pix]** enquanto o combinado invertido está sem chave (Épico 6 e 7 tocados, ver cross-refs).
 - **Inferência do tipo de chave compartilhada.** A lógica de detectar o tipo a partir do formato (hoje só no front) vira **fonte única** no backend para o `zap` reusar (ver "Decisões tomadas").
 
 ### Decisões tomadas
@@ -138,11 +138,11 @@ Como **owner**, quero que todo o fluxo respeite as regras de ouro, para manter c
 
 ### Decisões em aberto
 - **Janela de expiração da sessão:** tempo exato de inatividade até encerrar a sessão (e disparar a notificação de aceite de fallback do Gatilho A) a definir na implementação.
-- **Rótulo final do botão de pedido:** "Solicitar chave Pix" é provisório; o texto é editável pelo owner (Épico 12) e pode evitar a palavra "Pix" por precaução de canal, como o **[Chave de Pag.]** (Épico 7).
+- **Rótulo final do botão de pedido:** "Solicitar chave Pix" é provisório; o texto é editável pelo owner (Épico 12) e pode evitar a palavra "Pix" por precaução de canal, como o **[Chave Pix]** (Épico 7).
 
 ### Fora de escopo deste épico
 - ❌ Captura da chave **na criação** do combinado (Épicos 2 e 3) e edição da chave pelo painel.
-- ❌ Como o devedor **vê** a chave depois de cadastrada (botão **[Chave de Pag.]**, Épico 7, H7.3).
+- ❌ Como o devedor **vê** a chave depois de cadastrada (botão **[Chave Pix]**, Épico 7, H7.3).
 - ❌ Conteúdo, janela e canal das **notificações** em si (Épico 10).
 - ❌ Edição dos **textos/templates** do fluxo (Épico 12) e regras gerais de **linguagem/opt-out** (Épico 13).
 - ❌ Como os eventos `pix_solicitada` e `pix_cadastrada` aparecem no **painel** (Épico 9).

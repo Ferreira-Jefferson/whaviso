@@ -45,7 +45,7 @@ Transições novas a acrescentar (trigger no banco + app): `sem_aviso→{aguarda
 | 4 | Modo agenda | estado `sem_aviso`, separar "criar" de "gerar convite", free mantém agenda |
 | 5 | Convite & Aceite (WhatsApp) | aceite 100% WhatsApp (remover site), validação número+telefone, anti-brute-force 3 tentativas, `recusado`, telefone divergente |
 | 6 | Ciclo de lembretes | scheduler D-2..D+1, horário reservado por segundo + 10min/devedor, retry 3x, catch-up, `informado_pago` para o ciclo, cadência configurável (🟡 H6.10) |
-| 7 | Interação do devedor | 3 botões (Já paguei/Chave de Pag./Desativar), `desregistrado` reversível, só último aviso age, idempotência |
+| 7 | Interação do devedor | 3 botões (Já paguei/Chave Pix/Desativar), `desregistrado` reversível, só último aviso age, idempotência |
 | 8 | Confirmação de pagamento | `informado_pago→pago/programado`, marcar direto, reabrir, janela 1min, recorrência por ocorrência (🟡), botão WhatsApp p/ qualquer cobrador |
 | 9 | Painel de controle | visão por papel (a receber/a pagar), totais no backend, "precisa de você", linha do tempo de eventos, status de envio, só-leitura+solicita |
 | 10 | Notificações ao cobrador | outbox `notificacoes_cobrador`, roteamento conta/telefone, opt-out atraso 1min, **fila de saída espaçamento 10min + coalescing (H10.9, crítico)** |

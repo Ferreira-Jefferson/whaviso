@@ -10,7 +10,7 @@
 
 **MVP 🟢 (este épico):**
 - H6.1 programar ciclo ao aceitar (estado `programado`).
-- H6.2/H6.3 quatro etapas (D-2, D-1, D, D+1), textos distintos, **três botões fixos** em todas (Já paguei / Chave de Pag. / Desativar lembretes), opt-out visível, valor em reais, data em SP, linguagem neutra.
+- H6.2/H6.3 quatro etapas (D-2, D-1, D, D+1), textos distintos, **três botões fixos** em todas (Já paguei / Chave Pix / Desativar lembretes), opt-out visível, valor em reais, data em SP, linguagem neutra.
 - H6.4 parar o ciclo (terminal, `pausado`, `aguardando_aprovacao_aviso_editado`, opt-out), reconferência no disparo, liberação do horário reservado.
 - H6.5 `informado_pago` **para** o ciclo normal; única mensagem possível depois é o **empurrãozinho de D+1**; cobrador notificado ao clicar Já paguei (mecanismo no Épico 10).
 - H6.6 D+1 é o último envio (máx. 4); depois permanece `programado`/`informado_pago` sem novos envios.
@@ -40,7 +40,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 ### H6.2 Etapas, textos e botões
 - `[x]` Textos base D-2/D-1/D/D+1 estão na migration 0024 (templates `ciclo.<etapa>`), batem com a história.
 - `[!]` **Botões NÃO são fixos:** `enviar_lembretes/index.ts` remove `ver_pix` quando não há `pix_chave`. História: três botões sempre (Pix é obrigatório nos dois fluxos). A supressão deixa de existir.
-- `[!]` Rótulo do botão Pix hoje é **"Ver chave Pix"** (migration 0024); história pede **"Chave de Pag."** (precaução de bloqueio). Rótulo de opt-out hoje é "Não quero mais lembretes"; história usa "Desativar lembretes". Editável pelo owner (E12).
+- `[!]` Rótulo do botão Pix hoje é **"Ver chave Pix"** (migration 0024); história pede **"Chave Pix"** (precaução de bloqueio). Rótulo de opt-out hoje é "Não quero mais lembretes"; história usa "Desativar lembretes". Editável pelo owner (E12).
 - `[x]` Valor em reais (`formatarValorBr`) e data em SP (`formatarDataBr`).
 - `[x]` Textos vêm de `templates`, zap é só transporte (`shared/templates`).
 - `[x]` Nenhuma mensagem coleta texto livre (`inbound.ts` só lê botão).
@@ -90,7 +90,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 - `[!]` Renomear `pendente`→`programado` (enum, trigger, app api+zap, contratos shared+front, PROJETO.md/CLAUDE.md).
 - `[!]` `informado_pago` **para** o ciclo (inverter comportamento atual).
 - `[!]` Três botões fixos sempre (remover supressão de `ver_pix`).
-- `[!]` Rótulo "Chave de Pag." (e "Desativar lembretes").
+- `[!]` Rótulo "Chave Pix" (e "Desativar lembretes").
 - `[+]` `pausado` e `aguardando_aprovacao_aviso_editado` (E2/E3) na máquina de estados.
 - `[+]` Horário reservado por segundo (H6.9).
 - `[+]` Distância mínima 10 min por devedor.
@@ -116,7 +116,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 - Constraint de unicidade global de segundo entre avisos **ativos**: não dá para `unique` parcial direto sobre estado dinâmico de forma trivial; usar `create unique index idx_horario_seg_unico on public.avisos (horario_reservado_seg) where horario_reservado_seg is not null` (liberação por `null` garante o "segundo livre"). A regra dos 10 min por devedor é validada na **lógica de alocação** (não no índice).
 
 **M3 — Templates: rótulos e empurrãozinho (migration de dados, upsert).**
-- Atualizar `conteudo.botoes` dos `ciclo.*`: rótulo `ver_pix`→**"Chave de Pag."**, `optout`→**"Desativar lembretes"** (catálogo vai em migration, não no seed — regra do cloud).
+- Atualizar `conteudo.botoes` dos `ciclo.*`: rótulo `ver_pix`→**"Chave Pix"**, `optout`→**"Desativar lembretes"** (catálogo vai em migration, não no seed — regra do cloud).
 - Nova chave de template para o empurrãozinho de D+1 em `informado_pago`: usar o **contexto `revisao`** da etapa `ciclo.d_mais_1` (já existe na 0024, mas com texto de "desconsidere"); **trocar o texto** para o empurrãozinho da história ("...você já informou que pagou, mas [cobrador] ainda não confirmou..."), neutro de gênero, sem travessão. Aprovar+ativar (`status_meta='aprovado', ativo=true`) já que agora é a **única** mensagem possível em `informado_pago`.
 - Remover/aposentar os textos `revisao` das outras etapas (D, D+1 "desconsidere") porque o ciclo normal não roda mais em `informado_pago`.
 
@@ -143,7 +143,7 @@ Legenda: `[x]` ok · `[~]` parcial · `[!]` diverge (refatorar) · `[+]` não ex
 ### 3.4 Frontend (`frontend/src`)
 - Contratos Zod próprios (`shared/contracts/entidades.ts`): renomear `'pendente'`→`'programado'` no enum `statusAviso`; adicionar `pausado`, `aguardando_aprovacao_aviso_editado` (e `recusado`/`desregistrado` se já entrarem). Dicionário de rótulos do front (status) atualizado.
 - `CycleTimeline.tsx`: já é orientado por `envios` reais (bom). Garantir que os 4 pontos e rótulos batem; nenhum cálculo de etapa no cliente (já respeitado).
-- `PreviaCiclo.tsx`: copy ilustrativa — alinhar aos novos textos/rótulos ("Chave de Pag.", "Desativar lembretes"), neutro de gênero, sem travessão.
+- `PreviaCiclo.tsx`: copy ilustrativa — alinhar aos novos textos/rótulos ("Chave Pix", "Desativar lembretes"), neutro de gênero, sem travessão.
 - Qualquer tela que mostre status "pendente" passa a "programado" (rótulo amigável pode ser "No ciclo de lembretes"/"Programado" — decidir copy com E9/E13).
 
 ### 3.5 Lógica compartilhada (`packages/shared`)
@@ -211,7 +211,7 @@ Modelo: **sonnet** — remoção de um filtro, mecânico.
 
 **P9 — Rótulos dos botões e empurrãozinho de D+1 nos templates (migration de dados).**
 Arquivos: `0025_*` ou `0026_*.sql` (upsert em `templates`).
-Critério: H6.2 ("Chave de Pag."), H6.3 ("Desativar lembretes", opt-out visível), H6.5 (texto do empurrãozinho), divergência "rótulo sem Pix" + "textos editáveis e neutros".
+Critério: H6.2 ("Chave Pix"), H6.3 ("Desativar lembretes", opt-out visível), H6.5 (texto do empurrãozinho), divergência "rótulo sem Pix" + "textos editáveis e neutros".
 Modelo: **sonnet** — dados de catálogo + copy neutra; sem lógica.
 
 **P10 — Retry 3x com intervalo aleatório 20-60s (substitui backoff fixo em minutos).**
@@ -266,7 +266,7 @@ Modelo: **sonnet** — apenas registro; a construção real espera decisão de U
 ## 7. Decisões em aberto (não inventadas — confirmar com o humano)
 
 1. **H6.10 cadência configurável (🟡):** modelagem de dados da cadência custom (datas avulsas / semanal / mensal) e layout clean exigem estudo de UX. Manter MVP fixo D-2..D+1; não construir agora.
-2. **Confirmar bloqueio do WhatsApp por "Pix" em rótulo (H6.2):** se o WhatsApp não bloquear "Pix", reavaliar se "Chave de Pag." é mesmo necessário. Como decidir o texto é do owner (E12), o padrão default ("Chave de Pag.") é seguro, mas vale validar.
+2. **Confirmar bloqueio do WhatsApp por "Pix" em rótulo (H6.2):** se o WhatsApp não bloquear "Pix", reavaliar se "Chave Pix" é mesmo necessário. Como decidir o texto é do owner (E12), o padrão default ("Chave Pix") é seguro, mas vale validar.
 3. **Fallback de resposta numerada: RESOLVIDO.** Os botões hoje são os interactive buttons oficiais da Meta; o fallback de resposta numerada no corpo da mensagem já está no MVP como resiliência geral do canal.
 4. **Ordem dos épicos / donos dos estados:** `pausado`/`aguardando_aprovacao_aviso_editado` são donos de E2/E3 e `recusado`/`desregistrado` de E5/E7. Definir se a migration de estados do ciclo (P1) cria todos de uma vez ou só os que E6 precisa reconhecer, para o trigger de encerramento não quebrar quando os outros épicos chegarem.
 5. **Comportamento da pausa na outbox:** ao pausar, **cancelar** os envios pendentes e recriá-los ao retomar, **ou** mantê-los e barrar no disparo pela reconferência de estado? A história pede que ao retomar valha "a etapa aplicável à data" (recriar parece mais limpo). Confirmar a estratégia antes de P7.

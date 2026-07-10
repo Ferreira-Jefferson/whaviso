@@ -94,7 +94,7 @@ select 'devedor.rejeicao', 'padrao', 'whaviso_devedor_rejeicao', 'pt_BR',
 where not exists (select 1 from public.templates where chave = 'devedor.rejeicao' and contexto = 'padrao');
 
 -- H8.3 reengajamento (mensagem manual do cobrador pós-ciclo). Leva os TRÊS botões do
--- ciclo (Já paguei / Chave de Pag. / Desativar lembretes) e VIRA o último aviso (o
+-- ciclo (Já paguei / Chave Pix / Desativar lembretes) e VIRA o último aviso (o
 -- webhook casa os botões pelo identificador deste reengajamento, M2). Sem palavra proibida.
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'devedor.reengajamento', 'padrao', 'whaviso_devedor_reengajamento', 'pt_BR',
@@ -103,7 +103,7 @@ select 'devedor.reengajamento', 'padrao', 'whaviso_devedor_reengajamento', 'pt_B
          E'Oi, {{1}}. {{3}} pediu para avisar que ainda não localizou o pagamento do combinado {{2}}. 🙂',
          'botoes', jsonb_build_array(
            jsonb_build_object('acao', 'ja_paguei', 'rotulo', 'Já paguei'),
-           jsonb_build_object('acao', 'ver_pix', 'rotulo', 'Chave de Pag.'),
+           jsonb_build_object('acao', 'ver_pix', 'rotulo', 'Chave Pix'),
            jsonb_build_object('acao', 'optout', 'rotulo', 'Desativar lembretes')
          )
        ),

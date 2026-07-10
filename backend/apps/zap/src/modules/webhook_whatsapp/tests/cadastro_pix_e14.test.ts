@@ -1,4 +1,4 @@
-// E14 (Cadastro da chave de pagamento pelo cobrador, fluxo invertido): oferta no aceite
+// E14 (Cadastro da chave pix pelo cobrador, fluxo invertido): oferta no aceite
 // (Gatilho A, com a notificação de aceite SEGURADA), pedido pelo devedor (Gatilho B),
 // wizard etapa a etapa, corrigir anterior, finalização (grava chave + snapshot + notifica
 // devedor), botão no lembrete e idempotência. Integração com whaviso_dev.
@@ -263,7 +263,7 @@ describe('E14 H14.3: pedido pelo devedor (Gatilho B) + botão no lembrete', () =
     expect(await contarEvento(avisoId, 'pix_solicitada')).toBe(1)
   })
 
-  it('lembrete do invertido SEM chave troca "Chave de Pag." por "Solicitar chave..."', async () => {
+  it('lembrete do invertido SEM chave troca "Chave Pix" por "Solicitar chave..."', async () => {
     const { avisoId } = await criarInvertido({ status: 'programado' })
     const envioId = await criarEnvioAgendado(avisoId, 'd')
     const whats = clienteWhatsFake(() => ({ wamid: 'w_ok' }))
@@ -275,7 +275,7 @@ describe('E14 H14.3: pedido pelo devedor (Gatilho B) + botão no lembrete', () =
     void envioId
   })
 
-  it('lembrete do invertido COM chave mantém "Chave de Pag." (ver_pix)', async () => {
+  it('lembrete do invertido COM chave mantém "Chave Pix" (ver_pix)', async () => {
     const { avisoId } = await criarInvertido({ status: 'programado', pixChave: 'ja@tem.com' })
     await criarEnvioAgendado(avisoId, 'd')
     const whats = clienteWhatsFake(() => ({ wamid: 'w_ok' }))

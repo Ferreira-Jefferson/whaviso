@@ -17,7 +17,7 @@ embora a história só proíba a palavra no *rótulo do botão*, que está corre
 ### H7.1: O devedor só age por botão (sem chat)
 | Critério | Status | Evidência | Teste |
 |---|---|---|---|
-| Únicas ações = Já paguei / Chave de Pag. / Desativar lembretes | [x] | botões do ciclo definidos em `0024_ciclo_unificado.sql:19-22` (e 0039 renomeia rótulos); ações tratadas em `webhook_whatsapp/repo.ts:38` (`ACOES_CICLO`) | `interacao_devedor.test.ts` (vários) |
+| Únicas ações = Já paguei / Chave Pix / Desativar lembretes | [x] | botões do ciclo definidos em `0024_ciclo_unificado.sql:19-22` (e 0039 renomeia rótulos); ações tratadas em `webhook_whatsapp/repo.ts:38` (`ACOES_CICLO`) | `interacao_devedor.test.ts` (vários) |
 | Sem chat/IA/Pix automático; não responde livremente a texto | [x] | `service.ts:232-269` (`processarTexto`): texto livre só vira menu/silêncio, nunca conversa | `H7.1: texto livre...` |
 | Texto livre free/sem conta = silêncio | [x] | `service.ts:253-258`: só responde se `combinados.find(c => c.menuLiberado)`; senão `return` sem enviar; `repo.ts:812-830` lê `menu_texto_livre` do plano | `H7.1: texto livre, dono FREE → silêncio` |
 | Texto livre plano pago = menu de opções dos combinados ativos | [x] | `service.ts:256-258` envia `resposta.menu_opcoes` amarrado ao 1o acionável; template em `0040:85-96`; `listarCombinadosParaMenu` só `programado` (`repo.ts:823-825`) | `G-C1: texto livre com 1 programado + 1 informado_pago → menu só do programado` |
@@ -35,16 +35,16 @@ embora a história só proíba a palavra no *rótulo do botão*, que está corre
 | Transição registra evento append-only | [x] | `repo.ts:649-652` insere `ja_paguei_devedor` em `eventos_aviso` | `G-M3` (conta eventos = 1) |
 | Confirmação/rejeição pelo cobrador no E8 | [x] | tratado em `repo.ts:474-520` (confirmar/rejeitar) — fora do escopo declarado de E7 | E8 tests |
 
-### H7.3: Tocar "Chave de Pag." (ver o Pix)
+### H7.3: Tocar "Chave Pix" (ver o Pix)
 | Critério | Status | Evidência | Teste |
 |---|---|---|---|
-| Botão em todas as etapas; rótulo SEM "Pix"; editável (E12) | [x] | rótulo "Chave de Pag." em `0039:34` e `0024`; presente em todas as etapas | — |
-| Resposta inclui titular + banco salvos | [x] | `repo.ts:698-699` retorna `pixTitular`/`pixBanco`; `service.ts:137,175` usa-os na 2a mensagem; template `0040:70-74` | `"Chave de Pag." envia 2 mensagens...` |
-| Duas mensagens em sequência, até 3s entre elas | [x] | `service.ts:155-183`: 1a chave, `esperar(intervaloPixMs())` (`service.ts:144-147`, padrão 1500ms), 2a titular+banco | `"Chave de Pag." envia 2 mensagens` (intervalo 0 no teste) |
+| Botão em todas as etapas; rótulo SEM "Pix"; editável (E12) | [x] | rótulo "Chave Pix" em `0039:34` e `0024`; presente em todas as etapas | — |
+| Resposta inclui titular + banco salvos | [x] | `repo.ts:698-699` retorna `pixTitular`/`pixBanco`; `service.ts:137,175` usa-os na 2a mensagem; template `0040:70-74` | `"Chave Pix" envia 2 mensagens...` |
+| Duas mensagens em sequência, até 3s entre elas | [x] | `service.ts:155-183`: 1a chave, `esperar(intervaloPixMs())` (`service.ts:144-147`, padrão 1500ms), 2a titular+banco | `"Chave Pix" envia 2 mensagens` (intervalo 0 no teste) |
 | 1a só a chave / 2a titular+banco | [~] | estrutura correta (`service.ts:171,175`), porém o texto da 1a em `0022:67` é `"Chave Pix:\n{{1}}"` (a história exemplifica "Chave de pagamento: [chave]"). Funcional, mas diverge do exemplo e contém "Pix" no corpo (a história só proíbe no rótulo, então não é violação de regra) | `whats.enviadas[0].texto contém chave` |
 | Evento `solicitou_pix` só no 1o toque | [x] | `repo.ts:676-686`: insere só se `count=0` e só quando `!jaEntregue` | `G-C3: ...solicitou_pix gravado só uma vez` |
 | Entrega uma vez por combinado; reenvio só após falha de servidor | [x] | `repo.ts:673,688-692` (jaEntregue → silencioso); `marcarChaveEntregue` só após as 2 saírem (`service.ts:178`); falha não marca (`service.ts:179-182`) | `G-C3: 1ª ok, 2ª falha → reentregável` |
-| Não muda o estado | [x] | `ver_pix` não altera `status` (`repo.ts:660-703`) | `"Chave de Pag." ... status='programado'` |
+| Não muda o estado | [x] | `ver_pix` não altera `status` (`repo.ts:660-703`) | `"Chave Pix" ... status='programado'` |
 | Chave/nome/banco nunca em log | [x] | sem logs de chave; comentários `repo.ts:769`, `service.ts:153,181` reforçam | — |
 
 ### H7.4: Tocar "Desativar lembretes"
@@ -82,7 +82,7 @@ embora a história só proíba a palavra no *rótulo do botão*, que está corre
 | Critério | Status | Evidência | Teste |
 |---|---|---|---|
 | Só botões do último aviso enviado agem; botão antigo não dispara estado | [x] | `repo.ts:607-628`: `etapaUltimoAvisoEnviado` vs `etapaClicada`; etapa antiga → `encerrado:true`, sem ação | `H7.7: botão de etapa ANTERIOR ... inerte` / `...do ÚLTIMO ... age` |
-| Vale para os 3 botões, inclusive Chave de Pag. (uma vez/combinado, só último) | [x] | check antes de processar `ja_paguei/ver_pix/optout` (`repo.ts:615`, exclui só `ativar`) | etapa testada com `ja_paguei` |
+| Vale para os 3 botões, inclusive Chave Pix (uma vez/combinado, só último) | [x] | check antes de processar `ja_paguei/ver_pix/optout` (`repo.ts:615`, exclui só `ativar`) | etapa testada com `ja_paguei` |
 | Estado terminal (pago/cancelado/recusado/expirado): toque não reabre nem age | [x] | `repo.ts:595-605`: fora de `ESTADOS_ATIVOS` → `encerrado:true`, sem reabrir | `G-C2: terminal {pago,cancelado,recusado,expirado} não reabre` |
 | Resposta neutra "já encerrado" respeitando cortesia free/pago | [x] | `service.ts:119-124`: só responde `resposta.encerrado` se `menuLiberado` (pago); free = silêncio; template `0040:99-103` | `G-C2: ... pago → cortesia, free → silêncio` |
 | `aviso_id` inválido/desconhecido ignorado sem vazar | [x] | `service.ts:94-95` (`parsearPayloadBotao` retorna null → return); `repo.ts:439-440` (aviso ausente → null) | `H7.7: aviso_id inválido é ignorado sem vazar` |
@@ -97,7 +97,7 @@ embora a história só proíba a palavra no *rótulo do botão*, que está corre
 
 2. **Texto da 1a mensagem do Pix (H7.3) — [~]**: a história exemplifica a 1a mensagem como
    *"Chave de pagamento: [chave]"* (linha 43). O template `resposta.ver_pix` (`0022:67`) usa
-   *"Chave Pix:\n{{1}}"*. O rótulo do botão ("Chave de Pag.") está correto e a história só proíbe
+   *"Chave Pix:\n{{1}}"*. O rótulo do botão ("Chave Pix") está correto e a história só proíbe
    a palavra "Pix" no rótulo, então não há violação de regra de ouro; mas o corpo diverge do
    exemplo e mantém "Pix" num ponto onde a história optou por não usá-la. Considerar atualizar o
    texto do template para alinhar com o exemplo (via migration de catálogo, não no seed).

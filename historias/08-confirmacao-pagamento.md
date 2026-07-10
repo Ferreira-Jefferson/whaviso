@@ -40,7 +40,7 @@ Como **cobrador**, quero, depois que o ciclo de avisos terminou sem pagamento, m
 *Critérios de aceite:*
 - [ ] Disponível quando o ciclo padrão **já terminou** (passou de D+1) e o combinado segue **`programado`** sem pagamento confirmado.
 - [ ] O cobrador dispara, pelo painel, **uma** mensagem ao devedor, ex.: *"Olá [nome], [nome de quem recebe] pediu para avisar que ainda não localizou o pagamento do combinado: [combinado]."*
-- [ ] Essa mensagem leva os **três botões padrão** (Já paguei / Chave de Pag. / Desativar lembretes), e ela passa a ser o **último aviso** do combinado (os botões dela é que valem, Épico 7 H7.7).
+- [ ] Essa mensagem leva os **três botões padrão** (Já paguei / Chave Pix / Desativar lembretes), e ela passa a ser o **último aviso** do combinado (os botões dela é que valem, Épico 7 H7.7).
 - [ ] O combinado **não muda de estado** ao enviar esse reengajamento (continua `programado`); o disparo é registrado como evento.
 - [ ] Sai **dentro da janela 8h-18h** e no **horário reservado** do combinado (Épico 6 H6.9), como qualquer envio; consome do **saldo de créditos** (Épico 11).
 - [ ] Pode haver limite de quantos reengajamentos manuais o cobrador dispara (a definir no Épico 11); por padrão, ação consciente do cobrador, não automática.

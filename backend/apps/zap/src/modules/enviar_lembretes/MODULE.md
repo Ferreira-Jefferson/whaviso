@@ -5,7 +5,7 @@ Lado de saída do outbox: a cada tick, faz claim (`FOR UPDATE SKIP LOCKED`) dos 
 lê o template ativo da etapa (chave `ciclo.<etapa>`, contexto revisao então padrao) na tabela
 unificada `templates` e o renderiza via `shared/templates` (texto {{n}} + botões do
 template), disparando via WhatsApp (Meta Cloud API, por template aprovado), com retry e cancelamento por janela perdida.
-Os TRÊS botões (Já paguei / Chave de Pag. / Desativar lembretes) aparecem em TODAS as etapas
+Os TRÊS botões (Já paguei / Chave Pix / Desativar lembretes) aparecem em TODAS as etapas
 (H6.2, sem supressão condicional). Os envios saem no horário reservado do combinado (H6.9).
 
 ## Entry points

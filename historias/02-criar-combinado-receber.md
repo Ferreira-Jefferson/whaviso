@@ -10,7 +10,7 @@
 ### H2.1: Cadastrar um combinado a receber 🟢
 Como **cobrador**, quero cadastrar um combinado informando os dados do acordo, para automatizar os avisos ao devedor.
 *Critérios de aceite:*
-- [ ] Informo: **nome de quem paga** (devedor), **motivo**, **valor**, **data combinada**, **telefone do devedor** e a **chave Pix** (de quem recebe). A chave Pix é **obrigatória** (igual ao fluxo invertido): o botão "Chave de Pag." aparece em toda mensagem, então todo combinado precisa de Pix.
+- [ ] Informo: **nome de quem paga** (devedor), **motivo**, **valor**, **data combinada**, **telefone do devedor** e a **chave Pix** (de quem recebe). A chave Pix é **obrigatória** (igual ao fluxo invertido): o botão "Chave Pix" aparece em toda mensagem, então todo combinado precisa de Pix.
 - [ ] Junto da chave, informo o **nome do titular** e o **banco** da chave: eles compõem a 2ª mensagem enviada ao devedor quando ele pede o Pix (Épico 7 H7.3).
 - [ ] O **nome de quem cobra** é o do próprio cobrador (pré-preenchido a partir da conta).
 - [ ] O valor é exibido em reais na UI, mas persiste em **centavos** (int) no banco.
@@ -104,7 +104,7 @@ Como **cobrador**, quero pausar temporariamente um combinado já aceito, para su
 - **Sinal de "algum dado incorreto" no aceite:** terceira opção no aceite (além de aceitar/recusar), **sem texto livre**, que só notifica o criador para revisar. Mantido simples de propósito (não coleta o que mudar) para reduzir complexidade e risco. **Não cria status novo**; reusa a edição-antes-do-aceite (livre). Precisa de mensagens novas (notificação ao criador + resposta neutra ao convidado). Modelar no Épico 5.
 
 ### Decisões tomadas
-- **Pix obrigatório também no fluxo receber:** antes era opcional; passou a ser obrigatório porque o botão "Chave de Pag." aparece em toda mensagem do ciclo (Épico 6). Vale nos dois fluxos.
+- **Pix obrigatório também no fluxo receber:** antes era opcional; passou a ser obrigatório porque o botão "Chave Pix" aparece em toda mensagem do ciclo (Épico 6). Vale nos dois fluxos.
 - **Armazenamento do número de convite:** guardado como **hash**; exibido como `xxx-xxx` (hífen só visual); validação aceita 6 dígitos corridos ou com hífen. Limite de **3 tentativas** de validação.
 - **Convidado sinaliza dado incorreto (simplificado):** no aceite há três opções, aceitar / **algum dado está incorreto** / recusar. O "dado incorreto" **não** coleta texto livre (decisão para reduzir complexidade e risco): apenas notifica o criador, que revisa e reenvia; o convidado recebe resposta neutra. Vale nos dois fluxos (no invertido a variante é "chave Pix incorreta"). Detalhado no Épico 5.
 

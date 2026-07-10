@@ -59,14 +59,14 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 | 4 | Modo agenda (cadastrar sem enviar e ativar depois) | [04-modo-agenda.md](04-modo-agenda.md) | escrito |
 | 5 | Convite & Aceite pelo WhatsApp | [05-convite-aceite.md](05-convite-aceite.md) | escrito |
 | 6 | Ciclo de lembretes (D-2 a D+1) | [06-ciclo-lembretes.md](06-ciclo-lembretes.md) | escrito |
-| 7 | Interação do devedor (Já paguei / Chave de Pag. / Desativar) | [07-interacao-devedor.md](07-interacao-devedor.md) | escrito |
+| 7 | Interação do devedor (Já paguei / Chave Pix / Desativar) | [07-interacao-devedor.md](07-interacao-devedor.md) | escrito |
 | 8 | Confirmação de pagamento (informado_pago) | [08-confirmacao-pagamento.md](08-confirmacao-pagamento.md) | escrito |
 | 9 | Painel de controle | [09-painel.md](09-painel.md) | escrito |
 | 10 | Notificações ao cobrador | [10-notificacoes-cobrador.md](10-notificacoes-cobrador.md) | escrito |
 | 11 | Créditos de envio (carteira / billing) | [11-planos-billing.md](11-planos-billing.md) | reescrito |
 | 12 | Templates / mensagens (admin) | [12-templates-admin.md](12-templates-admin.md) | escrito |
 | 13 | Linguagem, opt-out e compliance | [13-compliance.md](13-compliance.md) | escrito |
-| 14 | Cadastro da chave de pagamento pelo cobrador (fluxo invertido) | [14-cadastro-chave-pix-cobrador.md](14-cadastro-chave-pix-cobrador.md) | escrito |
+| 14 | Cadastro da chave pix pelo cobrador (fluxo invertido) | [14-cadastro-chave-pix-cobrador.md](14-cadastro-chave-pix-cobrador.md) | escrito |
 
 ## Dívidas técnicas levantadas durante a escrita
 

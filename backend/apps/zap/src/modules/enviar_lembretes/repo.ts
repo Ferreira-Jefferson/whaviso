@@ -16,8 +16,8 @@ export interface EnvioClaim {
 export interface DadosEnvio {
   aviso_id: string
   aviso_status: string
-  // E14: no invertido (pagar) sem chave, o lembrete troca "Chave de Pag." por "Solicitar
-  // chave de pagamento" (o devedor pede a chave a quem vai receber).
+  // E14: no invertido (pagar) sem chave, o lembrete troca "Chave Pix" por "Solicitar
+  // chave pix" (o devedor pede a chave a quem vai receber).
   direcao: 'receber' | 'pagar'
   nome_devedor: string
   telefone_devedor: string | null

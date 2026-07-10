@@ -18,11 +18,11 @@ Sugestão de cadência: um passo por vez, confirmando cada um antes do próximo.
 - [x] **Passo 6 (painel Supabase)**: rate limits, Refresh Token Rotation + Reuse Detection, OTP expiry (Phone 600s/Email 3600s), anonymous OFF, SSL Enforcement, MFA (2 fatores). Detalhes no passo 6.
 - [x] **Passo 10 (backup próprio do banco)**: instalado e no ar no VPS (pg_dump 17, timer diário). Detalhes no passo 10.
 - [x] **Frontend (avisos de console) DEPLOYADO**: commit `6562627` (GIS init única + `@hookform/resolvers` 5.4.0 para zod v4) foi para produção junto com a fonte Lora e o rodapé, no deploy de 2026-07-07 (main = `094ed31`).
-- [ ] **Pendente de deploy**: correção do bind da api (`0.0.0.0` -> `127.0.0.1`, ver passo 4) e estas atualizações do runbook. Uncommitted na `development`.
-
 - [x] **Passo 2 (dividir env por serviço)**: `api.env`/`zap.env` separados no VPS, `whaviso.env` único removido; api e zap rodando com os próprios segredos.
+- [x] **Passo 3 (rotacionar segredos)**: feito (service_role, META_*, hook secret).
+- [x] **Passo 4 (firewall/bind) DEPLOYADO e verificado**: bind da api corrigido (`0.0.0.0` -> `127.0.0.1`, commits `c8cc23c`/`3e0340a`); api e zap confirmados em `127.0.0.1` no VPS. ufw já estava correto.
 
-**Ainda pendente por você (detalhado abaixo):** passo 3 (rotacionar segredos), passo 4 (conferir firewall/bind), passo 7 (Meta, quando ativar), passo 8 (deps de dev), passo 9 (follow-ups de engenharia).
+**Ainda pendente por você (detalhado abaixo):** só os condicionais/opcionais, passo 7 (Meta, quando ativar o webhook), passo 8 (deps de dev), passo 9 (follow-ups de engenharia = viram PR). Passos 1-6 e 10 concluídos em 2026-07-07.
 
 ---
 
@@ -74,10 +74,10 @@ Faça idealmente junto com o passo 2 (já vai editar os env).
 
 ---
 
-## 4. Firewall e bind das portas  🟡 ufw OK; bind da api corrigido, aguardando deploy (2026-07-07)
+## 4. Firewall e bind das portas  ✅ CONCLUÍDO 2026-07-07
 
 - [x] **ufw verificado (2026-07-07)**: default deny incoming; 22/SSH aberto; 80/443 só das faixas Cloudflare (IPv4+IPv6); 3001/3002 fora do allow (fechadas de fora). Correto.
-- [ ] **bind**: a verificação de 2026-07-07 achou a **api em `0.0.0.0:3001`** (o zap já em `127.0.0.1:3002`). Não estava exposto (o ufw bloqueia a 3001), mas faltava a defesa em profundidade. **Corrigido no código** (`apps/api/src/env.ts` + `server.ts`: a api passa a bindar `127.0.0.1` por padrão, configurável por `API_HOST`, espelhando o zap). Precisa de **deploy** para valer; depois re-rodar e confirmar que os DOIS estão em loopback:
+- [x] **bind** (corrigido + deployado + verificado 2026-07-07): a verificação achou a api em `0.0.0.0:3001` (zap já em loopback); corrigido no código (`apps/api/src/env.ts` + `server.ts`: bind `127.0.0.1` por padrão, configurável por `API_HOST`, espelhando o zap; commits `c8cc23c`/`3e0340a`). Após o deploy, confirmado no VPS que os DOIS estão em `127.0.0.1`:
 ```bash
 ss -tlnp | grep -E ':3001|:3002'   # ambos devem mostrar 127.0.0.1
 ufw status verbose                 # so 22 + 80/443 das faixas Cloudflare

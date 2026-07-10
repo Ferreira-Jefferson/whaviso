@@ -76,7 +76,7 @@ where not exists (select 1 from public.templates where chave = 'cobrador.convite
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'cobrador.convite_aceito', 'revisao', 'whaviso_cobrador_convite_aceito_pix', 'pt_BR',
        jsonb_build_object('texto',
-         E'Oi, {{1}}. O combinado {{2}} foi aceito e a chave de pagamento foi confirmada. 🙂'),
+         E'Oi, {{1}}. O combinado {{2}} foi aceito e a chave pix foi confirmada. 🙂'),
        '["alvo","codigo"]'::jsonb, 'pendente', false
 where not exists (select 1 from public.templates where chave = 'cobrador.convite_aceito' and contexto = 'revisao');
 

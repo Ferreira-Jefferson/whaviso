@@ -1,4 +1,4 @@
--- E14: cadastro guiado da chave de pagamento pelo COBRADOR no fluxo PAGAR INVERTIDO.
+-- E14: cadastro guiado da chave pix pelo COBRADOR no fluxo PAGAR INVERTIDO.
 --
 -- No invertido (criador = devedor que convida o cobrador) a chave passou a ser OPCIONAL
 -- (0047). Falta o caminho para o cobrador informar a PRÓPRIA chave depois, de forma
@@ -76,7 +76,7 @@ grant update (pix_chave, pix_titular, pix_banco) on public.avisos to whaviso_zap
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'resposta.pix_oferecer', 'padrao', 'whaviso_resposta_pix_oferecer', 'pt_BR',
        jsonb_build_object(
-         'texto', E'Combinado confirmado! 🙂 Quer informar sua chave de pagamento agora? Ela fica vinculada a este combinado para {{1}} te pagar com mais agilidade.',
+         'texto', E'Combinado confirmado! 🙂 Quer informar sua chave pix agora? Ela fica vinculada a este combinado para {{1}} te pagar com mais agilidade.',
          'botoes', jsonb_build_array(
            jsonb_build_object('acao', 'informar_pix', 'rotulo', 'Informar chave'),
            jsonb_build_object('acao', 'pix_pular', 'rotulo', 'Agora não')
@@ -88,7 +88,7 @@ where not exists (select 1 from public.templates where chave = 'resposta.pix_ofe
 -- Etapa 1: titular (texto livre, sem botão de corrigir por ser a primeira etapa).
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'pix.titular', 'padrao', 'whaviso_pix_titular', 'pt_BR',
-       jsonb_build_object('texto', E'Vamos lá. Informe o nome do titular da chave de pagamento.'),
+       jsonb_build_object('texto', E'Vamos lá. Informe o nome do titular da chave pix.'),
        '[]'::jsonb, 'aprovado', true
 where not exists (select 1 from public.templates where chave = 'pix.titular' and contexto = 'padrao');
 
@@ -106,7 +106,7 @@ where not exists (select 1 from public.templates where chave = 'pix.instituicao'
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'pix.chave', 'padrao', 'whaviso_pix_chave', 'pt_BR',
        jsonb_build_object(
-         'texto', E'Agora informe a sua chave de pagamento.',
+         'texto', E'Agora informe a sua chave pix.',
          'botoes', jsonb_build_array(jsonb_build_object('acao', 'pix_corrigir', 'rotulo', 'Corrigir anterior'))
        ),
        '[]'::jsonb, 'aprovado', true
@@ -158,14 +158,14 @@ where not exists (select 1 from public.templates where chave = 'resposta.pix_sal
 -- Cobrador escolheu "Agora não" na oferta.
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'resposta.pix_pulado', 'padrao', 'whaviso_resposta_pix_pulado', 'pt_BR',
-       jsonb_build_object('texto', E'Tudo bem! Você pode informar sua chave de pagamento mais tarde.'),
+       jsonb_build_object('texto', E'Tudo bem! Você pode informar sua chave pix mais tarde.'),
        '[]'::jsonb, 'aprovado', true
 where not exists (select 1 from public.templates where chave = 'resposta.pix_pulado' and contexto = 'padrao');
 
--- Resposta ao DEVEDOR quando ele toca "Solicitar chave de pagamento" no lembrete.
+-- Resposta ao DEVEDOR quando ele toca "Solicitar chave pix" no lembrete.
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'resposta.pix_solicitado_devedor', 'padrao', 'whaviso_resposta_pix_solicitado_devedor', 'pt_BR',
-       jsonb_build_object('texto', E'Pronto! Vamos pedir a chave de pagamento a quem vai receber. Assim que ela chegar, você recebe aqui.'),
+       jsonb_build_object('texto', E'Pronto! Vamos pedir a chave pix a quem vai receber. Assim que ela chegar, você recebe aqui.'),
        '[]'::jsonb, 'aprovado', true
 where not exists (select 1 from public.templates where chave = 'resposta.pix_solicitado_devedor' and contexto = 'padrao');
 
@@ -174,7 +174,7 @@ where not exists (select 1 from public.templates where chave = 'resposta.pix_sol
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'devedor.pix_chave_recebida', 'padrao', 'whaviso_devedor_pix_chave_recebida', 'pt_BR',
        jsonb_build_object('texto',
-         E'Oi, {{1}}. {{3}} confirmou o combinado {{2}} e enviou a chave de pagamento.\nChave: {{4}}\nTitular: {{5}}\nBanco: {{6}}'),
+         E'Oi, {{1}}. {{3}} confirmou o combinado {{2}} e enviou a chave pix.\nChave: {{4}}\nTitular: {{5}}\nBanco: {{6}}'),
        '["alvo","codigo","cobrador","pix_chave","pix_titular","pix_banco"]'::jsonb, 'aprovado', true
 where not exists (select 1 from public.templates where chave = 'devedor.pix_chave_recebida' and contexto = 'padrao');
 
@@ -182,6 +182,6 @@ where not exists (select 1 from public.templates where chave = 'devedor.pix_chav
 -- chave). Só o texto importa (usado como rótulo do botão em runtime).
 insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, status_meta, ativo)
 select 'botao.solicitar_pix', 'padrao', 'whaviso_botao_solicitar_pix', 'pt_BR',
-       jsonb_build_object('texto', E'Solicitar chave de pagamento'),
+       jsonb_build_object('texto', E'Solicitar chave pix'),
        '[]'::jsonb, 'aprovado', true
 where not exists (select 1 from public.templates where chave = 'botao.solicitar_pix' and contexto = 'padrao');

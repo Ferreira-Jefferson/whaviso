@@ -163,7 +163,7 @@ const CONFIG: Record<string, ConfigTipo> = {
     contexto: PADRAO,
     aindaValida: (d) => d.aviso_status === 'programado',
   },
-  // E14: chave de pagamento cadastrada pelo cobrador (invertido), ao DEVEDOR. Sem
+  // E14: chave pix cadastrada pelo cobrador (invertido), ao DEVEDOR. Sem
   // reconferência de estado: a chave é um fato (o devedor precisa dela em qualquer
   // estado vivo). Texto inclui a chave/titular/banco (valoresNotificacao).
   pix_chave_recebida: { chave: 'devedor.pix_chave_recebida', contexto: PADRAO },

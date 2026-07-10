@@ -71,9 +71,9 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
         continue
       }
 
-      // H6.2: os TRÊS botões (Já paguei / Chave de Pag. / Desativar lembretes) aparecem em
+      // H6.2: os TRÊS botões (Já paguei / Chave Pix / Desativar lembretes) aparecem em
       // TODAS as etapas, sem supressão condicional. O Pix é obrigatório nos dois fluxos
-      // (E2/E3), então o botão "Chave de Pag." sempre faz sentido.
+      // (E2/E3), então o botão "Chave Pix" sempre faz sentido.
       // H7.7: o refId leva a ETAPA junto do aviso_id ("<aviso>:<etapa>") para o botão
       // identificar de QUAL mensagem do ciclo veio; só os botões do último aviso enviado
       // agem. O webhook parseia "acao:<aviso>:<etapa>".
@@ -88,7 +88,7 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
         { valores: valoresCiclo(dados), refId: `${dados.aviso_id}:${envio.etapa}`, comoTemplate: true },
       )
       // E14: invertido SEM chave -> o devedor não tem o que "ver"; troca o botão
-      // "Chave de Pag." (ver_pix) por "Solicitar chave de pagamento" (solicitar_pix), que
+      // "Chave Pix" (ver_pix) por "Solicitar chave pix" (solicitar_pix), que
       // pede a chave a quem vai receber (Gatilho B). Quando a chave passa a existir, volta
       // o ver_pix normal (H7.3). Rótulo editável pelo owner (template botao.solicitar_pix).
       if (dados.direcao === 'pagar' && !dados.pix_chave) {
@@ -117,8 +117,8 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
 }
 
 /**
- * E14 (Gatilho B): troca o botão "Chave de Pag." (ver_pix) do lembrete pelo "Solicitar
- * chave de pagamento" (solicitar_pix), mantendo a etapa no payload (H7.7, só o último
+ * E14 (Gatilho B): troca o botão "Chave Pix" (ver_pix) do lembrete pelo "Solicitar
+ * chave pix" (solicitar_pix), mantendo a etapa no payload (H7.7, só o último
  * aviso age). O rótulo vem do template `botao.solicitar_pix` (editável pelo owner). Sem
  * esse template ativo, mantém o ver_pix (que responde resposta.sem_pix; degrada sem
  * quebrar). Idempotente: não faz nada se não houver um botão ver_pix na mensagem.

@@ -1,4 +1,4 @@
-// E14: wizard de cadastro da chave de pagamento pelo COBRADOR (fluxo invertido sem chave).
+// E14: wizard de cadastro da chave pix pelo COBRADOR (fluxo invertido sem chave).
 // Primeira conversa multi-etapa do projeto: lê/grava a sessão em `sessao_cadastro_pix`,
 // uma etapa por mensagem, com "corrigir anterior" e confirmação consolidada. Ao confirmar,
 // grava a chave no perfil do cobrador (chaves_pix) + snapshot no aviso, registra o evento

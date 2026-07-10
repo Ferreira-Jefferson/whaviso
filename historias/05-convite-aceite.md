@@ -165,4 +165,4 @@ Como **sistema (zap)**, quero reagir quando alguém erra o número de validaçã
 - ❌ Interação do devedor já ativo (Já paguei / Ver Pix / Sair) (Épico 7).
 - ❌ Confirmação de pagamento `informado_pago` (Épico 8).
 - ❌ Conteúdo das notificações ao criador/cobrador (Épico 10).
-- ❌ Oferta ao cobrador, no aceite de um invertido sem chave, para cadastrar a chave de pagamento (Épico 14).
+- ❌ Oferta ao cobrador, no aceite de um invertido sem chave, para cadastrar a chave pix (Épico 14).

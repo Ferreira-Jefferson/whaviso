@@ -153,7 +153,7 @@ async function aplicarEResponder(
   if (acao === 'aceite' && r.conta) {
     await garantirContaNoAceite(deps, avisoId, r.conta)
   }
-  // H7.3: "Chave de Pag." entrega DUAS mensagens (chave; depois titular+banco, até 3s) e
+  // H7.3: "Chave Pix" entrega DUAS mensagens (chave; depois titular+banco, até 3s) e
   // só marca a entrega como concluída se AMBAS saíram (G-C3). Caminho separado do resto.
   if (acao === 'ver_pix' && r.entregarPix && r.pixChave) {
     await entregarChaveDePagamento(deps, avisoId, r.pixChave, r.pixTitular ?? '', r.pixBanco ?? '')

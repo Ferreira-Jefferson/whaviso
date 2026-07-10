@@ -2,7 +2,7 @@
 --
 -- 1) RÓTULOS DOS BOTÕES (H6.2/H6.3, divergências): os TRÊS botões aparecem em TODAS as
 --    etapas do ciclo. Atualiza os rótulos no `conteudo.botoes` dos templates `ciclo.*`:
---      ver_pix : "Ver chave Pix" -> "Chave de Pag."  (rótulo SEM a palavra "Pix",
+--      ver_pix : "Ver chave Pix" -> "Chave Pix"  (rótulo SEM a palavra "Pix",
 --                precaução contra bloqueio do WhatsApp por termo sensível).
 --      optout  : "Não quero mais lembretes" -> "Desativar lembretes".
 --    (Rótulos são editáveis pelo owner via E12; aqui só atualizamos o padrão de catálogo.)
@@ -31,7 +31,7 @@ update public.templates
         (
           select jsonb_agg(
             case
-              when b->>'acao' = 'ver_pix' then jsonb_set(b, '{rotulo}', '"Chave de Pag."')
+              when b->>'acao' = 'ver_pix' then jsonb_set(b, '{rotulo}', '"Chave Pix"')
               when b->>'acao' = 'optout'  then jsonb_set(b, '{rotulo}', '"Desativar lembretes"')
               else b
             end
@@ -67,7 +67,7 @@ select 'ciclo.d_mais_1', 'revisao', 'whaviso_d1_empurraozinho', 'pt_BR',
            E'Oi, {{1}}. A data do pagamento foi ontem. Você já informou que pagou, mas {{4}} ainda não confirmou. Qualquer coisa, manda um oi pra {{4}}. 🙂',
          'botoes', jsonb_build_array(
            jsonb_build_object('acao','ja_paguei','rotulo','Já paguei'),
-           jsonb_build_object('acao','ver_pix','rotulo','Chave de Pag.'),
+           jsonb_build_object('acao','ver_pix','rotulo','Chave Pix'),
            jsonb_build_object('acao','optout','rotulo','Desativar lembretes')
          )
        ),

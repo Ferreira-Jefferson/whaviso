@@ -66,8 +66,8 @@ describe('E7 interação do devedor', () => {
     await limpar(cobradorId)
   })
 
-  // --- H7.3: chave de pagamento, duas mensagens, entrega única, 2ª falha --------------
-  it('"Chave de Pag." envia 2 mensagens (chave; titular+banco) e marca entregue', async () => {
+  // --- H7.3: chave pix, duas mensagens, entrega única, 2ª falha --------------
+  it('"Chave Pix" envia 2 mensagens (chave; titular+banco) e marca entregue', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({
       dataCombinada: '2026-12-15',
       pixChave: 'chave@pix.com',

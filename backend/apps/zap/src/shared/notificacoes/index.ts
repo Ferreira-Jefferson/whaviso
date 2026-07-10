@@ -34,7 +34,7 @@ export type TipoNotificacao =
   // E8 H8.7 (recorrente): confirmação de ocorrência INTERMEDIÁRIA (k < N). Variante
   // 'revisao' do template devedor.encerramento; o aviso volta a `programado` (não pago).
   | 'encerramento_recorrente'
-  // E14: chave de pagamento cadastrada pelo cobrador (fluxo invertido), ao DEVEDOR.
+  // E14: chave pix cadastrada pelo cobrador (fluxo invertido), ao DEVEDOR.
   | 'pix_chave_recebida'
 
 type Papel = 'cobrador' | 'devedor'

@@ -1,4 +1,4 @@
-# Plano de desenvolvimento: Épico 07 — Interação do devedor (Já paguei / Chave de Pag. / Desativar lembretes)
+# Plano de desenvolvimento: Épico 07 — Interação do devedor (Já paguei / Chave Pix / Desativar lembretes)
 
 > Fonte da verdade: `historias/07-interacao-devedor.md`. Onde o código diverge, o plano descreve como mudar o código para bater com a história.
 > Contexto base: `historias/planos/_CONTEXTO.md`.
@@ -7,12 +7,12 @@
 
 ## 1. Resumo do épico e escopo
 
-O devedor **não conversa**: só interage pelos **três botões** que acompanham toda mensagem do ciclo (E6): **Já paguei**, **Chave de Pag.** e **Desativar lembretes**. Cada toque chega ao `zap` pelo webhook HTTP da Meta (autenticado por HMAC, `X-Hub-Signature-256`), carrega o **`aviso_id`** no `buttonId`/payload (`acao:<avisoId>`), nunca o token. O épico define o que cada botão faz e a resposta ao devedor, mais a **idempotência**, o **roteamento ao combinado certo por `aviso_id`** (não pelo "último chat"), a regra de **só o último aviso enviado age**, e o estado novo **`desregistrado`** (opt-out reversível).
+O devedor **não conversa**: só interage pelos **três botões** que acompanham toda mensagem do ciclo (E6): **Já paguei**, **Chave Pix** e **Desativar lembretes**. Cada toque chega ao `zap` pelo webhook HTTP da Meta (autenticado por HMAC, `X-Hub-Signature-256`), carrega o **`aviso_id`** no `buttonId`/payload (`acao:<avisoId>`), nunca o token. O épico define o que cada botão faz e a resposta ao devedor, mais a **idempotência**, o **roteamento ao combinado certo por `aviso_id`** (não pelo "último chat"), a regra de **só o último aviso enviado age**, e o estado novo **`desregistrado`** (opt-out reversível).
 
 **MVP (🟢, tudo neste épico é 🟢):**
 - H7.1 só age por botão; texto livre: free silêncio, pago menu de opções; respeito a linguagem.
 - H7.2 "Já paguei" → `informado_pago`, para o ciclo, notifica cobrador (E10), confirmação, **idempotente e silencioso na repetição**.
-- H7.3 "Chave de Pag.": duas mensagens (chave; depois titular + banco, até 3s), `solicitou_pix` só no 1º toque, **uma vez por combinado** (reenvio só após falha confirmada de servidor), não muda estado, nada de Pix em log.
+- H7.3 "Chave Pix": duas mensagens (chave; depois titular + banco, até 3s), `solicitou_pix` só no 1º toque, **uma vez por combinado** (reenvio só após falha confirmada de servidor), não muda estado, nada de Pix em log.
 - H7.4 "Desativar lembretes" → `desregistrado`, zera horário reservado, confirmação com botão "Ativar lembretes", notificação ao cobrador **atrasada 1 min** (E10), não apaga, não terminal.
 - H7.5 "Ativar lembretes" → `desregistrado → programado`, pega novo horário reservado, mensagem sem botão, catch-up por etapa da data, notificação ao cobrador conforme a janela.
 - H7.6 toque sempre cai no combinado certo (por `aviso_id`); valida telefone == `telefone_devedor`; idempotente; auditoria.
@@ -45,7 +45,7 @@ Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service
 - `[~]` **Idempotente e silencioso na repetição**: o repo NÃO reaplica (`status != 'pendente' → aplicado:false`), e o service só envia se `aplicado` (service linha 69). MAS hoje, em `informado_pago`, o `ver_pix`/`optout` ainda agem e respondem — H7.2 pede silêncio só para o **re-tap de "Já paguei"**, o que já ocorre. Falta cobrir o caso "último aviso" (H7.7) e o caso de `aviso_id` de mensagem antiga.
 - `[x]` Evento append-only (`ja_paguei_devedor`).
 
-### H7.3 "Chave de Pag." (ver o Pix)
+### H7.3 "Chave Pix" (ver o Pix)
 - `[!]` Rótulo "não contém Pix": o template (0024) e o front (`catalogo_mensagens.ts`) usam "Ver chave Pix" / "Ver Pix". Diverge da regra "o rótulo não contém a palavra Pix". Rótulo editável pelo owner (E12) já existe.
 - `[!]` **Titular + banco**: a chave salva é só `avisos.pix_chave` (text) e `chaves_pix` tem `chave/tipo/rotulo`, **sem titular nem banco**. A 2ª mensagem (titular + banco) não tem dados. (Divergência do épico; captura em E2/E3.)
 - `[!]` **Duas mensagens em sequência (até 3s)**: hoje envia **uma** mensagem (`resposta.ver_pix` com `{pix_chave}`). Não há 2ª mensagem nem o intervalo.
@@ -81,7 +81,7 @@ Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service
 
 ### H7.7 Só o último aviso age; encerrado/inválido
 - `[+]` **Só o último aviso enviado age**: não há vínculo entre o clique e qual envio o originou. O `buttonId` é `acao:<avisoId>` (sem etapa/`envio_id`); o `EventoBotao` traz o `wamid` da **resposta** do devedor (`m.key.id`), não o `wamid` da mensagem **citada/respondida**. Não dá para saber se foi o último aviso. Diverge (núcleo do épico).
-- `[~]` Vale p/ os três botões inclusive "Chave de Pag.": consequência do item acima + "uma vez por combinado" (H7.3).
+- `[~]` Vale p/ os três botões inclusive "Chave Pix": consequência do item acima + "uma vez por combinado" (H7.3).
 - `[x]` Terminal não reabre: estados não-ativos retornam `aplicado:false` (repo linhas 85-87). Falta adicionar `desregistrado` à lista de "não-ativo para Já paguei" e tratar `recusado`/`expirado`.
 - `[+]` **Resposta neutra "combinado já encerrado"** (cortesia free/pago): hoje terminal → `aplicado:false` → **nenhuma** resposta. Falta a resposta de cortesia condicionada a plano.
 - `[~]` `aviso_id` inválido ignorado sem vazar: `parsearPayloadBotao` retorna `null` e `processarBotao` sai cedo; `aplicarAcaoBotao` retorna `null` para id inexistente. Não vaza. Ok, mas confirmar que nada é logado.
@@ -115,7 +115,7 @@ Arquivos centrais inspecionados: `apps/zap/src/modules/webhook_whatsapp/{service
   - **Validar telefone** (H7.6): comparar `evento.telefone` (normalizado) com `telefone_devedor` do aviso; divergente → ignorar sem logar dado sensível. O repo já carrega `telefone_devedor`; passar o telefone do evento ao repo e barrar lá (dentro da transação, com o `for update`).
   - **Roteamento por etapa/último aviso** (H7.7): parsear `acao:<avisoId>:<etapa>` (ou o stanzaId citado) e descartar ação de estado quando não for o último envio. Resposta de cortesia "encerrado" condicionada a plano (H7.1/H7.7).
   - **Nova ação `ativar`** (H7.5): adicionar a `ACOES_BOTAO` e a `chaveResposta` (`resposta.reativacao`, sem botão).
-  - **"Chave de Pag." duas mensagens** (H7.3): após `resposta.ver_pix` (só a chave), enviar a 2ª (`resposta.ver_pix_titular`, variáveis `nome`/`banco`) com `setTimeout`/delay até 3s. **Idempotência da entrega**: só envia se `entrega_chave_status != 'entregue'`; em falha de envio (após os 3 retrys do canal) deixa reentregável. `solicitou_pix` só no 1º toque (mover a gravação do evento para condicional "primeira vez").
+  - **"Chave Pix" duas mensagens** (H7.3): após `resposta.ver_pix` (só a chave), enviar a 2ª (`resposta.ver_pix_titular`, variáveis `nome`/`banco`) com `setTimeout`/delay até 3s. **Idempotência da entrega**: só envia se `entrega_chave_status != 'entregue'`; em falha de envio (após os 3 retrys do canal) deixa reentregável. `solicitou_pix` só no 1º toque (mover a gravação do evento para condicional "primeira vez").
   - **Texto livre → menu (pago) / silêncio (free)** (H7.1): hoje o inbound descarta texto livre. Acrescentar no inbound um caminho para **mensagem de texto** (não-botão) que: localiza combinados ativos do telefone, checa plano do cobrador/dono, e responde menu (pago) ou nada (free). **Importante:** o `meta_client` é transporte genérico; o "menu" é negócio → expor no `ClienteWhats` um `onTexto(handler)` análogo ao `onBotao`, e implementar a regra no módulo `webhook_whatsapp`. Não colocar negócio no `meta_client`.
 - `webhook_whatsapp/repo.ts` (`aplicarAcaoBotao`):
   - opt-out: `update status='desregistrado'` (não `cancelado`); **zerar `horario_reservado`** (quando o campo existir, E6); evento `optout`.
@@ -185,7 +185,7 @@ Cada passo: objetivo · arquivos prováveis · critério (HNN.x) · **modelo**.
    Arquivos: `inbound.ts` (extrair etapa/stanzaId), `service.ts`/`repo.ts` (comparar com último envio enviado), templates `resposta.encerrado`. Critério: H7.7 (botão antigo inerte; terminal não reabre; inválido sem vazar).
    **opus** — núcleo do épico: vínculo clique→envio, comparação com último, idempotência.
 
-9. **zap: "Chave de Pag." duas mensagens (chave; titular+banco até 3s), `solicitou_pix` 1x, entrega única, reenvio só em falha.**
+9. **zap: "Chave Pix" duas mensagens (chave; titular+banco até 3s), `solicitou_pix` 1x, entrega única, reenvio só em falha.**
    Arquivos: `service.ts`, `repo.ts`, templates `resposta.ver_pix`/`resposta.ver_pix_titular`. Critério: H7.3.
    **opus** — sequência temporizada + idempotência de entrega + condicional do evento; sensível a corrida e a falha de envio.
 

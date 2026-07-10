@@ -1,6 +1,6 @@
 -- E2 — H2.1: Pix OBRIGATÓRIO no fluxo receber + NOME DO TITULAR e BANCO da chave.
 --
--- O botão "Chave de Pag." aparece em TODA mensagem do ciclo (Épico 6), então todo
+-- O botão "Chave Pix" aparece em TODA mensagem do ciclo (Épico 6), então todo
 -- combinado precisa de Pix. Antes a chave era opcional (`pix_chave` nullable e o
 -- contrato `nullish()`); passa a ser obrigatória no `receber`.
 --

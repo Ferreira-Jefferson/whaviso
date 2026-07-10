@@ -1,4 +1,4 @@
-// Inferência do TIPO de uma chave de pagamento a partir do formato. FONTE ÚNICA
+// Inferência do TIPO de uma chave pix a partir do formato. FONTE ÚNICA
 // (api + zap): o front mantém uma cópia espelhada (não importa @whaviso/shared), como
 // as regras de linguagem. Auxílio de UX/automação, não validação: o backend guarda
 // tipo + chave sem validar um contra o outro.

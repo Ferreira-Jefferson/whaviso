@@ -2,7 +2,7 @@
 
 ## Veredito (38 [x] · 1 [~] · 0 [!] · 0 [+])
 
-O código segue a história com fidelidade alta. O ciclo D-2..D+1 é ancorado na data combinada em America/Sao_Paulo, calculado 100% no servidor, entregue pela outbox `envios` com `FOR UPDATE SKIP LOCKED`, idempotente por `(aviso_id, etapa)`, com retry de exatamente 3 tentativas e intervalo aleatório 20-60s. O horário reservado por segundo (janela 08-18, unicidade global, 10min/devedor, fallback, reuso na reabertura) está implementado e testado. `informado_pago` para o ciclo normal e deixa apenas o empurrãozinho de D+1. Os três botões saem em todas as etapas com rótulo "Chave de Pag." e "Desativar lembretes". A única ressalva [~] é H6.10 (cadência configurável), que a própria história marca 🟡 "precisa de estudo de design": o padrão D-2..D+1 existe, mas a configuração de janela/cadência custom não foi construída (esperado pela legenda).
+O código segue a história com fidelidade alta. O ciclo D-2..D+1 é ancorado na data combinada em America/Sao_Paulo, calculado 100% no servidor, entregue pela outbox `envios` com `FOR UPDATE SKIP LOCKED`, idempotente por `(aviso_id, etapa)`, com retry de exatamente 3 tentativas e intervalo aleatório 20-60s. O horário reservado por segundo (janela 08-18, unicidade global, 10min/devedor, fallback, reuso na reabertura) está implementado e testado. `informado_pago` para o ciclo normal e deixa apenas o empurrãozinho de D+1. Os três botões saem em todas as etapas com rótulo "Chave Pix" e "Desativar lembretes". A única ressalva [~] é H6.10 (cadência configurável), que a própria história marca 🟡 "precisa de estudo de design": o padrão D-2..D+1 existe, mas a configuração de janela/cadência custom não foi construída (esperado pela legenda).
 
 ---
 
@@ -26,7 +26,7 @@ O código segue a história com fidelidade alta. O ciclo D-2..D+1 é ancorado na
 | D texto confirmação ("Hoje é o dia...") | [x] | `ciclo.d` `0024:48-50` | — |
 | D+1 texto último aviso ("Último aviso...") | [x] | `ciclo.d_mais_1` `0024:51-53` | — |
 | Três botões em todas as etapas (inclusive D-2) | [x] | `conteudo.botoes` com 3 botões em todos os `ciclo.*` `0024:18-39`; render sempre monta todos `templates/index.ts:67-70`; index não suprime botão por etapa `enviar_lembretes/index.ts:65-75` | `ciclo_horario.test.ts:94`, `enviar_lembretes.test.ts:118` |
-| Rótulo sem "Pix": "Chave de Pag." | [x] | `0039:27-44` troca rótulo ver_pix → "Chave de Pag." e optout → "Desativar lembretes" | — |
+| Rótulo sem "Pix": "Chave Pix" | [x] | `0039:27-44` troca rótulo ver_pix → "Chave Pix" e optout → "Desativar lembretes" | — |
 | Valor em reais (de centavos) e data no fuso SP | [x] | `valoresCiclo` usa `formatarValorBr`/`formatarDataBr` `enviar_lembretes/render.ts:12-21`; data vem de `to_char(data_combinada,'YYYY-MM-DD')` `repo.ts:99` | `datas.test.ts` |
 | Textos são o padrão, editáveis pelo owner via templates; zap só transporta | [x] | conteúdo lido da tabela `templates` `repo.ts:96-117`; zap não tem strings fixas `templates/index.ts:1-5` | — |
 | Nenhuma mensagem coleta texto livre (só botão) | [x] | mensagens do ciclo só carregam botões; texto livre é tratado fora do ciclo (E7) `service.ts:232-269` | — |
