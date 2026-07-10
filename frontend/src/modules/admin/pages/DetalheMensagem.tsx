@@ -136,15 +136,12 @@ function Conteudo({
   const daChave = mensagens
     .filter((t) => t.chave === chave && t.contexto === ctx)
     .sort((a, b) => b.versao - a.versao)
-  // "No ar" exige a versão ativa E aprovada na Meta: o `ativo` do banco só marca a
-  // versão ESCOLHIDA; o whaviso só ENVIA depois que a Meta aprova (o dreno é gated
-  // em status_meta='aprovado'). Uma versão ativa mas não aprovada NÃO está no ar
-  // (mesmo critério do painel de templates e da trilha do ciclo).
+  // "No ar" = a versão ativa E aprovada na Meta (o dreno do zap é gated nos dois:
+  // ativo + status_meta='aprovado'). Só há uma no ar por (chave, contexto) e ativar
+  // exige aprovação (a api recusa ativar versão não aprovada, e ativar troca o ativo
+  // anterior). Uma versão não aprovada nunca está no ar: aparece como "outra versão"
+  // com seu estado real na Meta e o botão de submeter/ativar.
   const noAr = daChave.find((t) => t.ativo && t.status_meta === 'aprovado') ?? null
-  // A versão marcada como ativa pode estar pendente/em análise; nesse caso ela não
-  // está no ar e aparece entre as outras versões, com o estado real e o botão de
-  // submeter à Meta (senão não haveria como enviá-la para aprovação daqui).
-  const versaoSelecionada = daChave.find((t) => t.ativo) ?? null
   const propostas = daChave.filter((t) => t.id !== noAr?.id)
 
   // Versão que semeia o editor: SÓ a que o owner escolheu em "Usar como base". Ao
@@ -153,7 +150,7 @@ function Conteudo({
   // OU de contexto reancora o seed (via `key` no editor). `baseId` é só uma
   // preferência de UI; a lista continua vindo do servidor.
   const [baseId, setBaseId] = useState<string | null>(null)
-  const seed = noAr ?? versaoSelecionada ?? daChave[0] ?? null
+  const seed = noAr ?? daChave[0] ?? null
   const base = (baseId ? daChave.find((t) => t.id === baseId) : undefined) ?? null
   const temBase = base !== null
 
@@ -350,28 +347,14 @@ function LinhaProposta({
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-2 text-sm text-tinta">
+        <span className="text-sm text-tinta">
           {template.nome_meta} · v{template.versao}
-          {/* Versão marcada como ativa mas ainda não no ar (falta a Meta aprovar):
-              some daqui só quando aprovada, aí vai para "Versão no ar" acima. */}
-          {template.ativo && (
-            <span className="rounded-pill bg-salvia-claro px-2 py-0.5 text-xs font-medium text-folha">
-              Marcada como ativa
-            </span>
-          )}
         </span>
         <StatusMetaBadge template={template} />
       </div>
       <pre className="whitespace-pre-wrap break-words rounded-input bg-papel-2 p-3 text-xs text-tinta-2">
         {template.conteudo.texto}
       </pre>
-
-      {/* Ativa porém não no ar: explica por que ela aparece aqui e não em "Versão no ar". */}
-      {template.ativo && (
-        <Banner tom="info">
-          Esta é a versão marcada como ativa, mas ela só vai ao ar quando a Meta aprovar o template.
-        </Banner>
-      )}
 
       {/* A Meta recusou: mostra o motivo para o owner corrigir e reenviar. */}
       {rejeitado && template.meta_motivo && (
