@@ -10,6 +10,7 @@ import { SECOES_MENSAGENS, type SecaoMensagens } from '../catalogo_mensagens'
 import { useMensagens, type Template } from '../api'
 import { CicloTemplates } from '../components/CicloTemplates'
 import { ListaMensagens, type SituacaoChave } from '../components/ListaMensagens'
+import { situacaoTemplate } from '../situacao_template'
 
 export default function TemplatesPage() {
   const mensagens = useMensagens()
@@ -35,9 +36,10 @@ export default function TemplatesPage() {
   )
 }
 
-// Situação viva de cada chave a partir dos templates unificados: ativo (tem versão
-// ativa E aprovada na Meta, ou seja, de fato no ar), proposta (tem versões, mas
-// nenhuma ativa-e-aprovada, então segue aguardando a Meta) ou vazio (sem versão).
+// Situação viva de cada chave a partir dos templates unificados: 'ativo' (tem
+// versão ativa E aprovada na Meta, de fato no ar) ou 'vazio' (sem versão). Sem
+// versão no ar, resume as versões pela que MAIS pede atenção do owner:
+// rejeitado (corrigir e reenviar) > em_analise (só esperar) > rascunho (enviar).
 // Retorna undefined enquanto carrega, para a lista não piscar um estado errado.
 function construirResumo(
   mensagens: Template[] | undefined,
@@ -53,8 +55,12 @@ function construirResumo(
     const arr = porChave.get(chave)
     if (!arr || arr.length === 0) return 'vazio'
     // "No ar" (verde) exige a versão ativa E aprovada na Meta; enquanto a Meta não
-    // aprova, o envio fica gated (E12), então a chave mostra "aguardando aprovação".
-    return arr.some((t) => t.ativo && t.status_meta === 'aprovado') ? 'ativo' : 'proposta'
+    // aprova, o envio fica gated (E12), então a chave mostra o estado da proposta.
+    if (arr.some((t) => t.ativo && t.status_meta === 'aprovado')) return 'ativo'
+    const situacoes = new Set(arr.map(situacaoTemplate))
+    if (situacoes.has('rejeitado')) return 'rejeitado'
+    if (situacoes.has('em_analise')) return 'em_analise'
+    return 'rascunho'
   }
 }
 
@@ -148,7 +154,9 @@ function Legenda() {
   return (
     <ul className="-mt-2 mb-7 flex flex-wrap gap-x-6 gap-y-2 text-xs text-tinta-2">
       <ItemLegenda cor="border-folha bg-salvia-claro" texto="Versão ativa no ar" />
-      <ItemLegenda cor="border-ambar bg-ambar-claro" texto="Proposta aguardando aprovação" />
+      <ItemLegenda cor="border-ambar bg-ambar-claro" texto="Em análise na Meta" />
+      <ItemLegenda cor="border-tinta-2 bg-papel-2" texto="Não enviado à Meta" />
+      <ItemLegenda cor="border-barro bg-papel-2" texto="Recusado pela Meta" />
       <ItemLegenda cor="border-linha bg-papel-2" texto="Sem versão ainda" />
     </ul>
   )

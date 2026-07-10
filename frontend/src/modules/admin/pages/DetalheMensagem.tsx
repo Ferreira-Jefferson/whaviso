@@ -11,7 +11,7 @@
 // junto com as famílias que os usam (ciclo, convite); aqui as respostas não têm.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Bold, CheckCircle2, Copy, Italic, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -43,6 +43,7 @@ import {
   usePreviewMensagem,
 } from '../api'
 import { StatusMetaBadge } from '../components/StatusMetaBadge'
+import { situacaoTemplate } from '../situacao_template'
 import { mensagemPorChave, type MensagemItem } from '../catalogo_mensagens'
 import {
   CATALOGO_VARIAVEIS,
@@ -135,16 +136,26 @@ function Conteudo({
   const daChave = mensagens
     .filter((t) => t.chave === chave && t.contexto === ctx)
     .sort((a, b) => b.versao - a.versao)
-  const ativo = daChave.find((t) => t.ativo) ?? null
-  const propostas = daChave.filter((t) => !t.ativo)
+  // "No ar" exige a versão ativa E aprovada na Meta: o `ativo` do banco só marca a
+  // versão ESCOLHIDA; o whaviso só ENVIA depois que a Meta aprova (o dreno é gated
+  // em status_meta='aprovado'). Uma versão ativa mas não aprovada NÃO está no ar
+  // (mesmo critério do painel de templates e da trilha do ciclo).
+  const noAr = daChave.find((t) => t.ativo && t.status_meta === 'aprovado') ?? null
+  // A versão marcada como ativa pode estar pendente/em análise; nesse caso ela não
+  // está no ar e aparece entre as outras versões, com o estado real e o botão de
+  // submeter à Meta (senão não haveria como enviá-la para aprovação daqui).
+  const versaoSelecionada = daChave.find((t) => t.ativo) ?? null
+  const propostas = daChave.filter((t) => t.id !== noAr?.id)
 
-  // Versão que semeia o editor: a que o owner escolheu em "Usar como base", senão a
-  // ativa (o padrão). Trocar de base OU de contexto reancora o seed (via `key` no
-  // editor). Se a base escolhida sumir (troca de contexto, versão apagada), cai na
-  // ativa. `baseId` é só uma preferência de UI; a lista continua vindo do servidor.
+  // Versão que semeia o editor: SÓ a que o owner escolheu em "Usar como base". Ao
+  // abrir a tela o editor nasce VAZIO (base = null); clicar "Usar como base" em
+  // qualquer versão (inclusive a que está no ar) preenche os campos. Trocar de base
+  // OU de contexto reancora o seed (via `key` no editor). `baseId` é só uma
+  // preferência de UI; a lista continua vindo do servidor.
   const [baseId, setBaseId] = useState<string | null>(null)
-  const base = (baseId ? daChave.find((t) => t.id === baseId) : undefined) ?? ativo
-  const ehPadrao = base?.id === ativo?.id
+  const seed = noAr ?? versaoSelecionada ?? daChave[0] ?? null
+  const base = (baseId ? daChave.find((t) => t.id === baseId) : undefined) ?? null
+  const temBase = base !== null
 
   return (
     <div className="animate-rise">
@@ -152,7 +163,7 @@ function Conteudo({
       <PageHeader
         titulo={meta.nome}
         descricao={`${meta.destinatario} · ${meta.quando}. Visualize a versão ativa e proponha uma nova.`}
-        acoes={ativo ? <StatusMetaBadge status={ativo.status_meta} /> : undefined}
+        acoes={seed ? <StatusMetaBadge template={seed} /> : undefined}
       />
 
       {meta.temRevisao && (
@@ -173,7 +184,11 @@ function Conteudo({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
-          <VersaoAtiva ativo={ativo} emUso={ehPadrao} onUsarComoBase={() => setBaseId(null)} />
+          <VersaoAtiva
+            ativo={noAr}
+            emUso={temBase && base?.id === noAr?.id}
+            onUsarComoBase={() => noAr && setBaseId(noAr.id)}
+          />
           <Propostas propostas={propostas} baseId={base?.id ?? null} onUsarComoBase={setBaseId} />
         </div>
         <NovaProposta
@@ -192,9 +207,9 @@ function Conteudo({
           // nomeados; categoria da Meta), para propor a partir dela em vez do zero.
           sugestaoTexto={base ? paraNomeado(base.conteudo.texto, base.variaveis) : undefined}
           sugestaoCategoria={base?.categoria}
-          baseLabel={ehPadrao || !base ? undefined : `${base.nome_meta} · v${base.versao}`}
-          ehPadrao={ehPadrao}
-          onVoltarPadrao={() => setBaseId(null)}
+          baseLabel={base ? `${base.nome_meta} · v${base.versao}` : undefined}
+          temBase={temBase}
+          onLimpar={() => setBaseId(null)}
         />
       </div>
     </div>
@@ -250,9 +265,10 @@ function VersaoAtiva({
   if (!ativo) {
     return (
       <Card>
-        <h2 className="mb-2 text-lg text-salvia">Versão ativa</h2>
+        <h2 className="mb-2 text-lg text-salvia">Versão no ar</h2>
         <p className="text-sm text-tinta-2">
-          Nenhuma versão está ativa nesta mensagem. Proponha uma nova versão e ative-a após a aprovação.
+          Nenhuma versão está no ar nesta mensagem. O whaviso só envia depois que a Meta aprovar o
+          template: submeta uma versão à Meta abaixo e ative-a quando for aprovada.
         </p>
       </Card>
     )
@@ -261,7 +277,7 @@ function VersaoAtiva({
   return (
     <Card className={`flex flex-col gap-4 ${emUso ? 'ring-1 ring-salvia' : ''}`}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg text-salvia">Versão ativa</h2>
+        <h2 className="text-lg text-salvia">Versão no ar</h2>
         <span className="text-xs text-tinta-2">
           {ativo.nome_meta} · v{ativo.versao}
         </span>
@@ -321,10 +337,11 @@ function LinhaProposta({
   const submeter = useSubmeterMensagem()
   const apagar = useApagarMensagem()
   const [confirmando, setConfirmando] = useState(false)
-  const aprovado = template.status_meta === 'aprovado'
-  const rejeitado = template.status_meta === 'rejeitado'
-  // 'pendente' com data de submissão = em análise na Meta; sem data = rascunho (nunca enviado).
-  const emAnalise = template.status_meta === 'pendente' && template.meta_submetido_em != null
+  // Situação real (fonte única): rascunho = nunca enviado; em_analise = já foi à Meta.
+  const situacao = situacaoTemplate(template)
+  const aprovado = situacao === 'aprovado'
+  const rejeitado = situacao === 'rejeitado'
+  const emAnalise = situacao === 'em_analise'
 
   return (
     <li
@@ -333,14 +350,28 @@ function LinhaProposta({
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm text-tinta">
+        <span className="inline-flex items-center gap-2 text-sm text-tinta">
           {template.nome_meta} · v{template.versao}
+          {/* Versão marcada como ativa mas ainda não no ar (falta a Meta aprovar):
+              some daqui só quando aprovada, aí vai para "Versão no ar" acima. */}
+          {template.ativo && (
+            <span className="rounded-pill bg-salvia-claro px-2 py-0.5 text-xs font-medium text-folha">
+              Marcada como ativa
+            </span>
+          )}
         </span>
-        <StatusMetaBadge status={template.status_meta} />
+        <StatusMetaBadge template={template} />
       </div>
       <pre className="whitespace-pre-wrap break-words rounded-input bg-papel-2 p-3 text-xs text-tinta-2">
         {template.conteudo.texto}
       </pre>
+
+      {/* Ativa porém não no ar: explica por que ela aparece aqui e não em "Versão no ar". */}
+      {template.ativo && (
+        <Banner tom="info">
+          Esta é a versão marcada como ativa, mas ela só vai ao ar quando a Meta aprovar o template.
+        </Banner>
+      )}
 
       {/* A Meta recusou: mostra o motivo para o owner corrigir e reenviar. */}
       {rejeitado && template.meta_motivo && (
@@ -370,7 +401,9 @@ function LinhaProposta({
           </Button>
         )}
 
-        {confirmando ? (
+        {/* A versão marcada como ativa nunca pode ser apagada (a api recusa com 409
+            template_ativo): só mostramos o apagar para versões não ativas. */}
+        {template.ativo ? null : confirmando ? (
           <>
             <Button variante="destructive" loading={apagar.isPending} onClick={() => apagar.mutate(template.id)}>
               <Trash2 strokeWidth={1.75} className="size-4" />
@@ -465,8 +498,8 @@ function NovaProposta({
   sugestaoTexto,
   sugestaoCategoria,
   baseLabel,
-  ehPadrao,
-  onVoltarPadrao,
+  temBase,
+  onLimpar,
 }: {
   chave: string
   contexto: ContextoTemplate
@@ -475,11 +508,11 @@ function NovaProposta({
   sugestaoBotoes?: BotaoTemplate[]
   sugestaoTexto?: string
   sugestaoCategoria?: CategoriaTemplate
-  // Rótulo da versão que semeou o editor quando NÃO é a ativa (ex.: "nome · v2").
+  // Rótulo da versão que semeou o editor (ex.: "nome · v2"); undefined quando vazio.
   baseLabel?: string
-  // A base atual é a versão ativa (o padrão)? Some o botão de voltar quando sim.
-  ehPadrao: boolean
-  onVoltarPadrao: () => void
+  // Há uma versão carregada como base? Mostra o botão "Limpar" quando sim.
+  temBase: boolean
+  onLimpar: () => void
 }) {
   // Default do nome: o da versão ativa do contexto, ou derivado da chave (a
   // variante de revisão recebe sufixo para não colidir com o nome do padrão).
@@ -585,6 +618,21 @@ function NovaProposta({
     setCorpo(corpo.slice(0, ini) + trecho + corpo.slice(fim))
   }
 
+  // Envolve a seleção com o marcador do WhatsApp (* negrito, _ itálico). Sem
+  // seleção, insere o par e deixa o caret no meio para o owner digitar dentro.
+  function envolverSelecao(marcador: '*' | '_') {
+    const ta = textareaRef.current
+    if (!ta) {
+      setCorpo((c) => c + marcador + marcador)
+      return
+    }
+    const ini = ta.selectionStart ?? corpo.length
+    const fim = ta.selectionEnd ?? corpo.length
+    const selecao = corpo.slice(ini, fim)
+    caretAlvo.current = selecao ? fim + 2 : ini + 1
+    setCorpo(corpo.slice(0, ini) + marcador + selecao + marcador + corpo.slice(fim))
+  }
+
   function enviar() {
     if (!podeEnviar) return
     criar.mutate(
@@ -617,14 +665,14 @@ function NovaProposta({
       <div>
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg text-salvia">Propor nova versão</h2>
-          {!ehPadrao && (
+          {temBase && (
             <button
               type="button"
-              onClick={onVoltarPadrao}
+              onClick={onLimpar}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-salvia hover:underline"
             >
               <RotateCcw strokeWidth={1.75} className="size-4" />
-              Voltar ao padrão
+              Limpar
             </button>
           )}
         </div>
@@ -669,15 +717,41 @@ function NovaProposta({
       </div>
 
       <Field label="Texto da mensagem">
-        <textarea
-          ref={textareaRef}
-          value={corpo}
-          onChange={(e) => setCorpo(e.target.value)}
-          rows={5}
-          placeholder="Escreva a resposta enviada ao WhatsApp."
-          aria-invalid={palavraProibida ? true : undefined}
-          className="w-full rounded-input border border-linha bg-cartao px-3 py-2.5 font-mono text-sm text-tinta placeholder:text-tinta-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia aria-[invalid=true]:border-barro"
-        />
+        <div className="flex flex-col gap-1.5">
+          {/* Formatação do WhatsApp: envolve a seleção com * (negrito) ou _ (itálico).
+              O preview acima mostra o resultado já formatado. */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => envolverSelecao('*')}
+              title="Negrito (*texto*)"
+              aria-label="Aplicar negrito"
+              className="inline-flex items-center gap-1 rounded-pill border border-linha bg-papel-2 px-3 py-1 text-xs text-tinta hover:text-salvia"
+            >
+              <Bold strokeWidth={2} className="size-3.5" />
+              Negrito
+            </button>
+            <button
+              type="button"
+              onClick={() => envolverSelecao('_')}
+              title="Itálico (_texto_)"
+              aria-label="Aplicar itálico"
+              className="inline-flex items-center gap-1 rounded-pill border border-linha bg-papel-2 px-3 py-1 text-xs text-tinta hover:text-salvia"
+            >
+              <Italic strokeWidth={2} className="size-3.5" />
+              Itálico
+            </button>
+          </div>
+          <textarea
+            ref={textareaRef}
+            value={corpo}
+            onChange={(e) => setCorpo(e.target.value)}
+            rows={5}
+            placeholder="Escreva a resposta enviada ao WhatsApp."
+            aria-invalid={palavraProibida ? true : undefined}
+            className="w-full rounded-input border border-linha bg-cartao px-3 py-2.5 font-mono text-sm text-tinta placeholder:text-tinta-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia aria-[invalid=true]:border-barro"
+          />
+        </div>
       </Field>
 
       {palavraProibida && (

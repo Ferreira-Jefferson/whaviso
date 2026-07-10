@@ -1,10 +1,13 @@
 // WhatsAppPreview: bolha de mensagem no estilo WhatsApp (plano seção 1).
 // Usado pelo admin (preview de template) e pela landing. O texto exibido SEMPRE
 // vem renderizado pelo BACKEND (POST /v1/admin/templates/preview), risco nº 8:
-// o cliente nunca renderiza o template enviado ao WhatsApp; este componente é
-// puramente visual. Botão de opt-out sempre visível (Regra de Ouro do produto).
+// o cliente nunca renderiza o template enviado ao WhatsApp. A única coisa que este
+// componente faz por cima é FORMATAÇÃO VISUAL dos marcadores do WhatsApp
+// (*negrito*, _itálico_) via tokenizarWhatsApp, sem alterar o que é enviado.
+// Botão de opt-out sempre visível (Regra de Ouro do produto).
 import type { ReactNode } from 'react'
 import { CheckCheck } from 'lucide-react'
+import { tokenizarWhatsApp } from '@/shared/format/whatsapp'
 import { cn } from './cn'
 
 interface WhatsAppPreviewProps {
@@ -24,6 +27,18 @@ interface WhatsAppPreviewProps {
 const FUNDO_CHAT = '#ECE5DD'
 const BOLHA = '#DCF8C6'
 
+// Desenha o texto aplicando negrito/itálico dos marcadores do WhatsApp. Os
+// segmentos são inline, então quebras de linha/espaços seguem preservados pelo
+// whitespace-pre-wrap do <p> pai.
+function renderizarFormatado(texto: string): ReactNode {
+  return tokenizarWhatsApp(texto).map((seg, i) => {
+    let no: ReactNode = seg.texto
+    if (seg.negrito) no = <strong className="font-semibold">{no}</strong>
+    if (seg.italico) no = <em>{no}</em>
+    return <span key={i}>{no}</span>
+  })
+}
+
 export function WhatsAppPreview({
   texto,
   botoes = [],
@@ -41,7 +56,7 @@ export function WhatsAppPreview({
           className="max-w-[85%] rounded-xl rounded-tr-sm px-3 py-2 text-sm text-[#111b21] shadow-sm"
           style={{ backgroundColor: BOLHA }}
         >
-          <p className="whitespace-pre-wrap break-words">{texto}</p>
+          <p className="whitespace-pre-wrap break-words">{renderizarFormatado(texto)}</p>
           <span className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[#667781]">
             {horario}
             <CheckCheck strokeWidth={2} className="size-3 text-[#53bdeb]" aria-hidden />

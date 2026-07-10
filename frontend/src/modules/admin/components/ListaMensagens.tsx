@@ -6,12 +6,19 @@
 import { Link } from 'react-router'
 import { ChevronRight } from 'lucide-react'
 import { ESTADO_MENSAGEM, type MensagemItem } from '../catalogo_mensagens'
+import { ROTULO_SITUACAO } from '../situacao_template'
 
-export type SituacaoChave = 'ativo' | 'proposta' | 'vazio'
+// Situação viva de uma CHAVE (resumo das versões): 'ativo' (tem versão no ar) e
+// 'vazio' (sem versão) são conceitos da chave; os demais espelham a situação real
+// do template (situacao_template), para a lista distinguir "não enviado à Meta" de
+// "em análise" e "recusado" em vez do antigo rótulo genérico.
+export type SituacaoChave = 'ativo' | 'em_analise' | 'rascunho' | 'rejeitado' | 'vazio'
 
 const SITUACAO: Record<SituacaoChave, { rotulo: string; classe: string }> = {
   ativo: { rotulo: 'Versão ativa', classe: 'bg-salvia-claro text-folha' },
-  proposta: { rotulo: 'Aguardando aprovação', classe: 'bg-ambar-claro text-ambar' },
+  em_analise: { rotulo: ROTULO_SITUACAO.em_analise, classe: 'bg-ambar-claro text-ambar' },
+  rejeitado: { rotulo: ROTULO_SITUACAO.rejeitado, classe: 'bg-papel-2 text-barro' },
+  rascunho: { rotulo: ROTULO_SITUACAO.rascunho, classe: 'bg-papel-2 text-tinta-2' },
   vazio: { rotulo: 'Sem versão ainda', classe: 'bg-papel-2 text-tinta-2' },
 }
 

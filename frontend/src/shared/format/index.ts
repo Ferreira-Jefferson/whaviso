@@ -13,7 +13,6 @@ import type {
   PapelAviso,
   TipoEvento,
   AtorEvento,
-  StatusMetaTemplate,
   TipoChavePix,
   Envio,
   Aviso,
@@ -175,14 +174,6 @@ export const ROTULO_TIPO_CHAVE: Record<TipoChavePix, string> = {
   email: 'E-mail',
   telefone: 'Telefone',
   aleatoria: 'Chave aleatória',
-}
-
-// ---- Rótulos do status do template na Meta (área admin) ----
-// Sem cor aqui (definida no componente que o usa); só o rótulo pt-BR.
-export const ROTULO_STATUS_META: Record<StatusMetaTemplate, string> = {
-  pendente: 'Aguardando aprovação',
-  aprovado: 'Aprovado na Meta',
-  rejeitado: 'Recusado pela Meta',
 }
 
 // ---- Rótulos dos eventos do aviso (notificações in-app, risco nº 10) ----

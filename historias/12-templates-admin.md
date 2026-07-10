@@ -55,6 +55,7 @@ Como **owner**, quero criar uma nova versão da mensagem, revisar e publicar, pa
 *Critérios de aceite:*
 - [ ] Salvar uma edição **cria uma nova versão** da chave/contexto; ela **nasce pendente** (não entra no ar sozinha).
 - [ ] Há um passo de **aprovação** explícito antes de poder ativar: o owner **submete** a versão à Meta pelo painel, e ela só fica aprovada quando a **Meta aprova o template** correspondente (webhook/reconcile refletem o veredito real).
+- [ ] A versão pendente tem **dois momentos visíveis** ao owner, distintos em toda tela de template (lista, legenda, trilha do ciclo e badge do detalhe): **"Não enviado à Meta"** (nunca submetida, ou a submissão falhou antes de a Meta receber, ainda dá pra clicar em submeter) e **"Em análise na Meta"** (já submetida, aguardando o veredito). Somada aos vereditos **"Aprovado na Meta"** e **"Recusado pela Meta"**, o owner identifica o status real de cada versão sem abrir cada uma.
 - [ ] **Ativar** uma versão só é permitido se ela estiver **aprovada**; ativar versão não aprovada é recusado (envelope `{ error: { code, message } }`).
 - [ ] Ativar uma versão **substitui** a ativa daquela chave/contexto; as versões antigas ficam disponíveis (histórico de versões).
 - [ ] A versão **ativa** é a única que o `zap` usa em runtime (ver H12.8); editar não afeta o ar até ativar.
@@ -114,7 +115,7 @@ Como **owner**, quero que as mensagens que hoje não têm chave editável sejam 
 
 > A consolidação de templates já foi feita no código (uma tabela, um editor, zap genérico). As divergências aqui são pontos a **confirmar/fechar** na fase de validação, não reescritas grandes.
 
-- **Aprovação é a da Meta (não há passo manual separado):** o passo de "aprovar" (H12.5) é a própria aprovação da Meta. O owner **submete** a versão pelo painel (`/admin/mensagens/:id/submeter`); o `zap` cria/edita o template na WABA e o campo `status_meta` passa a refletir o veredito real (pendente, aprovado, rejeitado), via webhook e reconcile. Só uma versão com `status_meta='aprovado'` pode ser ativada.
+- **Aprovação é a da Meta (não há passo manual separado):** o passo de "aprovar" (H12.5) é a própria aprovação da Meta. O owner **submete** a versão pelo painel (`/admin/mensagens/:id/submeter`); o `zap` cria/edita o template na WABA e o campo `status_meta` passa a refletir o veredito real (pendente, aprovado, rejeitado), via webhook e reconcile. Só uma versão com `status_meta='aprovado'` pode ser ativada. O painel deriva de `status_meta` + `meta_submetido_em` quatro situações visíveis ao owner (não enviado à Meta / em análise / aprovado / recusado), consistentes em todas as telas de template.
 - **Famílias sem editor (`conta.*`):** `convite.resumo` já entrou no editor; o OTP (`conta.*`) também passou a ser um template Meta sujeito ao mesmo modelo de aprovação; falta só `boas-vindas`, que entra no mesmo modelo quando for ligado.
 - **Garantia de linguagem no editor:** as regras de ouro (palavras proibidas, travessão, gênero neutro) precisam ser **validadas ao salvar** o template, não só confiar no owner. Amarração com o Épico 13 (`contracts/linguagem.ts` / dicionário do front); confirmar se a validação roda no editor hoje.
 

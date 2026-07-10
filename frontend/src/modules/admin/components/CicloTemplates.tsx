@@ -15,24 +15,42 @@ import { ArrowRight } from 'lucide-react'
 import { ROTULO_ETAPA } from '@/shared/format'
 import { etapaEnvio, type EtapaEnvio, type Template } from '@/shared/contracts'
 import { cn } from '@/shared/ui'
+import { situacaoTemplate } from '../situacao_template'
 
 const ETAPAS = etapaEnvio.options
 
 // Situação de uma etapa no catálogo (deriva do array de templates da etapa).
-type Situacao = 'ativo' | 'proposta' | 'vazio'
+// 'ativo'/'vazio' são conceitos da etapa; os demais espelham a situação real do
+// template (situacao_template), para a trilha distinguir "não enviado à Meta" de
+// "em análise" e "recusado".
+type Situacao = 'ativo' | 'em_analise' | 'rascunho' | 'rejeitado' | 'vazio'
 
 // Família visual por situação. Espelha a paleta do CycleTimeline (verde = no ar,
-// âmbar = no ciclo/aguardando, cinza = inerte), mantendo o tom calmo (sem alarme).
+// âmbar = em análise, terroso = recusado, cinza = inerte/não enviado), mantendo o
+// tom calmo (sem alarme).
 const COR_NODE: Record<Situacao, string> = {
   ativo: 'bg-salvia-claro border-folha text-folha',
-  proposta: 'bg-ambar-claro border-ambar text-ambar',
+  em_analise: 'bg-ambar-claro border-ambar text-ambar',
+  rascunho: 'bg-papel-2 border-tinta-2 text-tinta-2',
+  rejeitado: 'bg-papel-2 border-barro text-barro',
   vazio: 'bg-papel-2 border-linha text-cinza-expirado',
 }
 
 const COR_LINHA: Record<Situacao, string> = {
   ativo: 'bg-folha/40',
-  proposta: 'bg-ambar/40',
+  em_analise: 'bg-ambar/40',
+  rascunho: 'bg-tinta-2/30',
+  rejeitado: 'bg-barro/40',
   vazio: 'bg-linha',
+}
+
+// Cor do texto de status embaixo do nó, por situação (mesma paleta dos nós).
+const COR_TEXTO: Record<Situacao, string> = {
+  ativo: 'text-folha',
+  em_analise: 'text-ambar',
+  rascunho: 'text-tinta-2',
+  rejeitado: 'text-barro',
+  vazio: 'text-tinta-2',
 }
 
 // Código curto (D-2) + descrição (aviso antecipado) da MESMA fonte de rótulos.
@@ -45,26 +63,41 @@ interface InfoEtapa {
   etapa: EtapaEnvio
   situacao: Situacao
   versaoAtiva: number | null
-  propostas: number
+  // Quantas versões estão na situação vencedora (para o texto "N em análise", etc.).
+  contagem: number
 }
 
 function resumoEtapa(etapa: EtapaEnvio, templates: Template[]): InfoEtapa {
   // Conta só o contexto 'padrao' (a variante 'revisao' é editada à parte).
   const daEtapa = templates.filter((t) => t.chave === `ciclo.${etapa}` && t.contexto === 'padrao')
   // "No ar" (verde) exige a versão ativa E aprovada na Meta; sem aprovação o envio
-  // fica gated (E12), então a versão conta como aguardando (âmbar), não como no ar.
+  // fica gated (E12), então a etapa mostra o estado da proposta, não "no ar".
   const noAr = daEtapa.find((t) => t.ativo && t.status_meta === 'aprovado') ?? null
-  const propostas = daEtapa.filter((t) => !(t.ativo && t.status_meta === 'aprovado')).length
-  const situacao: Situacao = noAr ? 'ativo' : daEtapa.length > 0 ? 'proposta' : 'vazio'
-  return { etapa, situacao, versaoAtiva: noAr?.versao ?? null, propostas }
+  if (noAr) return { etapa, situacao: 'ativo', versaoAtiva: noAr.versao, contagem: 0 }
+  if (daEtapa.length === 0) return { etapa, situacao: 'vazio', versaoAtiva: null, contagem: 0 }
+  // Sem versão no ar, resume pela situação que MAIS pede atenção do owner:
+  // rejeitado (corrigir e reenviar) > em_analise (só esperar) > rascunho (enviar).
+  const situacoes = daEtapa.map(situacaoTemplate)
+  const situacao: Situacao = situacoes.includes('rejeitado')
+    ? 'rejeitado'
+    : situacoes.includes('em_analise')
+      ? 'em_analise'
+      : 'rascunho'
+  const contagem = situacoes.filter((s) => s === situacao).length
+  return { etapa, situacao, versaoAtiva: null, contagem }
 }
 
 function textoStatus(info: InfoEtapa): string {
+  const plural = info.contagem === 1 ? '' : 's'
   switch (info.situacao) {
     case 'ativo':
       return `Ativo · v${info.versaoAtiva}`
-    case 'proposta':
-      return `${info.propostas} proposta${info.propostas === 1 ? '' : 's'} aguardando`
+    case 'em_analise':
+      return `${info.contagem} em análise na Meta`
+    case 'rascunho':
+      return `${info.contagem} não enviada${plural} à Meta`
+    case 'rejeitado':
+      return `${info.contagem} recusada${plural} pela Meta`
     case 'vazio':
       return 'Sem versão ainda'
   }
@@ -123,16 +156,7 @@ export function CicloTemplates({ templates, className }: CicloTemplatesProps) {
 
               <span className="min-w-0 sm:flex sm:flex-col sm:items-center">
                 <span className="block text-sm font-medium text-tinta">{descricao}</span>
-                <span
-                  className={cn(
-                    'mt-0.5 block text-xs',
-                    info.situacao === 'ativo'
-                      ? 'text-folha'
-                      : info.situacao === 'proposta'
-                        ? 'text-ambar'
-                        : 'text-tinta-2',
-                  )}
-                >
+                <span className={cn('mt-0.5 block text-xs', COR_TEXTO[info.situacao])}>
                   {textoStatus(info)}
                 </span>
                 <span className="mt-1 inline-flex items-center gap-1 text-xs text-tinta-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
