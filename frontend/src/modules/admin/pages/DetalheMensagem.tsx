@@ -10,8 +10,9 @@
 // chave. Botões e mídia já existem no modelo/transporte, mas o editor deles entra
 // junto com as famílias que os usam (ciclo, combinado); aqui as respostas não têm.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { AlertTriangle, ArrowLeft, Bold, CheckCircle2, Copy, Italic, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Bold, CheckCircle2, Copy, Italic, Loader2, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -35,6 +36,7 @@ import {
   type Template,
 } from '@/shared/contracts'
 import {
+  adminKeys,
   useSubmeterMensagem,
   useAtivarMensagem,
   useCriarMensagem,
@@ -330,6 +332,7 @@ function LinhaProposta({
   emUso: boolean
   onUsarComoBase: () => void
 }) {
+  const qc = useQueryClient()
   const ativar = useAtivarMensagem()
   const submeter = useSubmeterMensagem()
   const apagar = useApagarMensagem()
@@ -339,6 +342,29 @@ function LinhaProposta({
   const aprovado = situacao === 'aprovado'
   const rejeitado = situacao === 'rejeitado'
   const emAnalise = situacao === 'em_analise'
+
+  // "Submeter à Meta" só ENFILEIRA (meta_acao='criar'); o zap submete no próximo ciclo do
+  // scheduler (~30s) e só então grava meta_submetido_em -> a situação vira 'em_analise'.
+  // Sem isto o badge fica "Não enviado à Meta" e parece que "nada aconteceu". Enquanto
+  // aguardamos, mostramos "Enviando à Meta…" e re-consultamos a lista a cada 3s até o
+  // status virar (o efeito para sozinho) ou 60s de teto (rede de segurança se o zap demorar).
+  const [aguardandoEnvio, setAguardandoEnvio] = useState(false)
+  const enviando = aguardandoEnvio && situacao === 'rascunho'
+  useEffect(() => {
+    if (!aguardandoEnvio) return
+    if (situacao !== 'rascunho') {
+      setAguardandoEnvio(false)
+      return
+    }
+    const intervalo = setInterval(() => {
+      void qc.invalidateQueries({ queryKey: adminKeys.mensagens })
+    }, 3_000)
+    const teto = setTimeout(() => setAguardandoEnvio(false), 60_000)
+    return () => {
+      clearInterval(intervalo)
+      clearTimeout(teto)
+    }
+  }, [aguardandoEnvio, situacao, qc])
 
   return (
     <li
@@ -377,8 +403,19 @@ function LinhaProposta({
             <ShieldCheck strokeWidth={1.75} className="size-4" />
             Em análise na Meta
           </span>
+        ) : enviando ? (
+          <span className="inline-flex items-center gap-1.5 text-sm text-tinta-2">
+            <Loader2 strokeWidth={1.75} className="size-4 animate-spin" />
+            Enviando à Meta…
+          </span>
         ) : (
-          <Button variante="secondary" loading={submeter.isPending} onClick={() => submeter.mutate(template.id)}>
+          <Button
+            variante="secondary"
+            loading={submeter.isPending}
+            onClick={() =>
+              submeter.mutate(template.id, { onSuccess: () => setAguardandoEnvio(true) })
+            }
+          >
             <ShieldCheck strokeWidth={1.75} className="size-4" />
             {rejeitado ? 'Submeter à Meta de novo' : 'Submeter à Meta'}
           </Button>
@@ -416,9 +453,14 @@ function LinhaProposta({
         </span>
       </div>
 
-      {!aprovado && !emAnalise && (
+      {!aprovado && !emAnalise && !enviando && (
         <p className="text-xs text-tinta-2">
           Submeta a versão para a Meta validar. Quando ela aprovar, o status muda aqui e você poderá ativá-la.
+        </p>
+      )}
+      {enviando && (
+        <p className="text-xs text-tinta-2">
+          Enfileirado. O envio à Meta acontece no próximo ciclo (poucos segundos) e o status muda para “Em análise” aqui, sem recarregar.
         </p>
       )}
       {emAnalise && (
