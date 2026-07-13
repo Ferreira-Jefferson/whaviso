@@ -24,7 +24,7 @@ Como **sistema (zap/scheduler)**, quero programar os envios assim que o combinad
 ### H6.2: As etapas, seus textos e botões 🟢
 Como **devedor**, quero receber lembretes curtos e claros nas datas certas, para lembrar do combinado sem me sentir cobrado.
 *Critérios de aceite:*
-- [ ] **D-2 (2 dias antes), aviso antecipado, sem urgência.** Texto base: *"Oi, [nome]. [quem recebe] pediu pra te lembrar do combinado: [motivo], R$ X para [data]."*
+- [ ] **D-2 (2 dias antes), aviso antecipado, sem urgência.** Texto base: *"Oi, [nome]. Faltam 2 dias para o combinado com [quem recebe]: [motivo], R$ X para [data]."* (enquadramento **transacional**, sobre o próprio combinado. O antigo *"[quem recebe] pediu pra te lembrar"* saiu porque a Meta classificava a mensagem como **MARKETING** em vez de UTILITY, `INCORRECT_CATEGORY`, o que barrava o template; a referência a quem recebe segue presente, agora como parte do combinado.)
 - [ ] **D-1 (1 dia antes), organização.** Texto base: *"Oi, [nome]. Amanhã é o dia: [motivo], R$ X."*
 - [ ] **D (no dia), confirmação.** Texto base: *"Oi, [nome]. Hoje é o dia: [motivo], R$ X."*
 - [ ] **D+1 (1 dia depois), último aviso.** Texto base: *"Oi, [nome]. Último aviso: [motivo], R$ X."*
