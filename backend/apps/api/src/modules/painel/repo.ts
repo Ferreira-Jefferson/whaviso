@@ -1,5 +1,5 @@
 import type { Pool } from '@whaviso/shared/db'
-import type { PainelResumoResposta, Pendencia } from '@whaviso/shared/contracts'
+import type { PainelMetricasResposta, PainelResumoResposta, Pendencia } from '@whaviso/shared/contracts'
 import { ATIVOS_NAO_PAGOS } from '../../shared/estados'
 
 // Lista de estados "ativos não pagos" como literais SQL (fonte única em estados.ts).
@@ -136,4 +136,149 @@ export async function pendencias(pool: Pool, uid: string): Promise<Pendencia[]> 
     valor_centavos: Number(l.valor_centavos),
     data_combinada: l.data_combinada,
   }))
+}
+
+// ---- Métricas de negócio (Fase A, papel COBRADOR) --------------------------------------
+
+export interface FiltroMetricas {
+  uid: string
+  de?: string
+  ate?: string
+  categoria_id?: string
+  sem_categoria?: boolean
+  inativoDias: number
+}
+
+/**
+ * Saúde do negócio do dono como COBRADOR (o que vende/recebe): recebido, a receber, custo
+ * e LUCRO (só onde o custo foi informado, para não inflar), ticket médio, melhores clientes,
+ * quebra por categoria e clientes inativos. Tudo no servidor (H9.8), isolado por uid.
+ * Telefone só no corpo (nunca em log/rota, H13.8). Período em data_combinada; combinado a
+ * combinado (não desmembra recorrência, decisão da v1). Lucro é sempre realizado (`pago`).
+ */
+export async function metricas(pool: Pool, f: FiltroMetricas): Promise<PainelMetricasResposta> {
+  // WHERE do escopo cobrador (+ período + categoria), compartilhado pelos agregados e melhores.
+  const params: unknown[] = [f.uid]
+  const cond: string[] = ['cobrador_id = $1']
+  if (f.de) {
+    params.push(f.de)
+    cond.push(`data_combinada >= $${params.length}`)
+  }
+  if (f.ate) {
+    params.push(f.ate)
+    cond.push(`data_combinada <= $${params.length}`)
+  }
+  if (f.categoria_id) {
+    params.push(f.categoria_id)
+    cond.push(`categoria_id = $${params.length}`)
+  } else if (f.sem_categoria) {
+    cond.push('categoria_id is null')
+  }
+  const where = cond.join(' and ')
+
+  // 1) Agregados + lucro (lucro só onde há custo informado; lucro_base_qtd diz quantos).
+  const agg = await pool.query(
+    `select
+       coalesce(sum(valor_centavos) filter (where status='pago'),0)::bigint as recebido_c,
+       count(*) filter (where status='pago')::int as recebido_q,
+       coalesce(sum(valor_centavos) filter (where status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
+       count(*) filter (where status in (${ATIVOS_SQL}))::int as a_receber_q,
+       coalesce(sum(valor_custo_centavos) filter (where status='pago' and valor_custo_centavos is not null),0)::bigint as custo_pago_c,
+       coalesce(sum(valor_centavos - valor_custo_centavos) filter (where status='pago' and valor_custo_centavos is not null),0)::bigint as lucro_c,
+       count(*) filter (where status='pago' and valor_custo_centavos is not null)::int as lucro_base_q
+     from public.avisos where ${where}`,
+    params,
+  )
+  const a = agg.rows[0]
+  const recebido = Number(a.recebido_c)
+  const recebidoQ = a.recebido_q as number
+  const ticket = recebidoQ > 0 ? Math.round(recebido / recebidoQ) : 0
+
+  // 2) Melhores clientes (top 5 por recebido). Nome mais recente daquele número.
+  const melhores = await pool.query(
+    `select telefone_devedor as telefone,
+            (array_agg(nome_devedor order by data_combinada desc))[1] as nome,
+            coalesce(sum(valor_centavos) filter (where status='pago'),0)::bigint as recebido_c,
+            count(*) filter (where status='pago')::int as qtd
+       from public.avisos
+      where ${where} and telefone_devedor is not null
+      group by telefone_devedor
+      having count(*) filter (where status='pago') > 0
+      order by recebido_c desc
+      limit 5`,
+    params,
+  )
+
+  // 3) Quebra por categoria (respeita só o período, não o filtro de categoria: é a visão geral).
+  const catParams: unknown[] = [f.uid]
+  const catCond: string[] = ['a.cobrador_id = $1']
+  if (f.de) {
+    catParams.push(f.de)
+    catCond.push(`a.data_combinada >= $${catParams.length}`)
+  }
+  if (f.ate) {
+    catParams.push(f.ate)
+    catCond.push(`a.data_combinada <= $${catParams.length}`)
+  }
+  const porCategoria = await pool.query(
+    `select a.categoria_id, c.nome, c.cor,
+            coalesce(sum(a.valor_centavos) filter (where a.status='pago'),0)::bigint as recebido_c,
+            coalesce(sum(a.valor_centavos) filter (where a.status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
+            coalesce(sum(a.valor_centavos - a.valor_custo_centavos) filter (where a.status='pago' and a.valor_custo_centavos is not null),0)::bigint as lucro_c,
+            count(*)::int as qtd
+       from public.avisos a
+       left join public.categorias c on c.id = a.categoria_id
+      where ${catCond.join(' and ')}
+      group by a.categoria_id, c.nome, c.cor
+      order by recebido_c desc`,
+    catParams,
+  )
+
+  // 4) Inativos (sem período): sem combinado ativo e última data além de N dias.
+  const inativos = await pool.query(
+    `select telefone_devedor as telefone,
+            (array_agg(nome_devedor order by data_combinada desc))[1] as nome,
+            to_char(max(data_combinada),'YYYY-MM-DD') as ultima_data,
+            (current_date - max(data_combinada))::int as dias
+       from public.avisos
+      where cobrador_id = $1 and telefone_devedor is not null
+      group by telefone_devedor
+      having count(*) filter (where status in (${ATIVOS_SQL})) = 0
+         and max(data_combinada) < current_date - ($2::int)
+      order by max(data_combinada) asc
+      limit 10`,
+    [f.uid, f.inativoDias],
+  )
+
+  return {
+    recebido_centavos: recebido,
+    recebido_qtd: recebidoQ,
+    a_receber_centavos: Number(a.a_receber_c),
+    a_receber_qtd: a.a_receber_q,
+    custo_pago_centavos: Number(a.custo_pago_c),
+    lucro_centavos: Number(a.lucro_c),
+    lucro_base_qtd: a.lucro_base_q,
+    ticket_medio_centavos: ticket,
+    melhores_clientes: melhores.rows.map((m) => ({
+      nome: m.nome,
+      telefone: m.telefone,
+      recebido_centavos: Number(m.recebido_c),
+      qtd: m.qtd,
+    })),
+    por_categoria: porCategoria.rows.map((c) => ({
+      categoria_id: c.categoria_id,
+      nome: c.nome,
+      cor: c.cor,
+      recebido_centavos: Number(c.recebido_c),
+      a_receber_centavos: Number(c.a_receber_c),
+      lucro_centavos: Number(c.lucro_c),
+      qtd: c.qtd,
+    })),
+    inativos: inativos.rows.map((i) => ({
+      nome: i.nome,
+      telefone: i.telefone,
+      ultima_data: i.ultima_data,
+      dias: i.dias,
+    })),
+  }
 }

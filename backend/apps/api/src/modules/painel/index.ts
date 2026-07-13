@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
+  painelMetricasQuery,
+  painelMetricasResposta,
   painelPendenciasResposta,
   painelResumoQuery,
   painelResumoResposta,
@@ -26,5 +28,21 @@ export const painelRoutes: FastifyPluginAsync = async (raiz) => {
       const itens = await repo.pendencias(app.pool, req.userId)
       return { itens, total: itens.length }
     },
+  )
+
+  // Fase A: métricas de negócio (papel cobrador): lucro, ticket médio, melhores clientes,
+  // por categoria e inativos. Só leitura, calculado no servidor. Isolamento por req.userId.
+  app.get(
+    '/painel/metricas',
+    { preHandler: app.autenticar, schema: { querystring: painelMetricasQuery, response: { 200: painelMetricasResposta } } },
+    (req) =>
+      repo.metricas(app.pool, {
+        uid: req.userId,
+        de: req.query.de,
+        ate: req.query.ate,
+        categoria_id: req.query.categoria_id,
+        sem_categoria: req.query.sem_categoria,
+        inativoDias: req.query.inativo_dias,
+      }),
   )
 }

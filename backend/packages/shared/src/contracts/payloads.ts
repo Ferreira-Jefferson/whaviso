@@ -321,6 +321,56 @@ export type PainelPendenciasResposta = z.infer<typeof painelPendenciasResposta>
 // coerentes com o painel (H9.2). Isolamento por uid.
 
 // GET /v1/pessoas/:avisoId/resumo
+// ---- GET /v1/painel/metricas (Fase A: saúde do negócio, papel COBRADOR) ----
+// Métricas do que o dono VENDE/RECEBE (não do que paga). Período em data_combinada.
+// Lucro só conta combinados com custo informado (honestidade); `lucro_base_qtd` diz
+// quantos. Nada sensível em rota/log: telefone só no corpo (para exibir a quem é dono).
+export const painelMetricasQuery = z.object({
+  de: dataCombinada.optional(),
+  ate: dataCombinada.optional(),
+  categoria_id: z.uuid().optional(),
+  sem_categoria: z.coerce.boolean().optional(),
+  // "Inativo" = sem combinado ativo e última data combinada além de N dias (default 60).
+  inativo_dias: z.coerce.number().int().min(1).max(3650).default(60),
+})
+export type PainelMetricasQuery = z.infer<typeof painelMetricasQuery>
+
+export const melhorClienteSchema = z.object({
+  nome: z.string(),
+  telefone: telefoneE164.nullable(),
+  recebido_centavos: z.number().int(),
+  qtd: z.number().int(),
+})
+export const metricaCategoriaSchema = z.object({
+  categoria_id: z.uuid().nullable(),
+  nome: z.string().nullable(),
+  cor: z.string().nullable(),
+  recebido_centavos: z.number().int(),
+  a_receber_centavos: z.number().int(),
+  lucro_centavos: z.number().int(),
+  qtd: z.number().int(),
+})
+export const clienteInativoSchema = z.object({
+  nome: z.string(),
+  telefone: telefoneE164.nullable(),
+  ultima_data: dataCombinada,
+  dias: z.number().int(),
+})
+export const painelMetricasResposta = z.object({
+  recebido_centavos: z.number().int(),
+  recebido_qtd: z.number().int(),
+  a_receber_centavos: z.number().int(),
+  a_receber_qtd: z.number().int(),
+  custo_pago_centavos: z.number().int(),
+  lucro_centavos: z.number().int(),
+  lucro_base_qtd: z.number().int(),
+  ticket_medio_centavos: z.number().int(),
+  melhores_clientes: z.array(melhorClienteSchema),
+  por_categoria: z.array(metricaCategoriaSchema),
+  inativos: z.array(clienteInativoSchema),
+})
+export type PainelMetricasResposta = z.infer<typeof painelMetricasResposta>
+
 export const pessoaResumoResposta = z.object({
   // Telefone da outra ponta (E.164), resolvido no servidor. Dado do próprio usuário
   // (mesma exposição do detalhe do aviso); vai só no CORPO, nunca em rota/log.
