@@ -20,7 +20,7 @@ const COLS = `
   nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador, motivo,
   valor_centavos::bigint as valor_centavos,
   to_char(data_combinada, 'YYYY-MM-DD') as data_combinada, pix_chave,
-  pix_titular, pix_banco,
+  pix_titular, pix_banco, categoria_id,
   recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
   ocorrencias_total, ocorrencia_atual,
   -- node-pg não auto-parseia arrays de ENUM (etapa_envio[]) -> cast p/ text[] (parseado em JS).
@@ -38,7 +38,7 @@ const COLS_VIEW = `
   nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador, motivo,
   linha_valor::bigint as valor_centavos,
   to_char(linha_data, 'YYYY-MM-DD') as data_combinada, pix_chave,
-  pix_titular, pix_banco,
+  pix_titular, pix_banco, categoria_id,
   recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
   ocorrencias_total, indice as ocorrencia_atual,
   cadencia_etapas::text[] as cadencia_etapas,
@@ -62,6 +62,7 @@ interface LinhaAviso {
   pix_chave: string | null
   pix_titular: string | null
   pix_banco: string | null
+  categoria_id: string | null
   recorrencia_tipo: 'periodo' | 'avulsas' | null
   recorrencia_freq: 'mensal' | 'semanal' | null
   recorrencia_intervalo: number | null
@@ -105,6 +106,8 @@ export interface NovoAviso {
   pix_chave: string | null
   pix_titular: string | null
   pix_banco: string | null
+  // E16: categoria (opcional) do combinado.
+  categoria_id: string | null
   // Recorrência/cadência (null = combinado simples / ciclo completo).
   recorrencia_tipo?: 'periodo' | 'avulsas' | null
   recorrencia_freq?: 'mensal' | 'semanal' | null
@@ -127,9 +130,10 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
         valor_centavos, data_combinada, pix_chave, pix_titular, pix_banco,
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
         ocorrencias_total, ocorrencia_atual, cadencia_etapas,
-        aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em)
+        aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em,
+        categoria_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25)
+             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
@@ -140,7 +144,7 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
       novo.ocorrencias_total ?? null, novo.ocorrencia_atual ?? null,
       novo.cadencia_etapas ?? null,
       novo.aceite_token_hash, novo.aceite_token_expira_em, novo.acao_token_hash,
-      novo.convite_expira_em,
+      novo.convite_expira_em, novo.categoria_id ?? null,
     ],
   )
   return mapear(rows[0]!)
@@ -189,6 +193,9 @@ export interface FiltroLista {
    *  (uma linha por OCORRÊNCIA do recorrente); sem de/ate, lê public.avisos (uma por combinado). */
   de?: string
   ate?: string
+  /** E16 H16.4: filtra por uma categoria específica (id) ou pelos sem categoria. */
+  categoria_id?: string
+  sem_categoria?: boolean
   limit: number
   offset: number
 }
@@ -240,6 +247,14 @@ export async function listarAvisos(
   if (f.ate) {
     params.push(f.ate)
     cond.push(`${colData} <= $${params.length}`)
+  }
+  // E16 H16.4: categoria (id específico) OU sem categoria. A view combinado_linhas também
+  // projeta categoria_id (0081), então o filtro vale nos dois caminhos (com/sem período).
+  if (f.categoria_id) {
+    params.push(f.categoria_id)
+    cond.push(`categoria_id = $${params.length}`)
+  } else if (f.sem_categoria) {
+    cond.push('categoria_id is null')
   }
   const where = cond.join(' and ')
   const total = await ex.query<{ n: string }>(
@@ -610,4 +625,31 @@ export async function listarEventosDoAviso(ex: Executor, avisoId: string): Promi
     [avisoId],
   )
   return rows
+}
+
+// ---- Categoria do combinado (E16) -------------------------------------------------------
+
+/**
+ * Confirma que a categoria é do dono e está ativa (H16.3), por query direta na tabela
+ * `categorias` (módulo nunca importa módulo; consultar tabela compartilhada é permitido).
+ */
+export async function categoriaValidaDoDono(
+  ex: Executor,
+  uid: string,
+  categoriaId: string,
+): Promise<boolean> {
+  const { rows } = await ex.query(
+    `select 1 from public.categorias where id = $1 and profile_id = $2 and not arquivada`,
+    [categoriaId, uid],
+  )
+  return rows.length > 0
+}
+
+/** Grava/limpa a categoria de um combinado (H16.3). null remove a categoria. */
+export async function atualizarCategoria(
+  ex: Executor,
+  id: string,
+  categoriaId: string | null,
+): Promise<void> {
+  await ex.query(`update public.avisos set categoria_id = $2 where id = $1`, [id, categoriaId])
 }

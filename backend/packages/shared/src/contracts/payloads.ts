@@ -13,6 +13,7 @@ import {
 } from './enums'
 import {
   avisoSchema,
+  categoriaSchema,
   chavePixSchema,
   conteudoTemplate,
   dataCombinada,
@@ -82,6 +83,9 @@ export const criarAvisoBody = z
     // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = ciclo completo.
     // Gated por plano (cadencia_configuravel) no servidor.
     cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
+    // E16 H16.3: categoria (opcional) do combinado. Precisa ser minha e não arquivada
+    // (validado no servidor). Organização interna: nunca vai para mensagem ao devedor.
+    categoria_id: z.uuid().nullish(),
   })
   // No modo `agenda` (H4.1) telefone e Pix são OPCIONAIS (cobrados só ao ativar, H4.3):
   // todos os refines abaixo só valem quando o item já vai enviar (modo `enviar`).
@@ -153,6 +157,9 @@ export const editarAvisoBody = z
     pix_chave: z.string().trim().min(1).max(140).optional(),
     pix_titular: z.string().trim().min(1).max(120).optional(),
     pix_banco: z.string().trim().min(1).max(80).optional(),
+    // E16 H16.3: trocar/remover a categoria. Edição LIVRE (não abre reaprovação do
+    // devedor): categoria é dado interno do dono. `null` remove a categoria; ausente = mantém.
+    categoria_id: z.uuid().nullish(),
   })
   .refine(
     (b) =>
@@ -162,7 +169,8 @@ export const editarAvisoBody = z
       b.data_combinada !== undefined ||
       b.pix_chave !== undefined ||
       b.pix_titular !== undefined ||
-      b.pix_banco !== undefined,
+      b.pix_banco !== undefined ||
+      b.categoria_id !== undefined,
     { message: 'informe ao menos um campo para editar' },
   )
 export type EditarAvisoBody = z.infer<typeof editarAvisoBody>
@@ -181,6 +189,10 @@ export const listarAvisosQuery = z.object({
   papel: papelAviso.optional(),
   grupo: z.enum(['ativos', 'agenda', 'historico']).optional(),
   busca: z.string().trim().min(1).max(120).optional(),
+  // E16 H16.4: filtro por categoria (uma por vez), combinável com os demais. `categoria_id`
+  // filtra por uma categoria específica; `sem_categoria` isola os combinados sem categoria.
+  categoria_id: z.uuid().optional(),
+  sem_categoria: z.coerce.boolean().optional(),
   ordenar: z.enum(['data_combinada', 'criado_em']).default('criado_em'),
   dir: z.enum(['asc', 'desc']).default('desc'),
   // E9 H9.6: filtro por periodo. Com de/ate, a lista desmembra o recorrente em uma
@@ -370,6 +382,30 @@ export type AtualizarPerfilBody = z.infer<typeof atualizarPerfilBody>
 
 // ---- /v1/perfil/chaves-pix ----
 export const listaChavesPixResposta = z.array(chavePixSchema)
+
+// ---- Categorias (E16) ----
+const corHex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'cor deve ser um hex #RRGGBB')
+
+// H16.1: criar. nome obrigatório (1..40); cor opcional (hex).
+export const criarCategoriaBody = z.object({
+  nome: z.string().trim().min(1).max(40),
+  cor: corHex.nullish(),
+})
+export type CriarCategoriaBody = z.infer<typeof criarCategoriaBody>
+
+// H16.2: editar/arquivar (parcial; ao menos um campo). arquivar = soft-delete.
+export const atualizarCategoriaBody = z
+  .object({
+    nome: z.string().trim().min(1).max(40).optional(),
+    cor: corHex.nullish(),
+    arquivada: z.boolean().optional(),
+  })
+  .refine((b) => b.nome !== undefined || b.cor !== undefined || b.arquivada !== undefined, {
+    message: 'informe ao menos um campo para atualizar',
+  })
+export type AtualizarCategoriaBody = z.infer<typeof atualizarCategoriaBody>
+
+export const listaCategoriasResposta = z.array(categoriaSchema)
 export type ListaChavesPixResposta = z.infer<typeof listaChavesPixResposta>
 
 // POST: cria uma chave; padrao=true torna-a a padrão (zera as outras).

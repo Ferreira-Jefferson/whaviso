@@ -124,6 +124,11 @@ export async function criarAviso(
       }
     }
 
+    // E16 H16.3: se veio categoria, precisa ser MINHA e não arquivada (defesa no servidor).
+    if (body.categoria_id && !(await repo.categoriaValidaDoDono(cli, uid, body.categoria_id))) {
+      throw regraNegocio('categoria_invalida', 'A categoria escolhida não existe ou não é sua.')
+    }
+
     // No invertido, o telefone do devedor (alvo dos lembretes) é o do criador. Na agenda
     // pode ser null (o perfil pode nem ter telefone ainda); resolvido/exigido ao ativar.
     const telefoneCriador = ehReceber ? null : await repo.telefoneDoPerfil(cli, uid)
@@ -144,6 +149,7 @@ export async function criarAviso(
       pix_chave: body.pix_chave ?? null,
       pix_titular: body.pix_titular ?? null,
       pix_banco: body.pix_banco ?? null,
+      categoria_id: body.categoria_id ?? null,
     }
 
     // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM envio. ----
@@ -356,6 +362,8 @@ export async function listarAvisos(
     dir: query.dir,
     de: query.de,
     ate: query.ate,
+    categoria_id: query.categoria_id,
+    sem_categoria: query.sem_categoria,
     limit: query.per_page,
     offset: (query.page - 1) * query.per_page,
   })
@@ -462,16 +470,41 @@ export async function editarAviso(
     // E11 H11.2: editar é UNIVERSAL (não há mais teto de edições por plano). O único
     // limite do produto é o saldo de créditos (consumido só no disparo, não na edição).
 
+    // E16 H16.3: categoria é edição LIVRE (dado interno do dono; NUNCA abre reaprovação),
+    // separada dos campos do acordo. Valida posse e aplica direto, em qualquer estado vivo.
+    const mudaCategoria = body.categoria_id !== undefined
+    if (
+      mudaCategoria &&
+      body.categoria_id &&
+      !(await repo.categoriaValidaDoDono(cli, uid, body.categoria_id))
+    ) {
+      throw regraNegocio('categoria_invalida', 'A categoria escolhida não existe ou não é sua.')
+    }
+    if (mudaCategoria) await repo.atualizarCategoria(cli, id, body.categoria_id ?? null)
+    const categoriaFinal = mudaCategoria ? (body.categoria_id ?? null) : aviso.categoria_id
+
     const campos = camposEditados(body)
+    const temCampoAcordo = Object.keys(campos).length > 0
+
+    // Só a categoria mudou: aplica direto (sem reaprovação nem notificação), qualquer estado.
+    if (!temCampoAcordo) {
+      await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, {
+        reaprovacao: false,
+        categoria: true,
+      })
+      return { ...aviso, categoria_id: categoriaFinal }
+    }
 
     if (livre) {
       // Antes do aceite: aplica direto, sem reaprovação nem evento de sub-ciclo.
       await repo.atualizarDados(cli, id, campos)
       await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, { reaprovacao: false })
-      return { ...aviso, ...campos }
+      return { ...aviso, ...campos, categoria_id: categoriaFinal }
     }
 
-    // Pós-aceite: snapshot do "antes", aplica os novos dados, vai para reaprovação.
+    // Pós-aceite (campos do acordo): snapshot do "antes", aplica os novos dados, vai para
+    // reaprovação. A categoria NÃO entra no snapshot (edição livre), então desfazer/recusar
+    // reverte só o acordo; a categoria já aplicada permanece.
     const anteriores = await repo.lerDadosEditaveis(cli, id)
     if (!anteriores) throw naoEncontrado('Aviso não encontrado')
     await repo.inserirEdicao(cli, id, anteriores, aviso.status)
@@ -481,7 +514,7 @@ export async function editarAviso(
     // Notifica o DEVEDOR (alteração a aprovar + lembretes pausados). Só enfileira.
     await enfileirarNotificacaoDevedor(cli, aviso, 'aviso_edicao_a_aprovar')
 
-    return { ...aviso, ...campos, status: 'aguardando_aprovacao_aviso_editado' }
+    return { ...aviso, ...campos, categoria_id: categoriaFinal, status: 'aguardando_aprovacao_aviso_editado' }
   })
 }
 

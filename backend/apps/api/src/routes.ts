@@ -7,6 +7,7 @@ import { acoesDevedorRoutes } from './modules/acoes_devedor'
 import { recebimentosRoutes } from './modules/recebimentos'
 import { painelRoutes } from './modules/painel'
 import { pessoasRoutes } from './modules/pessoas'
+import { categoriasRoutes } from './modules/categorias'
 import { adminRoutes } from './modules/admin'
 import { billingRoutes } from './modules/billing'
 
@@ -18,6 +19,7 @@ export const registrarModulos: FastifyPluginAsync = async (app) => {
   await app.register(recebimentosRoutes)
   await app.register(painelRoutes)
   await app.register(pessoasRoutes)
+  await app.register(categoriasRoutes)
   await app.register(adminRoutes)
   await app.register(billingRoutes)
 }

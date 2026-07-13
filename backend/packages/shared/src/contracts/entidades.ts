@@ -57,6 +57,21 @@ export const chavePixSchema = z.object({
 })
 export type ChavePix = z.infer<typeof chavePixSchema>
 
+// E16: categoria definida pelo usuário (organização por marca/linha). Isolada por conta;
+// nunca aparece em mensagem ao devedor. cor opcional em hex #RRGGBB.
+export const categoriaSchema = z.object({
+  id: z.uuid(),
+  nome: z.string().min(1).max(40),
+  cor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .nullable(),
+  arquivada: z.boolean(),
+  criado_em: z.coerce.date(),
+  atualizado_em: z.coerce.date(),
+})
+export type Categoria = z.infer<typeof categoriaSchema>
+
 export const avisoSchema = z.object({
   id: z.uuid(),
   // nullable: no fluxo invertido o cobrador é convidado e só vincula conta ao aceitar.
@@ -79,6 +94,9 @@ export const avisoSchema = z.object({
   // Denormalizados no aviso (instantâneo do combinado), nunca logados (H13/segurança).
   pix_titular: z.string().max(120).nullable(),
   pix_banco: z.string().max(80).nullable(),
+  // E16: categoria (opcional) do combinado. nullish: nem toda projeção do Aviso a traz
+  // (ex.: recortes que não selecionam a coluna); quando presente, é o id da categoria.
+  categoria_id: z.uuid().nullish(),
   aceito_em: z.coerce.date().nullable(),
   // Arquivamento da agenda (H11.4): quando preenchido, a anotação sai da contagem/
   // visão da agenda (soft-delete; o registro permanece, regra de não-DELETE).
