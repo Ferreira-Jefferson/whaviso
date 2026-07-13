@@ -67,6 +67,7 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 | 12 | Templates / mensagens (admin) | [12-templates-admin.md](12-templates-admin.md) | escrito |
 | 13 | Linguagem, opt-out e compliance | [13-compliance.md](13-compliance.md) | escrito |
 | 14 | Cadastro da chave pix pelo cobrador (fluxo invertido) | [14-cadastro-chave-pix-cobrador.md](14-cadastro-chave-pix-cobrador.md) | escrito |
+| 15 | Combinados por pessoa (visão de contato) | [15-combinados-por-pessoa.md](15-combinados-por-pessoa.md) | escrito |
 
 ## Dívidas técnicas levantadas durante a escrita
 

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import {
   Banner,
@@ -25,8 +25,8 @@ import type {
 import { usePerfil } from '@/shared/auth'
 import { useSemSaldo } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
-import { hojeIso } from '@/shared/format'
-import { useCriarAviso } from '../api'
+import { hojeIso, telefone as fmtTelefone } from '@/shared/format'
+import { useBuscarPessoaPorTelefone, useCriarAviso } from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
 import { AvisoCriado } from '../components/AvisoCriado'
 import { RepetirCombinado } from '../components/RepetirCombinado'
@@ -39,8 +39,19 @@ const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
 
 export default function NovoAvisoPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const criar = useCriarAviso()
   const perfil = usePerfil()
+  // E15 H15.5: quando cheguei da tela da pessoa, o nome + telefone vêm por STATE de
+  // navegação (nunca na URL, H15.7) e pré-preenchem o formulário.
+  const pessoaPrefill = (location.state as { pessoa?: { nome?: string; telefone?: string | null } } | null)
+    ?.pessoa
+  // E15 H15.6: autocomplete de contato. O 6º dígito nacional liga a busca por prefixo; a
+  // sugestão escolhida preenche nome + telefone. Telefone só no corpo do POST (H15.7).
+  const [prefixoTel, setPrefixoTel] = useState<string | null>(null)
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false)
+  const sugestoes = useBuscarPessoaPorTelefone(prefixoTel)
+  const itensSugestao = sugestoes.data?.itens ?? []
   // E11 H11.2: recorrência, cadência e o envio são UNIVERSAIS (liberados para todos); o
   // único limite é o SALDO de créditos. Lemos o saldo livre só para antecipar o teto do
   // seletor de repetições (cada ocorrência reserva 1 crédito). A AUTORIDADE é o servidor:
@@ -73,10 +84,10 @@ export default function NovoAvisoPage() {
     defaultValues: {
       direcao: 'receber',
       modo: 'enviar',
-      nome_devedor: '',
+      nome_devedor: pessoaPrefill?.nome ?? '',
       motivo: '',
       data_combinada: '',
-      telefone_devedor: null,
+      telefone_devedor: pessoaPrefill?.telefone ?? null,
       pix_chave: '',
       pix_titular: '',
       pix_banco: '',
@@ -240,11 +251,45 @@ export default function NovoAvisoPage() {
               control={control}
               name="telefone_devedor"
               render={({ field }) => (
-                <PhoneInput
-                  value={field.value}
-                  onChange={field.onChange}
-                  invalido={Boolean(errors.telefone_devedor)}
-                />
+                <div className="relative">
+                  <PhoneInput
+                    value={field.value}
+                    onChange={field.onChange}
+                    // H15.6: a partir do 6º dígito nacional, busca contatos já usados por
+                    // prefixo (o número vai no corpo do POST, nunca na URL).
+                    onDigitos={(nacional, e164Parcial) => {
+                      const liga = nacional.length >= 6
+                      setPrefixoTel(liga ? e164Parcial : null)
+                      setMostrarSugestoes(liga)
+                    }}
+                    invalido={Boolean(errors.telefone_devedor)}
+                  />
+                  {mostrarSugestoes && itensSugestao.length > 0 && (
+                    <ul
+                      className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-input border border-linha bg-cartao py-1 shadow-lg"
+                      role="listbox"
+                      aria-label="Contatos já usados"
+                    >
+                      {itensSugestao.map((s) => (
+                        <li key={`${s.telefone}:${s.nome}`}>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-salvia-claro"
+                            onClick={() => {
+                              setValue('nome_devedor', s.nome, { shouldValidate: true })
+                              field.onChange(s.telefone)
+                              setMostrarSugestoes(false)
+                              setPrefixoTel(null)
+                            }}
+                          >
+                            <span className="truncate font-medium text-tinta">{s.nome}</span>
+                            <span className="shrink-0 text-xs text-tinta-2">{fmtTelefone(s.telefone)}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             />
           </Field>

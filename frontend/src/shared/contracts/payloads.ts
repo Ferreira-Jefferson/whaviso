@@ -264,6 +264,61 @@ export const painelPendenciasResposta = z.object({
 })
 export type PainelPendenciasResposta = z.infer<typeof painelPendenciasResposta>
 
+// ---- E15: Combinados por pessoa (visão de contato) ----
+// A "pessoa" é a OUTRA PONTA; a IDENTIDADE é o TELEFONE (E.164), nunca o nome. Para não
+// vazar telefone em rota/log (H13.8), a pessoa é referenciada por um id de COMBINADO
+// (UUID): a api resolve o telefone da outra ponta no servidor. Totais dos QUATRO lados
+// (H15.2), coerentes com o painel. Espelha backend/packages/shared/src/contracts.
+
+// GET /v1/pessoas/:avisoId/resumo
+export const pessoaResumoResposta = z.object({
+  telefone: telefoneE164,
+  nome_entrada: z.string(),
+  a_receber_centavos: z.number().int(),
+  a_receber_qtd: z.number().int(),
+  recebido_centavos: z.number().int(),
+  recebido_qtd: z.number().int(),
+  a_pagar_centavos: z.number().int(),
+  a_pagar_qtd: z.number().int(),
+  pago_centavos: z.number().int(),
+  pago_qtd: z.number().int(),
+})
+export type PessoaResumoResposta = z.infer<typeof pessoaResumoResposta>
+
+// GET /v1/pessoas/:avisoId/combinados (agrupado por nome, H15.3)
+export const grupoPessoaSchema = z.object({
+  nome: z.string(),
+  itens: z.array(avisoSchema),
+})
+export type GrupoPessoa = z.infer<typeof grupoPessoaSchema>
+
+export const pessoaCombinadosResposta = z.object({
+  grupos: z.array(grupoPessoaSchema),
+  total: z.number().int(),
+})
+export type PessoaCombinadosResposta = z.infer<typeof pessoaCombinadosResposta>
+
+// POST /v1/pessoas/buscar-por-telefone (autocomplete ao criar, H15.6). Telefone (parcial)
+// vai no CORPO, nunca em query/URL (H13.8).
+export const buscarPessoaBody = z.object({
+  prefixo: z
+    .string()
+    .trim()
+    .regex(/^\+\d{4,15}$/, 'prefixo de telefone inválido'),
+})
+export type BuscarPessoaBody = z.infer<typeof buscarPessoaBody>
+
+export const sugestaoPessoaSchema = z.object({
+  nome: z.string(),
+  telefone: telefoneE164,
+})
+export type SugestaoPessoa = z.infer<typeof sugestaoPessoaSchema>
+
+export const buscarPessoaResposta = z.object({
+  itens: z.array(sugestaoPessoaSchema),
+})
+export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
+
 // ---- PATCH /v1/perfil ----
 export const atualizarPerfilBody = z.object({
   nome: z.string().trim().min(1).max(120).optional(),

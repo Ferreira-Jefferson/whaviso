@@ -20,6 +20,7 @@ import {
   Play,
   Send,
   Undo2,
+  Users,
 } from 'lucide-react'
 import {
   Banner,
@@ -197,6 +198,18 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
         descricao={`${ROTULO_DIRECAO[aviso.direcao]} · ${aviso.motivo}`}
         acoes={<StatusBadge status={aviso.status} papel={meuPapel} />}
       />
+
+      {/* E15 H15.1: atalho para a visão da pessoa (todos os combinados do mesmo número).
+          Só quando há telefone da outra ponta (agenda sem_aviso ainda não tem). */}
+      {(aviso.telefone_devedor || aviso.telefone_cobrador) && (
+        <Link
+          to={`/app/pessoa/${aviso.id}`}
+          className="-mt-2 mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-salvia hover:underline"
+        >
+          <Users strokeWidth={1.75} className="size-4" />
+          Ver tudo com {meuPapel === 'devedor' ? (aviso.nome_cobrador ?? aviso.nome_devedor) : aviso.nome_devedor}
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Coluna principal: dados + timeline + eventos */}

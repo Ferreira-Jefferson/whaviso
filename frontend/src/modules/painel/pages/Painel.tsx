@@ -18,6 +18,7 @@ import {
   Plus,
   Repeat,
   Search,
+  Users,
   Wallet,
 } from 'lucide-react'
 import {
@@ -177,27 +178,43 @@ export default function PainelPage() {
       chave: 'nome',
       titulo: 'Nome',
       principal: true,
-      render: (a) => (
-        <span className="inline-flex items-center gap-2 font-medium">
-          {a.criador_papel === 'devedor' && papel === 'devedor'
+      render: (a) => {
+        const nome =
+          a.criador_papel === 'devedor' && papel === 'devedor'
             ? (a.nome_cobrador ?? a.nome_devedor)
-            : a.nome_devedor}
-          {/* E6 H6.10 / H9.6: combinado recorrente. Sem período, "k de N" = pagamentos
-              confirmados (progresso). Com período, a linha É uma ocorrência: mostra o
-              índice dela (i de N). O front não recalcula nada; usa o que a api manda. */}
-          {a.ocorrencias_total != null && a.ocorrencias_total > 1 && (
-            <span
-              className="inline-flex items-center gap-1 rounded-pill bg-salvia-claro px-2 py-0.5 text-xs font-normal text-salvia"
-              title={emPeriodo ? 'Ocorrência deste período' : 'Combinado recorrente'}
-            >
-              <Repeat strokeWidth={1.75} className="size-3" />
-              {emPeriodo
-                ? `${a.ocorrencia_atual ?? 1}/${a.ocorrencias_total}`
-                : `${Math.min(Math.max((a.ocorrencia_atual ?? 1) - 1, 0), a.ocorrencias_total)}/${a.ocorrencias_total}`}
-            </span>
-          )}
-        </span>
-      ),
+            : a.nome_devedor
+        // E15 H15.1: "Ver tudo com esta pessoa" (agrupa pelo número da outra ponta). Só
+        // aparece quando há telefone da outra ponta (agenda sem_aviso ainda não tem). O
+        // stopPropagation evita disparar o clique da linha (que vai ao detalhe).
+        const temTelefone = Boolean(a.telefone_devedor || a.telefone_cobrador)
+        return (
+          <span className="inline-flex items-center gap-2 font-medium">
+            {nome}
+            {a.ocorrencias_total != null && a.ocorrencias_total > 1 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-pill bg-salvia-claro px-2 py-0.5 text-xs font-normal text-salvia"
+                title={emPeriodo ? 'Ocorrência deste período' : 'Combinado recorrente'}
+              >
+                <Repeat strokeWidth={1.75} className="size-3" />
+                {emPeriodo
+                  ? `${a.ocorrencia_atual ?? 1}/${a.ocorrencias_total}`
+                  : `${Math.min(Math.max((a.ocorrencia_atual ?? 1) - 1, 0), a.ocorrencias_total)}/${a.ocorrencias_total}`}
+              </span>
+            )}
+            {temTelefone && (
+              <Link
+                to={`/app/pessoa/${a.id}`}
+                onClick={(e) => e.stopPropagation()}
+                title={`Ver tudo com ${nome}`}
+                aria-label={`Ver tudo com ${nome}`}
+                className="text-tinta-2 transition-colors hover:text-salvia"
+              >
+                <Users strokeWidth={1.75} className="size-4" />
+              </Link>
+            )}
+          </span>
+        )
+      },
     },
     {
       chave: 'motivo',

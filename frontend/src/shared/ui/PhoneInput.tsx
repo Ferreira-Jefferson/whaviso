@@ -26,6 +26,13 @@ type PhoneInputProps = Omit<
   value: string | null
   /** Emite o novo valor em E.164 ou null (sem dígitos suficientes). */
   onChange: (e164: string | null) => void
+  /**
+   * Opcional: emite os dígitos NACIONAIS crus conforme digitados (mesmo incompletos) e
+   * um E.164 PARCIAL (+<país><dígitos>). Serve para buscas por prefixo (ex.: autocomplete
+   * de contato a partir do 6º dígito, E15 H15.6), que o `onChange` não cobre por só emitir
+   * o número completo ou null.
+   */
+  onDigitos?: (nacional: string, e164Parcial: string) => void
   invalido?: boolean
 }
 
@@ -60,7 +67,7 @@ function montarE164(pais: Pais, nacional: string): string | null {
 }
 
 export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
-  ({ value, onChange, className, invalido, ...rest }, ref) => {
+  ({ value, onChange, onDigitos, className, invalido, ...rest }, ref) => {
     const [iso, setIso] = useState(() => separarPais(value).iso)
     const [digitos, setDigitos] = useState(() => separarPais(value).nacional)
     // Distingue o "eco" do que emitimos de uma mudança externa (reset/perfil).
@@ -77,11 +84,14 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
 
     const emitir = useCallback(
       (novoIso: string, nacional: string) => {
-        const e164 = montarE164(paisPorIso(novoIso), nacional)
+        const pais = paisPorIso(novoIso)
+        const e164 = montarE164(pais, nacional)
         ultimoEmitido.current = e164
         onChange(e164)
+        // Dígitos crus + E.164 parcial (mesmo incompleto), para buscas por prefixo.
+        onDigitos?.(nacional, `+${pais.dial}${nacional}`)
       },
-      [onChange],
+      [onChange, onDigitos],
     )
 
     const handleNumero = useCallback(

@@ -296,6 +296,71 @@ export const painelPendenciasResposta = z.object({
 })
 export type PainelPendenciasResposta = z.infer<typeof painelPendenciasResposta>
 
+// ---- E15: Combinados por pessoa (visão de contato) ----
+// A "pessoa" é a OUTRA PONTA; a IDENTIDADE é o TELEFONE (E.164), nunca o nome. Para não
+// vazar telefone em rota/log (H13.8, a redaction do logger não cobre req.url), a pessoa é
+// referenciada por um id de COMBINADO (UUID) que o usuário possui: a api resolve o
+// telefone da outra ponta no servidor e agrega por ele. Totais dos QUATRO lados (H15.2),
+// coerentes com o painel (H9.2). Isolamento por uid.
+
+// GET /v1/pessoas/:avisoId/resumo
+export const pessoaResumoResposta = z.object({
+  // Telefone da outra ponta (E.164), resolvido no servidor. Dado do próprio usuário
+  // (mesma exposição do detalhe do aviso); vai só no CORPO, nunca em rota/log.
+  telefone: telefoneE164,
+  // Nome pelo qual cheguei = o nome registrado no combinado de ENTRADA. Rótulo, não chave.
+  nome_entrada: z.string(),
+  // Quatro totais (H15.2): a receber/recebido como cobrador; a pagar/pago como devedor.
+  a_receber_centavos: z.number().int(),
+  a_receber_qtd: z.number().int(),
+  recebido_centavos: z.number().int(),
+  recebido_qtd: z.number().int(),
+  a_pagar_centavos: z.number().int(),
+  a_pagar_qtd: z.number().int(),
+  pago_centavos: z.number().int(),
+  pago_qtd: z.number().int(),
+})
+export type PessoaResumoResposta = z.infer<typeof pessoaResumoResposta>
+
+// GET /v1/pessoas/:avisoId/combinados
+// Todos os combinados daquele TELEFONE, AGRUPADOS POR NOME (H15.3): cada nome distinto
+// registrado para o número vira um grupo (identidade é o número, o nome é rótulo). Itens
+// no formato do aviso (avisoSchema), para o front reusar as colunas do painel.
+export const grupoPessoaSchema = z.object({
+  nome: z.string(),
+  itens: z.array(avisoSchema),
+})
+export type GrupoPessoa = z.infer<typeof grupoPessoaSchema>
+
+export const pessoaCombinadosResposta = z.object({
+  grupos: z.array(grupoPessoaSchema),
+  total: z.number().int(),
+})
+export type PessoaCombinadosResposta = z.infer<typeof pessoaCombinadosResposta>
+
+// POST /v1/pessoas/buscar-por-telefone (autocomplete ao criar, H15.6)
+// O número (parcial) carrega telefone, então vai no CORPO de um POST, nunca em query/URL
+// (H13.8: corpo/resposta não são logados pelo Fastify). `prefixo` = E.164 parcial
+// (+<país><dígitos>); o front só dispara a partir do 6º dígito nacional.
+export const buscarPessoaBody = z.object({
+  prefixo: z
+    .string()
+    .trim()
+    .regex(/^\+\d{4,15}$/, 'prefixo de telefone inválido'),
+})
+export type BuscarPessoaBody = z.infer<typeof buscarPessoaBody>
+
+export const sugestaoPessoaSchema = z.object({
+  nome: z.string(),
+  telefone: telefoneE164,
+})
+export type SugestaoPessoa = z.infer<typeof sugestaoPessoaSchema>
+
+export const buscarPessoaResposta = z.object({
+  itens: z.array(sugestaoPessoaSchema),
+})
+export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
+
 // ---- PATCH /v1/perfil ----
 export const atualizarPerfilBody = z.object({
   nome: z.string().trim().min(1).max(120).optional(),

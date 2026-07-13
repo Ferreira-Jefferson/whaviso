@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ApiError } from '@/shared/api_client'
 import {
   avisoSchema,
+  buscarPessoaResposta,
   combinadoEnvioResposta,
   criarAvisoResposta,
   envioSchema,
@@ -12,6 +13,7 @@ import {
   statusAviso,
   type Aviso,
   type AtivarAvisoBody,
+  type BuscarPessoaResposta,
   type CombinadoEnvioResposta,
   type CriarAvisoBody,
   type CriarAvisoResposta,
@@ -57,6 +59,27 @@ export function useCriarAviso() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: avisosKeys.todos })
     },
+  })
+}
+
+/**
+ * POST /v1/pessoas/buscar-por-telefone (E15 H15.6): autocomplete de contato ao criar.
+ * Chamado ao digitar o número (a partir do 6º dígito). O prefixo (E.164 parcial) vai no
+ * CORPO, nunca em query/URL (H15.7): telefone não entra em rota nem em log. `prefixo` null
+ * desabilita a busca. Modelado como POST-read; cache curto por prefixo (só na memória do
+ * cliente). Não importa o módulo pessoas: chama a rota por string (fronteira do lint).
+ */
+export function useBuscarPessoaPorTelefone(prefixo: string | null) {
+  return useQuery({
+    queryKey: ['pessoas', 'buscar-por-telefone', prefixo],
+    enabled: Boolean(prefixo),
+    staleTime: 30_000,
+    queryFn: ({ signal }) =>
+      apiClient.post<BuscarPessoaResposta>('/pessoas/buscar-por-telefone', {
+        body: { prefixo },
+        schema: buscarPessoaResposta,
+        signal,
+      }),
   })
 }
 
