@@ -94,6 +94,20 @@
     animation: whv-rise 300ms ease-out both;
   }
 
+  /* Folha de menu (mobile): entra deslizando de baixo. */
+  @keyframes whv-slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .animate-sheet {
+    animation: whv-slide-up 240ms ease-out both;
+  }
+
   /* CycleTimeline: ponto da etapa ativa pulsa suavemente (2s, escala 1→1.08). */
   @keyframes whv-pulso-etapa {
     0%,
