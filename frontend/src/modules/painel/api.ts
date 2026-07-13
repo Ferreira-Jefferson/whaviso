@@ -8,9 +8,11 @@ import { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
   avisoSchema,
+  painelMetricasResposta,
   painelPendenciasResposta,
   painelResumoResposta,
   type DirecaoAviso,
+  type PainelMetricasResposta,
   type PainelPendenciasResposta,
   type PainelResumoResposta,
   type PapelAviso,
@@ -26,6 +28,20 @@ export const painelKeys = {
   todos: ['painel'] as const,
   resumo: (periodo: PeriodoResumo) => ['painel', 'resumo', periodo] as const,
   pendencias: ['painel', 'pendencias'] as const,
+  metricas: (periodo: PeriodoResumo) => ['painel', 'metricas', periodo] as const,
+}
+
+/** GET /v1/painel/metricas: saúde do negócio (papel cobrador), calculada no backend. */
+export function usePainelMetricas(periodo: PeriodoResumo = {}) {
+  return useQuery({
+    queryKey: painelKeys.metricas(periodo),
+    queryFn: ({ signal }) =>
+      apiClient.get<PainelMetricasResposta>('/painel/metricas', {
+        schema: painelMetricasResposta,
+        query: { de: periodo.de, ate: periodo.ate },
+        signal,
+      }),
+  })
 }
 
 /** GET /v1/painel/resumo: totais por PAPEL (centavos) calculados no backend. */

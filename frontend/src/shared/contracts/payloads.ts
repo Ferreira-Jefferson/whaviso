@@ -612,6 +612,50 @@ export const previewMensagemResposta = z.object({
 })
 export type PreviewMensagemResposta = z.infer<typeof previewMensagemResposta>
 
+// ---- Métricas de negócio (Fase A): GET /v1/painel/metricas (papel cobrador) ----
+// Espelho do backend. Telefone e datas vêm como string (exibição), sem validação estrita.
+export const melhorClienteSchema = z.object({
+  nome: z.string(),
+  telefone: z.string().nullable(),
+  recebido_centavos: z.number().int(),
+  qtd: z.number().int(),
+})
+export type MelhorCliente = z.infer<typeof melhorClienteSchema>
+
+export const metricaCategoriaSchema = z.object({
+  categoria_id: z.string().nullable(),
+  nome: z.string().nullable(),
+  cor: z.string().nullable(),
+  recebido_centavos: z.number().int(),
+  a_receber_centavos: z.number().int(),
+  lucro_centavos: z.number().int(),
+  qtd: z.number().int(),
+})
+export type MetricaCategoria = z.infer<typeof metricaCategoriaSchema>
+
+export const clienteInativoSchema = z.object({
+  nome: z.string(),
+  telefone: z.string().nullable(),
+  ultima_data: z.string(),
+  dias: z.number().int(),
+})
+export type ClienteInativo = z.infer<typeof clienteInativoSchema>
+
+export const painelMetricasResposta = z.object({
+  recebido_centavos: z.number().int(),
+  recebido_qtd: z.number().int(),
+  a_receber_centavos: z.number().int(),
+  a_receber_qtd: z.number().int(),
+  custo_pago_centavos: z.number().int(),
+  lucro_centavos: z.number().int(),
+  lucro_base_qtd: z.number().int(),
+  ticket_medio_centavos: z.number().int(),
+  melhores_clientes: z.array(melhorClienteSchema),
+  por_categoria: z.array(metricaCategoriaSchema),
+  inativos: z.array(clienteInativoSchema),
+})
+export type PainelMetricasResposta = z.infer<typeof painelMetricasResposta>
+
 // ---- Envelope de erro padrão ----
 export const erroResposta = z.object({
   error: z.object({

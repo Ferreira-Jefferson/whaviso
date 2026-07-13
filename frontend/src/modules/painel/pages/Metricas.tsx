@@ -1,0 +1,182 @@
+// Fase A: "Resultado" (/app/metricas). Saúde do negócio de quem vende: recebido, a
+// receber, lucro (só onde o custo foi informado), ticket médio, melhores clientes,
+// quebra por categoria e clientes inativos. Só leitura: consome GET /v1/painel/metricas
+// (tudo calculado no servidor). Linguagem sem termos proibidos, neutra quanto a gênero.
+import { PiggyBank, Users, Tags, Clock } from 'lucide-react'
+import { Card, EmptyState, MoneyText, PageHeader, Spinner, StatCard } from '@/shared/ui'
+import { usePainelMetricas } from '../api'
+
+// Mascara o número (mantém só os 4 últimos), para não expor telefone inteiro na tela.
+function mascararTelefone(tel: string | null): string {
+  if (!tel) return ''
+  return tel.length <= 4 ? tel : `${'•'.repeat(3)} ${tel.slice(-4)}`
+}
+
+export default function MetricasPage() {
+  const { data, isLoading, isError } = usePainelMetricas()
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-salvia">
+        <Spinner className="size-6" />
+      </div>
+    )
+  }
+
+  if (isError || !data) {
+    return (
+      <div>
+        <PageHeader titulo="Resultado" />
+        <EmptyState
+          titulo="Não deu para carregar agora"
+          descricao="Tente de novo em instantes."
+        />
+      </div>
+    )
+  }
+
+  const temLucro = data.lucro_base_qtd > 0
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        titulo="Resultado"
+        descricao="Como vai o seu negócio: o que recebeu, o que ainda tem a receber e quanto rendeu."
+      />
+
+      {/* Números principais */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          rotulo="Recebido"
+          centavos={data.recebido_centavos}
+          detalhe={`${data.recebido_qtd} ${data.recebido_qtd === 1 ? 'combinado' : 'combinados'}`}
+          tom="folha"
+        />
+        <StatCard
+          rotulo="A receber"
+          centavos={data.a_receber_centavos}
+          detalhe={`${data.a_receber_qtd} ${data.a_receber_qtd === 1 ? 'combinado' : 'combinados'}`}
+          tom="salvia"
+        />
+        <StatCard
+          rotulo="Resultado"
+          centavos={data.lucro_centavos}
+          detalhe={
+            temLucro
+              ? `de ${data.lucro_base_qtd} com custo informado`
+              : 'informe o custo para ver o quanto sobrou'
+          }
+          tom="folha"
+          icone={<PiggyBank strokeWidth={1.75} className="size-4" />}
+        />
+        <StatCard
+          rotulo="Ticket médio"
+          centavos={data.ticket_medio_centavos}
+          detalhe="por combinado recebido"
+          tom="neutro"
+        />
+      </div>
+
+      {/* Por categoria */}
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 font-display text-xl text-salvia">
+          <Tags strokeWidth={1.75} className="size-5" />
+          Por categoria
+        </h2>
+        {data.por_categoria.length === 0 ? (
+          <Card className="text-sm text-tinta-2">
+            Ainda não há combinados para resumir por categoria.
+          </Card>
+        ) : (
+          <Card className="flex flex-col divide-y divide-linha p-0">
+            {data.por_categoria.map((c) => (
+              <div
+                key={c.categoria_id ?? 'sem'}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+              >
+                <span className="flex items-center gap-2 text-tinta">
+                  <span
+                    aria-hidden
+                    className="size-3 rounded-full border border-linha"
+                    style={{ backgroundColor: c.cor ?? 'transparent' }}
+                  />
+                  {c.nome ?? 'Sem categoria'}
+                  <span className="text-xs text-tinta-2">
+                    ({c.qtd} {c.qtd === 1 ? 'combinado' : 'combinados'})
+                  </span>
+                </span>
+                <span className="flex items-center gap-4 text-sm">
+                  <span className="text-tinta-2">
+                    recebido <MoneyText centavos={c.recebido_centavos} className="text-folha" />
+                  </span>
+                  <span className="text-tinta-2">
+                    resultado <MoneyText centavos={c.lucro_centavos} className="text-salvia" />
+                  </span>
+                </span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      {/* Melhores clientes */}
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 font-display text-xl text-salvia">
+          <Users strokeWidth={1.75} className="size-5" />
+          Melhores clientes
+        </h2>
+        {data.melhores_clientes.length === 0 ? (
+          <Card className="text-sm text-tinta-2">
+            Assim que você registrar recebimentos, os melhores clientes aparecem aqui.
+          </Card>
+        ) : (
+          <Card className="flex flex-col divide-y divide-linha p-0">
+            {data.melhores_clientes.map((m, i) => (
+              <div
+                key={`${m.telefone ?? m.nome}-${i}`}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+              >
+                <span className="text-tinta">
+                  {m.nome}
+                  <span className="ml-2 text-xs text-tinta-2">{mascararTelefone(m.telefone)}</span>
+                </span>
+                <span className="text-sm text-tinta-2">
+                  <MoneyText centavos={m.recebido_centavos} className="text-folha" /> em {m.qtd}{' '}
+                  {m.qtd === 1 ? 'combinado' : 'combinados'}
+                </span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      {/* Inativos */}
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 font-display text-xl text-salvia">
+          <Clock strokeWidth={1.75} className="size-5" />
+          Faz tempo que não compram
+        </h2>
+        {data.inativos.length === 0 ? (
+          <Card className="text-sm text-tinta-2">
+            Ninguém sumido por aqui. Todos os seus clientes têm movimento recente.
+          </Card>
+        ) : (
+          <Card className="flex flex-col divide-y divide-linha p-0">
+            {data.inativos.map((c, i) => (
+              <div
+                key={`${c.telefone ?? c.nome}-${i}`}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+              >
+                <span className="text-tinta">
+                  {c.nome}
+                  <span className="ml-2 text-xs text-tinta-2">{mascararTelefone(c.telefone)}</span>
+                </span>
+                <span className="text-sm text-tinta-2">há {c.dias} dias</span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+    </div>
+  )
+}

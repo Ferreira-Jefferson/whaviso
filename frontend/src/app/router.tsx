@@ -25,7 +25,7 @@ import { LandingPage } from '@/modules/landing'
 import { PoliticaPrivacidadePage, TermosUsoPage } from '@/modules/legal'
 import { LoginPage, OnboardingPage } from '@/modules/auth'
 import { AcaoAvisoPage, SairLembretesPage } from '@/modules/aceite'
-import { PainelPage } from '@/modules/painel'
+import { PainelPage, MetricasNegocioPage } from '@/modules/painel'
 import { PessoaPage } from '@/modules/pessoas'
 import { NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
 import { CreditosPage } from '@/modules/billing'
@@ -137,6 +137,7 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <PainelPage /> },
+          { path: 'metricas', element: <MetricasNegocioPage /> },
           { path: 'avisos', element: <RedirectAvisos /> },
           { path: 'avisos/novo', element: <NovoAvisoPage /> },
           { path: 'avisos/:id', element: <DetalheAvisoPage /> },
