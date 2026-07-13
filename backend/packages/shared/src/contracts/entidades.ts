@@ -97,6 +97,9 @@ export const avisoSchema = z.object({
   // E16: categoria (opcional) do combinado. nullish: nem toda projeção do Aviso a traz
   // (ex.: recortes que não selecionam a coluna); quando presente, é o id da categoria.
   categoria_id: z.uuid().nullish(),
+  // Fase A (estudo revendedores): custo opcional (centavos, >=0). Dado INTERNO do dono
+  // (nunca vai ao devedor); habilita o resultado/lucro no painel. null = não informado.
+  valor_custo_centavos: z.number().int().min(0).nullish(),
   aceito_em: z.coerce.date().nullable(),
   // Arquivamento da agenda (H11.4): quando preenchido, a anotação sai da contagem/
   // visão da agenda (soft-delete; o registro permanece, regra de não-DELETE).

@@ -150,6 +150,7 @@ export async function criarAviso(
       pix_titular: body.pix_titular ?? null,
       pix_banco: body.pix_banco ?? null,
       categoria_id: body.categoria_id ?? null,
+      valor_custo_centavos: body.valor_custo_centavos ?? null,
     }
 
     // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM envio. ----
@@ -483,23 +484,29 @@ export async function editarAviso(
     if (mudaCategoria) await repo.atualizarCategoria(cli, id, body.categoria_id ?? null)
     const categoriaFinal = mudaCategoria ? (body.categoria_id ?? null) : aviso.categoria_id
 
+    // Fase A: custo é dado INTERNO do dono, também edição LIVRE (nunca abre reaprovação).
+    const mudaCusto = body.valor_custo_centavos !== undefined
+    if (mudaCusto) await repo.atualizarCusto(cli, id, body.valor_custo_centavos ?? null)
+    const custoFinal = mudaCusto ? (body.valor_custo_centavos ?? null) : aviso.valor_custo_centavos
+
     const campos = camposEditados(body)
     const temCampoAcordo = Object.keys(campos).length > 0
 
-    // Só a categoria mudou: aplica direto (sem reaprovação nem notificação), qualquer estado.
+    // Só campos internos (categoria/custo) mudaram: aplica direto (sem reaprovação nem
+    // notificação ao devedor), em qualquer estado vivo.
     if (!temCampoAcordo) {
       await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, {
         reaprovacao: false,
-        categoria: true,
+        interno: true,
       })
-      return { ...aviso, categoria_id: categoriaFinal }
+      return { ...aviso, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal }
     }
 
     if (livre) {
       // Antes do aceite: aplica direto, sem reaprovação nem evento de sub-ciclo.
       await repo.atualizarDados(cli, id, campos)
       await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, { reaprovacao: false })
-      return { ...aviso, ...campos, categoria_id: categoriaFinal }
+      return { ...aviso, ...campos, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal }
     }
 
     // Pós-aceite (campos do acordo): snapshot do "antes", aplica os novos dados, vai para
@@ -514,7 +521,13 @@ export async function editarAviso(
     // Notifica o DEVEDOR (alteração a aprovar + lembretes pausados). Só enfileira.
     await enfileirarNotificacaoDevedor(cli, aviso, 'aviso_edicao_a_aprovar')
 
-    return { ...aviso, ...campos, categoria_id: categoriaFinal, status: 'aguardando_aprovacao_aviso_editado' }
+    return {
+      ...aviso,
+      ...campos,
+      categoria_id: categoriaFinal,
+      valor_custo_centavos: custoFinal,
+      status: 'aguardando_aprovacao_aviso_editado',
+    }
   })
 }
 

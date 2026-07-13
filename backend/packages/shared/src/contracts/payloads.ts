@@ -86,6 +86,8 @@ export const criarAvisoBody = z
     // E16 H16.3: categoria (opcional) do combinado. Precisa ser minha e não arquivada
     // (validado no servidor). Organização interna: nunca vai para mensagem ao devedor.
     categoria_id: z.uuid().nullish(),
+    // Fase A: custo opcional (centavos, >=0). Dado interno do dono; habilita o resultado.
+    valor_custo_centavos: z.number().int().min(0).nullish(),
   })
   // No modo `agenda` (H4.1) telefone e Pix são OPCIONAIS (cobrados só ao ativar, H4.3):
   // todos os refines abaixo só valem quando o item já vai enviar (modo `enviar`).
@@ -160,6 +162,8 @@ export const editarAvisoBody = z
     // E16 H16.3: trocar/remover a categoria. Edição LIVRE (não abre reaprovação do
     // devedor): categoria é dado interno do dono. `null` remove a categoria; ausente = mantém.
     categoria_id: z.uuid().nullish(),
+    // Fase A: custo (centavos, >=0). Também interno e LIVRE. `null` limpa; ausente = mantém.
+    valor_custo_centavos: z.number().int().min(0).nullish(),
   })
   .refine(
     (b) =>
@@ -170,7 +174,8 @@ export const editarAvisoBody = z
       b.pix_chave !== undefined ||
       b.pix_titular !== undefined ||
       b.pix_banco !== undefined ||
-      b.categoria_id !== undefined,
+      b.categoria_id !== undefined ||
+      b.valor_custo_centavos !== undefined,
     { message: 'informe ao menos um campo para editar' },
   )
 export type EditarAvisoBody = z.infer<typeof editarAvisoBody>

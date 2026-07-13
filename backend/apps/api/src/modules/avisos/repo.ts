@@ -21,6 +21,7 @@ const COLS = `
   valor_centavos::bigint as valor_centavos,
   to_char(data_combinada, 'YYYY-MM-DD') as data_combinada, pix_chave,
   pix_titular, pix_banco, categoria_id,
+  valor_custo_centavos::bigint as valor_custo_centavos,
   recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
   ocorrencias_total, ocorrencia_atual,
   -- node-pg não auto-parseia arrays de ENUM (etapa_envio[]) -> cast p/ text[] (parseado em JS).
@@ -39,6 +40,7 @@ const COLS_VIEW = `
   linha_valor::bigint as valor_centavos,
   to_char(linha_data, 'YYYY-MM-DD') as data_combinada, pix_chave,
   pix_titular, pix_banco, categoria_id,
+  valor_custo_centavos::bigint as valor_custo_centavos,
   recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
   ocorrencias_total, indice as ocorrencia_atual,
   cadencia_etapas::text[] as cadencia_etapas,
@@ -63,6 +65,7 @@ interface LinhaAviso {
   pix_titular: string | null
   pix_banco: string | null
   categoria_id: string | null
+  valor_custo_centavos: string | null
   recorrencia_tipo: 'periodo' | 'avulsas' | null
   recorrencia_freq: 'mensal' | 'semanal' | null
   recorrencia_intervalo: number | null
@@ -76,7 +79,11 @@ interface LinhaAviso {
 }
 
 function mapear(l: LinhaAviso): Aviso {
-  return { ...l, valor_centavos: Number(l.valor_centavos) }
+  return {
+    ...l,
+    valor_centavos: Number(l.valor_centavos),
+    valor_custo_centavos: l.valor_custo_centavos === null ? null : Number(l.valor_custo_centavos),
+  }
 }
 
 /** Configuração de recorrência/cadência gravada nas colunas do aviso (E6 H6.10 / E8 H8.7).
@@ -108,6 +115,8 @@ export interface NovoAviso {
   pix_banco: string | null
   // E16: categoria (opcional) do combinado.
   categoria_id: string | null
+  // Fase A: custo opcional (centavos) do combinado; null = não informado.
+  valor_custo_centavos: number | null
   // Recorrência/cadência (null = combinado simples / ciclo completo).
   recorrencia_tipo?: 'periodo' | 'avulsas' | null
   recorrencia_freq?: 'mensal' | 'semanal' | null
@@ -131,9 +140,9 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
         ocorrencias_total, ocorrencia_atual, cadencia_etapas,
         aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em,
-        categoria_id)
+        categoria_id, valor_custo_centavos)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26)
+             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
@@ -144,7 +153,7 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
       novo.ocorrencias_total ?? null, novo.ocorrencia_atual ?? null,
       novo.cadencia_etapas ?? null,
       novo.aceite_token_hash, novo.aceite_token_expira_em, novo.acao_token_hash,
-      novo.convite_expira_em, novo.categoria_id ?? null,
+      novo.convite_expira_em, novo.categoria_id ?? null, novo.valor_custo_centavos ?? null,
     ],
   )
   return mapear(rows[0]!)
@@ -652,4 +661,13 @@ export async function atualizarCategoria(
   categoriaId: string | null,
 ): Promise<void> {
   await ex.query(`update public.avisos set categoria_id = $2 where id = $1`, [id, categoriaId])
+}
+
+/** Grava/limpa o custo (centavos) de um combinado (Fase A). null limpa. Dado interno. */
+export async function atualizarCusto(
+  ex: Executor,
+  id: string,
+  custoCentavos: number | null,
+): Promise<void> {
+  await ex.query(`update public.avisos set valor_custo_centavos = $2 where id = $1`, [id, custoCentavos])
 }
