@@ -5,6 +5,7 @@ import type {
   Envio,
   EtapaEnvio,
   EventoAviso,
+  ItemPedido,
   Ocorrencia,
   PapelAviso,
   StatusAviso,
@@ -22,6 +23,8 @@ const COLS = `
   to_char(data_combinada, 'YYYY-MM-DD') as data_combinada, pix_chave,
   pix_titular, pix_banco, categoria_id,
   valor_custo_centavos::bigint as valor_custo_centavos,
+  -- itens é jsonb: node-pg já devolve como array JS (composição opcional do pedido, Fase A).
+  itens,
   recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
   ocorrencias_total, ocorrencia_atual,
   -- node-pg não auto-parseia arrays de ENUM (etapa_envio[]) -> cast p/ text[] (parseado em JS).
@@ -66,6 +69,7 @@ interface LinhaAviso {
   pix_banco: string | null
   categoria_id: string | null
   valor_custo_centavos: string | null
+  itens: ItemPedido[] | null
   recorrencia_tipo: 'periodo' | 'avulsas' | null
   recorrencia_freq: 'mensal' | 'semanal' | null
   recorrencia_intervalo: number | null
@@ -117,6 +121,8 @@ export interface NovoAviso {
   categoria_id: string | null
   // Fase A: custo opcional (centavos) do combinado; null = não informado.
   valor_custo_centavos: number | null
+  // Fase A: composição opcional do pedido (itens); null = não informado.
+  itens: ItemPedido[] | null
   // Recorrência/cadência (null = combinado simples / ciclo completo).
   recorrencia_tipo?: 'periodo' | 'avulsas' | null
   recorrencia_freq?: 'mensal' | 'semanal' | null
@@ -140,9 +146,9 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
         ocorrencias_total, ocorrencia_atual, cadencia_etapas,
         aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em,
-        categoria_id, valor_custo_centavos)
+        categoria_id, valor_custo_centavos, itens)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27)
+             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27,$28::jsonb)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
@@ -154,6 +160,9 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
       novo.cadencia_etapas ?? null,
       novo.aceite_token_hash, novo.aceite_token_expira_em, novo.acao_token_hash,
       novo.convite_expira_em, novo.categoria_id ?? null, novo.valor_custo_centavos ?? null,
+      // jsonb: node-pg serializa Array como array literal do Postgres, não como json; então
+      // passamos a string JSON (null = coluna null). Espelha inserirEdicao/atualizarItens.
+      novo.itens == null ? null : JSON.stringify(novo.itens),
     ],
   )
   return mapear(rows[0]!)
@@ -670,4 +679,17 @@ export async function atualizarCusto(
   custoCentavos: number | null,
 ): Promise<void> {
   await ex.query(`update public.avisos set valor_custo_centavos = $2 where id = $1`, [id, custoCentavos])
+}
+
+/** Grava/limpa a composição do pedido (itens) de um combinado (Fase A). null limpa. Interno.
+ *  jsonb: passa a string JSON (node-pg trataria Array como array literal do Postgres). */
+export async function atualizarItens(
+  ex: Executor,
+  id: string,
+  itens: ItemPedido[] | null,
+): Promise<void> {
+  await ex.query(`update public.avisos set itens = $2::jsonb where id = $1`, [
+    id,
+    itens == null ? null : JSON.stringify(itens),
+  ])
 }

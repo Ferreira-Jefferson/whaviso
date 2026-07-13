@@ -21,6 +21,7 @@ import type {
   CriarAvisoResposta,
   DirecaoAviso,
   EtapaEnvio,
+  ItemPedido,
   RecorrenciaInput,
 } from '@/shared/contracts'
 import { usePerfil } from '@/shared/auth'
@@ -32,6 +33,7 @@ import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../s
 import { AvisoCriado } from '../components/AvisoCriado'
 import { RepetirCombinado } from '../components/RepetirCombinado'
 import { CadenciaLembretes } from '../components/CadenciaLembretes'
+import { ItensPedido } from '../components/ItensPedido'
 
 const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
   { value: 'receber', label: 'Vou receber' },
@@ -74,6 +76,9 @@ export default function NovoAvisoPage() {
   // ocorrências (cada uma reserva 1 crédito). undefined = simples / ciclo completo.
   const [recorrencia, setRecorrencia] = useState<RecorrenciaInput | undefined>(undefined)
   const [cadenciaEtapas, setCadenciaEtapas] = useState<EtapaEnvio[] | undefined>(undefined)
+  // Fase A: composição opcional do pedido (itens). Estado local (como recorrência/cadência);
+  // vai no corpo do POST. Quando há itens, o total deles alimenta o valor combinado.
+  const [itens, setItens] = useState<ItemPedido[]>([])
   // Estáveis p/ os efeitos dos filhos não dispararem a cada render.
   const aoMudarRecorrencia = useCallback((v: RecorrenciaInput | undefined) => setRecorrencia(v), [])
   const aoMudarCadencia = useCallback((v: EtapaEnvio[] | undefined) => setCadenciaEtapas(v), [])
@@ -123,6 +128,18 @@ export default function NovoAvisoPage() {
   // em MAX_MOTIVO_CARACTERES; o schema valida por garantia (paste etc.).
   const motivoLen = (watch('motivo') ?? '').length
   const ehReceber = direcao === 'receber'
+  const temItens = itens.length > 0
+
+  // Fase A: ao mexer nos itens, o total deles vira o valor combinado (o whaviso soma por
+  // você). O valor segue editável para ajustar (ex.: desconto); a autoridade do acordo é o
+  // valor, não a soma (o backend não exige igualdade). Só sobrescreve quando há itens.
+  function aoMudarItens(novos: ItemPedido[]) {
+    setItens(novos)
+    if (novos.length > 0) {
+      const total = novos.reduce((s, it) => s + it.qtd * it.valor_unit_centavos, 0)
+      setValue('valor_centavos', total, { shouldValidate: true })
+    }
+  }
 
   // Cada botão escolhe o modo e dispara o submit. O schema valida conforme o modo
   // (telefone/Pix só obrigatórios ao enviar o combinado), então setamos antes de validar.
@@ -167,6 +184,8 @@ export default function NovoAvisoPage() {
         // E16 / Fase A: categoria ('' = sem categoria) e custo interno (opcional).
         categoria_id: dados.categoria_id ? dados.categoria_id : null,
         valor_custo_centavos: dados.valor_custo_centavos ?? null,
+        // Fase A: itens do pedido (opcional). null quando não usou o editor.
+        itens: itens.length > 0 ? itens : null,
         // E6 H6.10: recorrência (facilitador, todos os planos) + cadência (gated por plano
         // no servidor). undefined = combinado simples / ciclo completo. O servidor é a
         // autoridade: expande as ocorrências e valida vagas/cadência.
@@ -347,7 +366,11 @@ export default function NovoAvisoPage() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Valor" erro={errors.valor_centavos?.message}>
+            <Field
+              label="Valor"
+              erro={errors.valor_centavos?.message}
+              dica={temItens ? 'Somado dos itens abaixo. Você pode ajustar (ex.: desconto).' : undefined}
+            >
               <Controller
                 control={control}
                 name="valor_centavos"
@@ -379,6 +402,10 @@ export default function NovoAvisoPage() {
               />
             </Field>
           </div>
+
+          {/* Fase A: composição do pedido (o que foi vendido). Opcional e INTERNA: nunca
+              aparece para a outra pessoa; o total soma no valor acima. */}
+          <ItensPedido value={itens} onChange={aoMudarItens} />
 
           {/* E16 / Fase A: organização (categoria) + resultado (custo). Ambos opcionais e
               INTERNOS: nunca aparecem para a outra pessoa. */}

@@ -153,13 +153,15 @@ O revendedor raramente atende uma marca só: a mesma pessoa vende para a Natura,
 
 Cada item marca esforço aproximado e se respeita o escopo atual. Nada aqui manda mensagem nova ao devedor sem passar pelas regras do Épico 6/13.
 
-### Fase A: alto valor, baixo esforço, aditivo (recomendada primeiro)
+### Fase A: alto valor, baixo esforço, aditivo (recomendada primeiro) — ✅ ENTREGUE
 
-- **A0. Categorias definidas pelo usuário** (ver 5.1): tabela `categorias` + `avisos.categoria_id`, criação/edição pela conta, e filtro/recorte por categoria no painel e nas listas. É o eixo que amarra "por marca/linha" e destrava lucro por categoria junto de A1/A3. *Esforço: médio.*
-- **A1. Campo de custo opcional por combinado** (`valor_custo_centavos`, nullable). Não vai ao WhatsApp; só habilita lucro. Base para A3. *Esforço: baixo (1 coluna + form + serviço).*
-- **A2. Itens opcionais do pedido.** Estruturar a composição (ex.: `jsonb` `itens: [{descricao, qtd, valor_unit_centavos}]` que soma no `valor_centavos`), mantendo o `motivo` como resumo. Opcional: quem quiser continua usando só o motivo. *Esforço: médio.*
-- **A3. Painel com métricas de negócio** (backend, leitura): lucro do período (quando houver custo), ticket médio, ranking de melhores clientes (por soma), clientes inativos (última compra além de N dias), **tudo cortável por categoria** (A0). Reaproveita o padrão de agregação de `painel/repo.ts`. *Esforço: médio.*
-- **A4. Visão por pessoa com "última compra" e sinal de inatividade** (extensão do Épico 15). *Esforço: baixo.*
+Toda a Fase A (A0 a A4) está implementada de ponta a ponta (backend + Supabase cloud + frontend), com testes. As mensagens ao devedor não mudaram (compliance): categoria, custo, itens e métricas são dados internos do dono.
+
+- **A0. Categorias definidas pelo usuário** ✅ (ver 5.1): tabela `categorias` (migration 0081) + `avisos.categoria_id`, gerência em `/app/categorias`, seleção/criação inline no Novo Aviso e filtro por categoria no painel. É o eixo que amarra "por marca/linha" e destrava lucro por categoria junto de A1/A3.
+- **A1. Campo de custo opcional por combinado** ✅ (`avisos.valor_custo_centavos`, nullable, migration 0082). Não vai ao WhatsApp; edição livre (não reabre reaprovação); habilita o lucro. Aparece no Novo Aviso.
+- **A2. Itens opcionais do pedido** ✅ Composição em `avisos.itens` (`jsonb` array de `{descricao, qtd, valor_unit_centavos}`, migration 0083). Interno, nunca vai ao devedor; edição livre. O editor no Novo Aviso soma no `valor_centavos` (ajustável, ex.: desconto); o detalhe do combinado mostra a lista. Quem preferir segue só com o motivo + valor.
+- **A3. Painel com métricas de negócio** ✅ (backend `painel/repo.metricas` + tela `/app/metricas` "Resultado"): lucro do período (só onde há custo, honesto), ticket médio, melhores clientes, clientes inativos e quebra por categoria (A0).
+- **A4. Visão por pessoa com "última compra" e sinal de inatividade** ✅ (extensão do Épico 15): o resumo da pessoa (`/pessoas/:avisoId/resumo`) devolve `ultima_compra`, `dias_desde_ultima_compra` e `inativo` (sem venda ativa a receber e última venda além de 60 dias, alinhado ao default das métricas). A página da pessoa exibe a última compra e um sinal para reativar clientes parados.
 
 ### Fase B: fecha o ciclo do revendedor (médio esforço)
 

@@ -19,6 +19,7 @@ import {
   dataCombinada,
   envioSchema,
   eventoAvisoSchema,
+  itemPedidoSchema,
   motivoAviso,
   ocorrenciaSchema,
   perfilSchema,
@@ -26,6 +27,9 @@ import {
   templateSchema,
   valorCentavos,
 } from './entidades'
+
+// Fase A: teto de itens do pedido por combinado (defesa; venda direta raramente passa disso).
+const MAX_ITENS_PEDIDO = 50
 
 // Configuração de RECORRÊNCIA na criação/ativação (E6 H6.10). Ausente = combinado simples.
 //  - periodo: repete TODO mês ou toda semana (sempre intervalo 1) ancorado na
@@ -88,6 +92,9 @@ export const criarAvisoBody = z
     categoria_id: z.uuid().nullish(),
     // Fase A: custo opcional (centavos, >=0). Dado interno do dono; habilita o resultado.
     valor_custo_centavos: z.number().int().min(0).nullish(),
+    // Fase A: composição opcional do pedido (o que foi vendido). Interno; nunca vai ao
+    // devedor. O front soma no valor como conveniência (sem exigência de igualdade).
+    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
   })
   // No modo `agenda` (H4.1) telefone e Pix são OPCIONAIS (cobrados só ao ativar, H4.3):
   // todos os refines abaixo só valem quando o item já vai enviar (modo `enviar`).
@@ -164,6 +171,9 @@ export const editarAvisoBody = z
     categoria_id: z.uuid().nullish(),
     // Fase A: custo (centavos, >=0). Também interno e LIVRE. `null` limpa; ausente = mantém.
     valor_custo_centavos: z.number().int().min(0).nullish(),
+    // Fase A: composição do pedido (itens). Também interna e LIVRE (não abre reaprovação).
+    // `null` limpa; ausente = mantém. Trocar o valor combinado segue o caminho do acordo.
+    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
   })
   .refine(
     (b) =>
@@ -175,7 +185,8 @@ export const editarAvisoBody = z
       b.pix_titular !== undefined ||
       b.pix_banco !== undefined ||
       b.categoria_id !== undefined ||
-      b.valor_custo_centavos !== undefined,
+      b.valor_custo_centavos !== undefined ||
+      b.itens !== undefined,
     { message: 'informe ao menos um campo para editar' },
   )
 export type EditarAvisoBody = z.infer<typeof editarAvisoBody>
@@ -386,6 +397,13 @@ export const pessoaResumoResposta = z.object({
   a_pagar_qtd: z.number().int(),
   pago_centavos: z.number().int(),
   pago_qtd: z.number().int(),
+  // Fase A (A4): "última compra" = data do combinado mais recente em que EU sou o COBRADOR
+  // (vendi para a pessoa). null quando nunca vendi (ex.: só relação em que eu pago). Junto,
+  // os dias corridos até hoje (calculado no servidor) e o sinal de inatividade: sem nada
+  // ativo a receber E última venda além do limiar. Serve para reativar cliente parado.
+  ultima_compra: dataCombinada.nullable(),
+  dias_desde_ultima_compra: z.number().int().nullable(),
+  inativo: z.boolean(),
 })
 export type PessoaResumoResposta = z.infer<typeof pessoaResumoResposta>
 

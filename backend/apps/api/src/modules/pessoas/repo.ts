@@ -101,6 +101,10 @@ export interface TotaisPessoa {
   a_pagar_qtd: number
   pago_centavos: number
   pago_qtd: number
+  // Fase A (A4): última venda para a pessoa (sou COBRADOR) e dias corridos até hoje. null
+  // quando nunca vendi (só relação em que eu pago). Data em America/Sao_Paulo (current_date).
+  ultima_compra: string | null
+  dias_desde_ultima_compra: number | null
 }
 
 /**
@@ -129,7 +133,11 @@ export async function totaisPorPessoa(
          where devedor_profile_id=$1 and telefone_cobrador=$2 and status in (${ATIVOS_SQL}))::int as a_pagar_q,
        coalesce(sum(valor_centavos) filter (
          where devedor_profile_id=$1 and telefone_cobrador=$2 and status='pago'), 0)::bigint as pago_c,
-       count(*) filter (where devedor_profile_id=$1 and telefone_cobrador=$2 and status='pago')::int as pago_q
+       count(*) filter (where devedor_profile_id=$1 and telefone_cobrador=$2 and status='pago')::int as pago_q,
+       -- A4: última VENDA (sou cobrador daquele número) e dias corridos até hoje (Sao_Paulo).
+       to_char(max(data_combinada) filter (where cobrador_id=$1 and telefone_devedor=$2),
+               'YYYY-MM-DD') as ultima_compra,
+       (current_date - max(data_combinada) filter (where cobrador_id=$1 and telefone_devedor=$2))::int as dias_ultima
      from public.avisos
      where (cobrador_id=$1 and telefone_devedor=$2)
         or (devedor_profile_id=$1 and telefone_cobrador=$2)`,
@@ -145,6 +153,8 @@ export async function totaisPorPessoa(
     a_pagar_qtd: r.a_pagar_q,
     pago_centavos: Number(r.pago_c),
     pago_qtd: r.pago_q,
+    ultima_compra: r.ultima_compra ?? null,
+    dias_desde_ultima_compra: r.dias_ultima === null ? null : Number(r.dias_ultima),
   }
 }
 

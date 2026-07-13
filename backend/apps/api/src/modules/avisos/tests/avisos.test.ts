@@ -94,6 +94,34 @@ describe('avisos (integração com whaviso_dev)', () => {
     await app.close()
   })
 
+  it('cria aviso com itens do pedido (Fase A) → guarda e devolve a composição', async () => {
+    const app = await criarAppTeste(uid)
+    const itens = [
+      { descricao: 'Perfume Essencial', qtd: 2, valor_unit_centavos: 12000 },
+      { descricao: 'Batom', qtd: 1, valor_unit_centavos: 3500 },
+    ]
+    const r = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: corpoAviso({ valor_centavos: 27500, itens }),
+    })
+    expect(r.statusCode).toBe(201)
+    const criado = r.json().aviso
+    expect(criado.itens).toEqual(itens)
+    // Persistiu no jsonb: lê de volta pelo detalhe.
+    const det = await app.inject({ method: 'GET', url: `/v1/avisos/${criado.id}`, headers: AUTH })
+    expect(det.statusCode).toBe(200)
+    expect(det.json().itens).toEqual(itens)
+    // Itens são INTERNOS: nunca vão ao devedor (não aparecem na notificação enfileirada).
+    const { rows } = await poolSuper.query(
+      `select * from public.notificacoes_cobrador where aviso_id=$1 and tipo='combinado_enviar'`,
+      [criado.id],
+    )
+    expect(JSON.stringify(rows)).not.toContain('Perfume Essencial')
+    await app.close()
+  })
+
   it('cria invertido (pagar) em modo enviar SEM Pix → 201 (Pix opcional no invertido)', async () => {
     // Decisão do dono (sobrepõe H3.1): no invertido a chave Pix é OPCIONAL. Criar o
     // convite sem pix_chave deve passar (não 400/422 pix_obrigatorio). O receber segue

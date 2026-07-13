@@ -72,6 +72,15 @@ export const categoriaSchema = z.object({
 })
 export type Categoria = z.infer<typeof categoriaSchema>
 
+// Fase A (estudo revendedores): item OPCIONAL do pedido. Dado INTERNO do dono (composição do
+// que foi vendido); nunca vai para mensagem ao devedor. `valor_unit_centavos` em centavos, >=0.
+export const itemPedidoSchema = z.object({
+  descricao: z.string().trim().min(1).max(80),
+  qtd: z.number().int().min(1).max(9999),
+  valor_unit_centavos: z.number().int().min(0),
+})
+export type ItemPedido = z.infer<typeof itemPedidoSchema>
+
 export const avisoSchema = z.object({
   id: z.uuid(),
   // nullable: no fluxo invertido o cobrador é convidado e só vincula conta ao aceitar.
@@ -100,6 +109,9 @@ export const avisoSchema = z.object({
   // Fase A (estudo revendedores): custo opcional (centavos, >=0). Dado INTERNO do dono
   // (nunca vai ao devedor); habilita o resultado/lucro no painel. null = não informado.
   valor_custo_centavos: z.number().int().min(0).nullish(),
+  // Fase A: composição opcional do pedido (o que foi vendido). Dado INTERNO do dono; nunca
+  // vai ao devedor. nullish: nem toda projeção do Aviso a traz (a lista por período não).
+  itens: z.array(itemPedidoSchema).nullish(),
   aceito_em: z.coerce.date().nullable(),
   // Arquivamento da agenda (H11.4): quando preenchido, a anotação sai da contagem/
   // visão da agenda (soft-delete; o registro permanece, regra de não-DELETE).

@@ -11,6 +11,10 @@ import * as repo from './repo'
 const PESSOA_INEXISTENTE =
   'Combinado não encontrado, ou ainda sem WhatsApp da outra ponta para agrupar.'
 
+// A4: limiar de inatividade da pessoa (dias). Casa com o default de painel/metricas
+// (`inativo_dias`, 60) para a leitura ser coerente entre a visão por pessoa e as métricas.
+const INATIVO_DIAS = 60
+
 /**
  * Resumo da pessoa (H15.1/H15.2): resolve o telefone da outra ponta a partir de um
  * combinado do usuário (no servidor, telefone nunca em rota) e devolve os quatro totais.
@@ -23,7 +27,13 @@ export async function resumo(
   const ref = await repo.resolverPessoaPorAviso(pool, uid, avisoId)
   if (!ref) throw naoEncontrado(PESSOA_INEXISTENTE)
   const totais = await repo.totaisPorPessoa(pool, uid, ref.telefone)
-  return { telefone: ref.telefone, nome_entrada: ref.nome_entrada, ...totais }
+  // A4: inativo = já foi cliente (tem última compra), nada ativo a receber agora, e a última
+  // venda passou do limiar. Sinal para reativar; nunca marca quem nunca comprou de mim.
+  const inativo =
+    totais.a_receber_qtd === 0 &&
+    totais.dias_desde_ultima_compra !== null &&
+    totais.dias_desde_ultima_compra >= INATIVO_DIAS
+  return { telefone: ref.telefone, nome_entrada: ref.nome_entrada, ...totais, inativo }
 }
 
 /**

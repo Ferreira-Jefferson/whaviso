@@ -381,6 +381,35 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
             </dl>
           </Card>
 
+          {/* Fase A: composição do pedido (itens). Dado INTERNO do dono: só aparece aqui,
+              nunca para a outra pessoa. Só renderiza quando o combinado tem itens. */}
+          {aviso.itens && aviso.itens.length > 0 && (
+            <Card>
+              <h2 className="mb-1 text-lg text-salvia">Itens do pedido</h2>
+              <p className="mb-4 text-sm text-tinta-2">
+                O que foi combinado, só para o seu controle. A outra pessoa não vê esta lista.
+              </p>
+              <ul className="flex flex-col divide-y divide-linha">
+                {aviso.itens.map((item, i) => (
+                  <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="min-w-0 truncate text-tinta">
+                      {item.qtd > 1 && <span className="text-tinta-2">{item.qtd}× </span>}
+                      {item.descricao}
+                    </span>
+                    <MoneyText centavos={item.qtd * item.valor_unit_centavos} className="shrink-0 tabular" />
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex items-center justify-between border-t border-linha pt-3 text-sm">
+                <span className="text-tinta-2">Total dos itens</span>
+                <MoneyText
+                  centavos={aviso.itens.reduce((s, it) => s + it.qtd * it.valor_unit_centavos, 0)}
+                  className="font-medium tabular"
+                />
+              </div>
+            </Card>
+          )}
+
           {/* CycleTimeline: só para "a receber" (pagar não tem ciclo/WhatsApp). */}
           {ehReceber && (
             <Card>

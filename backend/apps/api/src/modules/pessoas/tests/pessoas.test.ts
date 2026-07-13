@@ -178,3 +178,56 @@ describe('pessoas: visão por número (integração)', () => {
     }
   })
 })
+
+// Fase A (A4): última venda + sinal de inatividade na visão por pessoa. Cada teste usa um
+// número próprio (dados autocontidos) para não depender da ordem de execução.
+describe('pessoas: última compra e inatividade (A4)', () => {
+  let uid: string
+  let idAntigo: string
+  const TEL_ANTIGO = '+5511900000055'
+
+  beforeAll(async () => {
+    uid = await criarUsuario('Vendedora')
+    // Uma venda paga ANTIGA (bem além do limiar de 60d) e nada ativo → cliente inativo.
+    idAntigo = await insReceber(uid, 'Rita', TEL_ANTIGO, 'pago', 5000, '2026-01-05')
+  })
+  afterAll(async () => {
+    await limparUsuario(uid)
+  })
+
+  it('marca inativo: última venda passou do limiar e nada ativo a receber', async () => {
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({ method: 'GET', url: `/v1/pessoas/${idAntigo}/resumo`, headers: AUTH })
+    await app.close()
+    const b = r.json()
+    expect(b.ultima_compra).toBe('2026-01-05')
+    expect(b.dias_desde_ultima_compra).toBeGreaterThanOrEqual(60)
+    expect(b.a_receber_qtd).toBe(0)
+    expect(b.inativo).toBe(true)
+  })
+
+  it('NÃO marca inativo quando há combinado ativo a receber', async () => {
+    const tel = '+5511900000056'
+    const idBia = await insReceber(uid, 'Bia', tel, 'pago', 5000, '2026-01-05')
+    await insReceber(uid, 'Bia', tel, 'programado', 8000, '2026-07-01')
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({ method: 'GET', url: `/v1/pessoas/${idBia}/resumo`, headers: AUTH })
+    await app.close()
+    const b = r.json()
+    expect(b.inativo).toBe(false)
+    // Última compra = a venda mais recente em que sou cobrador daquele número.
+    expect(b.ultima_compra).toBe('2026-07-01')
+  })
+
+  it('sem venda como cobrador (só relação de pagar) → ultima_compra null, não inativo', async () => {
+    const tel = '+5511900000057'
+    const idPago = await insPagar(uid, 'Fornecedor', tel, 'programado', 3000, '2026-01-02')
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({ method: 'GET', url: `/v1/pessoas/${idPago}/resumo`, headers: AUTH })
+    await app.close()
+    const b = r.json()
+    expect(b.ultima_compra).toBeNull()
+    expect(b.dias_desde_ultima_compra).toBeNull()
+    expect(b.inativo).toBe(false)
+  })
+})

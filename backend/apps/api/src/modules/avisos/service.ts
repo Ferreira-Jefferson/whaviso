@@ -151,6 +151,8 @@ export async function criarAviso(
       pix_banco: body.pix_banco ?? null,
       categoria_id: body.categoria_id ?? null,
       valor_custo_centavos: body.valor_custo_centavos ?? null,
+      // Fase A: composição do pedido (itens). Interno; nunca vai ao devedor.
+      itens: body.itens ?? null,
     }
 
     // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM envio. ----
@@ -489,6 +491,12 @@ export async function editarAviso(
     if (mudaCusto) await repo.atualizarCusto(cli, id, body.valor_custo_centavos ?? null)
     const custoFinal = mudaCusto ? (body.valor_custo_centavos ?? null) : aviso.valor_custo_centavos
 
+    // Fase A: composição do pedido (itens) também é INTERNA e LIVRE (nunca abre reaprovação;
+    // não vai ao devedor). Trocar o VALOR combinado segue o caminho do acordo (abaixo).
+    const mudaItens = body.itens !== undefined
+    if (mudaItens) await repo.atualizarItens(cli, id, body.itens ?? null)
+    const itensFinal = mudaItens ? (body.itens ?? null) : aviso.itens
+
     const campos = camposEditados(body)
     const temCampoAcordo = Object.keys(campos).length > 0
 
@@ -499,14 +507,14 @@ export async function editarAviso(
         reaprovacao: false,
         interno: true,
       })
-      return { ...aviso, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal }
+      return { ...aviso, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal, itens: itensFinal }
     }
 
     if (livre) {
       // Antes do aceite: aplica direto, sem reaprovação nem evento de sub-ciclo.
       await repo.atualizarDados(cli, id, campos)
       await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, { reaprovacao: false })
-      return { ...aviso, ...campos, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal }
+      return { ...aviso, ...campos, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal, itens: itensFinal }
     }
 
     // Pós-aceite (campos do acordo): snapshot do "antes", aplica os novos dados, vai para
@@ -526,6 +534,7 @@ export async function editarAviso(
       ...campos,
       categoria_id: categoriaFinal,
       valor_custo_centavos: custoFinal,
+      itens: itensFinal,
       status: 'aguardando_aprovacao_aviso_editado',
     }
   })

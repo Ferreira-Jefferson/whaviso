@@ -18,12 +18,16 @@ import {
   chavePixSchema,
   conteudoTemplate,
   dataCombinada,
+  itemPedidoSchema,
   motivoAviso,
   perfilSchema,
   telefoneE164,
   templateSchema,
   valorCentavos,
 } from './entidades'
+
+// Fase A: teto de itens do pedido por combinado (espelha o backend).
+const MAX_ITENS_PEDIDO = 50
 
 // Configuração de RECORRÊNCIA na criação/ativação (E6 H6.10). Ausente = combinado simples.
 //  - periodo: repete TODO mês ou toda semana (sempre intervalo 1) ancorado na
@@ -74,6 +78,8 @@ export const criarAvisoBody = z
     // E16 / Fase A: categoria (opcional, minha e não arquivada) e custo interno (>=0).
     categoria_id: z.uuid().nullish(),
     valor_custo_centavos: z.number().int().min(0).nullish(),
+    // Fase A: composição opcional do pedido (itens). Interno; nunca vai ao devedor.
+    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
   })
   // No modo `agenda` (H4.1) telefone e Pix são opcionais (cobrados só ao ativar).
   .refine((b) => b.modo === 'agenda' || b.direcao !== 'receber' || b.telefone_devedor != null, {
@@ -153,6 +159,8 @@ export const editarAvisoBody = z
     // null limpa; ausente mantém.
     categoria_id: z.uuid().nullish(),
     valor_custo_centavos: z.number().int().min(0).nullish(),
+    // Fase A: composição do pedido (itens). Interna e LIVRE. null limpa; ausente mantém.
+    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
   })
   .refine(
     (b) =>
@@ -164,7 +172,8 @@ export const editarAvisoBody = z
       b.pix_titular !== undefined ||
       b.pix_banco !== undefined ||
       b.categoria_id !== undefined ||
-      b.valor_custo_centavos !== undefined,
+      b.valor_custo_centavos !== undefined ||
+      b.itens !== undefined,
     { message: 'informe ao menos um campo para editar' },
   )
 export type EditarAvisoBody = z.infer<typeof editarAvisoBody>
@@ -292,6 +301,11 @@ export const pessoaResumoResposta = z.object({
   a_pagar_qtd: z.number().int(),
   pago_centavos: z.number().int(),
   pago_qtd: z.number().int(),
+  // Fase A (A4): última venda para a pessoa + dias até hoje + sinal de inatividade
+  // (calculados no servidor). null quando nunca vendi para ela. Espelha o backend.
+  ultima_compra: dataCombinada.nullable(),
+  dias_desde_ultima_compra: z.number().int().nullable(),
+  inativo: z.boolean(),
 })
 export type PessoaResumoResposta = z.infer<typeof pessoaResumoResposta>
 
