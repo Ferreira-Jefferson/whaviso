@@ -24,7 +24,7 @@ O produto tem **dois pilares**:
 
 Variações: *"Cadastrou, agendou, recebeu." · "Seus recebimentos no automático." · "Agende o aviso. Saiba quando recebeu."*
 
-> **Uso secundário (não é a promessa central):** como cada combinado fica anotado na agenda (modo agenda: registrar sem enviar, Épico 4 / Épico 11), o whaviso também serve de **agenda leve de pedidos e de vendas a receber**. É um uso possível, citável na comunicação, mas não o coração do produto: a promessa central segue "avisar + controlar", não "gestão de vendas". Não vender como sistema de gestão de vendas nem prometer recursos de ERP.
+> **Posicionamento (revisto em 2026-07-12, ver [ESTUDO-revendedores-venda-direta.md](ESTUDO-revendedores-venda-direta.md)):** o público-alvo é **quem trabalha com venda direta** (revenda de perfumes, roupas, bijuterias, cosméticos). A **notificação é o motor**, mas notificar por notificar é commodity: o **diferencial é a gestão**, saber o que se vendeu, quanto se tem a receber e de quem, organizado por pessoa e por **categoria** (marca/linha), e o **resultado** (custo opcional por combinado, quanto sobrou). Continua **não sendo ERP** (sem estoque, sem catálogo de produtos, sem contas a pagar ao fornecedor) e continua **não recebendo pagamento no automático**: o sistema lembra e organiza; conferir e confirmar o recebimento é sempre da pessoa. A **linguagem das mensagens ao devedor não muda** (Regras de Ouro §2); o que a virada altera é o escopo de gestão e a **linguagem do produto** (painel e landing).
 
 ### O problema que resolve
 
@@ -203,11 +203,14 @@ Free mantém a agenda e visualiza, mas qualquer envio leva à CTA de upgrade (na
 
 ## 9. Público-alvo
 
+**Principal: revendedores de venda direta** (perfumes, roupas, bijuterias, semijoias, cosméticos), que vendem no fiado por confiança e hoje controlam tudo no caderno. Para eles o whaviso é a **agenda de vendas e recebimentos**: anotam a venda, veem quanto têm a receber de cada pessoa, separam por categoria (cada marca/linha), acompanham o resultado, e escolhem quem o sistema lembra por eles.
+
+Também atende, com a mesma mecânica:
 - Prestadores de serviço autônomos (mensalidade, consulta, aula, serviço recorrente)
 - Pais separados (pensão, despesas combinadas)
 - Acordos informais entre pessoas físicas (empréstimos, vaquinhas, mensalidades)
 
-Conexão de marketing: *"Para quem já se cansou de cobrar na mão."*
+Conexão de marketing: *"Organize suas vendas e deixe os lembretes com a gente."* (a antiga *"para quem já se cansou de cobrar na mão"* segue válida como dor secundária).
 
 ---
 
