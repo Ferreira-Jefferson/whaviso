@@ -1,54 +1,70 @@
 // Landing pública (/): página de venda. Layout próprio de marketing (largo,
 // responsivo), distinto do PublicLayout (coluna estreita das telas do devedor).
-// Comunica a proposta: automatize avisos de pagamento + painel de controle.
-// Linguagem das Regras de Ouro: só "aviso/lembrete/combinado"; sem termos de
-// pressão ou linguagem agressiva (restrição do canal WhatsApp).
+// Posicionamento: o whaviso é a AGENDA DE VENDAS E RECEBIMENTOS de quem trabalha
+// com confiança e fiado (revenda de venda direta). A notificação é o motor; o
+// diferencial é a GESTÃO (o que vendeu, quanto tem a receber e de quem, por
+// categoria). Duas linguagens distintas: a das MENSAGENS ao devedor segue as
+// Regras de Ouro (só "aviso/lembrete/combinado", sem pressão, restrição do canal
+// WhatsApp); a do PRODUTO/landing pode falar de vendas, recebimentos e resultado.
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router'
 import {
-  BellRing,
   CalendarClock,
   MessageSquare,
   ShieldCheck,
   Wallet,
   RefreshCw,
   Unlock,
+  LayoutDashboard,
+  Users,
+  Tags,
+  PiggyBank,
 } from 'lucide-react'
-import { Button, Card, WhatsAppPreview, BellLogo, RodapeSite, cn } from '@/shared/ui'
+import {
+  Button,
+  Card,
+  StatCard,
+  MoneyText,
+  WhatsAppPreview,
+  BellLogo,
+  RodapeSite,
+  cn,
+} from '@/shared/ui'
 
 const MENSAGEM_EXEMPLO =
-  'Oi, Maria. João pediu pra te lembrar do combinado: aluguel de junho, R$ 1.200,00 para 10 de junho.'
+  'Oi, Ana. Marina pediu pra te lembrar do combinado: pedido do catálogo, R$ 89,90 para 10 de junho.'
 
 // Os quatro avisos que a pessoa recebe ao longo do ciclo (D-2 → D+1). Vitrine de
 // marketing: "Já paguei" aparece em todas as etapas, com "Ver Pix" e o opt-out
-// sempre visível (Regra de Ouro). Os textos espelham os templates do backend.
+// sempre visível (Regra de Ouro). Os textos espelham os templates do backend e
+// seguem neutros (nenhuma palavra de pressão), mesmo com tema de venda direta.
 const MENSAGENS_CICLO = [
   {
     dia: 'D-2',
     rotulo: 'Aviso antecipado',
     texto:
-      'Oi, Maria. João pediu pra te lembrar do combinado: aluguel de junho, R$ 1.200,00 para 10 de junho.',
+      'Oi, Ana. Marina pediu pra te lembrar do combinado: pedido do catálogo, R$ 89,90 para 10 de junho.',
     botoes: ['Já paguei', 'Ver Pix', 'Sair dos lembretes'],
     horario: '09:00',
   },
   {
     dia: 'D-1',
     rotulo: 'Véspera',
-    texto: 'Oi, Maria. Amanhã é o dia: aluguel de junho, R$ 1.200,00.',
+    texto: 'Oi, Ana. Amanhã é o dia: pedido do catálogo, R$ 89,90.',
     botoes: ['Já paguei', 'Ver Pix', 'Sair dos lembretes'],
     horario: '09:00',
   },
   {
     dia: 'D',
     rotulo: 'No dia',
-    texto: 'Oi, Maria. Hoje é o dia: aluguel de junho, R$ 1.200,00.',
+    texto: 'Oi, Ana. Hoje é o dia: pedido do catálogo, R$ 89,90.',
     botoes: ['Já paguei', 'Ver Pix', 'Sair dos lembretes'],
     horario: '08:30',
   },
   {
     dia: 'D+1',
     rotulo: 'Encerramento',
-    texto: 'Oi, Maria. Último aviso: aluguel de junho, R$ 1.200,00.',
+    texto: 'Oi, Ana. Último aviso: pedido do catálogo, R$ 89,90.',
     botoes: ['Já paguei', 'Ver Pix', 'Sair dos lembretes'],
     horario: '09:00',
   },
@@ -56,7 +72,7 @@ const MENSAGENS_CICLO = [
 
 export default function LandingPage() {
   useEffect(() => {
-    document.title = 'Whaviso | automatize seus avisos de pagamento'
+    document.title = 'Whaviso | sua agenda de vendas e recebimentos'
   }, [])
 
   return (
@@ -64,6 +80,7 @@ export default function LandingPage() {
       <CabecalhoMarketing />
       <main>
         <Hero />
+        <NegocioOrganizado />
         <ComoFunciona />
         <Mensagem />
         <Planos />
@@ -103,20 +120,21 @@ function Hero() {
       <div className="grid items-center gap-10 lg:grid-cols-2">
         <div className="animate-rise">
           <span className="inline-flex items-center gap-2 rounded-pill bg-salvia-claro px-3 py-1 text-sm font-medium text-salvia">
-            <BellRing strokeWidth={1.75} className="size-4" />
-            Lembretes no automático
+            <CalendarClock strokeWidth={1.75} className="size-4" />
+            Sua agenda de vendas e recebimentos
           </span>
           <h1 className="mt-5 font-display text-4xl leading-tight text-salvia sm:text-5xl">
-            Você combina, o whaviso lembra por você.
+            Acompanhe suas vendas, saiba de quem tem a receber e escolha quem o
+            whaviso lembra por você.
           </h1>
           <p className="mt-4 max-w-prose text-lg text-tinta-2">
-            Cadastre o combinado uma vez. O whaviso manda os lembretes pelo
-            WhatsApp na hora certa e mostra no painel quem já pagou e quem
-            ainda falta.
+            O whaviso é a agenda do seu negócio: anote cada venda ou combinado,
+            veja quanto tem a receber de cada pessoa e deixe os lembretes saírem
+            sozinhos pelo WhatsApp, na hora certa.
           </p>
           <p className="mt-3 max-w-prose text-sm text-tinta-2">
-            Use também como sua agenda de pedidos e vendas: anote cada
-            combinado e acompanhe o que tem a receber, mesmo sem disparar aviso.
+            Separe por categoria (cada marca, cada linha que você revende) e
+            acompanhe o que entrou, o que falta e quanto rendeu.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link to="/entrar?modo=cadastro">
@@ -147,12 +165,106 @@ function Hero() {
   )
 }
 
+// Pilar da GESTÃO (o diferencial). Vem logo depois do hero para comunicar valor
+// antes do "como funciona". À esquerda, um mock ilustrativo do painel (StatCard do
+// design system); à direita, os quatro ganhos de gestão.
+const GESTAO = [
+  {
+    icone: LayoutDashboard,
+    titulo: 'Tudo num painel só',
+    texto:
+      'Veja num relance o que tem a receber, o que já recebeu e o que ainda falta, sem depender do caderno nem da memória.',
+  },
+  {
+    icone: Users,
+    titulo: 'Cada pessoa num lugar',
+    texto:
+      'Todos os combinados de uma pessoa reunidos: o que já acertou e o que falta, mesmo que o nome tenha variado entre um pedido e outro.',
+  },
+  {
+    icone: Tags,
+    titulo: 'Separe por categoria',
+    texto:
+      'Crie uma categoria para cada marca ou linha que você revende (Natura, Boticário, ou o que for) e filtre do jeito que te ajuda.',
+  },
+  {
+    icone: PiggyBank,
+    titulo: 'Saiba o seu resultado',
+    texto:
+      'Anote quanto custou e veja quanto sobrou de verdade, por período e por categoria. Vender bastante é bom; lucrar é o que importa.',
+  },
+]
+
+function NegocioOrganizado() {
+  return (
+    <section className="mx-auto w-full max-w-5xl px-4 py-16">
+      <h2 className="font-display text-3xl text-salvia">Seu negócio organizado</h2>
+      <p className="mt-2 max-w-prose text-tinta-2">
+        Mais que lembrar: o whaviso mostra o que você vendeu, o que tem a receber
+        e de quem, para você decidir com clareza e crescer.
+      </p>
+
+      <div className="mt-8 grid items-center gap-10 lg:grid-cols-2">
+        {/* Mock ilustrativo do painel */}
+        <div
+          className="rounded-2xl border border-linha bg-cartao p-5 shadow-[0_12px_40px_rgba(32,50,42,0.12)]"
+          aria-label="Exemplo ilustrativo do painel"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <span className="font-medium text-tinta">Seu mês</span>
+            <span className="text-sm text-tinta-2">junho</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard rotulo="A receber" centavos={124000} detalhe="3 pessoas" tom="salvia" />
+            <StatCard rotulo="Recebido" centavos={318000} detalhe="8 combinados" tom="folha" />
+          </div>
+          <div className="mt-3 flex items-center justify-between rounded-2xl bg-salvia-claro px-4 py-3">
+            <span className="text-sm font-medium text-salvia">Resultado estimado</span>
+            <MoneyText centavos={94000} className="text-lg font-semibold text-salvia" />
+          </div>
+          <div className="mt-4">
+            <span className="text-xs text-tinta-2">Por categoria</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {['Natura', 'Boticário', 'Bijuterias'].map((c) => (
+                <span
+                  key={c}
+                  className="rounded-pill border border-linha bg-papel-2 px-3 py-1 text-xs text-tinta-2"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Ganhos de gestão */}
+        <ul className="flex flex-col gap-5">
+          {GESTAO.map((g) => {
+            const Icon = g.icone
+            return (
+              <li key={g.titulo} className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-pill bg-salvia-claro text-salvia">
+                  <Icon strokeWidth={1.75} className="size-5" />
+                </span>
+                <div>
+                  <h3 className="text-lg text-tinta">{g.titulo}</h3>
+                  <p className="mt-0.5 text-sm text-tinta-2">{g.texto}</p>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
 const PASSOS = [
   {
     icone: CalendarClock,
-    titulo: 'Você combina os detalhes',
+    titulo: 'Anote a venda ou o combinado',
     texto:
-      'Cadastre o nome, o valor, a data e/ou sua chave Pix. Enviamos o combinado para a outra pessoa revisar e confirmar.',
+      'Cadastre a pessoa, o que foi vendido, o valor, a data e sua chave Pix. Fica tudo no seu painel, com ou sem envio de aviso.',
   },
   {
     icone: MessageSquare,
@@ -181,7 +293,8 @@ function ComoFunciona() {
       <div className="mx-auto w-full max-w-5xl px-4 py-16">
         <h2 className="font-display text-3xl text-salvia">Como funciona</h2>
         <p className="mt-2 max-w-prose text-tinta-2">
-          Cadastre o combinado. Os avisos saem automaticamente.
+          Anote a venda. Os avisos saem automaticamente. Você acompanha tudo no
+          painel.
         </p>
 
         <div className="mt-8 grid gap-5 sm:grid-cols-3">
@@ -379,7 +492,7 @@ const CREDITOS = [
     icone: Unlock,
     titulo: 'Tudo liberado',
     texto:
-      'Todos os recursos ficam disponíveis para qualquer conta: combinados, lembretes e painel. O único limite é o seu saldo de créditos.',
+      'Todos os recursos ficam disponíveis para qualquer conta: agenda, categorias, painel e lembretes. O único limite é o seu saldo de créditos.',
   },
 ]
 
@@ -389,8 +502,8 @@ function Planos() {
       <div className="mx-auto w-full max-w-5xl px-4 py-16">
         <h2 className="font-display text-3xl text-salvia">Créditos de envio</h2>
         <p className="mt-2 max-w-prose text-tinta-2">
-          Sem plano e sem mensalidade obrigatória: você compra créditos de envio e
-          paga pelo que usa. 
+          Anotar suas vendas e usar o painel é livre. Você só compra créditos de
+          envio quando quiser disparar os lembretes, e paga pelo que usa.
         </p>
 
         <div className="mt-8 grid gap-5 sm:grid-cols-3">
@@ -412,10 +525,11 @@ function Planos() {
             discreto e a seção duplicada que existia no fim da página). */}
         <Card className="mt-10 flex flex-col items-center gap-5 bg-salvia px-6 py-12 text-center text-papel">
           <h2 className="font-display text-3xl text-papel">
-            Pronto para automatizar seus avisos de pagamento?
+            Comece pelo que você já faz: anotar.
           </h2>
           <p className="max-w-prose text-papel/85">
-            Crie sua conta em minutos e gere o primeiro combinado hoje mesmo.
+            Crie sua conta em minutos e comece a acompanhar suas vendas e
+            recebimentos hoje mesmo.
           </p>
           <Link to="/entrar?modo=cadastro">
             <Button variante="secondary" className="px-7 py-3 text-base">
@@ -427,4 +541,3 @@ function Planos() {
     </section>
   )
 }
-
