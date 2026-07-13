@@ -58,6 +58,7 @@ import {
   useAviso,
   useAvisoEnvios,
   useAvisoEventos,
+  useCombinadoEnvio,
   useCancelarAviso,
   useConfirmarRecebimento,
   useDesfazerEdicao,
@@ -114,6 +115,11 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const { semSaldo } = useSemSaldo()
   const envios = useAvisoEnvios(id, ehReceber)
   const eventos = useAvisoEventos(id)
+  // E5/H5.0: o combinado é enviado de forma assíncrona (a api enfileira, o zap envia). Enquanto
+  // aguarda aceite, mostramos o estado REAL do envio (enviando/enviado/nao_enviado), para nunca
+  // afirmar "enviado" antes de sair. Sem polling: carrega ao abrir; ações invalidam a query.
+  const emAceite = aviso.status === 'aguardando_aceite'
+  const combinadoEnvio = useCombinadoEnvio(id, emAceite)
 
   const confirmar = useConfirmarRecebimento(id)
   const desmarcar = useDesmarcarRecebimento(id)
@@ -212,6 +218,50 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
                 </p>
               </div>
             </Card>
+          )}
+
+          {/* E5/H5.0: estado REAL do envio do combinado (enviando/enviado/nao_enviado).
+              O envio é assíncrono; nunca afirmar "enviado" antes de o zap enviar de fato. */}
+          {emAceite && combinadoEnvio.data && (
+            <>
+              {combinadoEnvio.data.estado === 'enviando' && (
+                <Card className="flex items-start gap-3 border-linha bg-areia/40">
+                  <Send strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-tinta-2" />
+                  <div>
+                    <p className="font-medium text-tinta">Enviando o combinado</p>
+                    <p className="mt-0.5 text-sm text-tinta-2">
+                      O Whaviso está enviando o combinado para o WhatsApp da pessoa. Isso pode
+                      levar alguns instantes. Assim que ela responder, o combinado entra no ciclo.
+                    </p>
+                  </div>
+                </Card>
+              )}
+              {combinadoEnvio.data.estado === 'enviado' && (
+                <Card className="flex items-start gap-3 border-folha/30 bg-salvia-claro">
+                  <CheckCircle2 strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-folha" />
+                  <div>
+                    <p className="font-medium text-folha">Combinado enviado</p>
+                    <p className="mt-0.5 text-sm text-tinta-2">
+                      {combinadoEnvio.data.enviado_em
+                        ? `Enviado pelo WhatsApp em ${dataHoraPtBR(combinadoEnvio.data.enviado_em)}. É só aguardar a pessoa confirmar.`
+                        : 'Enviado pelo WhatsApp. É só aguardar a pessoa confirmar.'}
+                    </p>
+                  </div>
+                </Card>
+              )}
+              {combinadoEnvio.data.estado === 'nao_enviado' && (
+                <Card className="flex items-start gap-3 border-ambar/30 bg-ambar-claro">
+                  <AlertTriangle strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-ambar" />
+                  <div>
+                    <p className="font-medium text-ambar">Combinado ainda não enviado</p>
+                    <p className="mt-0.5 text-sm text-tinta-2">
+                      Ainda não foi possível enviar o combinado pelo WhatsApp. O Whaviso vai
+                      tentar de novo automaticamente.
+                    </p>
+                  </div>
+                </Card>
+              )}
+            </>
           )}
 
           {/* Pessoa informou pagamento: aguardando o cobrador conferir e confirmar. */}

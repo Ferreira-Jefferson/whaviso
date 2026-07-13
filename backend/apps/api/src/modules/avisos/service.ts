@@ -6,9 +6,11 @@ import { reprogramarCiclo } from '@whaviso/shared/datas/horario'
 import type {
   AtivarAvisoBody,
   Aviso,
+  CombinadoEnvioResposta,
   CriarAvisoBody,
   EditarAvisoBody,
   Envio,
+  EstadoEnvioCombinado,
   EtapaEnvio,
   EventoAviso,
   ListarAvisosQuery,
@@ -371,6 +373,31 @@ export async function listarEnvios(pool: Pool, uid: string, id: string): Promise
   const aviso = await repo.buscarAvisoVisivel(pool, id, uid)
   if (!aviso) throw naoEncontrado('Aviso não encontrado')
   return repo.listarEnviosDoAviso(pool, id)
+}
+
+/**
+ * E5/H5.0: estado REAL do envio do combinado ao convidado, para a UI ser honesta (nunca
+ * afirmar "enviado" antes de o zap enviar de fato). Lê o outbox 'combinado_enviar' e mapeia
+ * o status técnico + erro para um estado semântico, sem vazar o código interno:
+ *  - enviado                       -> 'enviado' (com enviado_em)
+ *  - agendado | processando        -> 'enviando' (a caminho; inclui o gate de template ainda
+ *                                     não ativo/aprovado, que resolve sozinho ao ativar)
+ *  - falhou | cancelado            -> 'nao_enviado'
+ *  - sem linha (ex.: modo agenda)  -> 'enviando' (neutro; a UI só consulta quando há envio)
+ * Mesma visibilidade do detalhe (cobrador dono OU devedor vinculado).
+ */
+export async function estadoEnvioCombinado(
+  pool: Pool,
+  uid: string,
+  id: string,
+): Promise<CombinadoEnvioResposta> {
+  const aviso = await repo.buscarAvisoVisivel(pool, id, uid)
+  if (!aviso) throw naoEncontrado('Aviso não encontrado')
+  const linha = await repo.buscarEnvioCombinado(pool, id)
+  let estado: EstadoEnvioCombinado = 'enviando'
+  if (linha?.status === 'enviado') estado = 'enviado'
+  else if (linha?.status === 'falhou' || linha?.status === 'cancelado') estado = 'nao_enviado'
+  return { estado, enviado_em: linha?.enviado_em ?? null }
 }
 
 /** Eventos de auditoria do ciclo. Mesma visibilidade do detalhe. */

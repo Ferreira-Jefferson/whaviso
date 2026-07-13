@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ApiError } from '@/shared/api_client'
 import {
   avisoSchema,
+  combinadoEnvioResposta,
   criarAvisoResposta,
   envioSchema,
   eventoAvisoSchema,
@@ -11,6 +12,7 @@ import {
   statusAviso,
   type Aviso,
   type AtivarAvisoBody,
+  type CombinadoEnvioResposta,
   type CriarAvisoBody,
   type CriarAvisoResposta,
   type EditarAvisoBody,
@@ -32,6 +34,7 @@ export const avisosKeys = {
   envios: (id: string) => ['avisos', 'envios', id] as const,
   eventos: (id: string) => ['avisos', 'eventos', id] as const,
   ocorrencias: (id: string) => ['avisos', 'ocorrencias', id] as const,
+  combinadoEnvio: (id: string) => ['avisos', 'combinado-envio', id] as const,
 }
 
 // Prefixo das queries do painel financeiro. Invalidado após mutações que mudam
@@ -63,6 +66,30 @@ export function useAviso(id: string) {
     queryKey: avisosKeys.detalhe(id),
     queryFn: ({ signal }) =>
       apiClient.get<Aviso>(`/avisos/${id}`, { schema: avisoSchema, signal }),
+  })
+}
+
+/**
+ * GET /v1/avisos/:id/combinado-envio (E5/H5.0): estado REAL do envio do combinado
+ * (enviando/enviado/nao_enviado), para o detalhe não afirmar "enviado" antes de sair. Carrega
+ * ao abrir (sem polling; refetch no foco). `habilitado` deve refletir "faz sentido consultar"
+ * (aviso em aguardando_aceite). 404 (backend antigo) degrada para null: a UI só não mostra o bloco.
+ */
+export function useCombinadoEnvio(id: string, habilitado = true) {
+  return useQuery({
+    queryKey: avisosKeys.combinadoEnvio(id),
+    enabled: habilitado,
+    queryFn: async ({ signal }) => {
+      try {
+        return await apiClient.get<CombinadoEnvioResposta>(`/avisos/${id}/combinado-envio`, {
+          schema: combinadoEnvioResposta,
+          signal,
+        })
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.code === 'rota_inexistente')) return null
+        throw e
+      }
+    },
   })
 }
 
@@ -137,6 +164,7 @@ function invalidarTudo(qc: ReturnType<typeof useQueryClient>, id: string) {
   void qc.invalidateQueries({ queryKey: avisosKeys.envios(id) })
   void qc.invalidateQueries({ queryKey: avisosKeys.eventos(id) })
   void qc.invalidateQueries({ queryKey: avisosKeys.ocorrencias(id) })
+  void qc.invalidateQueries({ queryKey: avisosKeys.combinadoEnvio(id) })
   void qc.invalidateQueries({ queryKey: avisosKeys.todos })
   void qc.invalidateQueries({ queryKey: PAINEL_PREFIXO })
 }

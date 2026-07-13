@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import {
   ativarAvisoBody,
   avisoSchema,
+  combinadoEnvioResposta,
   criarAvisoBody,
   criarAvisoResposta,
   editarAvisoBody,
@@ -97,6 +98,14 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
     '/avisos/:id/envios',
     { preHandler: app.autenticar, schema: { params: idParam, response: { 200: listaEnviosResposta } } },
     async (req) => service.listarEnvios(app.pool, req.userId, req.params.id),
+  )
+
+  // E5/H5.0: estado REAL do envio do combinado (enviando/enviado/nao_enviado), para a UI
+  // não afirmar "enviado" antes de o zap enviar. Carrega ao abrir o detalhe (sem polling).
+  app.get(
+    '/avisos/:id/combinado-envio',
+    { preHandler: app.autenticar, schema: { params: idParam, response: { 200: combinadoEnvioResposta } } },
+    async (req) => service.estadoEnvioCombinado(app.pool, req.userId, req.params.id),
   )
 
   app.get(

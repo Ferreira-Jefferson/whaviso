@@ -584,6 +584,23 @@ export async function listarEnviosDoAviso(ex: Executor, avisoId: string): Promis
   return rows
 }
 
+/**
+ * Estado bruto do envio do combinado (outbox notificacoes_cobrador, tipo 'combinado_enviar').
+ * Lê a linha mais recente do aviso; o service mapeia para o estado semântico. Retorna null
+ * quando não há envio enfileirado (ex.: modo agenda). Não expõe telefone/Pix (só status/erro).
+ */
+export async function buscarEnvioCombinado(
+  ex: Executor,
+  avisoId: string,
+): Promise<{ status: string; erro: string | null; enviado_em: Date | null } | null> {
+  const { rows } = await ex.query<{ status: string; erro: string | null; enviado_em: Date | null }>(
+    `select status, erro, enviado_em from public.notificacoes_cobrador
+      where aviso_id = $1 and tipo = 'combinado_enviar' order by criado_em desc limit 1`,
+    [avisoId],
+  )
+  return rows[0] ?? null
+}
+
 /** Eventos de auditoria do aviso (ordem cronológica, append-only). */
 export async function listarEventosDoAviso(ex: Executor, avisoId: string): Promise<EventoAviso[]> {
   // id é bigint: o driver pg o devolve como string; convertemos para number (cabe com folga).

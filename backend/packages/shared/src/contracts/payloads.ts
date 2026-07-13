@@ -343,6 +343,20 @@ export type AtualizarChavePixBody = z.infer<typeof atualizarChavePixBody>
 export const listaEnviosResposta = z.array(envioSchema)
 export type ListaEnviosResposta = z.infer<typeof listaEnviosResposta>
 
+// ---- GET /v1/avisos/:id/combinado-envio (estado REAL do envio do combinado, E5/H5.0) ----
+// O combinado é apenas ENFILEIRADO na criação (outbox notificacoes_cobrador, tipo
+// 'combinado_enviar'); o zap drena e envia depois, com gate de template. Esta rota expõe um
+// ESTADO SEMÂNTICO já computado no servidor (nunca o código interno de erro, sem PII/jargão),
+// para a UI ser honesta: nunca afirmar "enviado" antes de o zap enviar de fato.
+export const estadoEnvioCombinado = z.enum(['enviando', 'enviado', 'nao_enviado'])
+export type EstadoEnvioCombinado = z.infer<typeof estadoEnvioCombinado>
+
+export const combinadoEnvioResposta = z.object({
+  estado: estadoEnvioCombinado,
+  enviado_em: z.coerce.date().nullable(),
+})
+export type CombinadoEnvioResposta = z.infer<typeof combinadoEnvioResposta>
+
 // ---- GET /v1/avisos/:id/eventos (auditoria, ordem cronológica) ----
 export const listaEventosResposta = z.array(eventoAvisoSchema)
 export type ListaEventosResposta = z.infer<typeof listaEventosResposta>

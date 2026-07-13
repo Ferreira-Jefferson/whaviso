@@ -26,11 +26,11 @@ export function AvisoCriado({ resultado, onNovo }: AvisoCriadoProps) {
   return (
     <div className="animate-rise">
       <PageHeader
-        titulo={ehAgenda ? 'Salvo na agenda' : 'Combinado enviado'}
+        titulo={ehAgenda ? 'Salvo na agenda' : 'Combinado criado'}
         descricao={
           ehAgenda
             ? 'Nada foi enviado. Ative quando quiser para o Whaviso mandar o combinado.'
-            : 'O Whaviso já mandou o combinado pelo WhatsApp. É só aguardar a pessoa confirmar.'
+            : 'O Whaviso está enviando o combinado pelo WhatsApp. Você acompanha o envio no detalhe.'
         }
       />
 
@@ -64,13 +64,13 @@ export function AvisoCriado({ resultado, onNovo }: AvisoCriadoProps) {
               Ativar quando quiser
             </Link>
           </div>
-        ) : /* E5: o Whaviso já enviou o combinado direto ao convidado. */ (
+        ) : /* E5: o Whaviso está enviando o combinado direto ao convidado (assíncrono). */ (
           <div className="flex flex-col gap-4 border-t border-linha pt-4">
             <p className="text-sm text-tinta-2">
-              O combinado foi enviado para o WhatsApp de{' '}
-              <strong className="font-medium text-tinta">{nomeConvidado}</strong>. A pessoa
-              vai ver o resumo e responder por lá com um toque. O combinado entra no ciclo de
-              lembretes assim que ela confirmar.
+              O Whaviso está enviando o combinado para o WhatsApp de{' '}
+              <strong className="font-medium text-tinta">{nomeConvidado}</strong>. Assim que a
+              pessoa responder, o combinado entra no ciclo de lembretes. Acompanhe o envio no
+              detalhe.
             </p>
           </div>
         )}

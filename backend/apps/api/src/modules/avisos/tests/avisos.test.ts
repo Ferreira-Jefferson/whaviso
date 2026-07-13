@@ -378,4 +378,78 @@ describe('avisos: envios e eventos por aviso (integração)', () => {
     await app.close()
     expect(r.statusCode).toBe(404)
   })
+
+  // E5/H5.0: estado REAL do envio do combinado (a UI não pode afirmar "enviado" antes de sair).
+  describe('GET /avisos/:id/combinado-envio', () => {
+    async function criarNaoAceito(): Promise<string> {
+      const app = await criarAppTeste(cobrador)
+      const criado = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
+      await app.close()
+      return criado.json().aviso.id
+    }
+    async function setStatusCombinado(avisoId: string, status: string, erro: string | null, enviadoEm: string | null) {
+      await poolSuper.query(
+        `update public.notificacoes_cobrador set status=$2, erro=$3, enviado_em=$4
+          where aviso_id=$1 and tipo='combinado_enviar'`,
+        [avisoId, status, erro, enviadoEm],
+      )
+    }
+
+    it('recém-criado (agendado) → estado enviando, enviado_em null', async () => {
+      const id = await criarNaoAceito()
+      const app = await criarAppTeste(cobrador)
+      const r = await app.inject({ method: 'GET', url: `/v1/avisos/${id}/combinado-envio`, headers: AUTH })
+      await app.close()
+      expect(r.statusCode).toBe(200)
+      expect(r.json().estado).toBe('enviando')
+      expect(r.json().enviado_em).toBeNull()
+    })
+
+    it('gate de template (agendado + erro sem_template_ativo) ainda é enviando (não vaza o motivo)', async () => {
+      const id = await criarNaoAceito()
+      await setStatusCombinado(id, 'agendado', 'sem_template_ativo', null)
+      const app = await criarAppTeste(cobrador)
+      const r = await app.inject({ method: 'GET', url: `/v1/avisos/${id}/combinado-envio`, headers: AUTH })
+      await app.close()
+      expect(r.json().estado).toBe('enviando')
+      // sem código interno na resposta
+      expect(JSON.stringify(r.json())).not.toContain('sem_template_ativo')
+    })
+
+    it('enviado carimba estado enviado + enviado_em', async () => {
+      const id = await criarNaoAceito()
+      await setStatusCombinado(id, 'enviado', null, '2026-07-13T00:00:00Z')
+      const app = await criarAppTeste(cobrador)
+      const r = await app.inject({ method: 'GET', url: `/v1/avisos/${id}/combinado-envio`, headers: AUTH })
+      await app.close()
+      expect(r.json().estado).toBe('enviado')
+      expect(r.json().enviado_em).not.toBeNull()
+    })
+
+    it('falhou → estado nao_enviado', async () => {
+      const id = await criarNaoAceito()
+      await setStatusCombinado(id, 'falhou', 'envio_132001: erro', null)
+      const app = await criarAppTeste(cobrador)
+      const r = await app.inject({ method: 'GET', url: `/v1/avisos/${id}/combinado-envio`, headers: AUTH })
+      await app.close()
+      expect(r.json().estado).toBe('nao_enviado')
+    })
+
+    it('terceiro não-vinculado → 404 (não vaza existência); sem token → 401', async () => {
+      const id = await criarNaoAceito()
+      const appEstranho = await criarAppTeste(estranho)
+      const rEstranho = await appEstranho.inject({
+        method: 'GET',
+        url: `/v1/avisos/${id}/combinado-envio`,
+        headers: { authorization: 'Bearer estranho' },
+      })
+      await appEstranho.close()
+      expect(rEstranho.statusCode).toBe(404)
+
+      const appSem = await criarAppTeste(cobrador)
+      const rSem = await appSem.inject({ method: 'GET', url: `/v1/avisos/${id}/combinado-envio` })
+      await appSem.close()
+      expect(rSem.statusCode).toBe(401)
+    })
+  })
 })

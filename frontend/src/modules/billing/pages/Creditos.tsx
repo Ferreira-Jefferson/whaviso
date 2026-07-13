@@ -160,7 +160,7 @@ export default function CreditosPage() {
       {/* Resultado da recarga (H11.10): a mensagem com o Pix foi empurrada ao WhatsApp. */}
       {enviado && (
         <Banner tom="sucesso" className="mt-4">
-          Enviamos as instruções de pagamento no seu WhatsApp. Pague via Pix e envie o
+          Estamos enviando as instruções de pagamento no seu WhatsApp. Pague via Pix e envie o
           comprovante na conversa que liberamos seus envios.
           {linkConversa && (
             <>

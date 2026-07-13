@@ -103,6 +103,19 @@ export const criarAvisoResposta = z.object({
 })
 export type CriarAvisoResposta = z.infer<typeof criarAvisoResposta>
 
+// ---- GET /v1/avisos/:id/combinado-envio (estado REAL do envio, E5/H5.0) ----
+// O combinado é só ENFILEIRADO na criação; o zap envia depois (com gate de template). Este
+// estado semântico deixa a UI honesta: nunca afirmar "enviado" antes de sair de fato. O
+// servidor não expõe o motivo técnico do erro (sem PII/jargão).
+export const estadoEnvioCombinado = z.enum(['enviando', 'enviado', 'nao_enviado'])
+export type EstadoEnvioCombinado = z.infer<typeof estadoEnvioCombinado>
+
+export const combinadoEnvioResposta = z.object({
+  estado: estadoEnvioCombinado,
+  enviado_em: z.coerce.date().nullable(),
+})
+export type CombinadoEnvioResposta = z.infer<typeof combinadoEnvioResposta>
+
 // ---- POST /v1/avisos/:id/ativar (H4.3) ----
 // Ativa uma anotação da agenda (sem_aviso -> aguardando_aceite): o Whaviso envia o
 // combinado ao convidado. Devolve o MESMO formato da criação (só o aviso). Dados

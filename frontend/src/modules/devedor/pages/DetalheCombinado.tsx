@@ -137,7 +137,7 @@ function Conteudo({ id, aviso }: { id: string; aviso: Aviso }) {
               <div>
                 <p className="font-medium text-folha">Você informou que pagou</p>
                 <p className="mt-0.5 text-sm text-tinta-2">
-                  Avisamos quem te convidou. Assim que a pessoa confirmar o recebimento, o
+                  Vamos avisar quem te convidou. Assim que a pessoa confirmar o recebimento, o
                   combinado fica concluído. Se ainda chegar algum lembrete neste meio-tempo,
                   pode desconsiderar.
                 </p>
