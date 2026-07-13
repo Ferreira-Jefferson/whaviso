@@ -14,6 +14,7 @@ import {
   PageHeader,
   PhoneInput,
   SegmentedControl,
+  Select,
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
 import type {
@@ -26,7 +27,7 @@ import { usePerfil } from '@/shared/auth'
 import { useSemSaldo } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
 import { hojeIso, telefone as fmtTelefone } from '@/shared/format'
-import { useBuscarPessoaPorTelefone, useCriarAviso } from '../api'
+import { useBuscarPessoaPorTelefone, useCategorias, useCriarAviso, useCriarCategoria } from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
 import { AvisoCriado } from '../components/AvisoCriado'
 import { RepetirCombinado } from '../components/RepetirCombinado'
@@ -42,6 +43,11 @@ export default function NovoAvisoPage() {
   const location = useLocation()
   const criar = useCriarAviso()
   const perfil = usePerfil()
+  // E16: categorias do usuário para o SELECT + criação inline de uma nova categoria.
+  const categorias = useCategorias()
+  const criarCategoria = useCriarCategoria()
+  const [mostrarNovaCat, setMostrarNovaCat] = useState(false)
+  const [novaCatNome, setNovaCatNome] = useState('')
   // E15 H15.5: quando cheguei da tela da pessoa, o nome + telefone vêm por STATE de
   // navegação (nunca na URL, H15.7) e pré-preenchem o formulário.
   const pessoaPrefill = (location.state as { pessoa?: { nome?: string; telefone?: string | null } } | null)
@@ -91,8 +97,23 @@ export default function NovoAvisoPage() {
       pix_chave: '',
       pix_titular: '',
       pix_banco: '',
+      categoria_id: '',
     },
   })
+
+  // Cria uma categoria inline e já a seleciona no formulário (H16.1/H16.3).
+  async function criarCategoriaInline() {
+    const nome = novaCatNome.trim()
+    if (!nome) return
+    try {
+      const c = await criarCategoria.mutateAsync({ nome })
+      setValue('categoria_id', c.id)
+      setNovaCatNome('')
+      setMostrarNovaCat(false)
+    } catch (e) {
+      setErroGeral(e instanceof ApiError ? e.message : 'Não foi possível criar a categoria.')
+    }
+  }
 
   const direcao = watch('direcao')
   // H4.1: o modo (enviar o combinado agora x só salvar) não é mais um seletor à parte;
@@ -143,6 +164,9 @@ export default function NovoAvisoPage() {
         motivo: dados.motivo,
         valor_centavos: dados.valor_centavos,
         data_combinada: dados.data_combinada,
+        // E16 / Fase A: categoria ('' = sem categoria) e custo interno (opcional).
+        categoria_id: dados.categoria_id ? dados.categoria_id : null,
+        valor_custo_centavos: dados.valor_custo_centavos ?? null,
         // E6 H6.10: recorrência (facilitador, todos os planos) + cadência (gated por plano
         // no servidor). undefined = combinado simples / ciclo completo. O servidor é a
         // autoridade: expande as ocorrências e valida vagas/cadência.
@@ -350,6 +374,74 @@ export default function NovoAvisoPage() {
                     onBlur={field.onBlur}
                     invalido={Boolean(errors.data_combinada)}
                     min={hojeIso()}
+                  />
+                )}
+              />
+            </Field>
+          </div>
+
+          {/* E16 / Fase A: organização (categoria) + resultado (custo). Ambos opcionais e
+              INTERNOS: nunca aparecem para a outra pessoa. */}
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field
+              label="Categoria (opcional)"
+              dica="Organize por marca ou linha. Não aparece para a outra pessoa."
+            >
+              <Controller
+                control={control}
+                name="categoria_id"
+                render={({ field }) => (
+                  <Select
+                    ariaLabel="Categoria"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    options={[
+                      { value: '', label: 'Sem categoria' },
+                      ...(categorias.data ?? []).map((c) => ({ value: c.id, label: c.nome })),
+                    ]}
+                  />
+                )}
+              />
+              {!mostrarNovaCat ? (
+                <button
+                  type="button"
+                  className="mt-1 self-start text-xs font-medium text-salvia hover:underline"
+                  onClick={() => setMostrarNovaCat(true)}
+                >
+                  + Nova categoria
+                </button>
+              ) : (
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    value={novaCatNome}
+                    onChange={(e) => setNovaCatNome(e.target.value)}
+                    placeholder="Ex.: Natura"
+                    maxLength={40}
+                    autoComplete="off"
+                  />
+                  <Button
+                    type="button"
+                    variante="secondary"
+                    loading={criarCategoria.isPending}
+                    onClick={criarCategoriaInline}
+                  >
+                    Criar
+                  </Button>
+                </div>
+              )}
+            </Field>
+
+            <Field
+              label="Custo (opcional)"
+              dica="Quanto o produto te custou. Fica só para você, para ver o resultado."
+            >
+              <Controller
+                control={control}
+                name="valor_custo_centavos"
+                render={({ field }) => (
+                  <MoneyInput
+                    value={field.value ?? null}
+                    onChange={(c) => field.onChange(c ?? undefined)}
                   />
                 )}
               />

@@ -8,9 +8,11 @@ import { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
   avisoSchema,
+  listaCategoriasResposta,
   painelMetricasResposta,
   painelPendenciasResposta,
   painelResumoResposta,
+  type Categoria,
   type DirecaoAviso,
   type PainelMetricasResposta,
   type PainelPendenciasResposta,
@@ -57,6 +59,16 @@ export function usePainelResumo(periodo: PeriodoResumo) {
   })
 }
 
+// E16: categorias do usuário, para o filtro do painel. Rota por string (o painel não
+// importa o módulo categorias/avisos; fronteira do lint). Raiz ['categorias'] compartilhada.
+export function useCategorias() {
+  return useQuery({
+    queryKey: ['categorias'],
+    queryFn: ({ signal }) =>
+      apiClient.get<Categoria[]>('/categorias', { schema: listaCategoriasResposta, signal }),
+  })
+}
+
 /** GET /v1/painel/pendencias: "precisa de você" (aguarda ação do usuário). */
 export function usePainelPendencias() {
   return useQuery({
@@ -96,6 +108,9 @@ export interface FiltrosLista {
    *  ocorrência do recorrente, com data/status próprios); sem de/ate, uma linha por combinado. */
   de?: string
   ate?: string
+  /** E16 H16.4: filtra por uma categoria (id) ou pelos sem categoria. */
+  categoria_id?: string
+  sem_categoria?: boolean
   page?: number
   per_page?: number
 }
@@ -123,6 +138,8 @@ export function useAvisos(filtros: FiltrosLista) {
           dir: filtros.dir,
           de: filtros.de,
           ate: filtros.ate,
+          categoria_id: filtros.categoria_id,
+          sem_categoria: filtros.sem_categoria,
           page: filtros.page,
           per_page: filtros.per_page,
         },

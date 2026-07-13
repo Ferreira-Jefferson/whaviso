@@ -47,6 +47,10 @@ export const novoAvisoSchema = z
     // invertido a chave é de terceiro e não exigimos esses dados aqui.
     pix_titular: z.string().trim().max(120, 'Nome muito longo.').optional(),
     pix_banco: z.string().trim().max(80, 'Nome muito longo.').optional(),
+    // E16 / Fase A: categoria (opcional; '' = sem categoria) e custo interno (centavos,
+    // opcional). Nunca vão ao devedor; ajudam a organizar e a ver o resultado.
+    categoria_id: z.string().optional(),
+    valor_custo_centavos: z.number().int().min(0).optional(),
   })
   // No modo agenda telefone e Pix são opcionais (H4.1): só obrigatórios ao enviar.
   .refine((v) => v.modo === 'agenda' || v.telefone_devedor !== null, {

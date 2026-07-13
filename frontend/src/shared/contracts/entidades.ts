@@ -57,6 +57,20 @@ export const chavePixSchema = z.object({
 export type ChavePix = z.infer<typeof chavePixSchema>
 export type Perfil = z.infer<typeof perfilSchema>
 
+// E16: categoria definida pelo usuário (organização por marca/linha). Espelho do backend.
+export const categoriaSchema = z.object({
+  id: z.uuid(),
+  nome: z.string().min(1).max(40),
+  cor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .nullable(),
+  arquivada: z.boolean(),
+  criado_em: z.coerce.date(),
+  atualizado_em: z.coerce.date(),
+})
+export type Categoria = z.infer<typeof categoriaSchema>
+
 export const avisoSchema = z.object({
   id: z.uuid(),
   // nullable: no fluxo invertido o cobrador é convidado e só vincula conta ao aceitar.
@@ -77,6 +91,10 @@ export const avisoSchema = z.object({
   // Titular + banco da chave Pix (compõem a 2ª msg do Pix ao devedor, E7 H7.3).
   pix_titular: z.string().max(120).nullable(),
   pix_banco: z.string().max(80).nullable(),
+  // E16 / Fase A: categoria (opcional) e custo interno do combinado. nullish: nem toda
+  // projeção do Aviso os traz. Nunca vão ao devedor; habilitam organização e resultado.
+  categoria_id: z.uuid().nullish(),
+  valor_custo_centavos: z.number().int().min(0).nullish(),
   aceito_em: z.coerce.date().nullable(),
   // Arquivamento da agenda (H11.4): quando preenchido, a anotação saiu da agenda.
   arquivado_em: z.coerce.date().nullable(),

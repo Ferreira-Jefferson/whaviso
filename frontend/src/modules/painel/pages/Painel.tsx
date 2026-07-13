@@ -47,7 +47,7 @@ import {
   type Pendencia,
   type StatusAviso,
 } from '@/shared/contracts'
-import { useAvisos, usePainelPendencias, usePainelResumo } from '../api'
+import { useAvisos, useCategorias, usePainelPendencias, usePainelResumo } from '../api'
 
 const ROTULO_PENDENCIA: Record<Pendencia['tipo'], string> = {
   confirmar_pagamento: 'Aguardando sua confirmação',
@@ -116,12 +116,15 @@ export default function PainelPage() {
   const papel = lerPapel(params.get('papel'))
   const estado = lerEstado(params.get('status'))
   const buscaUrl = params.get('busca') ?? ''
+  // E16 H16.4: filtro por categoria. '' = todas; 'sem' = sem categoria; senão = id.
+  const categoria = params.get('categoria') ?? ''
 
   const { data, isLoading, isError } = usePainelResumo({
     de: de || undefined,
     ate: ate || undefined,
   })
   const pendencias = usePainelPendencias()
+  const categorias = useCategorias()
 
   // Busca com debounce local antes de ir ao servidor (server-side por nome OU motivo).
   const [buscaInput, setBuscaInput] = useState(buscaUrl)
@@ -152,6 +155,8 @@ export default function PainelPage() {
     dir: grupo === 'historico' ? 'desc' : 'asc',
     de: de || undefined,
     ate: ate || undefined,
+    categoria_id: categoria && categoria !== 'sem' ? categoria : undefined,
+    sem_categoria: categoria === 'sem' ? true : undefined,
     per_page: 100,
   })
   const linhas = lista.data?.itens ?? []
@@ -413,20 +418,37 @@ export default function PainelPage() {
               aria-label="Buscar por nome ou motivo"
             />
           </div>
-          {/* Filtro por situação: só os estados da faixa atual; oculto quando a faixa tem
-              um estado só (Sem aviso). Rótulos canônicos da H9.3. */}
-          {mostrarFiltroEstado && (
-            <Select<FiltroEstado>
-              ariaLabel="Filtrar por situação"
-              value={estadoValido}
-              onChange={(v) => setParam({ status: v === FILTRO_TODOS ? null : v })}
-              options={[
-                { value: FILTRO_TODOS, label: 'Todas as situações' },
-                ...estadosFaixa.map((s) => ({ value: s, label: ROTULO_STATUS_AVISO[s] })),
-              ]}
-              className="lg:w-56"
-            />
-          )}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {/* E16 H16.4: filtro por categoria (todas / sem categoria / cada categoria).
+                Só aparece quando a conta tem categorias. */}
+            {(categorias.data?.length ?? 0) > 0 && (
+              <Select<string>
+                ariaLabel="Filtrar por categoria"
+                value={categoria}
+                onChange={(v) => setParam({ categoria: v || null })}
+                options={[
+                  { value: '', label: 'Todas as categorias' },
+                  { value: 'sem', label: 'Sem categoria' },
+                  ...(categorias.data ?? []).map((c) => ({ value: c.id, label: c.nome })),
+                ]}
+                className="lg:w-56"
+              />
+            )}
+            {/* Filtro por situação: só os estados da faixa atual; oculto quando a faixa tem
+                um estado só (Sem aviso). Rótulos canônicos da H9.3. */}
+            {mostrarFiltroEstado && (
+              <Select<FiltroEstado>
+                ariaLabel="Filtrar por situação"
+                value={estadoValido}
+                onChange={(v) => setParam({ status: v === FILTRO_TODOS ? null : v })}
+                options={[
+                  { value: FILTRO_TODOS, label: 'Todas as situações' },
+                  ...estadosFaixa.map((s) => ({ value: s, label: ROTULO_STATUS_AVISO[s] })),
+                ]}
+                className="lg:w-56"
+              />
+            )}
+          </div>
         </div>
 
         {lista.isLoading ? (

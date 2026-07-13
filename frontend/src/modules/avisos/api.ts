@@ -5,18 +5,22 @@ import { apiClient, ApiError } from '@/shared/api_client'
 import {
   avisoSchema,
   buscarPessoaResposta,
+  categoriaSchema,
   combinadoEnvioResposta,
   criarAvisoResposta,
   envioSchema,
   eventoAvisoSchema,
+  listaCategoriasResposta,
   ocorrenciaSchema,
   statusAviso,
   type Aviso,
   type AtivarAvisoBody,
   type BuscarPessoaResposta,
+  type Categoria,
   type CombinadoEnvioResposta,
   type CriarAvisoBody,
   type CriarAvisoResposta,
+  type CriarCategoriaBody,
   type EditarAvisoBody,
   type Envio,
   type EventoAviso,
@@ -58,6 +62,28 @@ export function useCriarAviso() {
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: avisosKeys.todos })
+    },
+  })
+}
+
+// E16: categorias do usuário, para o SELECT no formulário. Chamadas pela rota (o módulo
+// avisos não importa o módulo categorias; fronteira do lint). A raiz ['categorias'] é
+// compartilhada por string com o módulo categorias (a gerência invalida a mesma chave).
+export function useCategorias() {
+  return useQuery({
+    queryKey: ['categorias'],
+    queryFn: ({ signal }) =>
+      apiClient.get<Categoria[]>('/categorias', { schema: listaCategoriasResposta, signal }),
+  })
+}
+
+/** POST /v1/categorias: cria uma categoria inline no formulário. Invalida ['categorias']. */
+export function useCriarCategoria() {
+  const qc = useQueryClient()
+  return useMutation<Categoria, Error, CriarCategoriaBody>({
+    mutationFn: (body) => apiClient.post<Categoria>('/categorias', { body, schema: categoriaSchema }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['categorias'] })
     },
   })
 }
