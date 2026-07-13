@@ -429,6 +429,12 @@ export default function NovoAvisoPage() {
                   </Button>
                 </div>
               )}
+              <Link
+                to="/app/categorias"
+                className="mt-1 self-start text-xs text-tinta-2 hover:underline"
+              >
+                Gerenciar categorias
+              </Link>
             </Field>
 
             <Field

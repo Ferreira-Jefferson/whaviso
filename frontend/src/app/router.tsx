@@ -29,6 +29,7 @@ import { PainelPage, MetricasNegocioPage } from '@/modules/painel'
 import { PessoaPage } from '@/modules/pessoas'
 import { NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
 import { CreditosPage } from '@/modules/billing'
+import { CategoriasPage } from '@/modules/categorias'
 import { ContaPage } from '@/modules/conta'
 import {
   MeusCombinadosPage,
@@ -138,6 +139,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <PainelPage /> },
           { path: 'metricas', element: <MetricasNegocioPage /> },
+          { path: 'categorias', element: <CategoriasPage /> },
           { path: 'avisos', element: <RedirectAvisos /> },
           { path: 'avisos/novo', element: <NovoAvisoPage /> },
           { path: 'avisos/:id', element: <DetalheAvisoPage /> },
