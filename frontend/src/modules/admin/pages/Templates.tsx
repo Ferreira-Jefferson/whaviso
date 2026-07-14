@@ -38,9 +38,10 @@ export default function TemplatesPage() {
 
 // Situação viva de cada chave a partir dos templates unificados: 'ativo' (tem
 // versão ativa E aprovada na Meta, de fato no ar) ou 'vazio' (sem versão). Sem
-// versão no ar, resume as versões pela que MAIS pede atenção do owner:
-// rejeitado (corrigir e reenviar) > em_analise (só esperar) > rascunho (enviar).
-// Retorna undefined enquanto carrega, para a lista não piscar um estado errado.
+// versão no ar, resume as versões pela que MAIS pede atenção do owner: aprovado
+// (falta só ativar, um clique) > rejeitado (corrigir e reenviar) > em_analise (só
+// esperar) > rascunho (enviar). Retorna undefined enquanto carrega, para a lista
+// não piscar um estado errado.
 function construirResumo(
   mensagens: Template[] | undefined,
 ): ((chave: string) => SituacaoChave | undefined) | undefined {
@@ -58,6 +59,7 @@ function construirResumo(
     // aprova, o envio fica gated (E12), então a chave mostra o estado da proposta.
     if (arr.some((t) => t.ativo && t.status_meta === 'aprovado')) return 'ativo'
     const situacoes = new Set(arr.map(situacaoTemplate))
+    if (situacoes.has('aprovado')) return 'aprovado'
     if (situacoes.has('rejeitado')) return 'rejeitado'
     if (situacoes.has('em_analise')) return 'em_analise'
     return 'rascunho'
@@ -154,6 +156,7 @@ function Legenda() {
   return (
     <ul className="-mt-2 mb-7 flex flex-wrap gap-x-6 gap-y-2 text-xs text-tinta-2">
       <ItemLegenda cor="border-folha bg-salvia-claro" texto="Versão ativa no ar" />
+      <ItemLegenda cor="border-folha bg-papel-2" texto="Aprovado, falta ativar" />
       <ItemLegenda cor="border-ambar bg-ambar-claro" texto="Em análise na Meta" />
       <ItemLegenda cor="border-tinta-2 bg-papel-2" texto="Não enviado à Meta" />
       <ItemLegenda cor="border-barro bg-papel-2" texto="Recusado pela Meta" />

@@ -11,11 +11,16 @@ import { ROTULO_SITUACAO } from '../situacao_template'
 // Situação viva de uma CHAVE (resumo das versões): 'ativo' (tem versão no ar) e
 // 'vazio' (sem versão) são conceitos da chave; os demais espelham a situação real
 // do template (situacao_template), para a lista distinguir "não enviado à Meta" de
-// "em análise" e "recusado" em vez do antigo rótulo genérico.
-export type SituacaoChave = 'ativo' | 'em_analise' | 'rascunho' | 'rejeitado' | 'vazio'
+// "em análise", "aprovado (falta só ativar)" e "recusado" em vez do antigo rótulo
+// genérico.
+export type SituacaoChave = 'ativo' | 'aprovado' | 'em_analise' | 'rascunho' | 'rejeitado' | 'vazio'
 
 const SITUACAO: Record<SituacaoChave, { rotulo: string; classe: string }> = {
   ativo: { rotulo: 'Versão ativa', classe: 'bg-salvia-claro text-folha' },
+  // Aprovado na Meta mas ainda não ativado: mesma cor de "no ar" (folha), porém sem
+  // preenchimento, para não parecer já ativo e ainda assim sinalizar que falta só
+  // um clique do owner (Ativar esta versão).
+  aprovado: { rotulo: 'Aprovado, falta ativar', classe: 'bg-papel-2 text-folha' },
   em_analise: { rotulo: ROTULO_SITUACAO.em_analise, classe: 'bg-ambar-claro text-ambar' },
   rejeitado: { rotulo: ROTULO_SITUACAO.rejeitado, classe: 'bg-papel-2 text-barro' },
   rascunho: { rotulo: ROTULO_SITUACAO.rascunho, classe: 'bg-papel-2 text-tinta-2' },

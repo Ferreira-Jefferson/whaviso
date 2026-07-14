@@ -22,14 +22,17 @@ const ETAPAS = etapaEnvio.options
 // Situação de uma etapa no catálogo (deriva do array de templates da etapa).
 // 'ativo'/'vazio' são conceitos da etapa; os demais espelham a situação real do
 // template (situacao_template), para a trilha distinguir "não enviado à Meta" de
-// "em análise" e "recusado".
-type Situacao = 'ativo' | 'em_analise' | 'rascunho' | 'rejeitado' | 'vazio'
+// "em análise", "aprovado (falta só ativar)" e "recusado".
+type Situacao = 'ativo' | 'aprovado' | 'em_analise' | 'rascunho' | 'rejeitado' | 'vazio'
 
 // Família visual por situação. Espelha a paleta do CycleTimeline (verde = no ar,
 // âmbar = em análise, terroso = recusado, cinza = inerte/não enviado), mantendo o
-// tom calmo (sem alarme).
+// tom calmo (sem alarme). 'aprovado' usa o mesmo verde do 'ativo', mas SEM
+// preenchimento (só contorno): já passou pela Meta, mas ainda não é o que está
+// no ar, então não pode parecer igual ao 'ativo'.
 const COR_NODE: Record<Situacao, string> = {
   ativo: 'bg-salvia-claro border-folha text-folha',
+  aprovado: 'bg-papel-2 border-folha text-folha',
   em_analise: 'bg-ambar-claro border-ambar text-ambar',
   rascunho: 'bg-papel-2 border-tinta-2 text-tinta-2',
   rejeitado: 'bg-papel-2 border-barro text-barro',
@@ -38,6 +41,7 @@ const COR_NODE: Record<Situacao, string> = {
 
 const COR_LINHA: Record<Situacao, string> = {
   ativo: 'bg-folha/40',
+  aprovado: 'bg-folha/40',
   em_analise: 'bg-ambar/40',
   rascunho: 'bg-tinta-2/30',
   rejeitado: 'bg-barro/40',
@@ -47,6 +51,7 @@ const COR_LINHA: Record<Situacao, string> = {
 // Cor do texto de status embaixo do nó, por situação (mesma paleta dos nós).
 const COR_TEXTO: Record<Situacao, string> = {
   ativo: 'text-folha',
+  aprovado: 'text-folha',
   em_analise: 'text-ambar',
   rascunho: 'text-tinta-2',
   rejeitado: 'text-barro',
@@ -75,14 +80,17 @@ function resumoEtapa(etapa: EtapaEnvio, templates: Template[]): InfoEtapa {
   const noAr = daEtapa.find((t) => t.ativo && t.status_meta === 'aprovado') ?? null
   if (noAr) return { etapa, situacao: 'ativo', versaoAtiva: noAr.versao, contagem: 0 }
   if (daEtapa.length === 0) return { etapa, situacao: 'vazio', versaoAtiva: null, contagem: 0 }
-  // Sem versão no ar, resume pela situação que MAIS pede atenção do owner:
-  // rejeitado (corrigir e reenviar) > em_analise (só esperar) > rascunho (enviar).
+  // Sem versão no ar, resume pela situação que MAIS pede atenção do owner: aprovado
+  // (falta só ativar, um clique) > rejeitado (corrigir e reenviar) > em_analise (só
+  // esperar) > rascunho (enviar).
   const situacoes = daEtapa.map(situacaoTemplate)
-  const situacao: Situacao = situacoes.includes('rejeitado')
-    ? 'rejeitado'
-    : situacoes.includes('em_analise')
-      ? 'em_analise'
-      : 'rascunho'
+  const situacao: Situacao = situacoes.includes('aprovado')
+    ? 'aprovado'
+    : situacoes.includes('rejeitado')
+      ? 'rejeitado'
+      : situacoes.includes('em_analise')
+        ? 'em_analise'
+        : 'rascunho'
   const contagem = situacoes.filter((s) => s === situacao).length
   return { etapa, situacao, versaoAtiva: null, contagem }
 }
@@ -92,6 +100,8 @@ function textoStatus(info: InfoEtapa): string {
   switch (info.situacao) {
     case 'ativo':
       return `Ativo · v${info.versaoAtiva}`
+    case 'aprovado':
+      return `${info.contagem} aprovada${plural}, falta ativar`
     case 'em_analise':
       return `${info.contagem} em análise na Meta`
     case 'rascunho':
