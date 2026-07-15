@@ -9,6 +9,7 @@ import type {
   Ocorrencia,
   PapelAviso,
   StatusAviso,
+  TipoChavePix,
 } from '@whaviso/shared/contracts'
 
 type Executor = Pool | PoolClient
@@ -117,6 +118,9 @@ export interface NovoAviso {
   pix_chave: string | null
   pix_titular: string | null
   pix_banco: string | null
+  // E7/H7.3: tipo da chave (snapshot). Resolvido pelo serviço (cadastro do cobrador ou
+  // inferência). null quando sem chave / ambíguo (o zap reinferre no envio).
+  pix_tipo: TipoChavePix | null
   // E16: categoria (opcional) do combinado.
   categoria_id: string | null
   // Fase A: custo opcional (centavos) do combinado; null = não informado.
@@ -146,9 +150,10 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
         ocorrencias_total, ocorrencia_atual, cadencia_etapas,
         aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em,
-        categoria_id, valor_custo_centavos, itens)
+        categoria_id, valor_custo_centavos, itens, pix_tipo)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27,$28::jsonb)
+             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27,$28::jsonb,
+             $29::tipo_chave_pix)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
@@ -163,6 +168,7 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
       // jsonb: node-pg serializa Array como array literal do Postgres, não como json; então
       // passamos a string JSON (null = coluna null). Espelha inserirEdicao/atualizarItens.
       novo.itens == null ? null : JSON.stringify(novo.itens),
+      novo.pix_tipo ?? null,
     ],
   )
   return mapear(rows[0]!)
@@ -346,6 +352,7 @@ export interface DadosAtivacao {
   pix_chave?: string | null
   pix_titular?: string | null
   pix_banco?: string | null
+  pix_tipo?: TipoChavePix | null
 }
 
 /**
@@ -382,6 +389,7 @@ export async function ativarAviso(
        pix_chave = coalesce($5, pix_chave),
        pix_titular = coalesce($6, pix_titular),
        pix_banco = coalesce($7, pix_banco),
+       pix_tipo = coalesce($20::tipo_chave_pix, pix_tipo),
        recorrencia_tipo = case when $12::boolean then $13 else recorrencia_tipo end,
        recorrencia_freq = case when $12::boolean then $14 else recorrencia_freq end,
        recorrencia_intervalo = case when $12::boolean then coalesce($15,1) else recorrencia_intervalo end,
@@ -414,9 +422,20 @@ export async function ativarAviso(
       recorrencia?.ocorrencia_atual ?? null,
       cadenciaEtapas !== undefined,
       cadenciaEtapas ?? null,
+      dados.pix_tipo ?? null,
     ],
   )
   return mapear(rows[0]!)
+}
+
+/**
+ * E7/H7.3: atualiza SÓ o snapshot do tipo da chave no aviso. Chamado quando a chave é
+ * (re)escrita fora da criação/ativação (edição H2.5, desfazer/recusar), para o tipo
+ * acompanhar a chave sem carona no snapshot de avisos_edicoes (que só guarda os campos do
+ * acordo). null = sem tipo resolvido (o zap reinferre no envio).
+ */
+export async function atualizarPixTipo(ex: Executor, id: string, tipo: TipoChavePix | null): Promise<void> {
+  await ex.query(`update public.avisos set pix_tipo = $2::tipo_chave_pix where id = $1`, [id, tipo])
 }
 
 // ---- Ocorrências de combinado recorrente (E8 H8.7) -------------------------------------

@@ -18,7 +18,9 @@ import type {
   PapelAviso,
   RecorrenciaInput,
   StatusAviso,
+  TipoChavePix,
 } from '@whaviso/shared/contracts'
+import { detectarTipoChavePix } from '@whaviso/shared/contracts'
 import { gerarToken, sha256Hex } from '../../shared/tokens'
 import { conflito, naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
 import {
@@ -80,6 +82,28 @@ function montarRecorrencia(
   }
 }
 
+/**
+ * E7/H7.3: resolve o TIPO da chave para o snapshot do aviso, com precisão máxima e SEM
+ * dar ao zap acesso a chaves_pix. Preferência: o tipo CONFIRMADO no cadastro do próprio
+ * cobrador (fluxo receber, `cobradorId` = dono da chave); senão a inferência por formato
+ * (@whaviso/shared), que devolve null no ambíguo (11 díg. CPF x celular). null aceitável:
+ * o zap reinferre no envio. Roda na api (que tem grant em chaves_pix), nunca no zap.
+ */
+async function resolverPixTipo(
+  cli: PoolClient,
+  cobradorId: string | null,
+  chave: string,
+): Promise<TipoChavePix | null> {
+  if (cobradorId) {
+    const { rows } = await cli.query<{ tipo: TipoChavePix }>(
+      `select tipo from public.chaves_pix where profile_id = $1 and chave = $2 and not arquivada limit 1`,
+      [cobradorId, chave],
+    )
+    if (rows[0]?.tipo) return rows[0].tipo
+  }
+  return detectarTipoChavePix(chave)
+}
+
 export async function criarAviso(
   pool: Pool,
   uid: string,
@@ -134,6 +158,12 @@ export async function criarAviso(
     const telefoneCriador = ehReceber ? null : await repo.telefoneDoPerfil(cli, uid)
     const telefoneDevedor = ehReceber ? (body.telefone_devedor ?? null) : telefoneCriador
 
+    // E7/H7.3: tipo da chave (snapshot). No receber a chave é do próprio cobrador (uid), com
+    // tipo confirmado no cadastro; no invertido é de terceiro (só inferência por formato).
+    const pixTipo = body.pix_chave
+      ? await resolverPixTipo(cli, ehReceber ? uid : null, body.pix_chave)
+      : null
+
     const camposComuns = {
       cobrador_id: ehReceber ? uid : null,
       devedor_profile_id: ehReceber ? null : uid,
@@ -149,6 +179,7 @@ export async function criarAviso(
       pix_chave: body.pix_chave ?? null,
       pix_titular: body.pix_titular ?? null,
       pix_banco: body.pix_banco ?? null,
+      pix_tipo: pixTipo,
       categoria_id: body.categoria_id ?? null,
       valor_custo_centavos: body.valor_custo_centavos ?? null,
       // Fase A: composição do pedido (itens). Interno; nunca vai ao devedor.
@@ -260,6 +291,9 @@ export async function ativarAviso(
     const pixAtivo = body.pix_chave ?? aviso.pix_chave
     const pixTitularAtivo = body.pix_titular ?? aviso.pix_titular
     const pixBancoAtivo = body.pix_banco ?? aviso.pix_banco
+    // E7/H7.3: (re)resolve o tipo se a chave veio/mudou na ativação; senão mantém o snapshot.
+    const pixTipoAtivo =
+      body.pix_chave != null && pixAtivo ? await resolverPixTipo(cli, aviso.cobrador_id, pixAtivo) : null
 
     // Dados obrigatórios para ATIVAR (H4.3). Lista o que falta sem logar valores.
     const faltando: string[] = []
@@ -313,6 +347,9 @@ export async function ativarAviso(
         pix_chave: pixAtivo,
         pix_titular: pixTitularAtivo,
         pix_banco: pixBancoAtivo,
+        // null NÃO sobrescreve (coalesce no repo): mantém o tipo já gravado quando a chave
+        // não mudou na ativação.
+        pix_tipo: pixTipoAtivo,
       },
       {
         aceite_token_hash: aceiteHash,
@@ -513,6 +550,10 @@ export async function editarAviso(
     if (livre) {
       // Antes do aceite: aplica direto, sem reaprovação nem evento de sub-ciclo.
       await repo.atualizarDados(cli, id, campos)
+      // E7/H7.3: o tipo acompanha a chave editada (snapshot fora de avisos_edicoes).
+      if (campos.pix_chave != null) {
+        await repo.atualizarPixTipo(cli, id, await resolverPixTipo(cli, aviso.cobrador_id, campos.pix_chave))
+      }
       await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, { reaprovacao: false })
       return { ...aviso, ...campos, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal, itens: itensFinal }
     }
@@ -524,6 +565,11 @@ export async function editarAviso(
     if (!anteriores) throw naoEncontrado('Aviso não encontrado')
     await repo.inserirEdicao(cli, id, anteriores, aviso.status)
     await repo.atualizarDados(cli, id, campos)
+    // E7/H7.3: o tipo acompanha a chave editada (o snapshot de avisos_edicoes só guarda
+    // os campos do acordo; o tipo é derivado da chave e re-resolvido no desfazer/recusar).
+    if (campos.pix_chave != null) {
+      await repo.atualizarPixTipo(cli, id, await resolverPixTipo(cli, aviso.cobrador_id, campos.pix_chave))
+    }
     await repo.atualizarStatus(cli, id, 'aguardando_aprovacao_aviso_editado')
     await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, { reaprovacao: true })
     // Notifica o DEVEDOR (alteração a aprovar + lembretes pausados). Só enfileira.
@@ -572,6 +618,14 @@ export async function desfazerEdicao(pool: Pool, uid: string, id: string): Promi
     if (!edicao) throw conflito('sem_edicao_pendente', 'Não há edição aguardando aprovação para desfazer.')
 
     await repo.atualizarDados(cli, id, edicao.dados_anteriores)
+    // E7/H7.3: restaura o tipo junto da chave revertida (re-resolvido, não vem do snapshot).
+    await repo.atualizarPixTipo(
+      cli,
+      id,
+      edicao.dados_anteriores.pix_chave
+        ? await resolverPixTipo(cli, aviso.cobrador_id, edicao.dados_anteriores.pix_chave)
+        : null,
+    )
     await repo.resolverEdicao(cli, edicao.id, 'desfeita')
     await repo.atualizarStatus(cli, id, 'programado')
     await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, { desfeito: true })
@@ -611,6 +665,19 @@ export async function recusarEdicao(cli: PoolClient, id: string): Promise<void> 
   const edicao = await repo.edicaoPendente(cli, id)
   if (!edicao) throw conflito('sem_edicao_pendente', 'Não há edição aguardando aprovação.')
   await repo.atualizarDados(cli, id, edicao.dados_anteriores)
+  // E7/H7.3: restaura o tipo junto da chave revertida. Sem `aviso` aqui (fluxo devedor):
+  // busca o cobrador_id (dono da chave) para o tipo confirmado; ou infere no fallback.
+  const { rows: cobRow } = await cli.query<{ cobrador_id: string | null }>(
+    `select cobrador_id from public.avisos where id = $1`,
+    [id],
+  )
+  await repo.atualizarPixTipo(
+    cli,
+    id,
+    edicao.dados_anteriores.pix_chave
+      ? await resolverPixTipo(cli, cobRow[0]?.cobrador_id ?? null, edicao.dados_anteriores.pix_chave)
+      : null,
+  )
   await repo.resolverEdicao(cli, edicao.id, 'recusada')
   await repo.atualizarStatus(cli, id, 'programado')
   await repo.inserirEvento(cli, id, 'editado_recusado', 'devedor')

@@ -8,7 +8,7 @@
 // 'oferta' no repo.ts (mesma transação do botão); aqui tratamos a oferta em diante.
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
-import { detectarTipoChavePix, type TipoChavePix } from '@whaviso/shared/contracts'
+import { detectarTipoChavePix, ROTULO_TIPO_CHAVE, type TipoChavePix } from '@whaviso/shared/contracts'
 import type { ClienteWhats } from '../../shared/whats'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
 import { enfileirarNotificacao, enfileirarNotificacaoDevedor, type AvisoAlvo } from '../../shared/notificacoes'
@@ -56,15 +56,10 @@ interface SessaoPix {
   tipo: TipoChavePix | null
 }
 
-// Rótulo de exibição do tipo (auxílio de leitura no WhatsApp), e o mapa da resposta
-// numerada do fallback (H14.5). Espelha a ordem do template pix.tipo_manual.
-const ROTULO_TIPO: Record<TipoChavePix, string> = {
-  cpf: 'CPF',
-  cnpj: 'CNPJ',
-  email: 'E-mail',
-  telefone: 'Telefone',
-  aleatoria: 'Chave aleatória',
-}
+// Rótulo de exibição do tipo (auxílio de leitura no WhatsApp): fonte única em
+// @whaviso/shared. O mapa da resposta numerada do fallback (H14.5) espelha a ordem do
+// template pix.tipo_manual.
+const ROTULO_TIPO = ROTULO_TIPO_CHAVE
 const TIPO_POR_NUMERO: Record<string, TipoChavePix> = {
   '1': 'cpf',
   '2': 'cnpj',
@@ -375,8 +370,8 @@ async function finalizar(deps: DepsWizard, telefone: string, sessao: SessaoPix):
       )
     }
     await cli.query(
-      `update public.avisos set pix_chave=$2, pix_titular=$3, pix_banco=$4 where id=$1`,
-      [sessao.aviso_id, sessao.chave, sessao.titular, sessao.instituicao],
+      `update public.avisos set pix_chave=$2, pix_titular=$3, pix_banco=$4, pix_tipo=$5::tipo_chave_pix where id=$1`,
+      [sessao.aviso_id, sessao.chave, sessao.titular, sessao.instituicao, sessao.tipo],
     )
     await cli.query(
       `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'pix_cadastrada','cobrador')`,

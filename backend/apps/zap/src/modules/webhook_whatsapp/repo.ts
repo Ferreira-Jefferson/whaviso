@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
 import { calcularAgendamentos } from '@whaviso/shared/datas'
-import type { EtapaEnvio } from '@whaviso/shared/contracts'
+import type { EtapaEnvio, TipoChavePix } from '@whaviso/shared/contracts'
 import { reservarHorario, reprogramarCiclo } from '@whaviso/shared/datas/horario'
 import {
   confirmarOcorrenciaCorrente,
@@ -65,6 +65,8 @@ export interface ResultadoBotao {
   /** H7.3: titular e banco da chave (2a mensagem do Pix). Nunca logados. */
   pixTitular?: string | null
   pixBanco?: string | null
+  /** E7/H7.3: tipo da chave (snapshot no aviso), p/ a 1a msg do Pix informar CPF/telefone/etc. */
+  pixTipo?: TipoChavePix | null
   /** Para escolher o template de resposta ao convidado (resposta.* / combinado.ja_respondido). */
   chaveResposta?: string
   /** H5.3: presente só no ACEITE aplicado e quando o convidado ainda não tem profile. */
@@ -226,6 +228,7 @@ export async function aplicarAcaoBotao(
       pix_chave: string | null
       pix_titular: string | null
       pix_banco: string | null
+      pix_tipo: TipoChavePix | null
       entrega_chave_status: string | null
       cobrador_id: string | null
       devedor_profile_id: string | null
@@ -241,7 +244,7 @@ export async function aplicarAcaoBotao(
     }>(
       `select a.status, a.direcao, a.criador_papel, a.telefone_devedor, a.telefone_cobrador,
               a.nome_devedor, a.nome_cobrador, a.pix_chave, a.pix_titular, a.pix_banco,
-              a.entrega_chave_status, a.cobrador_id, a.devedor_profile_id,
+              a.pix_tipo, a.entrega_chave_status, a.cobrador_id, a.devedor_profile_id,
               to_char(a.data_combinada,'YYYY-MM-DD') as data_combinada,
               a.recorrencia_tipo, a.ocorrencia_atual,
               a.cadencia_etapas::text[] as cadencia_etapas,
@@ -621,6 +624,7 @@ export async function aplicarAcaoBotao(
         pixChave: aviso.pix_chave,
         pixTitular: aviso.pix_titular,
         pixBanco: aviso.pix_banco,
+        pixTipo: aviso.pix_tipo,
         chaveResposta: 'resposta.ver_pix',
         entregarPix: true,
       }

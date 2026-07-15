@@ -20,6 +20,17 @@ import type { TipoChavePix } from './enums'
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Rótulo de EXIBIÇÃO do tipo (leitura humana no WhatsApp/painel). FONTE ÚNICA: o zap
+// (resposta.ver_pix, wizard E14) e a api compartilham daqui; o front espelha em
+// ROTULO_TIPO_CHAVE. Não é validação, só apresentação.
+export const ROTULO_TIPO_CHAVE: Record<TipoChavePix, string> = {
+  cpf: 'CPF',
+  cnpj: 'CNPJ',
+  email: 'E-mail',
+  telefone: 'Telefone',
+  aleatoria: 'Chave aleatória',
+}
+
 /** Adivinha o tipo da chave Pix a partir do texto, ou null se ambíguo/incompleto. */
 export function detectarTipoChavePix(bruto: string): TipoChavePix | null {
   const v = bruto.trim()

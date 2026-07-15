@@ -159,7 +159,9 @@ export const SECOES_MENSAGENS: SecaoMensagens[] = [
         quando: 'Toca em “Ver Pix” (com chave cadastrada)',
         estado: 'fixo',
         chave: 'resposta.ver_pix',
-        variaveis: ['pix_chave'],
+        // pix_tipo (CPF/telefone/etc.) + a chave: o editor oferece os dois chips. O tipo é
+        // resolvido pelo zap no envio (snapshot do aviso; inferência no fallback).
+        variaveis: ['pix_tipo', 'pix_chave'],
       },
       {
         nome: 'Sem chave Pix cadastrada',

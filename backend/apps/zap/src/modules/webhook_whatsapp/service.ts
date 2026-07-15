@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Pool } from '@whaviso/shared/db'
+import { detectarTipoChavePix, ROTULO_TIPO_CHAVE, type TipoChavePix } from '@whaviso/shared/contracts'
 import type { ClienteWhats, EventoBotao, EventoStatus, EventoTexto } from '../../shared/whats'
 import type { AdminSupabase } from '../../shared/supabase_admin'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
@@ -174,7 +175,7 @@ async function aplicarEResponder(
   // H7.3: "Chave Pix" entrega DUAS mensagens (chave; depois titular+banco, até 3s) e
   // só marca a entrega como concluída se AMBAS saíram (G-C3). Caminho separado do resto.
   if (acao === 'ver_pix' && r.entregarPix && r.pixChave) {
-    await entregarChaveDePagamento(deps, avisoId, r.pixChave, r.pixTitular ?? '', r.pixBanco ?? '')
+    await entregarChaveDePagamento(deps, avisoId, r.pixChave, r.pixTitular ?? '', r.pixBanco ?? '', r.pixTipo ?? null)
     return
   }
   // E14: oferta de cadastro de chave ao COBRADOR (Gatilho A no aceite invertido sem chave,
@@ -211,6 +212,7 @@ async function entregarChaveDePagamento(
   chave: string,
   titular: string,
   banco: string,
+  tipo: TipoChavePix | null,
 ): Promise<void> {
   const t1 = await carregarTemplateAtivo(deps.pool, 'resposta.ver_pix', 'padrao')
   const t2 = await carregarTemplateAtivo(deps.pool, 'resposta.ver_pix_titular', 'padrao')
@@ -220,8 +222,15 @@ async function entregarChaveDePagamento(
   }
   const para = await telefoneDoAviso(deps, avisoId)
   if (!para) return
+  // Tipo p/ o corpo (ex.: "Chave Pix (CPF):"): prefere o snapshot do aviso; senão infere do
+  // formato (o zap não acessa chaves_pix). Ambíguo (11 díg. CPF x celular) -> '' (o corpo
+  // é texto livre, então vazio só renderiza sem o rótulo, sem quebrar o envio).
+  const tipoResolvido = tipo ?? detectarTipoChavePix(chave)
+  const pixTipoRotulo = tipoResolvido ? ROTULO_TIPO_CHAVE[tipoResolvido] : ''
   try {
-    await deps.whats.enviarMensagem(renderMensagem(t1, para, { valores: { pix_chave: chave } }))
+    await deps.whats.enviarMensagem(
+      renderMensagem(t1, para, { valores: { pix_tipo: pixTipoRotulo, pix_chave: chave } }),
+    )
     // 2a mensagem só faz sentido com titular/banco e template; sem eles, entrega só a 1a.
     if (t2 && (titular || banco)) {
       await esperar(intervaloPixMs())
