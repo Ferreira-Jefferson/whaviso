@@ -272,7 +272,7 @@ const TITULO_PREFIXO: Record<string, { titulo: string; descricao: string }> = {
   },
   resposta: {
     titulo: 'Outras respostas automáticas',
-    descricao: 'Respostas a botões e ao wizard, na janela de 24h (texto livre, não vão à Meta).',
+    descricao: 'Respostas a toques de botão e passos do wizard, enviadas na janela de 24h. Como toda mensagem, só entram no ar depois de aprovadas e ativadas.',
   },
   pix: {
     titulo: 'Cadastro de chave Pix (wizard)',

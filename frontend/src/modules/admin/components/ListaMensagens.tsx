@@ -68,9 +68,20 @@ export function ListaMensagens({
 }
 
 function Descricao({ m }: { m: MensagemItem }) {
+  // Rótulo de botão avulso (ex.: botao.solicitar_pix): o zap troca esse botão na hora do
+  // envio, por isso ele tem linha própria. Os botões das mensagens normais são editados
+  // dentro da própria mensagem (seção "Botões"), não aqui.
+  const ehRotuloBotao = m.chave?.startsWith('botao.') ?? false
   return (
     <div className="min-w-0 flex-1">
-      <p className="text-sm text-tinta group-hover:text-salvia">{m.nome}</p>
+      <p className="flex items-center gap-2 text-sm text-tinta group-hover:text-salvia">
+        <span className="truncate">{m.nome}</span>
+        {ehRotuloBotao && (
+          <span className="inline-flex shrink-0 items-center rounded-pill bg-papel-2 px-2 py-0.5 text-[11px] font-medium text-tinta-2">
+            Rótulo de botão
+          </span>
+        )}
+      </p>
       <p className="truncate text-xs text-tinta-2">
         {m.destinatario} · {m.quando}
       </p>

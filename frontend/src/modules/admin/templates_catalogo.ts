@@ -35,6 +35,18 @@ export const CATALOGO_VARIAVEIS: VariavelCatalogo[] = [
   { chave: 'pix_titular', token: 'PIX_TITULAR', rotulo: 'Titular da chave Pix', exemplo: 'Whaviso' },
   { chave: 'pix_banco', token: 'PIX_BANCO', rotulo: 'Banco da chave Pix', exemplo: 'Banco X' },
   { chave: 'pix_comentario', token: 'PIX_COMENTARIO', rotulo: 'Comentário do Pix', exemplo: 'confirmamos em até 1 dia útil' },
+  // Notificações de estado ao devedor/cobrador (devedor.* / cobrador.*): `alvo` é o nome
+  // de quem recebe a mensagem e `codigo` identifica o combinado (ex.: "ABC-123"). O zap
+  // resolve ambos no envio (notificar_cobrador/render.ts); sem exemplo aqui o preview
+  // mostrava o token cru "[alvo]"/"[codigo]".
+  { chave: 'alvo', token: 'ALVO', rotulo: 'Nome de quem recebe', exemplo: 'Maria' },
+  { chave: 'codigo', token: 'CODIGO', rotulo: 'Código do combinado', exemplo: 'ABC-123' },
+  // Wizard de cadastro de chave Pix (E14, pix.*) e devedor.pix_chave_recebida: nomes
+  // "curtos" da chave, distintos dos pix_* (que vêm do config da plataforma/aviso).
+  { chave: 'titular', token: 'TITULAR', rotulo: 'Titular da chave', exemplo: 'Maria Silva' },
+  { chave: 'banco', token: 'BANCO', rotulo: 'Banco da chave', exemplo: 'Nubank' },
+  { chave: 'chave', token: 'CHAVE', rotulo: 'Chave Pix', exemplo: 'maria@pix.com' },
+  { chave: 'tipo', token: 'TIPO', rotulo: 'Tipo da chave', exemplo: 'CPF' },
 ]
 
 const POR_TOKEN = new Map(CATALOGO_VARIAVEIS.map((v) => [v.token, v]))

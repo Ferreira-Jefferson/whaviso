@@ -168,6 +168,19 @@ function Conteudo({
         acoes={seed ? <StatusMetaBadge template={seed} /> : undefined}
       />
 
+      {/* Rótulo de botão avulso: contextualiza por que ele tem cartão próprio e vai à Meta,
+          diferente dos botões que já vivem dentro de uma mensagem (seção "Botões" dela). */}
+      {chave.startsWith('botao.') && (
+        <div className="mb-6">
+          <Banner tom="info">
+            Este é o rótulo de um botão, não uma mensagem. O whaviso troca este botão na hora do
+            envio, por isso ele tem um cartão próprio aqui. Os botões das outras mensagens são
+            editados dentro da própria mensagem, na seção “Botões”. Como toda mensagem, o texto só
+            entra no ar depois de aprovado e ativado.
+          </Banner>
+        </div>
+      )}
+
       {meta.temRevisao && (
         <div className="mb-6 flex flex-col gap-1.5">
           <SegmentedControl
