@@ -12,7 +12,7 @@
 //
 // Linguagem das Regras de Ouro em toda string (aviso/lembrete/combinado).
 
-import { etapaEnvio, type AcaoBotaoTemplate, type EtapaEnvio } from '@/shared/contracts'
+import { etapaEnvio, type AcaoBotaoTemplate, type EtapaEnvio, type Template } from '@/shared/contracts'
 import { ROTULO_ETAPA } from '@/shared/format'
 
 export type EstadoMensagem = 'em_breve' | 'fixo' | 'planejado'
@@ -235,4 +235,124 @@ export function mensagemPorChave(chave: string): MensagemItem | undefined {
     if (m) return m
   }
   return undefined
+}
+
+// ---- Templates FORA do catálogo curado ------------------------------------
+// A área do owner lista TODO template da tabela `templates`, nada oculto, não só
+// os curados acima. Escopo é estritamente TEMPLATE (configuração de mensagem, texto
+// que o owner edita), NÃO conteúdo de cliente (combinados, telefones, etc.), que o
+// owner não tem direito de ver. As helpers abaixo derivam metadados a partir da
+// própria chave (e das versões existentes) para os templates sem entrada no
+// catálogo, ex.: as muitas notificações de estado do devedor/cobrador que o zap
+// dispara. Assim, template novo aparece sozinho, sem editar este arquivo.
+
+// destinatário/quando padrão por PREFIXO da chave (parte antes do primeiro ponto).
+const PREFIXO_META: Record<string, { destinatario: string; quando: string }> = {
+  ciclo: { destinatario: 'Devedor', quando: 'Lembrete automático do combinado' },
+  cobrador: { destinatario: 'Quem vai receber', quando: 'Aviso automático em mudança do combinado' },
+  devedor: { destinatario: 'Devedor', quando: 'Aviso automático em mudança do combinado' },
+  resposta: { destinatario: 'Devedor', quando: 'Resposta imediata a um toque de botão (janela 24h)' },
+  pix: { destinatario: 'Devedor', quando: 'Passo do cadastro de chave Pix (wizard)' },
+  combinado: { destinatario: 'Convidado', quando: 'Fluxo do combinado' },
+  billing: { destinatario: 'Quem recarrega', quando: 'Compra de créditos' },
+  botao: { destinatario: 'Devedor', quando: 'Rótulo de botão' },
+}
+
+// título/descrição da SEÇÃO por prefixo (agrupa as mensagens fora do catálogo).
+const TITULO_PREFIXO: Record<string, { titulo: string; descricao: string }> = {
+  cobrador: {
+    titulo: 'Outros avisos a quem vai receber',
+    descricao: 'Notificações automáticas ao cobrador nas mudanças do combinado.',
+  },
+  devedor: {
+    titulo: 'Avisos ao devedor (mudanças no combinado)',
+    descricao: 'Notificações automáticas ao devedor quando o combinado muda de estado.',
+  },
+  resposta: {
+    titulo: 'Outras respostas automáticas',
+    descricao: 'Respostas a botões e ao wizard, na janela de 24h (texto livre, não vão à Meta).',
+  },
+  pix: {
+    titulo: 'Cadastro de chave Pix (wizard)',
+    descricao: 'Passos do wizard de cadastro da chave Pix, enviados na janela de 24h.',
+  },
+  combinado: {
+    titulo: 'Combinado (outras mensagens)',
+    descricao: 'Outras mensagens do fluxo do combinado.',
+  },
+  billing: { titulo: 'Créditos (outras mensagens)', descricao: 'Outras mensagens de billing.' },
+  botao: { titulo: 'Botões', descricao: 'Rótulos e mensagens de botão.' },
+}
+
+/** Nome legível derivado da chave (ex.: 'devedor.aviso_cancelado' -> 'Aviso cancelado'). */
+export function rotuloDaChave(chave: string): string {
+  const parte = chave.includes('.') ? chave.slice(chave.indexOf('.') + 1) : chave
+  const texto = parte.replace(/[._]/g, ' ').trim()
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+/** Todas as chaves que o catálogo curado já cobre. */
+export function chavesDoCatalogo(): Set<string> {
+  const s = new Set<string>()
+  for (const secao of SECOES_MENSAGENS) {
+    for (const m of secao.mensagens) if (m.chave) s.add(m.chave)
+  }
+  return s
+}
+
+/**
+ * Metadado para uma mensagem que NÃO está no catálogo curado, derivado da chave e
+ * das versões existentes no banco (variáveis/botões/revisão vêm dos próprios
+ * templates). Devolve undefined se a chave não existe no banco.
+ */
+export function metaFallback(chave: string, mensagens: Template[]): MensagemItem | undefined {
+  const daChave = mensagens.filter((t) => t.chave === chave)
+  if (daChave.length === 0) return undefined
+  const prefixo = chave.split('.')[0] ?? chave
+  const info = PREFIXO_META[prefixo] ?? {
+    destinatario: 'Sistema',
+    quando: 'Mensagem do sistema',
+  }
+  const variaveis = [...new Set(daChave.flatMap((t) => t.variaveis))]
+  const acoes = [
+    ...new Set(daChave.flatMap((t) => (t.conteudo.botoes ?? []).map((b) => b.acao))),
+  ] as AcaoBotaoTemplate[]
+  return {
+    nome: rotuloDaChave(chave),
+    destinatario: info.destinatario,
+    quando: info.quando,
+    estado: 'fixo',
+    chave,
+    variaveis,
+    acoes: acoes.length ? acoes : undefined,
+    temRevisao: daChave.some((t) => t.contexto === 'revisao'),
+  }
+}
+
+/**
+ * Seções (por prefixo de chave) para todo TEMPLATE da tabela `templates` que o
+ * catálogo curado ainda não lista. Nenhum template fica oculto do owner (templates
+ * são configuração de mensagem, não conteúdo de cliente) e um novo aparece sozinho.
+ */
+export function construirSecoesExtra(chavesPresentes: string[]): SecaoMensagens[] {
+  const conhecidas = chavesDoCatalogo()
+  const extras = [...new Set(chavesPresentes)].filter((c) => !conhecidas.has(c)).sort()
+  const porPrefixo = new Map<string, MensagemItem[]>()
+  for (const chave of extras) {
+    const prefixo = chave.split('.')[0] ?? chave
+    const info = PREFIXO_META[prefixo] ?? { destinatario: 'Sistema', quando: 'Mensagem do sistema' }
+    const arr = porPrefixo.get(prefixo) ?? []
+    arr.push({
+      nome: rotuloDaChave(chave),
+      destinatario: info.destinatario,
+      quando: info.quando,
+      estado: 'fixo',
+      chave,
+    })
+    porPrefixo.set(prefixo, arr)
+  }
+  return [...porPrefixo.entries()].map(([prefixo, mensagens]) => {
+    const t = TITULO_PREFIXO[prefixo] ?? { titulo: prefixo, descricao: 'Mensagens do sistema.' }
+    return { id: `extra-${prefixo}`, titulo: t.titulo, descricao: t.descricao, variante: 'lista', mensagens }
+  })
 }

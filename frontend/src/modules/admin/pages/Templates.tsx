@@ -6,7 +6,7 @@
 // ou catálogo com estado honesto quando ainda não há editor. O owner é o único que
 // mexe em templates (risco nº 8). Linguagem das Regras de Ouro em toda string.
 import { Card, EmptyState, PageHeader, Skeleton } from '@/shared/ui'
-import { SECOES_MENSAGENS, type SecaoMensagens } from '../catalogo_mensagens'
+import { SECOES_MENSAGENS, construirSecoesExtra, type SecaoMensagens } from '../catalogo_mensagens'
 import { useMensagens, type Template } from '../api'
 import { CicloTemplates } from '../components/CicloTemplates'
 import { ListaMensagens, type SituacaoChave } from '../components/ListaMensagens'
@@ -15,6 +15,12 @@ import { situacaoTemplate } from '../situacao_template'
 export default function TemplatesPage() {
   const mensagens = useMensagens()
   const resumoPorChave = construirResumo(mensagens.data)
+  // Seções curadas + todo TEMPLATE fora do catálogo (nenhum template oculto): o owner
+  // vê e gerencia qualquer template, e um novo aparece sozinho na próxima carga. Escopo
+  // é só a tabela `templates` (configuração), não conteúdo de cliente.
+  const secoesExtra = mensagens.data
+    ? construirSecoesExtra(mensagens.data.map((t) => t.chave))
+    : []
 
   return (
     <div className="animate-rise">
@@ -28,7 +34,7 @@ export default function TemplatesPage() {
       <Legenda />
 
       <div className="flex flex-col gap-10">
-        {SECOES_MENSAGENS.map((secao) => (
+        {[...SECOES_MENSAGENS, ...secoesExtra].map((secao) => (
           <Secao key={secao.id} secao={secao} mensagens={mensagens} resumoPorChave={resumoPorChave} />
         ))}
       </div>

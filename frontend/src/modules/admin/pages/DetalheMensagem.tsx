@@ -46,7 +46,7 @@ import {
 } from '../api'
 import { StatusMetaBadge } from '../components/StatusMetaBadge'
 import { situacaoTemplate } from '../situacao_template'
-import { mensagemPorChave, type MensagemItem } from '../catalogo_mensagens'
+import { mensagemPorChave, metaFallback, type MensagemItem } from '../catalogo_mensagens'
 import {
   CATALOGO_VARIAVEIS,
   exemplosPadrao,
@@ -57,24 +57,7 @@ import {
 
 export default function DetalheMensagemPage() {
   const { chave } = useParams()
-  const meta = chave ? mensagemPorChave(chave) : undefined
   const { data, isLoading, isError } = useMensagens()
-
-  if (!chave || !meta) {
-    return (
-      <div className="animate-rise">
-        <EmptyState
-          titulo="Mensagem desconhecida"
-          descricao="Esta mensagem não existe ou ainda não é editável."
-          acao={
-            <Link to="/admin/templates" className="text-sm font-medium text-salvia hover:underline">
-              Voltar para os templates
-            </Link>
-          }
-        />
-      </div>
-    )
-  }
 
   if (isError) {
     return (
@@ -90,6 +73,26 @@ export default function DetalheMensagemPage() {
       <div className="animate-rise flex flex-col gap-4">
         <Skeleton className="h-24 w-full rounded-card" />
         <Skeleton className="h-48 w-full rounded-card" />
+      </div>
+    )
+  }
+
+  // Metadado do catálogo curado quando existe; senão, derivado da chave + versões do
+  // banco, para que QUALQUER template (inclusive os fora do catálogo) seja editável.
+  const meta = chave ? (mensagemPorChave(chave) ?? metaFallback(chave, data)) : undefined
+
+  if (!chave || !meta) {
+    return (
+      <div className="animate-rise">
+        <EmptyState
+          titulo="Mensagem desconhecida"
+          descricao="Esta mensagem não existe no catálogo de templates."
+          acao={
+            <Link to="/admin/templates" className="text-sm font-medium text-salvia hover:underline">
+              Voltar para os templates
+            </Link>
+          }
+        />
       </div>
     )
   }
