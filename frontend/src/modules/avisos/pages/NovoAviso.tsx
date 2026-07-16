@@ -324,8 +324,12 @@ export default function NovoAvisoPage() {
           {/* Campo montado à mão (não via Field) para sobrepor o contador de
               caracteres no canto inferior direito do input. */}
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="campo-motivo" className="text-sm font-medium text-tinta">
+            <label htmlFor="campo-motivo" className="flex items-center gap-1.5 text-sm font-medium text-tinta">
               Sobre o quê
+              <InfoHint
+                texto="Um rótulo curto do combinado (ex.: aluguel de junho). Aparece na mensagem para a outra pessoa."
+                rotulo="Sobre: Sobre o quê"
+              />
             </label>
             <div className="relative">
               <Input
@@ -417,7 +421,11 @@ export default function NovoAvisoPage() {
               </Link>
             </Field>
 
-            <Field label="Data combinada" erro={errors.data_combinada?.message}>
+            <Field
+              label="Data combinada"
+              dica="A data em que vocês combinaram o pagamento. Os lembretes se organizam em torno dela."
+              erro={errors.data_combinada?.message}
+            >
               {/* Controlado: o DateInput é um calendário próprio; o modo controlado mantém a
                   exibição em sincronia com o react-hook-form. */}
               <Controller
