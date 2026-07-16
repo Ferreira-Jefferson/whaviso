@@ -1,0 +1,12 @@
+-- 0086: whaviso_zap precisa de INSERT em public.envios.
+--
+-- Motivo: o aceite do combinado passou a rodar no webhook do zap
+-- (modules/webhook_whatsapp): ao aceitar, o aviso vira 'programado' e o zap
+-- INSERE as etapas do ciclo em public.envios. O grant original (0008) só previa
+-- o zap DRENANDO a outbox (select, update); o INSERT ficou de fora. Resultado:
+-- "permission denied for table envios" (SQLSTATE 42501) no aceite, que reverte a
+-- transacao inteira (comTransacao) e deixa o aviso preso em aguardando_aceite.
+-- A policy RLS zap_envios ja cobre (for all); faltava so o privilegio de tabela.
+--
+-- Idempotente: reconceder um grant existente e no-op.
+grant insert on public.envios to whaviso_zap;
