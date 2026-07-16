@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Check, Loader2, X } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -11,23 +12,34 @@ import {
   Field,
   InfoHint,
   Input,
+  MoneyText,
   PageHeader,
   PhoneInput,
   SegmentedControl,
   Select,
+  Spinner,
+  WhatsAppPreview,
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
 import type {
+  CombinadoPreviewBody,
   CriarAvisoResposta,
   DirecaoAviso,
   EtapaEnvio,
   RecorrenciaInput,
 } from '@/shared/contracts'
+import { somaItensCentavos } from '@/shared/contracts'
 import { usePerfil } from '@/shared/auth'
 import { useSemSaldo } from '@/shared/plano'
 import { SeletorChavePix } from '@/shared/pix'
-import { hojeIso, telefone as fmtTelefone } from '@/shared/format'
-import { useBuscarPessoaPorTelefone, useCategorias, useCriarAviso, useCriarCategoria } from '../api'
+import { ROTULO_DIRECAO, dataPtBR, hojeIso, telefone as fmtTelefone } from '@/shared/format'
+import {
+  useBuscarPessoaPorTelefone,
+  useCategorias,
+  useCombinadoPreview,
+  useCriarAviso,
+  useCriarCategoria,
+} from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
 import { AvisoCriado } from '../components/AvisoCriado'
 import { RepetirCombinado } from '../components/RepetirCombinado'
@@ -38,6 +50,15 @@ const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
   { value: 'receber', label: 'Vou receber' },
   { value: 'pagar', label: 'Vou pagar' },
 ]
+
+// Valor sentinela da 1ª opção do select de categoria: escolher "+ Nova categoria" não é uma
+// categoria, é a AÇÃO de criar uma (o select vira um input). Não colide com '' nem com UUIDs.
+const NOVA_CATEGORIA = '__nova__'
+// Sentinela da opção "Outros" enquanto ela ainda não existe como categoria do dono: ao
+// escolhê-la, criamos a categoria "Outros" e a selecionamos. Se o dono já tem uma "Outros",
+// usamos o id real dela (sem sentinela). "Outros" fica sempre por último; o padrão é sem categoria.
+const OUTROS_CATEGORIA = '__outros__'
+const NOME_OUTROS = 'Outros'
 
 export default function NovoAvisoPage() {
   const navigate = useNavigate()
@@ -68,6 +89,8 @@ export default function NovoAvisoPage() {
   // 0, deixamos undefined (sem teto numérico no seletor; o servidor barra na ativação).
   const enviosDisponiveis = saldoLivre > 0 ? saldoLivre : undefined
   const [resultado, setResultado] = useState<CriarAvisoResposta | null>(null)
+  // Revisão do combinado antes de concluir: abre um modal com o resumo + preview da mensagem.
+  const [revisando, setRevisando] = useState(false)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   const [limiteAtingido, setLimiteAtingido] = useState<string | null>(null)
   // E6 H6.10 / E11 H11.2: recorrência e cadência são UNIVERSAIS (liberadas para todos). A
@@ -85,6 +108,8 @@ export default function NovoAvisoPage() {
     control,
     watch,
     setValue,
+    trigger,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<NovoAvisoForm>({
     resolver: zodResolver(novoAvisoSchema),
@@ -118,10 +143,25 @@ export default function NovoAvisoPage() {
     }
   }
 
+  // Sai do modo "criar categoria" sem criar nada (volta ao select, mantendo a seleção atual).
+  function cancelarNovaCat() {
+    setNovaCatNome('')
+    setMostrarNovaCat(false)
+  }
+
+  // Escolher "Outros" quando ela ainda não existe: cria a categoria "Outros" e a seleciona.
+  async function selecionarOutros() {
+    try {
+      const c = await criarCategoria.mutateAsync({ nome: NOME_OUTROS })
+      setValue('categoria_id', c.id)
+    } catch (e) {
+      setErroGeral(e instanceof ApiError ? e.message : 'Não foi possível usar a categoria Outros.')
+    }
+  }
+
   const direcao = watch('direcao')
   // H4.1: o modo (enviar o combinado agora x só salvar) não é mais um seletor à parte;
-  // ele é definido pelo botão de ação clicado no rodapé do formulário.
-  const modo = watch('modo')
+  // ele é definido pelo botão de ação escolhido na revisão do combinado.
   // Contador ao vivo do "Sobre o quê" (caracteres). O maxLength já trava a digitação
   // em MAX_MOTIVO_CARACTERES; o schema valida por garantia (paste etc.).
   const motivoLen = (watch('motivo') ?? '').length
@@ -371,47 +411,99 @@ export default function NovoAvisoPage() {
               label="Categoria (opcional)"
               dica="Organize por marca ou linha. Não aparece para a outra pessoa."
             >
-              <Controller
-                control={control}
-                name="categoria_id"
-                render={({ field }) => (
-                  <Select
-                    ariaLabel="Categoria"
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    options={[
-                      { value: '', label: 'Sem categoria' },
-                      ...(categorias.data ?? []).map((c) => ({ value: c.id, label: c.nome })),
-                    ]}
-                  />
-                )}
-              />
-              {!mostrarNovaCat ? (
-                <button
-                  type="button"
-                  className="mt-1 self-start text-xs font-medium text-salvia hover:underline"
-                  onClick={() => setMostrarNovaCat(true)}
-                >
-                  + Nova categoria
-                </button>
-              ) : (
-                <div className="mt-1 flex gap-2">
+              {mostrarNovaCat ? (
+                // Modo criar: o select virou um input com os ícones DENTRO dele: check confirma
+                // (cria e já seleciona) e x cancela. Enter/Esc fazem o mesmo pelo teclado.
+                <div className="relative">
                   <Input
+                    autoFocus
                     value={novaCatNome}
                     onChange={(e) => setNovaCatNome(e.target.value)}
-                    placeholder="Ex.: Natura"
+                    placeholder="Nome da nova categoria"
                     maxLength={40}
                     autoComplete="off"
+                    aria-label="Nome da nova categoria"
+                    className="pr-20"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        void criarCategoriaInline()
+                      } else if (e.key === 'Escape') {
+                        cancelarNovaCat()
+                      }
+                    }}
                   />
-                  <Button
-                    type="button"
-                    variante="secondary"
-                    loading={criarCategoria.isPending}
-                    onClick={criarCategoriaInline}
-                  >
-                    Criar
-                  </Button>
+                  <div className="absolute inset-y-0 right-2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label="Criar categoria"
+                      disabled={criarCategoria.isPending || novaCatNome.trim().length === 0}
+                      onClick={criarCategoriaInline}
+                      className="rounded-lg border border-salvia/40 p-1.5 text-salvia transition-colors hover:bg-salvia-claro disabled:cursor-not-allowed disabled:border-linha disabled:text-tinta-2/50 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                    >
+                      {criarCategoria.isPending ? (
+                        <Loader2 strokeWidth={1.75} className="size-4 animate-spin" />
+                      ) : (
+                        <Check strokeWidth={2} className="size-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Cancelar"
+                      onClick={cancelarNovaCat}
+                      className="rounded-lg border border-linha p-1.5 text-tinta-2 transition-colors hover:bg-areia hover:text-barro focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                    >
+                      <X strokeWidth={2} className="size-4" />
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <Controller
+                  control={control}
+                  name="categoria_id"
+                  render={({ field }) => {
+                    // "Outros" fica SEMPRE por último. Se o dono já tem uma "Outros", usamos o
+                    // id real dela (e a tiramos da lista do meio para não duplicar); senão,
+                    // mostramos a opção com a sentinela (criada ao ser escolhida).
+                    const cats = categorias.data ?? []
+                    const outros = cats.find((c) => c.nome.trim().toLowerCase() === NOME_OUTROS.toLowerCase())
+                    const demais = cats.filter((c) => c.id !== outros?.id)
+                    return (
+                      <Select
+                        ariaLabel="Categoria"
+                        value={field.value ?? ''}
+                        // A 1ª opção "+ Nova categoria" é uma AÇÃO (abre o input de criação, sem
+                        // mexer na seleção). "Outros" cria/seleciona a categoria Outros. As demais
+                        // selecionam normalmente.
+                        onChange={(v) => {
+                          if (v === NOVA_CATEGORIA) {
+                            setMostrarNovaCat(true)
+                            return
+                          }
+                          if (v === OUTROS_CATEGORIA) {
+                            void selecionarOutros()
+                            return
+                          }
+                          field.onChange(v)
+                        }}
+                        options={[
+                          // Destacada (fundo verde-claro + verde + negrito) para o olho perceber
+                          // que é uma ação clicável, distinta das categorias de verdade.
+                          {
+                            value: NOVA_CATEGORIA,
+                            label: '+ Nova categoria',
+                            className: 'bg-salvia-claro font-semibold text-salvia',
+                          },
+                          { value: '', label: 'Sem categoria' },
+                          ...demais.map((c) => ({ value: c.id, label: c.nome })),
+                          outros
+                            ? { value: outros.id, label: outros.nome }
+                            : { value: OUTROS_CATEGORIA, label: NOME_OUTROS },
+                        ]}
+                      />
+                    )
+                  }}
+                />
               )}
               <Link
                 to="/app/categorias"
@@ -505,28 +597,225 @@ export default function NovoAvisoPage() {
               >
                 Cancelar
               </Button>
-              <Button
-                type="button"
-                variante="secondary"
-                loading={isSubmitting && modo === 'agenda'}
-                onClick={() => salvar('agenda')}
-              >
-                Apenas salvar
-              </Button>
-              {/* Envio é universal (liberado para todos); o que limita é o saldo. A api
-                  recusa com saldo_insuficiente se faltar crédito. */}
+              {/* Concluir valida os campos SEMPRE obrigatórios (itens, nome, WhatsApp, motivo,
+                  data) com modo=agenda; o Pix do caminho de envio é validado dentro do modal
+                  (guarda de envio). Sem WhatsApp o botão nem habilita: ele identifica a outra
+                  pessoa e é obrigatório mesmo na agenda (H4.1). Passando, abre a revisão. */}
               <Button
                 type="button"
                 variante="primary"
-                loading={isSubmitting && modo === 'enviar'}
-                onClick={() => salvar('enviar')}
+                disabled={watch('telefone_devedor') == null}
+                title={
+                  watch('telefone_devedor') == null
+                    ? 'Informe o WhatsApp de quem combinou.'
+                    : undefined
+                }
+                onClick={async () => {
+                  setValue('modo', 'agenda')
+                  const ok = await trigger()
+                  if (ok) setRevisando(true)
+                }}
               >
-                Salvar e enviar combinado
+                Concluir
               </Button>
             </div>
           </div>
         </form>
       </Card>
+
+      {revisando && (
+        <RevisarModal
+          valores={getValues()}
+          categoriaNome={
+            categorias.data?.find((c) => c.id === getValues('categoria_id'))?.nome ?? null
+          }
+          ehReceber={ehReceber}
+          salvando={isSubmitting}
+          onSalvar={salvar}
+          onFechar={() => setRevisando(false)}
+        />
+      )}
     </div>
+  )
+}
+
+// Revisão do combinado antes de concluir (H4.1): resumo do que foi digitado + preview da
+// mensagem REAL que a outra pessoa recebe no WhatsApp (renderizada pelo backend). A checkbox
+// "Enviar aceite" decide o modo: desmarcada salva na agenda; marcada envia o combinado agora.
+// Mesmo padrão de overlay do EditarModal/AtivarModal (DetalheAviso).
+function RevisarModal({
+  valores,
+  categoriaNome,
+  ehReceber,
+  salvando,
+  onSalvar,
+  onFechar,
+}: {
+  valores: NovoAvisoForm
+  categoriaNome: string | null
+  ehReceber: boolean
+  salvando: boolean
+  onSalvar: (modo: 'enviar' | 'agenda') => void
+  onFechar: () => void
+}) {
+  const [enviarAceite, setEnviarAceite] = useState(false)
+  const totalCentavos = somaItensCentavos(valores.itens)
+
+  // Payload do preview: só faz sentido montar quando há o mínimo (nome/valor); a query só
+  // dispara quando `enviarAceite` está ligado.
+  const payload: CombinadoPreviewBody | null =
+    valores.nome_devedor.trim().length > 0 && totalCentavos > 0
+      ? {
+          direcao: valores.direcao,
+          nome_devedor: valores.nome_devedor,
+          valor_centavos: totalCentavos,
+          motivo: valores.motivo,
+          data_combinada: valores.data_combinada,
+          pix_chave: valores.pix_chave || null,
+          pix_titular: valores.pix_titular || null,
+          pix_banco: valores.pix_banco || null,
+        }
+      : null
+  const preview = useCombinadoPreview(payload, enviarAceite)
+
+  // Guarda de envio: o WhatsApp já é exigido para chegar até aqui (Concluir bloqueia sem
+  // ele), então só falta validar, no receber, o trio Pix (chave+titular+banco).
+  const enviarPossivel =
+    !ehReceber ||
+    Boolean(
+      valores.pix_chave?.trim() && valores.pix_titular?.trim() && valores.pix_banco?.trim(),
+    )
+
+  // Portal para o body: a página vive dentro de um `.animate-rise` cujo `transform`
+  // (fill-mode both) vira bloco de contenção do `position: fixed`, prendendo o overlay
+  // ao tamanho do form. No body o `inset-0` cobre a viewport inteira.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-tinta/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Revisar combinado"
+    >
+      <Card className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto">
+        <h2 className="text-lg text-salvia">Revisar combinado</h2>
+
+        <dl className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <dt className="text-tinta-2">Tipo</dt>
+            <dd className="mt-0.5 text-tinta">{ROTULO_DIRECAO[valores.direcao]}</dd>
+          </div>
+          <div>
+            <dt className="text-tinta-2">Nome</dt>
+            <dd className="mt-0.5 text-tinta">{valores.nome_devedor}</dd>
+          </div>
+          <div>
+            <dt className="text-tinta-2">Data combinada</dt>
+            <dd className="mt-0.5 text-tinta">{dataPtBR(valores.data_combinada)}</dd>
+          </div>
+          <div>
+            <dt className="text-tinta-2">Categoria</dt>
+            <dd className="mt-0.5 text-tinta">{categoriaNome ?? 'Sem categoria'}</dd>
+          </div>
+          {valores.telefone_devedor && (
+            <div>
+              <dt className="text-tinta-2">Telefone</dt>
+              <dd className="mt-0.5 text-tinta">{fmtTelefone(valores.telefone_devedor)}</dd>
+            </div>
+          )}
+          {valores.pix_chave?.trim() && (
+            <div className="col-span-2">
+              <dt className="text-tinta-2">Chave Pix</dt>
+              <dd className="mt-0.5 break-all text-tinta">{valores.pix_chave}</dd>
+            </div>
+          )}
+          {valores.pix_titular?.trim() && (
+            <div>
+              <dt className="text-tinta-2">Titular da chave</dt>
+              <dd className="mt-0.5 text-tinta">{valores.pix_titular}</dd>
+            </div>
+          )}
+          {valores.pix_banco?.trim() && (
+            <div>
+              <dt className="text-tinta-2">Banco da chave</dt>
+              <dd className="mt-0.5 text-tinta">{valores.pix_banco}</dd>
+            </div>
+          )}
+        </dl>
+
+        {/* Itens do pedido (interno) + total derivado. Mesmo layout do DetalheAviso. */}
+        <div>
+          <ul className="flex flex-col divide-y divide-linha">
+            {valores.itens.map((item, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0 truncate text-tinta">
+                  {item.qtd > 1 && <span className="text-tinta-2">{item.qtd}× </span>}
+                  {item.descricao}
+                </span>
+                <MoneyText centavos={item.qtd * item.valor_unit_centavos} className="shrink-0 tabular" />
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex items-center justify-between border-t border-linha pt-3 text-sm">
+            <span className="text-tinta-2">Total</span>
+            <MoneyText centavos={totalCentavos} className="font-medium tabular" />
+          </div>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-tinta">
+          <input
+            type="checkbox"
+            className="size-4 accent-salvia"
+            checked={enviarAceite}
+            onChange={(e) => setEnviarAceite(e.target.checked)}
+          />
+          Enviar o combinado para {valores.nome_devedor || 'a outra pessoa'} confirmar no WhatsApp
+        </label>
+
+        {/* Preview da mensagem: cinza/desabilitado até marcar "Enviar aceite". */}
+        {!enviarAceite ? (
+          <div className="rounded-card border border-linha bg-areia/30 p-4 text-sm text-tinta-2 opacity-70">
+            Marque "Enviar aceite" para ver a mensagem que {valores.nome_devedor || 'a outra pessoa'}{' '}
+            vai receber no WhatsApp.
+          </div>
+        ) : preview.isLoading ? (
+          <div className="flex justify-center py-4">
+            <Spinner />
+          </div>
+        ) : (preview.data?.render ?? '').trim().length > 0 ? (
+          <WhatsAppPreview texto={preview.data?.render ?? ''} botoes={preview.data?.botoes ?? []} />
+        ) : (
+          <p className="text-sm text-tinta-2">
+            O preview da mensagem não está disponível agora. Você ainda pode enviar o combinado.
+          </p>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2 pt-1">
+          <Button variante="secondary" onClick={onFechar}>
+            Revisar
+          </Button>
+          {enviarAceite ? (
+            <Button
+              variante="primary"
+              onClick={() => onSalvar('enviar')}
+              loading={salvando}
+              disabled={!enviarPossivel}
+            >
+              Salvar e enviar combinado
+            </Button>
+          ) : (
+            <Button variante="primary" onClick={() => onSalvar('agenda')} loading={salvando}>
+              Salvar na agenda
+            </Button>
+          )}
+        </div>
+
+        {enviarAceite && !enviarPossivel && (
+          <p className="text-xs text-barro">
+            Falta a chave Pix para enviar. Toque em Revisar para completar.
+          </p>
+        )}
+      </Card>
+    </div>,
+    document.body,
   )
 }

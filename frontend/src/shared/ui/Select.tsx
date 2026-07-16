@@ -13,6 +13,12 @@ import { cn } from './cn'
 export interface SelectOption<T extends string> {
   value: T
   label: string
+  /**
+   * Classes para destacar esta opção na lista aberta (ex.: uma opção de AÇÃO como
+   * "+ Nova categoria"). Navegadores aplicam `color`/`font-weight` em <option>, então
+   * cor e peso funcionam; hover/fundo em <option> nativo não são confiáveis.
+   */
+  className?: string
 }
 
 interface SelectProps<T extends string> {
@@ -64,7 +70,7 @@ export function Select<T extends string>({
         )}
       >
         {options.map((op) => (
-          <option key={op.value} value={op.value}>
+          <option key={op.value} value={op.value} className={op.className}>
             {op.label}
           </option>
         ))}

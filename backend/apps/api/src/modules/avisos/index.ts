@@ -3,6 +3,8 @@ import {
   ativarAvisoBody,
   avisoSchema,
   combinadoEnvioResposta,
+  combinadoPreviewBody,
+  combinadoPreviewResposta,
   criarAvisoBody,
   criarAvisoResposta,
   editarAvisoBody,
@@ -26,6 +28,14 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
       const r = await service.criarAviso(app.pool, req.userId, req.body)
       return reply.status(201).send(r)
     },
+  )
+
+  // Preview do combinado no fluxo de CRIAR: renderiza o template combinado.resumo a partir
+  // do RASCUNHO (o aviso ainda não existe). Rota estática, tem prioridade sobre /:id.
+  app.post(
+    '/avisos/combinado-preview',
+    { preHandler: app.autenticar, schema: { body: combinadoPreviewBody, response: { 200: combinadoPreviewResposta } } },
+    (req) => service.previewCombinado(app.pool, req.userId, req.body),
   )
 
   // H4.3: ativar uma anotação da agenda (sem_aviso -> aguardando_aceite): gera o

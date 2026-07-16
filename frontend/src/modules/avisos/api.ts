@@ -8,6 +8,7 @@ import {
   buscarPessoaResposta,
   categoriaSchema,
   combinadoEnvioResposta,
+  combinadoPreviewResposta,
   criarAvisoResposta,
   envioSchema,
   eventoAvisoSchema,
@@ -20,6 +21,8 @@ import {
   type BuscarPessoaResposta,
   type Categoria,
   type CombinadoEnvioResposta,
+  type CombinadoPreviewBody,
+  type CombinadoPreviewResposta,
   type CriarAvisoBody,
   type CriarAvisoResposta,
   type CriarCategoriaBody,
@@ -133,6 +136,35 @@ export function useBuscarItemPorNome(prefixo: string | null) {
       } catch (e) {
         if (e instanceof ApiError && (e.status === 404 || e.code === 'rota_inexistente')) {
           return { itens: [] as string[] }
+        }
+        throw e
+      }
+    },
+  })
+}
+
+/**
+ * POST /v1/avisos/combinado-preview: preview da mensagem REAL do combinado (o texto que a
+ * outra pessoa recebe no WhatsApp), renderizada pelo BACKEND. Chamado ao revisar antes de
+ * enviar (só quando o usuário marca "Enviar aceite"). `habilitado` liga a consulta; `payload`
+ * null a desliga. Degrada em 404 (backend antigo sem a rota) para render vazio: a UI só não
+ * mostra o preview. Espelha o padrão de useBuscarItemPorNome/useCombinadoEnvio.
+ */
+export function useCombinadoPreview(payload: CombinadoPreviewBody | null, habilitado: boolean) {
+  return useQuery({
+    queryKey: ['avisos', 'combinado-preview', payload],
+    enabled: habilitado && payload != null,
+    staleTime: 30_000,
+    queryFn: async ({ signal }) => {
+      try {
+        return await apiClient.post<CombinadoPreviewResposta>('/avisos/combinado-preview', {
+          body: payload,
+          schema: combinadoPreviewResposta,
+          signal,
+        })
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.code === 'rota_inexistente')) {
+          return { render: '', botoes: [] as string[] }
         }
         throw e
       }

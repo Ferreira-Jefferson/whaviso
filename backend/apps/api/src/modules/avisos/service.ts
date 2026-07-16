@@ -1,12 +1,14 @@
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
-import { aceiteExpiraEm, conviteExpiraEm, expandirOcorrencias } from '@whaviso/shared/datas'
+import { aceiteExpiraEm, conviteExpiraEm, expandirOcorrencias, formatarDataBr, formatarValorBr } from '@whaviso/shared/datas'
 import type { RecorrenciaCfg } from '@whaviso/shared/datas'
 import { reprogramarCiclo } from '@whaviso/shared/datas/horario'
 import type {
   AtivarAvisoBody,
   Aviso,
   CombinadoEnvioResposta,
+  CombinadoPreviewBody,
+  CombinadoPreviewResposta,
   CriarAvisoBody,
   EditarAvisoBody,
   Envio,
@@ -20,7 +22,7 @@ import type {
   StatusAviso,
   TipoChavePix,
 } from '@whaviso/shared/contracts'
-import { detectarTipoChavePix, somaItensCentavos } from '@whaviso/shared/contracts'
+import { detectarTipoChavePix, renderizarTexto, somaItensCentavos } from '@whaviso/shared/contracts'
 import { gerarToken, sha256Hex } from '../../shared/tokens'
 import { conflito, naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
 import {
@@ -257,6 +259,51 @@ export async function criarAviso(
 
     return { aviso }
   })
+}
+
+/**
+ * Preview do combinado no fluxo de CRIAR: renderiza o template `combinado.resumo` a partir
+ * dos dados de RASCUNHO do formulário (o aviso ainda não existe), para a UI mostrar como a
+ * mensagem vai sair antes de criar. Autenticado, não-admin. Não persiste nada.
+ *
+ * Espelha o mapeamento de papéis do onSubmit do front: no `receber` eu sou o cobrador
+ * (nome do perfil) e a outra ponta é o devedor; no `pagar` (invertido) eu sou o devedor
+ * (nome do perfil) e a outra ponta é o cobrador. O `pagar` usa o template de contexto
+ * `revisao` (que inclui a chave Pix); o `receber` usa o `padrao`.
+ *
+ * A linha de CTA de "criar conta" que o zap anexa em RUNTIME (anexarCta) para o convidado
+ * SEM conta NÃO entra neste preview de propósito: o preview mostra o CORPO do template.
+ */
+export async function previewCombinado(
+  pool: Pool,
+  uid: string,
+  body: CombinadoPreviewBody,
+): Promise<CombinadoPreviewResposta> {
+  const contexto = body.direcao === 'pagar' ? 'revisao' : 'padrao'
+  const perfilNome = (await repo.nomeDoPerfil(pool, uid)).trim() || 'Eu'
+
+  // Papéis conforme a direção (espelha o onSubmit do front): no receber o criador é o
+  // cobrador; no pagar (invertido) o criador é o devedor e a outra ponta é o cobrador.
+  const cobrador = body.direcao === 'receber' ? perfilNome : body.nome_devedor
+  const nomeDevedor = body.direcao === 'receber' ? body.nome_devedor : perfilNome
+
+  // Mapa nome_da_variavel -> valor. As variáveis do combinado.resumo padrao são
+  // ["cobrador","nome_devedor","motivo","valor","data"]; a revisao adiciona "pix_chave".
+  const valores: Record<string, string> = {
+    cobrador,
+    nome_devedor: nomeDevedor,
+    motivo: body.motivo,
+    valor: formatarValorBr(body.valor_centavos),
+    data: formatarDataBr(body.data_combinada),
+    pix_chave: body.pix_chave ?? '',
+  }
+
+  const tpl = await repo.carregarTemplateCombinado(pool, contexto)
+  if (!tpl) throw naoEncontrado('Modelo de mensagem indisponivel.')
+
+  const render = renderizarTexto(tpl.conteudo.texto ?? '', tpl.variaveis, valores)
+  const botoes = (tpl.conteudo.botoes ?? []).map((b) => b.rotulo)
+  return { render, botoes }
 }
 
 /**

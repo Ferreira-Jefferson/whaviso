@@ -140,7 +140,7 @@ export function ItensPedido({
         ))}
       </ul>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button type="button" variante="secondary" onClick={adicionar}>
           <Plus strokeWidth={1.75} className="size-4" />
           Adicionar item

@@ -132,6 +132,24 @@ export const combinadoEnvioResposta = z.object({
 })
 export type CombinadoEnvioResposta = z.infer<typeof combinadoEnvioResposta>
 
+// ---- POST /v1/avisos/combinado-preview ----
+// Preview da mensagem REAL do combinado (o texto que a outra pessoa recebe no WhatsApp),
+// renderizada pelo BACKEND (o cliente nunca renderiza o template). Chamado ao revisar antes
+// de enviar. Espelha o backend (em construção em paralelo).
+export const combinadoPreviewBody = z.object({
+  direcao: direcaoAviso,
+  nome_devedor: z.string().trim().min(1).max(120),
+  valor_centavos: valorCentavos,
+  motivo: motivoAviso,
+  data_combinada: dataCombinada,
+  pix_chave: z.string().trim().max(140).nullish(),
+  pix_titular: z.string().trim().max(120).nullish(),
+  pix_banco: z.string().trim().max(80).nullish(),
+})
+export type CombinadoPreviewBody = z.infer<typeof combinadoPreviewBody>
+export const combinadoPreviewResposta = z.object({ render: z.string(), botoes: z.array(z.string()) })
+export type CombinadoPreviewResposta = z.infer<typeof combinadoPreviewResposta>
+
 // ---- POST /v1/avisos/:id/ativar (H4.3) ----
 // Ativa uma anotação da agenda (sem_aviso -> aguardando_aceite): o Whaviso envia o
 // combinado ao convidado. Devolve o MESMO formato da criação (só o aviso). Dados

@@ -20,7 +20,8 @@ export const novoAvisoSchema = z
   .object({
     direcao: z.enum(['receber', 'pagar']),
     // H4.1: `enviar` envia o combinado agora; `agenda` só anota (nasce sem_aviso, sem
-    // envio). No modo agenda telefone e Pix são opcionais (cobrados só ao ativar).
+    // envio). O WhatsApp é obrigatório nos DOIS modos (identifica a outra pessoa); só o
+    // Pix é diferido no modo agenda (cobrado ao ativar).
     modo: z.enum(['enviar', 'agenda']),
     nome_devedor: z
       .string()
@@ -70,9 +71,10 @@ export const novoAvisoSchema = z
       ctx.addIssue({ code: 'custom', path: ['itens'], message: 'O valor do pedido precisa ser maior que zero.' })
     }
   })
-  // No modo agenda telefone e Pix são opcionais (H4.1): só obrigatórios ao enviar.
-  .refine((v) => v.modo === 'agenda' || v.telefone_devedor !== null, {
-    message: 'Informe o WhatsApp para enviar o combinado.',
+  // WhatsApp obrigatório SEMPRE (H4.1): é quem recebe o combinado e identifica a outra
+  // pessoa, mesmo salvando na agenda. Só o Pix é diferido no modo agenda (abaixo).
+  .refine((v) => v.telefone_devedor !== null, {
+    message: 'Informe o WhatsApp de quem combinou.',
     path: ['telefone_devedor'],
   })
   // H2.1: Pix obrigatório no receber (chave + titular + banco). No invertido (pagar) a

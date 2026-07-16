@@ -196,6 +196,43 @@ export async function telefoneDoPerfil(ex: Executor, uid: string): Promise<strin
   return rows[0]?.telefone ?? null
 }
 
+/** Nome do perfil ('' quando ausente/vazio). Usado no preview do combinado (nome de saudação). */
+export async function nomeDoPerfil(ex: Executor, uid: string): Promise<string> {
+  const { rows } = await ex.query<{ nome: string | null }>(
+    `select nome from public.profiles where id = $1`,
+    [uid],
+  )
+  return rows[0]?.nome ?? ''
+}
+
+/** Conteúdo estruturado do template `combinado.resumo` (espelha o jsonb da tabela). */
+interface ConteudoCombinado {
+  texto?: string
+  botoes?: { acao: string; rotulo: string }[]
+}
+
+/**
+ * Lê o template ATIVO de `combinado.resumo` para o preview (módulo nunca importa o zap;
+ * consultar a tabela compartilhada `templates` é permitido). Espelha `carregarTemplateAtivo`
+ * do zap, fixo nesta chave: se `contexto='revisao'` e houver variante ativa, ela vence;
+ * senão cai no 'padrao'. node-pg devolve `conteudo` como objeto JS e `variaveis` como array JS.
+ */
+export async function carregarTemplateCombinado(
+  ex: Executor,
+  contexto: 'padrao' | 'revisao',
+): Promise<{ conteudo: ConteudoCombinado; variaveis: string[] } | null> {
+  const { rows } = await ex.query<{ conteudo: ConteudoCombinado; variaveis: string[] }>(
+    `select conteudo, variaveis
+       from public.templates
+      where chave = 'combinado.resumo' and ativo
+        and contexto in ('padrao'::template_contexto, $1::template_contexto)
+      order by (contexto = $1::template_contexto) desc
+      limit 1`,
+    [contexto],
+  )
+  return rows[0] ?? null
+}
+
 // A contagem de avisos ATIVOS (vagas de ativo) e da AGENDA (balde único) vive em
 // shared/planos (`contarAtivos`/`contarAgenda`), fonte única lida pelos gates de
 // criar/ativar. NÃO duplicamos aqui (E4/G-M4: `sem_aviso` NÃO conta como ativo).

@@ -10,12 +10,13 @@
 ### H4.1: Cadastrar um combinado em modo agenda 🟢
 Como **criador (cobrador ou devedor)**, quero cadastrar um combinado sem enviar nada para a outra ponta, para usar o Whaviso como agenda particular sem incomodar ninguém.
 *Critérios de aceite:*
-- [ ] A escolha é feita pelos **botões de ação** no rodapé do formulário (sem seletor de modo à parte): **"Apenas salvar"** cria em modo agenda; **"Salvar e enviar"** já envia o combinado à outra ponta. Os campos do combinado são os mesmos nos dois: muda só o que acontece ao confirmar.
+- [ ] Ao **concluir** o aviso, decido entre **salvar só na agenda** e **salvar e enviar o combinado** por uma etapa de revisão: um checkbox **"Enviar aceite"**. Desmarcado leva a **`sem_aviso`** (nada é enviado); marcado leva a **`aguardando_aceite`** (combinado enviado à outra ponta). Os campos do combinado são os mesmos nos dois: muda só o que acontece ao confirmar.
+- [ ] Antes de concluir, vejo uma **revisão do combinado** e, quando **"Enviar aceite"** está marcado, uma **prévia da mensagem** que a outra ponta vai receber (montada pelo backend a partir do template aprovado, então já é compatível com as regras de linguagem). Essa revisão/prévia é um apoio ao criador e **não muda nenhuma regra de estado**.
 - [ ] O combinado nasce no estado **`sem_aviso`**, **sem nada enviado à outra ponta** e **sem nenhum envio** programado.
-- [ ] **Estado por ação (não confundir os dois):** "Apenas salvar" leva a **`sem_aviso`** (nada enviado); "Salvar e enviar" leva direto a **`aguardando_aceite`** (combinado enviado à outra ponta, aguardando resposta). Nos dois ainda não sai lembrete, mas em `aguardando_aceite` o combinado já foi enviado e aguarda resposta. Um combinado enviado e **não respondido não volta** para `sem_aviso`: segue em `aguardando_aceite` até aceite, recusa ou expiração (ver H4.3 e o épico de Combinado & Aceite).
+- [ ] **Estado por ação (não confundir os dois):** concluir com **"Enviar aceite"** desmarcado leva a **`sem_aviso`** (nada enviado); com **"Enviar aceite"** marcado leva direto a **`aguardando_aceite`** (combinado enviado à outra ponta, aguardando resposta). Nos dois ainda não sai lembrete, mas em `aguardando_aceite` o combinado já foi enviado e aguarda resposta. Um combinado enviado e **não respondido não volta** para `sem_aviso`: segue em `aguardando_aceite` até aceite, recusa ou expiração (ver H4.3 e o épico de Combinado & Aceite).
 - [ ] A outra ponta (devedor ou cobrador convidado) **não recebe nada** e pode nem saber que o combinado existe.
 - [ ] Os mesmos campos de negócio valem (nome da outra ponta, motivo, valor em centavos, data em America/Sao_Paulo).
-- [ ] O **telefone da outra ponta é opcional** na agenda; só passa a ser obrigatório se eu quiser **ativar** o combinado (transformar em aviso, ver H4.3).
+- [ ] O **WhatsApp da outra ponta é obrigatório** mesmo na agenda: é ele que identifica quem combinou e para onde o combinado iria se eu ativar. Só o **Pix é diferido** no modo agenda (cobrado apenas ao ativar, H4.3). Na tela de criar, **"Concluir" fica desabilitado enquanto o WhatsApp não estiver preenchido**.
 - [ ] Funciona tanto no fluxo **receber** quanto no **pagar invertido**.
 - [ ] **Free também usa a agenda:** criar item de agenda é permitido no plano free (até o limite), porque nada é enviado; o que o free não pode é **ativar** (enviar), ver H4.3 e H1.5.
 - [ ] A linguagem respeita as regras de ouro (sem "dívida/cobrança/atraso") e as convenções de mensagem (gênero neutro).
@@ -37,7 +38,7 @@ Como **criador**, quero pegar um combinado da agenda e ativar o envio, para pass
 *Critérios de aceite:*
 - [ ] A ação **ativar** faz o Whaviso enviar o combinado (resumo + botões) direto ao WhatsApp da outra ponta (H2.2/H3.2).
 - [ ] Ao ativar, o combinado transita de **`sem_aviso` → `aguardando_aceite`** e segue o fluxo normal (Combinado & Aceite, depois lembretes).
-- [ ] Se faltar dado obrigatório para ativar (ex.: **telefone** da outra ponta, ou **Pix** no fluxo invertido), o sistema pede antes de ativar.
+- [ ] Se faltar dado obrigatório para ativar (o **Pix** no fluxo receber, diferido na agenda), o sistema pede antes de ativar. O WhatsApp já é obrigatório desde a criação (H4.1), então não falta aqui.
 - [ ] Ativar **reserva créditos** (1 por ocorrência, charge-on-success, H11.4); manter a agenda é livre para todos (até o teto de agenda, H11.7), mas **ativar sem saldo** recusa com `saldo_insuficiente` e CTA de recarga (o item fica na agenda, não se perde).
 - [ ] Antes de ativar, nada do ciclo de lembretes existe; depois de ativar, vale tudo do épico de lembretes.
 
@@ -64,7 +65,7 @@ Como **criador**, quero marcar como pago um combinado que ficou só na agenda, p
 
 ### Divergências com a definição atual (já implementado)
 
-> ✅ **Implementado.** Quando este épico foi escrito, toda criação já enviava o combinado e seguia para `aguardando_aceite`. Hoje o modo agenda existe: "criar" e "enviar" estão separados, a criação pode nascer em `sem_aviso`, e a escolha na tela de criar é feita pelos botões de ação ("Apenas salvar" x "Salvar e enviar"), sem seletor de modo à parte. Os pontos abaixo ficam como registro do que foi construído.
+> ✅ **Implementado.** Quando este épico foi escrito, toda criação já enviava o combinado e seguia para `aguardando_aceite`. Hoje o modo agenda existe: "criar" e "enviar" estão separados e a criação pode nascer em `sem_aviso`. Na tela de criar, o rodapé traz **"Cancelar"** e **"Concluir"**; **Concluir** abre um **modal de revisão** com o resumo do combinado, um checkbox **"Enviar aceite"** e, quando marcado, uma **prévia da mensagem** que a outra ponta receberia (mais um botão **"Revisar"** que volta ao formulário). O checkbox é acoplado à confirmação (ele alterna o botão de confirmar entre **"Salvar"** e **"Salvar e enviar combinado"**), logo não é um seletor de modo à parte. Os pontos abaixo ficam como registro do que foi construído.
 
 - **Estado novo `sem_aviso`** (modo agenda): anterior ao envio do combinado. Transições a acrescentar na máquina de estados: `sem_aviso → aguardando_aceite` (ativar), `sem_aviso → cancelado` (descartar) e `sem_aviso → pago` (registro manual da H4.5). Em `sem_aviso`, **nenhum** envio/lembrete é programado.
 - **Criação sem envio:** hoje criar já dispara o envio. Precisa separar "criar" de "enviar": o combinado só é enviado à outra ponta ao **ativar** (H4.3).
