@@ -6,6 +6,7 @@
 //   cancelar (PESSIMISTA, ConfirmDialog). Invalidação cobre detalhe+lista+resumo.
 // Linguagem das Regras de Ouro: só recebido/combinado/encerrar (ver linguagem.ts).
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router'
 import {
   ArrowLeft,
@@ -755,12 +756,16 @@ function EditarModal({
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-40 flex items-center justify-center bg-tinta/40 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Editar combinado"
-      >
+      {/* Portal para o body: a página vive dentro de um `.animate-rise` cujo `transform`
+          (fill-mode both) vira bloco de contenção do `position: fixed`, prendendo o overlay
+          ao tamanho da página. No body o `inset-0` cobre a viewport inteira. */}
+      {createPortal(
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-tinta/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Editar combinado"
+        >
         <Card className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto">
           <h2 className="text-lg text-salvia">Editar combinado</h2>
           <Field label="Nome de quem vai pagar">
@@ -793,7 +798,9 @@ function EditarModal({
             </Button>
           </div>
         </Card>
-      </div>
+        </div>,
+        document.body,
+      )}
 
       <ConfirmDialog
         aberto={confirmando}
@@ -850,7 +857,10 @@ function AtivarModal({
     return body
   }
 
-  return (
+  // Portal para o body: a página vive dentro de um `.animate-rise` cujo `transform`
+  // (fill-mode both) vira bloco de contenção do `position: fixed`, prendendo o overlay
+  // ao tamanho da página. No body o `inset-0` cobre a viewport inteira.
+  return createPortal(
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-tinta/40 p-4"
       role="dialog"
@@ -915,7 +925,8 @@ function AtivarModal({
           </Button>
         </div>
       </Card>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
