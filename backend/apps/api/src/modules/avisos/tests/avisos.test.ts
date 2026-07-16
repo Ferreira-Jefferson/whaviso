@@ -20,7 +20,7 @@ function corpoAviso(over: Record<string, unknown> = {}) {
     nome_devedor: 'Maria',
     telefone_devedor: '+5511999998888',
     motivo: 'mensalidade',
-    valor_centavos: 9900,
+    itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }],
     data_combinada: '2026-12-15',
     // H2.1: Pix obrigatório no receber, com titular e banco.
     pix_chave: 'maria@pix.com',
@@ -38,7 +38,7 @@ function corpoAvisoAgenda(over: Record<string, unknown> = {}) {
     modo: 'agenda',
     nome_devedor: 'Maria',
     motivo: 'mensalidade',
-    valor_centavos: 9900,
+    itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }],
     data_combinada: '2026-12-15',
     ...over,
   }
@@ -104,7 +104,7 @@ describe('avisos (integração com whaviso_dev)', () => {
       method: 'POST',
       url: '/v1/avisos',
       headers: AUTH,
-      payload: corpoAviso({ valor_centavos: 27500, itens }),
+      payload: corpoAviso({ itens }),
     })
     expect(r.statusCode).toBe(201)
     const criado = r.json().aviso
@@ -138,7 +138,7 @@ describe('avisos (integração com whaviso_dev)', () => {
         nome_cobrador: 'João',
         telefone_cobrador: '+5511988887777',
         motivo: 'aluguel',
-        valor_centavos: 5000,
+        itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }],
         data_combinada: '2026-12-15',
         // sem pix_chave de propósito
       },
@@ -163,9 +163,37 @@ describe('avisos (integração com whaviso_dev)', () => {
   it('payload inválido (valor 0) → 400', async () => {
     const app = await criarAppTeste(uid)
     const r = await app.inject({
-      method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso({ valor_centavos: 0 }),
+      method: 'POST', url: '/v1/avisos', headers: AUTH,
+      payload: corpoAviso({ itens: [{ descricao: 'x', qtd: 1, valor_unit_centavos: 0 }] }),
     })
     expect(r.statusCode).toBe(400)
+    await app.close()
+  })
+
+  it('sem itens → 400', async () => {
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({
+      method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso({ itens: [] }),
+    })
+    expect(r.statusCode).toBe(400)
+    await app.close()
+  })
+
+  it('valor derivado da soma dos itens', async () => {
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: corpoAviso({
+        itens: [
+          { descricao: 'A', qtd: 2, valor_unit_centavos: 12000 },
+          { descricao: 'B', qtd: 1, valor_unit_centavos: 3500 },
+        ],
+      }),
+    })
+    expect(r.statusCode).toBe(201)
+    expect(r.json().aviso.valor_centavos).toBe(27500)
     await app.close()
   })
 

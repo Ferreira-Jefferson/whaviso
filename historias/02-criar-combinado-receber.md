@@ -10,12 +10,14 @@
 ### H2.1: Cadastrar um combinado a receber 🟢
 Como **cobrador**, quero cadastrar um combinado informando os dados do acordo, para automatizar os avisos ao devedor.
 *Critérios de aceite:*
-- [ ] Informo: **nome de quem paga** (devedor), **motivo**, **valor**, **data combinada**, **telefone do devedor** e a **chave Pix** (de quem recebe). A chave Pix é **obrigatória** (igual ao fluxo invertido): o botão "Chave Pix" aparece em toda mensagem, então todo combinado precisa de Pix.
+- [ ] Informo: **nome de quem paga** (devedor), **motivo**, os **itens do pedido** (ver H2.8), **data combinada**, **telefone do devedor** e a **chave Pix** (de quem recebe). A chave Pix é **obrigatória** (igual ao fluxo invertido): o botão "Chave Pix" aparece em toda mensagem, então todo combinado precisa de Pix.
+- [ ] O **valor não é digitado à parte**: é **derivado da soma dos itens** do pedido (soma de quantidade x preço unitário), calculado pelo servidor e exibido em modo leitura. O formulário **não tem** campo de valor avulso.
 - [ ] Junto da chave, informo o **nome do titular** e o **banco** da chave: eles compõem a 2ª mensagem enviada ao devedor quando ele pede o Pix (Épico 7 H7.3).
 - [ ] O **nome de quem cobra** é o do próprio cobrador (pré-preenchido a partir da conta).
 - [ ] O valor é exibido em reais na UI, mas persiste em **centavos** (int) no banco.
 - [ ] A data é interpretada em **America/Sao_Paulo**; o banco guarda em UTC.
-- [ ] Campos obrigatórios validados com mensagem clara; valor precisa ser maior que zero.
+- [ ] Campos obrigatórios validados com mensagem clara; é preciso **ao menos um item** e o **total precisa ser maior que zero**.
+- [ ] **Não há campo de custo** do produto no formulário (o dono acompanha só o preço de venda). Custo por item pode virar uma feature futura, se solicitado.
 - [ ] Ao salvar, o combinado é criado no estado **aguardando_aceite**.
 - [ ] A linguagem de toda a tela respeita as regras de ouro (sem "dívida/cobrança/atraso").
 
@@ -64,6 +66,7 @@ Como **cobrador**, quero editar o combinado a qualquer momento, para corrigir ou
 - [ ] No aceite, em vez de aceitar ou recusar, o devedor pode sinalizar **"algum dado está incorreto"** (sem texto livre): isso **não aceita nem recusa**, só **notifica o cobrador** para revisar. O devedor vê uma resposta neutra (*"Certo, vamos comunicar sua resposta."*) e o cobrador edita e reenvia o combinado (como ainda não houve aceite, a edição é livre, sem `aguardando_aprovacao_aviso_editado`). Detalhe no Épico 5.
 - [ ] Toda alteração (edição, desfazer, aprovação, recusa, pedido de ajuste) é registrada como evento (auditoria append-only).
 - [ ] A **quantidade de edições/reedições** permitidas é **universal** (não varia por plano; o modelo é carteira de créditos, H11.2).
+- [ ] Como o valor é **derivado dos itens** (H2.1/H2.8), a edição dos **itens** também é editável a qualquer momento. Se a edição dos itens **altera o total**, ela é tratada como mudança do **acordo** (mesmo caminho do valor: livre antes do aceite; reaprovação depois do aceite). Se os itens mudam mas o **total permanece igual** (ex.: corrigir uma descrição), é edição **interna livre** (não reabre aprovação, não vai ao devedor).
 
 ---
 
@@ -87,6 +90,19 @@ Como **cobrador**, quero pausar temporariamente um combinado já aceito, para su
 - [ ] Ao **reativar**, o devedor também é notificado e o ciclo de lembretes volta a valer.
 - [ ] **pausado** não é terminal: o combinado continua vivo e pode voltar a `programado`, ser cancelado, etc.
 - [ ] Pausa/reativação são registradas como eventos (auditoria).
+
+---
+
+### H2.8: Montar o pedido por itens (base do valor) 🟢
+Como **cobrador (revendedor)**, quero montar o combinado listando os **itens do pedido**, para que o valor seja a soma do que foi vendido, sem eu ter que somar na mão.
+*Critérios de aceite:*
+- [ ] O combinado tem uma lista de **itens do pedido**, cada item com **descrição**, **quantidade** e **preço unitário** (centavos, >= 0).
+- [ ] A lista é **obrigatória**: pelo menos **um item**. O formulário já nasce com **uma linha** aberta.
+- [ ] O **valor do combinado é a soma** dos itens (quantidade x preço unitário), calculada pelo servidor (autoridade). O total é exibido em modo leitura e é o valor que aparece no aceite e nas mensagens ao devedor.
+- [ ] O **total precisa ser maior que zero** (não dá para salvar/enviar um pedido de valor zero).
+- [ ] A **composição por item é interna** do dono: a outra pessoa vê **apenas o valor total**, nunca a lista de itens.
+- [ ] Ao digitar a **descrição** de um item, o formulário sugere **descrições já usadas** pelo próprio dono em combinados anteriores (autocomplete), análogo ao autocomplete de pessoa por telefone (H15.6). Escolher uma sugestão preenche a descrição daquela linha.
+- [ ] **Não existe custo por item** nesta versão: o dono informa só o preço de venda. (Custo por item pode virar feature futura, se solicitado.)
 
 ---
 

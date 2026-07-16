@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ApiError } from '@/shared/api_client'
 import {
   avisoSchema,
+  buscarItemResposta,
   buscarPessoaResposta,
   categoriaSchema,
   combinadoEnvioResposta,
@@ -15,6 +16,7 @@ import {
   statusAviso,
   type Aviso,
   type AtivarAvisoBody,
+  type BuscarItemResposta,
   type BuscarPessoaResposta,
   type Categoria,
   type CombinadoEnvioResposta,
@@ -106,6 +108,35 @@ export function useBuscarPessoaPorTelefone(prefixo: string | null) {
         schema: buscarPessoaResposta,
         signal,
       }),
+  })
+}
+
+/**
+ * POST /v1/itens/buscar-por-nome: autocomplete do nome do item ao montar o pedido. Espelha o
+ * autocomplete de pessoa: o termo (>= 2 caracteres) vai no CORPO; devolve descrições de itens
+ * já usadas pelo próprio criador. `prefixo` null/curto desabilita a busca. Cache curto por
+ * termo. Degrada em 404 para lista vazia (backend antigo sem a rota): a UI só não sugere.
+ */
+export function useBuscarItemPorNome(prefixo: string | null) {
+  const termo = prefixo?.trim() ?? ''
+  return useQuery({
+    queryKey: ['itens', 'buscar-por-nome', termo],
+    enabled: termo.length >= 2,
+    staleTime: 30_000,
+    queryFn: async ({ signal }) => {
+      try {
+        return await apiClient.post<BuscarItemResposta>('/itens/buscar-por-nome', {
+          body: { prefixo: termo },
+          schema: buscarItemResposta,
+          signal,
+        })
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.code === 'rota_inexistente')) {
+          return { itens: [] as string[] }
+        }
+        throw e
+      }
+    },
   })
 }
 

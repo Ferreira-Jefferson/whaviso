@@ -21,6 +21,7 @@ import {
   itemPedidoSchema,
   motivoAviso,
   perfilSchema,
+  somaItensCentavos,
   telefoneE164,
   templateSchema,
   valorCentavos,
@@ -62,7 +63,6 @@ export const criarAvisoBody = z
     nome_cobrador: z.string().trim().min(1).max(120).nullish(),
     telefone_cobrador: telefoneE164.nullish(),
     motivo: motivoAviso,
-    valor_centavos: valorCentavos,
     data_combinada: dataCombinada,
     // Pix OBRIGATÓRIO no receber (H2.1): chave + titular + banco. Diferido no modo agenda.
     pix_chave: z.string().trim().max(140).nullish(),
@@ -77,9 +77,15 @@ export const criarAvisoBody = z
     cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
     // E16 / Fase A: categoria (opcional, minha e não arquivada) e custo interno (>=0).
     categoria_id: z.uuid().nullish(),
+    // Custo saiu do formulário; contrato segue aceitando (dormente) para não quebrar callers.
     valor_custo_centavos: z.number().int().min(0).nullish(),
-    // Fase A: composição opcional do pedido (itens). Interno; nunca vai ao devedor.
-    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
+    // Composição do pedido OBRIGATÓRIA (>=1 item): o valor do combinado é DERIVADO da soma
+    // dos itens (o servidor calcula). O front envia só os itens (nunca valor_centavos).
+    itens: z.array(itemPedidoSchema).min(1).max(MAX_ITENS_PEDIDO),
+  })
+  .refine((b) => somaItensCentavos(b.itens) > 0, {
+    message: 'o total dos itens precisa ser maior que zero',
+    path: ['itens'],
   })
   // No modo `agenda` (H4.1) telefone e Pix são opcionais (cobrados só ao ativar).
   .refine((b) => b.modo === 'agenda' || b.direcao !== 'receber' || b.telefone_devedor != null, {
@@ -150,7 +156,6 @@ export const editarAvisoBody = z
   .object({
     nome_devedor: z.string().trim().min(1).max(120).optional(),
     motivo: motivoAviso.optional(),
-    valor_centavos: valorCentavos.optional(),
     data_combinada: dataCombinada.optional(),
     pix_chave: z.string().trim().min(1).max(140).optional(),
     pix_titular: z.string().trim().min(1).max(120).optional(),
@@ -159,14 +164,15 @@ export const editarAvisoBody = z
     // null limpa; ausente mantém.
     categoria_id: z.uuid().nullish(),
     valor_custo_centavos: z.number().int().min(0).nullish(),
-    // Fase A: composição do pedido (itens). Interna e LIVRE. null limpa; ausente mantém.
-    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
+    // Composição do pedido (itens). Presente = substitui (>=1 item); ausente = mantém. Sem
+    // null (limpar quebraria o valor derivado). O valor é DERIVADO da soma: mudar os itens de
+    // forma que altere o total segue o caminho do acordo no servidor (reaprovação pós-aceite).
+    itens: z.array(itemPedidoSchema).min(1).max(MAX_ITENS_PEDIDO).optional(),
   })
   .refine(
     (b) =>
       b.nome_devedor !== undefined ||
       b.motivo !== undefined ||
-      b.valor_centavos !== undefined ||
       b.data_combinada !== undefined ||
       b.pix_chave !== undefined ||
       b.pix_titular !== undefined ||
@@ -176,6 +182,10 @@ export const editarAvisoBody = z
       b.itens !== undefined,
     { message: 'informe ao menos um campo para editar' },
   )
+  .refine((b) => b.itens === undefined || somaItensCentavos(b.itens) > 0, {
+    message: 'o total dos itens precisa ser maior que zero',
+    path: ['itens'],
+  })
 export type EditarAvisoBody = z.infer<typeof editarAvisoBody>
 
 // ---- GET /v1/avisos ----
@@ -342,6 +352,18 @@ export const buscarPessoaResposta = z.object({
   itens: z.array(sugestaoPessoaSchema),
 })
 export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
+
+// POST /v1/itens/buscar-por-nome (autocomplete do nome do item ao montar o pedido). O termo
+// vai no CORPO (espelha o backend). Devolve descrições de itens já usadas pelo criador.
+export const buscarItemBody = z.object({
+  prefixo: z.string().trim().min(1).max(80),
+})
+export type BuscarItemBody = z.infer<typeof buscarItemBody>
+
+export const buscarItemResposta = z.object({
+  itens: z.array(z.string()),
+})
+export type BuscarItemResposta = z.infer<typeof buscarItemResposta>
 
 // ---- PATCH /v1/perfil ----
 export const atualizarPerfilBody = z.object({

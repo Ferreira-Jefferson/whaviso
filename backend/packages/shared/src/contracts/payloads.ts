@@ -23,6 +23,7 @@ import {
   motivoAviso,
   ocorrenciaSchema,
   perfilSchema,
+  somaItensCentavos,
   telefoneE164,
   templateSchema,
   valorCentavos,
@@ -69,7 +70,6 @@ export const criarAvisoBody = z
     nome_cobrador: z.string().trim().min(1).max(120).nullish(),
     telefone_cobrador: telefoneE164.nullish(),
     motivo: motivoAviso,
-    valor_centavos: valorCentavos,
     data_combinada: dataCombinada,
     // Pix OBRIGATÓRIO no receber (H2.1): chave de quem cria (cobrador). No `pagar`
     // invertido é OPCIONAL (decisão do dono): chave de quem VAI RECEBER (informada pelo
@@ -91,10 +91,17 @@ export const criarAvisoBody = z
     // (validado no servidor). Organização interna: nunca vai para mensagem ao devedor.
     categoria_id: z.uuid().nullish(),
     // Fase A: custo opcional (centavos, >=0). Dado interno do dono; habilita o resultado.
+    // Saiu do formulário, mas o contrato segue aceitando (dormente) para não quebrar callers.
     valor_custo_centavos: z.number().int().min(0).nullish(),
-    // Fase A: composição opcional do pedido (o que foi vendido). Interno; nunca vai ao
-    // devedor. O front soma no valor como conveniência (sem exigência de igualdade).
-    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
+    // Composição do pedido (o que foi vendido). OBRIGATÓRIA (>=1 item): o valor do combinado
+    // é DERIVADO da soma dos itens (o servidor calcula; ver criarAviso). Interno na parte de
+    // custo, mas a soma vira o valor exibido no aceite.
+    itens: z.array(itemPedidoSchema).min(1).max(MAX_ITENS_PEDIDO),
+  })
+  // O valor derivado precisa ser > 0 (a coluna avisos.valor_centavos tem CHECK > 0).
+  .refine((b) => somaItensCentavos(b.itens) > 0, {
+    message: 'o total dos itens precisa ser maior que zero',
+    path: ['itens'],
   })
   // No modo `agenda` (H4.1) telefone e Pix são OPCIONAIS (cobrados só ao ativar, H4.3):
   // todos os refines abaixo só valem quando o item já vai enviar (modo `enviar`).
@@ -161,7 +168,6 @@ export const editarAvisoBody = z
   .object({
     nome_devedor: z.string().trim().min(1).max(120).optional(),
     motivo: motivoAviso.optional(),
-    valor_centavos: valorCentavos.optional(),
     data_combinada: dataCombinada.optional(),
     pix_chave: z.string().trim().min(1).max(140).optional(),
     pix_titular: z.string().trim().min(1).max(120).optional(),
@@ -170,16 +176,18 @@ export const editarAvisoBody = z
     // devedor): categoria é dado interno do dono. `null` remove a categoria; ausente = mantém.
     categoria_id: z.uuid().nullish(),
     // Fase A: custo (centavos, >=0). Também interno e LIVRE. `null` limpa; ausente = mantém.
+    // Dormente (saiu do formulário), mas o contrato segue aceitando para não quebrar callers.
     valor_custo_centavos: z.number().int().min(0).nullish(),
-    // Fase A: composição do pedido (itens). Também interna e LIVRE (não abre reaprovação).
-    // `null` limpa; ausente = mantém. Trocar o valor combinado segue o caminho do acordo.
-    itens: z.array(itemPedidoSchema).max(MAX_ITENS_PEDIDO).nullish(),
+    // Composição do pedido (itens). Presente = substitui (>=1 item); ausente = mantém. Não
+    // aceita `null` (limpar quebraria o valor derivado). Como o valor é DERIVADO da soma dos
+    // itens, mudar os itens que altere o total segue o caminho do ACORDO (reaprovação); uma
+    // edição de itens que mantenha o total (ex.: corrigir descrição) é LIVRE. Ver editarAviso.
+    itens: z.array(itemPedidoSchema).min(1).max(MAX_ITENS_PEDIDO).optional(),
   })
   .refine(
     (b) =>
       b.nome_devedor !== undefined ||
       b.motivo !== undefined ||
-      b.valor_centavos !== undefined ||
       b.data_combinada !== undefined ||
       b.pix_chave !== undefined ||
       b.pix_titular !== undefined ||
@@ -189,6 +197,11 @@ export const editarAvisoBody = z
       b.itens !== undefined,
     { message: 'informe ao menos um campo para editar' },
   )
+  // Se vierem itens, o total derivado precisa ser > 0 (CHECK avisos.valor_centavos > 0).
+  .refine((b) => b.itens === undefined || somaItensCentavos(b.itens) > 0, {
+    message: 'o total dos itens precisa ser maior que zero',
+    path: ['itens'],
+  })
 export type EditarAvisoBody = z.infer<typeof editarAvisoBody>
 
 // ---- GET /v1/avisos ----
@@ -445,6 +458,19 @@ export const buscarPessoaResposta = z.object({
   itens: z.array(sugestaoPessoaSchema),
 })
 export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
+
+// POST /v1/itens/buscar-por-nome (autocomplete do nome do item ao montar o pedido).
+// Espelha o autocomplete de pessoa: o termo vai no CORPO de um POST (consistência com a
+// família de buscas; corpo não é logado). Sugere descrições de itens já usadas pelo criador.
+export const buscarItemBody = z.object({
+  prefixo: z.string().trim().min(1).max(80),
+})
+export type BuscarItemBody = z.infer<typeof buscarItemBody>
+
+export const buscarItemResposta = z.object({
+  itens: z.array(z.string()),
+})
+export type BuscarItemResposta = z.infer<typeof buscarItemResposta>
 
 // ---- PATCH /v1/perfil ----
 export const atualizarPerfilBody = z.object({

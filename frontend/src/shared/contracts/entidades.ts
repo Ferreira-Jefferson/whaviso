@@ -80,6 +80,12 @@ export const itemPedidoSchema = z.object({
 })
 export type ItemPedido = z.infer<typeof itemPedidoSchema>
 
+// O valor do combinado é DERIVADO dos itens (soma de qtd x preço unitário), em centavos.
+// Espelha o helper do backend; usado no form para exibir o total e montar o payload.
+export function somaItensCentavos(itens: ReadonlyArray<ItemPedido>): number {
+  return itens.reduce((s, i) => s + i.qtd * i.valor_unit_centavos, 0)
+}
+
 export const avisoSchema = z.object({
   id: z.uuid(),
   // nullable: no fluxo invertido o cobrador é convidado e só vincula conta ao aceitar.

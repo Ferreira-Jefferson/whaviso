@@ -20,7 +20,7 @@ import type {
   StatusAviso,
   TipoChavePix,
 } from '@whaviso/shared/contracts'
-import { detectarTipoChavePix } from '@whaviso/shared/contracts'
+import { detectarTipoChavePix, somaItensCentavos } from '@whaviso/shared/contracts'
 import { gerarToken, sha256Hex } from '../../shared/tokens'
 import { conflito, naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
 import {
@@ -153,6 +153,13 @@ export async function criarAviso(
       throw regraNegocio('categoria_invalida', 'A categoria escolhida não existe ou não é sua.')
     }
 
+    // O valor do combinado é DERIVADO da soma dos itens (autoridade do servidor). O contrato
+    // já exige >=1 item e total > 0; a guarda abaixo protege a coluna (CHECK valor > 0).
+    const valorCentavos = somaItensCentavos(body.itens)
+    if (valorCentavos <= 0) {
+      throw regraNegocio('valor_invalido', 'O total dos itens precisa ser maior que zero.')
+    }
+
     // No invertido, o telefone do devedor (alvo dos lembretes) é o do criador. Na agenda
     // pode ser null (o perfil pode nem ter telefone ainda); resolvido/exigido ao ativar.
     const telefoneCriador = ehReceber ? null : await repo.telefoneDoPerfil(cli, uid)
@@ -174,7 +181,7 @@ export async function criarAviso(
       nome_cobrador: ehReceber ? null : (body.nome_cobrador ?? null),
       telefone_cobrador: ehReceber ? null : (body.telefone_cobrador ?? null),
       motivo: body.motivo,
-      valor_centavos: body.valor_centavos,
+      valor_centavos: valorCentavos,
       data_combinada: body.data_combinada,
       pix_chave: body.pix_chave ?? null,
       pix_titular: body.pix_titular ?? null,
@@ -182,8 +189,8 @@ export async function criarAviso(
       pix_tipo: pixTipo,
       categoria_id: body.categoria_id ?? null,
       valor_custo_centavos: body.valor_custo_centavos ?? null,
-      // Fase A: composição do pedido (itens). Interno; nunca vai ao devedor.
-      itens: body.itens ?? null,
+      // Composição do pedido (itens): obrigatória; a soma vira o valor_centavos acima.
+      itens: body.itens,
     }
 
     // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM envio. ----
@@ -528,13 +535,28 @@ export async function editarAviso(
     if (mudaCusto) await repo.atualizarCusto(cli, id, body.valor_custo_centavos ?? null)
     const custoFinal = mudaCusto ? (body.valor_custo_centavos ?? null) : aviso.valor_custo_centavos
 
-    // Fase A: composição do pedido (itens) também é INTERNA e LIVRE (nunca abre reaprovação;
-    // não vai ao devedor). Trocar o VALOR combinado segue o caminho do acordo (abaixo).
-    const mudaItens = body.itens !== undefined
-    if (mudaItens) await repo.atualizarItens(cli, id, body.itens ?? null)
-    const itensFinal = mudaItens ? (body.itens ?? null) : aviso.itens
+    // O valor do combinado é DERIVADO da soma dos itens. Editar os itens de forma que MUDE o
+    // total é uma alteração do ACORDO (valor + itens andam juntos: snapshot + reaprovação
+    // pós-aceite, abaixo). Editar os itens mantendo o total (ex.: corrigir uma descrição) é
+    // interno e LIVRE (aplicado direto, nunca abre reaprovação; não vai ao devedor).
+    const itensNovos = body.itens
+    const novoValor = itensNovos !== undefined ? somaItensCentavos(itensNovos) : aviso.valor_centavos
+    if (itensNovos !== undefined && novoValor <= 0) {
+      throw regraNegocio('valor_invalido', 'O total dos itens precisa ser maior que zero.')
+    }
+    const mudaValor = itensNovos !== undefined && novoValor !== aviso.valor_centavos
 
     const campos = camposEditados(body)
+    if (mudaValor) {
+      // valor + itens entram no acordo (snapshot os cobre; desfazer/recusar reverte ambos).
+      campos.valor_centavos = novoValor
+      campos.itens = itensNovos
+    } else if (itensNovos !== undefined) {
+      // Mesmo total: edição interna livre, fora do caminho do acordo.
+      await repo.atualizarItens(cli, id, itensNovos)
+    }
+    const itensFinal = itensNovos !== undefined ? itensNovos : aviso.itens
+
     const temCampoAcordo = Object.keys(campos).length > 0
 
     // Só campos internos (categoria/custo) mudaram: aplica direto (sem reaprovação nem
@@ -591,7 +613,8 @@ function camposEditados(body: EditarAvisoBody): Partial<repo.DadosEditaveis> {
   const c: Partial<repo.DadosEditaveis> = {}
   if (body.nome_devedor !== undefined) c.nome_devedor = body.nome_devedor
   if (body.motivo !== undefined) c.motivo = body.motivo
-  if (body.valor_centavos !== undefined) c.valor_centavos = body.valor_centavos
+  // valor_centavos NÃO vem do corpo: é derivado dos itens e injetado por editarAviso quando
+  // uma mudança de itens altera o total (junto de `itens`), seguindo o caminho do acordo.
   if (body.data_combinada !== undefined) c.data_combinada = body.data_combinada
   if (body.pix_chave !== undefined) c.pix_chave = body.pix_chave
   if (body.pix_titular !== undefined) c.pix_titular = body.pix_titular

@@ -3,7 +3,7 @@
 // (toque). type="button" para nunca submeter o formulário em volta. Acessível:
 // botão com aria-label e tooltip ligado por aria-describedby.
 import { useId, useState } from 'react'
-import { Info } from 'lucide-react'
+import { CircleHelp } from 'lucide-react'
 
 export function InfoHint({ texto, rotulo }: { texto: string; rotulo?: string }) {
   const id = useId()
@@ -25,7 +25,7 @@ export function InfoHint({ texto, rotulo }: { texto: string; rotulo?: string }) 
           setAberto((v) => !v)
         }}
       >
-        <Info strokeWidth={1.75} className="size-3.5" />
+        <CircleHelp strokeWidth={1.75} className="size-3.5" />
       </button>
       {aberto && (
         <span

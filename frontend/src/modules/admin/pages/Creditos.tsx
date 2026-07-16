@@ -160,13 +160,13 @@ function FormCatalogo({ catalogo }: { catalogo: CreditosCatalogo }) {
 
       <h2 className="mt-2 text-lg text-salvia">Cortesia e agenda</h2>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Cortesia inicial (Free)" dica="Saldo grátis ao nascer a conta." dicaComoIcone>
+        <Field label="Cortesia inicial (Free)" dica="Saldo grátis ao nascer a conta.">
           <InteiroInput value={form.cortesia_inicial} onChange={(v) => set('cortesia_inicial', v)} />
         </Field>
-        <Field label="Agenda do Free" dica="Teto de anotações sem nenhuma compra." dicaComoIcone>
+        <Field label="Agenda do Free" dica="Teto de anotações sem nenhuma compra.">
           <InteiroInput value={form.agenda_teto_free} onChange={(v) => set('agenda_teto_free', v)} />
         </Field>
-        <Field label="Agenda após a 1a compra" dica="Teto de anotações depois de comprar créditos." dicaComoIcone>
+        <Field label="Agenda após a 1a compra" dica="Teto de anotações depois de comprar créditos.">
           <InteiroInput value={form.agenda_teto_pago} onChange={(v) => set('agenda_teto_pago', v)} />
         </Field>
       </div>
@@ -261,7 +261,7 @@ function FormPixPlataforma({ config }: { config: ConfigPlataforma }) {
         </Field>
       </div>
 
-      <Field label="Comentário (opcional)" dica="Observação livre sobre o pagamento." dicaComoIcone>
+      <Field label="Comentário (opcional)" dica="Observação livre sobre o pagamento.">
         <Input
           value={comentario}
           placeholder="Ex.: confirmamos o pagamento em até 1 dia útil"

@@ -23,7 +23,7 @@ function bodyAgenda(nome: string, categoria_id?: string) {
     modo: 'agenda' as const,
     nome_devedor: nome,
     motivo: 'pedido do catalogo',
-    valor_centavos: 8990,
+    itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 8990 }],
     data_combinada: '2026-08-01',
     ...(categoria_id ? { categoria_id } : {}),
   }

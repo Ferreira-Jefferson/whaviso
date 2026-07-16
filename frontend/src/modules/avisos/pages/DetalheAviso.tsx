@@ -5,7 +5,7 @@
 // - Ações: confirmar/desmarcar recebimento (OTIMISTA, reversível);
 //   cancelar (PESSIMISTA, ConfirmDialog). Invalidação cobre detalhe+lista+resumo.
 // Linguagem das Regras de Ouro: só recebido/combinado/encerrar (ver linguagem.ts).
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
   ArrowLeft,
@@ -32,7 +32,6 @@ import {
   EmptyState,
   Field,
   Input,
-  MoneyInput,
   MoneyText,
   PageHeader,
   PhoneInput,
@@ -48,9 +47,11 @@ import {
   rotuloAtor,
   telefone,
 } from '@/shared/format'
-import type { Aviso, EventoAviso, PapelAviso } from '@/shared/contracts'
+import type { Aviso, EventoAviso, ItemPedido, PapelAviso } from '@/shared/contracts'
 import type { EditarAvisoBody } from '@/shared/contracts'
 import type { AtivarAvisoBody, CriarAvisoResposta } from '@/shared/contracts'
+import { somaItensCentavos } from '@/shared/contracts'
+import { ItensPedido } from '../components/ItensPedido'
 import { ApiError } from '@/shared/api_client'
 import { usePerfil } from '@/shared/auth'
 import { useSemSaldo } from '@/shared/plano'
@@ -686,32 +687,66 @@ function EditarModal({
 }) {
   const [nome, setNome] = useState(aviso.nome_devedor)
   const [motivo, setMotivo] = useState(aviso.motivo)
-  const [valor, setValor] = useState<number | null>(aviso.valor_centavos)
   const [data, setData] = useState(aviso.data_combinada)
   const [pix, setPix] = useState(aviso.pix_chave ?? '')
   const [titular, setTitular] = useState(aviso.pix_titular ?? '')
   const [banco, setBanco] = useState(aviso.pix_banco ?? '')
   const [confirmando, setConfirmando] = useState(false)
+  // O valor do combinado vem dos itens. Avisos antigos sem itens ganham uma linha semente
+  // (descrição = motivo, preço = valor atual), preservando o total até o dono ajustar.
+  const itensIniciais = useMemo<ItemPedido[]>(
+    () =>
+      aviso.itens && aviso.itens.length > 0
+        ? aviso.itens
+        : [{ descricao: aviso.motivo, qtd: 1, valor_unit_centavos: aviso.valor_centavos }],
+    [aviso],
+  )
+  const [itens, setItens] = useState<ItemPedido[]>(itensIniciais)
 
-  // Monta o corpo só com os campos que MUDARAM (edição parcial).
+  const totalItens = somaItensCentavos(itens)
+  const itensMudou = JSON.stringify(itens) !== JSON.stringify(itensIniciais)
+  const itensInvalido =
+    itens.length === 0 || itens.some((i) => i.descricao.trim().length === 0) || totalItens <= 0
+  const erroItens = itensInvalido
+    ? itens.length === 0
+      ? 'Adicione ao menos um item ao pedido.'
+      : itens.some((i) => i.descricao.trim().length === 0)
+        ? 'Preencha a descrição de todos os itens.'
+        : 'O valor do pedido precisa ser maior que zero.'
+    : undefined
+
+  // Monta o corpo só com os campos que MUDARAM (edição parcial). O valor não é enviado: o
+  // servidor o deriva dos itens. Mudar os itens de forma que altere o total reabre a aprovação.
   function montar(): EditarAvisoBody {
     const body: EditarAvisoBody = {}
     if (nome.trim() && nome.trim() !== aviso.nome_devedor) body.nome_devedor = nome.trim()
     if (motivo.trim() && motivo.trim() !== aviso.motivo) body.motivo = motivo.trim()
-    if (valor != null && valor !== aviso.valor_centavos) body.valor_centavos = valor
     if (data && data !== aviso.data_combinada) body.data_combinada = data
     if (pix.trim() && pix.trim() !== (aviso.pix_chave ?? '')) body.pix_chave = pix.trim()
     if (titular.trim() && titular.trim() !== (aviso.pix_titular ?? '')) body.pix_titular = titular.trim()
     if (banco.trim() && banco.trim() !== (aviso.pix_banco ?? '')) body.pix_banco = banco.trim()
+    if (itensMudou && !itensInvalido) body.itens = itens
     return body
   }
 
   const body = montar()
   const semMudanca = Object.keys(body).length === 0
+  // A confirmação de reaprovação só faz sentido quando a mudança afeta o ACORDO: nome, motivo,
+  // data, Pix, ou os itens de um jeito que altere o TOTAL. Um ajuste de itens que mantém o total
+  // é edição interna livre (o servidor aplica direto), então não pede aprovação.
+  const totalMudou = itensMudou && totalItens !== aviso.valor_centavos
+  const afetaAcordo =
+    body.nome_devedor !== undefined ||
+    body.motivo !== undefined ||
+    body.data_combinada !== undefined ||
+    body.pix_chave !== undefined ||
+    body.pix_titular !== undefined ||
+    body.pix_banco !== undefined ||
+    totalMudou
 
   function aoSalvar() {
-    if (semMudanca) return
-    if (exigeAprovacao) {
+    if (semMudanca || itensInvalido) return
+    if (exigeAprovacao && afetaAcordo) {
       setConfirmando(true)
       return
     }
@@ -734,14 +769,10 @@ function EditarModal({
           <Field label="Sobre o quê">
             <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Valor">
-              <MoneyInput value={valor} onChange={setValor} />
-            </Field>
-            <Field label="Data combinada">
-              <DateInput value={data} onChange={(e) => setData(e.target.value)} />
-            </Field>
-          </div>
+          <ItensPedido value={itens} onChange={setItens} erro={erroItens} />
+          <Field label="Data combinada">
+            <DateInput value={data} onChange={(e) => setData(e.target.value)} />
+          </Field>
           <Field label="Chave Pix">
             <Input value={pix} onChange={(e) => setPix(e.target.value)} />
           </Field>
@@ -757,7 +788,7 @@ function EditarModal({
             <Button variante="secondary" onClick={onFechar}>
               Cancelar
             </Button>
-            <Button onClick={aoSalvar} loading={salvando} disabled={semMudanca}>
+            <Button onClick={aoSalvar} loading={salvando} disabled={semMudanca || itensInvalido}>
               Salvar
             </Button>
           </div>

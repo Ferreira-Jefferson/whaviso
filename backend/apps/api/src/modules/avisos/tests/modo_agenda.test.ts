@@ -23,7 +23,7 @@ function corpoReceber(over: Record<string, unknown> = {}) {
     nome_devedor: 'Maria',
     telefone_devedor: '+5511999998888',
     motivo: 'mensalidade',
-    valor_centavos: 9900,
+    itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }],
     data_combinada: '2026-12-15',
     pix_chave: 'maria@pix.com',
     pix_titular: 'Maria Silva',
@@ -134,7 +134,7 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
         modo: 'agenda',
         nome_devedor: 'Eu',
         motivo: 'aluguel',
-        valor_centavos: 5000,
+        itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }],
         data_combinada: '2026-12-20',
         // sem nome_cobrador/telefone_cobrador/pix: tudo diferido para ativar
       },
@@ -254,7 +254,7 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
       method: 'POST', url: '/v1/avisos', headers: AUTH,
       payload: {
         direcao: 'pagar', modo: 'agenda', nome_devedor: 'Eu', motivo: 'aluguel',
-        valor_centavos: 5000, data_combinada: '2026-12-20',
+        itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }], data_combinada: '2026-12-20',
       },
     })
     const id = criado.json().aviso.id
@@ -321,7 +321,7 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     const id = criado.json().aviso.id
     const editar = await app.inject({
       method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH,
-      payload: { valor_centavos: 12345, motivo: 'mensalidade nova' },
+      payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 12345 }], motivo: 'mensalidade nova' },
     })
     expect(editar.statusCode).toBe(200)
     // Aplicado direto: continua sem_aviso (sem aguardando_aprovacao).
@@ -373,7 +373,7 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
       method: 'POST', url: '/v1/avisos', headers: AUTH,
       payload: {
         direcao: 'pagar', modo: 'agenda', nome_devedor: 'Eu', motivo: 'aluguel',
-        valor_centavos: 5000, data_combinada: '2026-12-20',
+        itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }], data_combinada: '2026-12-20',
       },
     })
     const id = criado.json().aviso.id

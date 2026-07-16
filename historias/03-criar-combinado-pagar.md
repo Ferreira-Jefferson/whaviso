@@ -11,13 +11,14 @@
 ### H3.1: Cadastrar um combinado a pagar 🟢
 Como **devedor**, quero cadastrar um combinado que eu vou pagar e convidar quem vai receber, para ser lembrado dos meus compromissos antes de vencerem.
 *Critérios de aceite:*
-- [ ] Informo: **nome de quem recebe** (cobrador), **motivo**, **valor**, **data combinada**, **telefone do cobrador** (alvo do combinado).
+- [ ] Informo: **nome de quem recebe** (cobrador), **motivo**, os **itens do pedido** (mesma regra da H2.8), **data combinada**, **telefone do cobrador** (alvo do combinado).
+- [ ] O **valor não é digitado à parte**: é **derivado da soma dos itens** (calculado pelo servidor, exibido em leitura). Não há campo de valor avulso nem campo de custo (mesma regra da H2.1/H2.8). É preciso ao menos um item e o total maior que zero. O input de descrição do item tem autocomplete das descrições já usadas pelo criador.
 - [ ] O **nome de quem paga** (devedor) é o do próprio criador (pré-preenchido a partir da conta).
 - [ ] Posso informar a **chave Pix** de quem recebe (para onde vou pagar), mas ela é **opcional** no fluxo invertido: o devedor nem sempre conhece a chave de quem vai receber. Se eu informar, ela vai no combinado para o cobrador **conferir e confirmar** (ou apontar como incorreta), ver H3.3, e o cobrador valida/ajusta o **nome do titular** e o **banco** (usados na resposta de Pix ao devedor, Épico 7 H7.3). Se eu **não** informar, o combinado nasce sem chave e o **cobrador informa a própria chave depois**, de forma guiada (Épico 14).
 - [ ] O combinado nasce com `criador_papel = devedor` e **sem cobrador vinculado** (`cobrador_id` nulo); o cobrador entra denormalizado por `nome_cobrador` / `telefone_cobrador`.
 - [ ] O valor é exibido em reais, mas persiste em **centavos** (int).
 - [ ] A data é interpretada em **America/Sao_Paulo**; o banco guarda em UTC.
-- [ ] Campos obrigatórios validados com mensagem clara; valor maior que zero.
+- [ ] Campos obrigatórios validados com mensagem clara; ao menos um item e total maior que zero.
 - [ ] Ao salvar, o combinado é criado no estado **aguardando_aceite**.
 - [ ] A linguagem respeita as regras de ouro (sem "dívida/cobrança/atraso").
 

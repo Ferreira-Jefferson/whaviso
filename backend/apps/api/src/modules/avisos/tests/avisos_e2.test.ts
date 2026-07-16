@@ -22,7 +22,7 @@ function corpoAviso(over: Record<string, unknown> = {}) {
     nome_devedor: 'Maria',
     telefone_devedor: '+5511999998888',
     motivo: 'mensalidade',
-    valor_centavos: 9900,
+    itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }],
     data_combinada: '2026-12-15',
     pix_chave: 'maria@pix.com',
     pix_titular: 'Maria Silva',
@@ -169,7 +169,8 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     const criado = await appC.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: corpoAviso() })
     const id = criado.json().aviso.id
     const r = await appC.inject({
-      method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 12000 },
+      method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH,
+      payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 12000 }] },
     })
     await appC.close()
     expect(r.statusCode).toBe(200)
@@ -187,7 +188,8 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     expect(await enviosVivos(id)).toBeGreaterThan(0)
     const appC = await criarAppTeste(cobrador)
     const r = await appC.inject({
-      method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 15000 },
+      method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH,
+      payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 15000 }] },
     })
     await appC.close()
     expect(r.statusCode).toBe(200)
@@ -207,7 +209,7 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
   it('H2.5: DESFAZER restaura as condições anteriores e volta a programado', async () => {
     const { id } = await criarAceito()
     const appC = await criarAppTeste(cobrador)
-    await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 15000 } })
+    await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 15000 }] } })
     const r = await appC.inject({ method: 'POST', url: `/v1/avisos/${id}/desfazer-edicao`, headers: AUTH })
     await appC.close()
     expect(r.statusCode).toBe(200)
@@ -220,11 +222,57 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     expect(rows[0]!.resolucao).toBe('desfeita')
   })
 
+  it('edição de itens que MANTÉM o total é livre (sem reaprovação)', async () => {
+    // O aceito nasce com total 9900 (item default). Trocar a composição mantendo a soma
+    // (ex.: renomear o item) é edição INTERNA livre: aplica direto, não abre reaprovação.
+    const { id } = await criarAceito()
+    const appC = await criarAppTeste(cobrador)
+    const r = await appC.inject({
+      method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH,
+      payload: { itens: [{ descricao: 'Novo', qtd: 1, valor_unit_centavos: 9900 }] },
+    })
+    await appC.close()
+    expect(r.statusCode).toBe(200)
+    // Não foi a reaprovação: segue programado (não aguardando_aprovacao_aviso_editado).
+    expect(r.json().status).toBe('programado')
+    expect(await statusDe(id)).toBe('programado')
+    // Nenhuma edição pendente foi aberta (edição livre não entra no sub-ciclo).
+    const { rows } = await poolSuper.query<{ n: string }>(
+      `select count(*) as n from public.avisos_edicoes where aviso_id=$1 and resolucao is null`, [id],
+    )
+    expect(Number(rows[0]!.n)).toBe(0)
+  })
+
+  it('desfazer edição de itens reverte itens e valor', async () => {
+    // Mudar a composição de forma que ALTERE o total é acordo (reaprovação); desfazer
+    // restaura o valor E os itens anteriores (o snapshot cobre ambos).
+    const { id } = await criarAceito()
+    const appC = await criarAppTeste(cobrador)
+    await appC.inject({
+      method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH,
+      payload: { itens: [{ descricao: 'X', qtd: 1, valor_unit_centavos: 15000 }] },
+    })
+    expect(await statusDe(id)).toBe('aguardando_aprovacao_aviso_editado')
+    const r = await appC.inject({ method: 'POST', url: `/v1/avisos/${id}/desfazer-edicao`, headers: AUTH })
+    await appC.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json().status).toBe('programado')
+    // Valor E composição voltaram ao estado anterior (item default de 9900).
+    expect(r.json().valor_centavos).toBe(9900)
+    expect(r.json().itens).toEqual([{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }])
+    // Confirma na fonte (jsonb persistido).
+    const { rows } = await poolSuper.query<{ valor_centavos: string; itens: unknown }>(
+      `select valor_centavos::bigint as valor_centavos, itens from public.avisos where id=$1`, [id],
+    )
+    expect(Number(rows[0]!.valor_centavos)).toBe(9900)
+    expect(rows[0]!.itens).toEqual([{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }])
+  })
+
   it('H2.5: não pode editar de novo enquanto há edição aguardando aprovação', async () => {
     const { id } = await criarAceito()
     const appC = await criarAppTeste(cobrador)
-    await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 15000 } })
-    const r = await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 16000 } })
+    await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 15000 }] } })
+    const r = await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 16000 }] } })
     await appC.close()
     expect(r.statusCode).toBe(409)
     expect(r.json().error.code).toBe('edicao_em_aprovacao')
@@ -241,7 +289,7 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     await aceitarAvisoDireto(id, dev) // E5: site de aceite removido
 
     for (let i = 0; i < 4; i++) {
-      const e = await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { valor_centavos: 10000 + i } })
+      const e = await appC.inject({ method: 'PATCH', url: `/v1/avisos/${id}`, headers: AUTH, payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 10000 + i }] } })
       expect(e.statusCode).toBe(200)
       await appC.inject({ method: 'POST', url: `/v1/avisos/${id}/desfazer-edicao`, headers: AUTH })
     }
@@ -340,7 +388,7 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     const b = await criarAceito()
     const appC = await criarAppTeste(cobrador)
     await appC.inject({ method: 'POST', url: `/v1/avisos/${a.id}/pausar`, headers: AUTH })
-    await appC.inject({ method: 'PATCH', url: `/v1/avisos/${b.id}`, headers: AUTH, payload: { valor_centavos: 13000 } })
+    await appC.inject({ method: 'PATCH', url: `/v1/avisos/${b.id}`, headers: AUTH, payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 13000 }] } })
     await appC.close()
     const { rows } = await poolSuper.query<{ n: number }>(`select public.contar_agenda($1) as n`, [cobrador])
     expect(Number(rows[0]!.n)).toBe(2)

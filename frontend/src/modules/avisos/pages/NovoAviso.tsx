@@ -9,8 +9,8 @@ import {
   Card,
   DateInput,
   Field,
+  InfoHint,
   Input,
-  MoneyInput,
   PageHeader,
   PhoneInput,
   SegmentedControl,
@@ -21,7 +21,6 @@ import type {
   CriarAvisoResposta,
   DirecaoAviso,
   EtapaEnvio,
-  ItemPedido,
   RecorrenciaInput,
 } from '@/shared/contracts'
 import { usePerfil } from '@/shared/auth'
@@ -76,9 +75,6 @@ export default function NovoAvisoPage() {
   // ocorrências (cada uma reserva 1 crédito). undefined = simples / ciclo completo.
   const [recorrencia, setRecorrencia] = useState<RecorrenciaInput | undefined>(undefined)
   const [cadenciaEtapas, setCadenciaEtapas] = useState<EtapaEnvio[] | undefined>(undefined)
-  // Fase A: composição opcional do pedido (itens). Estado local (como recorrência/cadência);
-  // vai no corpo do POST. Quando há itens, o total deles alimenta o valor combinado.
-  const [itens, setItens] = useState<ItemPedido[]>([])
   // Estáveis p/ os efeitos dos filhos não dispararem a cada render.
   const aoMudarRecorrencia = useCallback((v: RecorrenciaInput | undefined) => setRecorrencia(v), [])
   const aoMudarCadencia = useCallback((v: EtapaEnvio[] | undefined) => setCadenciaEtapas(v), [])
@@ -103,6 +99,8 @@ export default function NovoAvisoPage() {
       pix_titular: '',
       pix_banco: '',
       categoria_id: '',
+      // Itens obrigatórios: começa com uma linha vazia (o valor do combinado vem da soma).
+      itens: [{ descricao: '', qtd: 1, valor_unit_centavos: 0 }],
     },
   })
 
@@ -128,18 +126,6 @@ export default function NovoAvisoPage() {
   // em MAX_MOTIVO_CARACTERES; o schema valida por garantia (paste etc.).
   const motivoLen = (watch('motivo') ?? '').length
   const ehReceber = direcao === 'receber'
-  const temItens = itens.length > 0
-
-  // Fase A: ao mexer nos itens, o total deles vira o valor combinado (o whaviso soma por
-  // você). O valor segue editável para ajustar (ex.: desconto); a autoridade do acordo é o
-  // valor, não a soma (o backend não exige igualdade). Só sobrescreve quando há itens.
-  function aoMudarItens(novos: ItemPedido[]) {
-    setItens(novos)
-    if (novos.length > 0) {
-      const total = novos.reduce((s, it) => s + it.qtd * it.valor_unit_centavos, 0)
-      setValue('valor_centavos', total, { shouldValidate: true })
-    }
-  }
 
   // Cada botão escolhe o modo e dispara o submit. O schema valida conforme o modo
   // (telefone/Pix só obrigatórios ao enviar o combinado), então setamos antes de validar.
@@ -179,13 +165,11 @@ export default function NovoAvisoPage() {
       const r = await criar.mutateAsync({
         ...payload,
         motivo: dados.motivo,
-        valor_centavos: dados.valor_centavos,
         data_combinada: dados.data_combinada,
-        // E16 / Fase A: categoria ('' = sem categoria) e custo interno (opcional).
+        // E16: categoria ('' = sem categoria). Interna; nunca vai ao devedor.
         categoria_id: dados.categoria_id ? dados.categoria_id : null,
-        valor_custo_centavos: dados.valor_custo_centavos ?? null,
-        // Fase A: itens do pedido (opcional). null quando não usou o editor.
-        itens: itens.length > 0 ? itens : null,
+        // Itens obrigatórios: o servidor DERIVA o valor combinado da soma deles.
+        itens: dados.itens,
         // E6 H6.10: recorrência (facilitador, todos os planos) + cadência (gated por plano
         // no servidor). undefined = combinado simples / ciclo completo. O servidor é a
         // autoridade: expande as ocorrências e valida vagas/cadência.
@@ -275,19 +259,8 @@ export default function NovoAvisoPage() {
           </p>
 
           <Field
-            label={ehReceber ? 'Nome de quem vai pagar' : 'Para quem você vai pagar'}
-            erro={errors.nome_devedor?.message}
-          >
-            <Input
-              placeholder="Ex.: Maria Silva"
-              autoComplete="off"
-              {...register('nome_devedor')}
-            />
-          </Field>
-
-          <Field
             label={ehReceber ? 'WhatsApp de quem vai pagar' : 'WhatsApp de quem vai receber'}
-            dica="Necessário para enviar o combinado. Sem ele, dá para só salvar."
+            dica="Necessário para enviar o combinado. Se já usou esse contato, o nome vem preenchido."
             erro={errors.telefone_devedor?.message}
           >
             <Controller
@@ -337,6 +310,17 @@ export default function NovoAvisoPage() {
             />
           </Field>
 
+          <Field
+            label={ehReceber ? 'Nome de quem vai pagar' : 'Para quem você vai pagar'}
+            erro={errors.nome_devedor?.message}
+          >
+            <Input
+              placeholder="Ex.: Maria Silva"
+              autoComplete="off"
+              {...register('nome_devedor')}
+            />
+          </Field>
+
           {/* Campo montado à mão (não via Field) para sobrepor o contador de
               caracteres no canto inferior direito do input. */}
           <div className="flex flex-col gap-1.5">
@@ -365,50 +349,19 @@ export default function NovoAvisoPage() {
             )}
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field
-              label="Valor"
-              erro={errors.valor_centavos?.message}
-              dica={temItens ? 'Somado dos itens abaixo. Você pode ajustar (ex.: desconto).' : undefined}
-            >
-              <Controller
-                control={control}
-                name="valor_centavos"
-                render={({ field }) => (
-                  <MoneyInput
-                    value={field.value ?? null}
-                    onChange={(c) => field.onChange(c ?? undefined)}
-                    invalido={Boolean(errors.valor_centavos)}
-                  />
-                )}
-              />
-            </Field>
+          {/* Composição do pedido (o que foi vendido): OBRIGATÓRIA (>=1 item). O total dos
+              itens É o valor do combinado (derivado; não há mais campo de valor avulso). Só a
+              parte de itens é interna: a outra pessoa vê apenas o valor. */}
+          <Controller
+            control={control}
+            name="itens"
+            render={({ field }) => (
+              <ItensPedido value={field.value} onChange={field.onChange} erro={errors.itens?.message} />
+            )}
+          />
 
-            <Field label="Data combinada" erro={errors.data_combinada?.message}>
-              {/* Controlado (como o Valor): o DateInput é um calendário próprio, e o modo
-                  controlado mantém a exibição em sincronia com o react-hook-form. */}
-              <Controller
-                control={control}
-                name="data_combinada"
-                render={({ field }) => (
-                  <DateInput
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    invalido={Boolean(errors.data_combinada)}
-                    min={hojeIso()}
-                  />
-                )}
-              />
-            </Field>
-          </div>
-
-          {/* Fase A: composição do pedido (o que foi vendido). Opcional e INTERNA: nunca
-              aparece para a outra pessoa; o total soma no valor acima. */}
-          <ItensPedido value={itens} onChange={aoMudarItens} />
-
-          {/* E16 / Fase A: organização (categoria) + resultado (custo). Ambos opcionais e
-              INTERNOS: nunca aparecem para a outra pessoa. */}
+          {/* E16: categoria (interna, nunca vai para a outra pessoa) ao lado da data combinada
+              (do acordo). A data desceu para cá porque o valor avulso deixou de existir. */}
           <div className="grid gap-5 sm:grid-cols-2">
             <Field
               label="Categoria (opcional)"
@@ -464,17 +417,19 @@ export default function NovoAvisoPage() {
               </Link>
             </Field>
 
-            <Field
-              label="Custo (opcional)"
-              dica="Quanto o produto te custou. Fica só para você, para ver o resultado."
-            >
+            <Field label="Data combinada" erro={errors.data_combinada?.message}>
+              {/* Controlado: o DateInput é um calendário próprio; o modo controlado mantém a
+                  exibição em sincronia com o react-hook-form. */}
               <Controller
                 control={control}
-                name="valor_custo_centavos"
+                name="data_combinada"
                 render={({ field }) => (
-                  <MoneyInput
-                    value={field.value ?? null}
-                    onChange={(c) => field.onChange(c ?? undefined)}
+                  <DateInput
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    invalido={Boolean(errors.data_combinada)}
+                    min={hojeIso()}
                   />
                 )}
               />
@@ -491,14 +446,17 @@ export default function NovoAvisoPage() {
           />
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-tinta">
+            <span className="flex items-center gap-1.5 text-sm font-medium text-tinta">
               {ehReceber ? 'Chave Pix' : 'Chave Pix (opcional)'}
+              <InfoHint
+                texto={
+                  ehReceber
+                    ? 'Aparece para a outra pessoa pagar com facilidade.'
+                    : 'A chave de quem vai receber. Quem confirmar pode ajustar.'
+                }
+                rotulo="Sobre: Chave Pix"
+              />
             </span>
-            <p className="text-xs text-tinta-2">
-              {ehReceber
-                ? 'Aparece para a outra pessoa pagar com facilidade.'
-                : 'A chave de quem vai receber. Quem confirmar pode ajustar.'}
-            </p>
             <SeletorChavePix
               // remonta ao trocar a direção: limpa seleção/cadastro do modo anterior.
               key={direcao}

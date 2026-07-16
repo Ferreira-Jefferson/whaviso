@@ -490,6 +490,8 @@ export async function buscarComoCriadorParaUpdate(
 }
 
 // Campos editáveis do combinado (H2.5). pix_titular/pix_banco acompanham a chave.
+// itens entra no snapshot porque o valor é DERIVADO deles: uma edição de itens que muda o
+// total anda junto com valor_centavos pelo caminho do acordo (desfazer/recusar reverte ambos).
 export interface DadosEditaveis {
   nome_devedor: string
   motivo: string
@@ -498,6 +500,7 @@ export interface DadosEditaveis {
   pix_chave: string | null
   pix_titular: string | null
   pix_banco: string | null
+  itens: ItemPedido[] | null
 }
 
 /** Lê os dados editáveis atuais (snapshot do "antes" da edição). */
@@ -510,10 +513,11 @@ export async function lerDadosEditaveis(ex: Executor, id: string): Promise<Dados
     pix_chave: string | null
     pix_titular: string | null
     pix_banco: string | null
+    itens: ItemPedido[] | null
   }>(
     `select nome_devedor, motivo, valor_centavos::bigint as valor_centavos,
             to_char(data_combinada,'YYYY-MM-DD') as data_combinada,
-            pix_chave, pix_titular, pix_banco
+            pix_chave, pix_titular, pix_banco, itens
      from public.avisos where id = $1`,
     [id],
   )
@@ -532,6 +536,13 @@ export async function atualizarDados(
   const params: unknown[] = [id]
   for (const [k, v] of Object.entries(campos)) {
     if (v === undefined) continue
+    // itens é jsonb: passamos a string JSON e casteamos (senão node-pg trata o array JS como
+    // array literal do Postgres). Espelha inserirAviso/atualizarItens. null limpa a coluna.
+    if (k === 'itens') {
+      params.push(v == null ? null : JSON.stringify(v))
+      sets.push(`itens = $${params.length}::jsonb`)
+      continue
+    }
     params.push(v)
     sets.push(`${k} = $${params.length}`)
   }

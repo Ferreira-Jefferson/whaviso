@@ -7,7 +7,7 @@
 //    é o nome da pessoa que vou pagar + telefone_devedor é o WhatsApp dela). O Pix
 //    é dela (posso pré-preencher). Telefone obrigatório nos DOIS (vai o combinado).
 import { z } from 'zod'
-import { telefoneE164 } from '@/shared/contracts'
+import { somaItensCentavos, telefoneE164 } from '@/shared/contracts'
 
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/
 
@@ -27,11 +27,16 @@ export const novoAvisoSchema = z
       .trim()
       .min(1, 'Informe o nome de quem combinou.')
       .max(120, 'Nome muito longo.'),
-    // Valor em CENTAVOS, emitido pelo MoneyInput; nunca parseFloat manual.
-    valor_centavos: z
-      .number({ error: 'Informe o valor combinado.' })
-      .int()
-      .positive('O valor precisa ser maior que zero.'),
+    // Itens do pedido: o valor do combinado é DERIVADO da soma (qtd x preço). Shape leniente
+    // (só o suficiente para a soma); as mensagens são AGREGADAS num único erro em `itens` pelo
+    // superRefine abaixo (a validação estrita real acontece no criarAvisoBody, no envio).
+    itens: z.array(
+      z.object({
+        descricao: z.string(),
+        qtd: z.number().int(),
+        valor_unit_centavos: z.number().int(),
+      }),
+    ),
     motivo: z
       .string()
       .trim()
@@ -47,10 +52,23 @@ export const novoAvisoSchema = z
     // invertido a chave é de terceiro e não exigimos esses dados aqui.
     pix_titular: z.string().trim().max(120, 'Nome muito longo.').optional(),
     pix_banco: z.string().trim().max(80, 'Nome muito longo.').optional(),
-    // E16 / Fase A: categoria (opcional; '' = sem categoria) e custo interno (centavos,
-    // opcional). Nunca vão ao devedor; ajudam a organizar e a ver o resultado.
+    // E16: categoria (opcional; '' = sem categoria). Nunca vai ao devedor; ajuda a organizar.
     categoria_id: z.string().optional(),
-    valor_custo_centavos: z.number().int().min(0).optional(),
+  })
+  // Itens obrigatórios: >=1 item, todos com descrição, e total > 0 (uma mensagem por vez, em
+  // ordem de prioridade). Vale nos dois modos (enviar e agenda): sem itens não há valor.
+  .superRefine((v, ctx) => {
+    if (v.itens.length === 0) {
+      ctx.addIssue({ code: 'custom', path: ['itens'], message: 'Adicione ao menos um item ao pedido.' })
+      return
+    }
+    if (v.itens.some((i) => i.descricao.trim().length === 0)) {
+      ctx.addIssue({ code: 'custom', path: ['itens'], message: 'Preencha a descrição de todos os itens.' })
+      return
+    }
+    if (somaItensCentavos(v.itens) <= 0) {
+      ctx.addIssue({ code: 'custom', path: ['itens'], message: 'O valor do pedido precisa ser maior que zero.' })
+    }
   })
   // No modo agenda telefone e Pix são opcionais (H4.1): só obrigatórios ao enviar.
   .refine((v) => v.modo === 'agenda' || v.telefone_devedor !== null, {

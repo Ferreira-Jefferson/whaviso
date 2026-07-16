@@ -19,7 +19,7 @@ function corpo(over: Record<string, unknown> = {}) {
     nome_devedor: 'Maria',
     telefone_devedor: '+5511999998888',
     motivo: 'mensalidade',
-    valor_centavos: 9900,
+    itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }],
     data_combinada: '2026-12-15',
     pix_chave: 'maria@pix.com',
     pix_titular: 'Maria Silva',
