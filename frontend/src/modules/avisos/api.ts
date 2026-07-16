@@ -13,6 +13,7 @@ import {
   envioSchema,
   eventoAvisoSchema,
   listaCategoriasResposta,
+  listaProdutosResposta,
   ocorrenciaSchema,
   statusAviso,
   type Aviso,
@@ -20,6 +21,7 @@ import {
   type BuscarItemResposta,
   type BuscarPessoaResposta,
   type Categoria,
+  type Produto,
   type CombinadoEnvioResposta,
   type CombinadoPreviewBody,
   type CombinadoPreviewResposta,
@@ -79,6 +81,27 @@ export function useCategorias() {
     queryKey: ['categorias'],
     queryFn: ({ signal }) =>
       apiClient.get<Categoria[]>('/categorias', { schema: listaCategoriasResposta, signal }),
+  })
+}
+
+/**
+ * E17: catálogo de produtos do usuário, para o autocomplete do pedido (ItensPedido). Lido por
+ * ROTA (o módulo avisos não importa o módulo produtos; fronteira do lint). A key STRING
+ * ['produtos'] é a MESMA do módulo produtos (que a invalida ao criar/editar). Degrada 404 -> [].
+ */
+export function useProdutosCatalogo() {
+  return useQuery({
+    queryKey: ['produtos'],
+    queryFn: async ({ signal }) => {
+      try {
+        return await apiClient.get<Produto[]>('/produtos', { schema: listaProdutosResposta, signal })
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.code === 'rota_inexistente')) {
+          return [] as Produto[]
+        }
+        throw e
+      }
+    },
   })
 }
 

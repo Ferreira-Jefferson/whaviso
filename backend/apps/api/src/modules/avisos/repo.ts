@@ -22,7 +22,10 @@ const COLS = `
   nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador, motivo,
   valor_centavos::bigint as valor_centavos,
   to_char(data_combinada, 'YYYY-MM-DD') as data_combinada, pix_chave,
-  pix_titular, pix_banco, categoria_id,
+  pix_titular, pix_banco,
+  -- E16 (multi): categorias via junção aviso_categorias. Subquery escalar (uuid[], parseado
+  -- pelo node-pg em string[]); vale em SELECT e em RETURNING (referencia avisos.id da linha).
+  array(select ac.categoria_id from public.aviso_categorias ac where ac.aviso_id = avisos.id) as categoria_ids,
   valor_custo_centavos::bigint as valor_custo_centavos,
   -- itens é jsonb: node-pg já devolve como array JS (composição opcional do pedido, Fase A).
   itens,
@@ -43,7 +46,7 @@ const COLS_VIEW = `
   nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador, motivo,
   linha_valor::bigint as valor_centavos,
   to_char(linha_data, 'YYYY-MM-DD') as data_combinada, pix_chave,
-  pix_titular, pix_banco, categoria_id,
+  pix_titular, pix_banco, categoria_ids,
   valor_custo_centavos::bigint as valor_custo_centavos,
   recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
   ocorrencias_total, indice as ocorrencia_atual,
@@ -68,7 +71,7 @@ interface LinhaAviso {
   pix_chave: string | null
   pix_titular: string | null
   pix_banco: string | null
-  categoria_id: string | null
+  categoria_ids: string[]
   valor_custo_centavos: string | null
   itens: ItemPedido[] | null
   recorrencia_tipo: 'periodo' | 'avulsas' | null
@@ -121,8 +124,8 @@ export interface NovoAviso {
   // E7/H7.3: tipo da chave (snapshot). Resolvido pelo serviço (cadastro do cobrador ou
   // inferência). null quando sem chave / ambíguo (o zap reinferre no envio).
   pix_tipo: TipoChavePix | null
-  // E16: categoria (opcional) do combinado.
-  categoria_id: string | null
+  // E16 (multi): as categorias do combinado NÃO são coluna de avisos; vivem na junção
+  // aviso_categorias, gravadas pelo serviço via definirCategorias após o insert.
   // Fase A: custo opcional (centavos) do combinado; null = não informado.
   valor_custo_centavos: number | null
   // Fase A: composição opcional do pedido (itens); null = não informado.
@@ -150,10 +153,10 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
         ocorrencias_total, ocorrencia_atual, cadencia_etapas,
         aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em,
-        categoria_id, valor_custo_centavos, itens, pix_tipo)
+        valor_custo_centavos, itens, pix_tipo)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27,$28::jsonb,
-             $29::tipo_chave_pix)
+             coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27::jsonb,
+             $28::tipo_chave_pix)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
@@ -164,7 +167,7 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
       novo.ocorrencias_total ?? null, novo.ocorrencia_atual ?? null,
       novo.cadencia_etapas ?? null,
       novo.aceite_token_hash, novo.aceite_token_expira_em, novo.acao_token_hash,
-      novo.convite_expira_em, novo.categoria_id ?? null, novo.valor_custo_centavos ?? null,
+      novo.convite_expira_em, novo.valor_custo_centavos ?? null,
       // jsonb: node-pg serializa Array como array literal do Postgres, não como json; então
       // passamos a string JSON (null = coluna null). Espelha inserirEdicao/atualizarItens.
       novo.itens == null ? null : JSON.stringify(novo.itens),
@@ -309,13 +312,23 @@ export async function listarAvisos(
     params.push(f.ate)
     cond.push(`${colData} <= $${params.length}`)
   }
-  // E16 H16.4: categoria (id específico) OU sem categoria. A view combinado_linhas também
-  // projeta categoria_id (0081), então o filtro vale nos dois caminhos (com/sem período).
+  // E16 H16.4 (multi): filtro por categoria com semântica "CONTÉM" (o combinado aparece se
+  // UMA das suas categorias for a escolhida). No caminho por período a view já projeta
+  // `categoria_ids` (array) -> `= any(...)`; sem período consultamos a junção via exists.
   if (f.categoria_id) {
     params.push(f.categoria_id)
-    cond.push(`categoria_id = $${params.length}`)
+    cond.push(
+      usaPeriodo
+        ? `$${params.length} = any(categoria_ids)`
+        : `exists (select 1 from public.aviso_categorias ac
+                    where ac.aviso_id = public.avisos.id and ac.categoria_id = $${params.length})`,
+    )
   } else if (f.sem_categoria) {
-    cond.push('categoria_id is null')
+    cond.push(
+      usaPeriodo
+        ? `coalesce(array_length(categoria_ids, 1), 0) = 0`
+        : `not exists (select 1 from public.aviso_categorias ac where ac.aviso_id = public.avisos.id)`,
+    )
   }
   const where = cond.join(' and ')
   const total = await ex.query<{ n: string }>(
@@ -715,28 +728,42 @@ export async function listarEventosDoAviso(ex: Executor, avisoId: string): Promi
 // ---- Categoria do combinado (E16) -------------------------------------------------------
 
 /**
- * Confirma que a categoria é do dono e está ativa (H16.3), por query direta na tabela
- * `categorias` (módulo nunca importa módulo; consultar tabela compartilhada é permitido).
+ * Confirma que TODAS as categorias são do dono e estão ativas (H16.3 multi), por query direta
+ * na tabela `categorias` (módulo nunca importa módulo; consultar tabela compartilhada é
+ * permitido). Espera `ids` já deduplicado; compara count = ids.length. [] = válido (vazio).
  */
-export async function categoriaValidaDoDono(
+export async function categoriasValidasDoDono(
   ex: Executor,
   uid: string,
-  categoriaId: string,
+  ids: readonly string[],
 ): Promise<boolean> {
-  const { rows } = await ex.query(
-    `select 1 from public.categorias where id = $1 and profile_id = $2 and not arquivada`,
-    [categoriaId, uid],
+  if (ids.length === 0) return true
+  const { rows } = await ex.query<{ n: number }>(
+    `select count(*)::int as n from public.categorias
+      where profile_id = $1 and not arquivada and id = any($2::uuid[])`,
+    [uid, ids as string[]],
   )
-  return rows.length > 0
+  return (rows[0]?.n ?? 0) === ids.length
 }
 
-/** Grava/limpa a categoria de um combinado (H16.3). null remove a categoria. */
-export async function atualizarCategoria(
+/**
+ * DEFINE as categorias de um combinado (H16.3 multi): delete-all + insert na junção
+ * aviso_categorias (idempotente). `ids` vazio limpa todas. Junção pura (grant de DELETE é
+ * exceção deliberada, ver MODULE.md); nunca apaga o combinado nem a categoria do catálogo.
+ */
+export async function definirCategorias(
   ex: Executor,
-  id: string,
-  categoriaId: string | null,
+  avisoId: string,
+  ids: readonly string[],
 ): Promise<void> {
-  await ex.query(`update public.avisos set categoria_id = $2 where id = $1`, [id, categoriaId])
+  await ex.query(`delete from public.aviso_categorias where aviso_id = $1`, [avisoId])
+  if (ids.length > 0) {
+    await ex.query(
+      `insert into public.aviso_categorias (aviso_id, categoria_id)
+       select $1, unnest($2::uuid[]) on conflict do nothing`,
+      [avisoId, ids as string[]],
+    )
+  }
 }
 
 /** Grava/limpa o custo (centavos) de um combinado (Fase A). null limpa. Dado interno. */

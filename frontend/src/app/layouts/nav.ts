@@ -54,7 +54,9 @@ export const NAV_POR_SECAO: Record<Secao, NavItem[]> = {
     // "Avisos" saiu; /app/avisos redireciona para cá).
     { to: '/app', label: 'Painel', icon: LayoutDashboard, end: true },
     { to: '/app/avisos/novo', label: 'Novo', icon: PlusCircle },
-    { to: '/app/metricas', label: 'Resultado', icon: BarChart3 },
+    // E18: "Resultado" virou a área "Gestão" (abas Resultados/Clientes/Produtos/Categorias).
+    // Sem `end`: acende também nas sub-rotas (/app/gestao/clientes etc.).
+    { to: '/app/gestao', label: 'Gestão', icon: BarChart3 },
     { to: '/app/creditos', label: 'Créditos', icon: CreditCard },
     { to: '/app/conta', label: 'Conta', icon: UserCircle },
   ],

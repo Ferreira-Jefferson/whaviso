@@ -17,7 +17,7 @@ async function criarCategoria(app: Awaited<ReturnType<typeof criarAppTeste>>, no
   return app.inject({ method: 'POST', url: '/v1/categorias', headers: AUTH, payload: { nome, cor } })
 }
 
-function bodyAgenda(nome: string, categoria_id?: string) {
+function bodyAgenda(nome: string, categoria_ids?: string[]) {
   return {
     direcao: 'receber' as const,
     modo: 'agenda' as const,
@@ -27,7 +27,7 @@ function bodyAgenda(nome: string, categoria_id?: string) {
     motivo: 'pedido do catalogo',
     itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 8990 }],
     data_combinada: '2026-08-01',
-    ...(categoria_id ? { categoria_id } : {}),
+    ...(categoria_ids ? { categoria_ids } : {}),
   }
 }
 
@@ -82,9 +82,9 @@ describe('categorias (integração)', () => {
     const app = await criarAppTeste(uid)
     const catId = (await criarCategoria(app, 'Natura')).json().id
 
-    const comCat = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: bodyAgenda('Ana', catId) })
+    const comCat = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: bodyAgenda('Ana', [catId]) })
     expect(comCat.statusCode).toBe(201)
-    expect(comCat.json().aviso.categoria_id).toBe(catId)
+    expect(comCat.json().aviso.categoria_ids).toEqual([catId])
 
     await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: bodyAgenda('Bruno') })
 
@@ -107,11 +107,11 @@ describe('categorias (integração)', () => {
       method: 'PATCH',
       url: `/v1/avisos/${avisoId}`,
       headers: AUTH,
-      payload: { categoria_id: catId },
+      payload: { categoria_ids: [catId] },
     })
     await app.close()
     expect(edit.statusCode).toBe(200)
-    expect(edit.json().categoria_id).toBe(catId)
+    expect(edit.json().categoria_ids).toEqual([catId])
     expect(edit.json().status).toBe('sem_aviso') // não foi para aguardando_aprovacao_aviso_editado
   })
 
@@ -122,10 +122,43 @@ describe('categorias (integração)', () => {
     await appOutro.close()
 
     const app = await criarAppTeste(uid)
-    const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: bodyAgenda('Ana', catAlheia) })
+    const r = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: bodyAgenda('Ana', [catAlheia]) })
     await app.close()
     await limparUsuario(outro)
     expect(r.statusCode).toBeGreaterThanOrEqual(400)
     expect(r.json().error.code).toBe('categoria_invalida')
+  })
+
+  it('aceita múltiplas categorias e o filtro "contém" acha por qualquer uma delas', async () => {
+    const app = await criarAppTeste(uid)
+    const natura = (await criarCategoria(app, 'Natura')).json().id
+    const presentes = (await criarCategoria(app, 'Presentes')).json().id
+
+    const criado = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: bodyAgenda('Ana', [natura, presentes]),
+    })
+    expect(criado.statusCode).toBe(201)
+    expect(criado.json().aviso.categoria_ids.slice().sort()).toEqual([natura, presentes].slice().sort())
+
+    // "Contém": aparece filtrando por qualquer uma das suas categorias.
+    const porNatura = await app.inject({ method: 'GET', url: `/v1/avisos?papel=cobrador&categoria_id=${natura}`, headers: AUTH })
+    expect(porNatura.json().total).toBe(1)
+    const porPresentes = await app.inject({ method: 'GET', url: `/v1/avisos?papel=cobrador&categoria_id=${presentes}`, headers: AUTH })
+    expect(porPresentes.json().total).toBe(1)
+
+    // Editar para só uma categoria limpa a outra (delete-all + insert).
+    const soNatura = await app.inject({
+      method: 'PATCH',
+      url: `/v1/avisos/${criado.json().aviso.id}`,
+      headers: AUTH,
+      payload: { categoria_ids: [natura] },
+    })
+    expect(soNatura.json().categoria_ids).toEqual([natura])
+    const aindaPresentes = await app.inject({ method: 'GET', url: `/v1/avisos?papel=cobrador&categoria_id=${presentes}`, headers: AUTH })
+    await app.close()
+    expect(aindaPresentes.json().total).toBe(0)
   })
 })

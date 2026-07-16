@@ -23,6 +23,7 @@ import {
   motivoAviso,
   ocorrenciaSchema,
   perfilSchema,
+  produtoSchema,
   somaItensCentavos,
   telefoneE164,
   templateSchema,
@@ -87,9 +88,10 @@ export const criarAvisoBody = z
     // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = ciclo completo.
     // Gated por plano (cadencia_configuravel) no servidor.
     cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
-    // E16 H16.3: categoria (opcional) do combinado. Precisa ser minha e não arquivada
-    // (validado no servidor). Organização interna: nunca vai para mensagem ao devedor.
-    categoria_id: z.uuid().nullish(),
+    // E16 H16.3 (multi): categorias (0..N) do combinado. Cada uma precisa ser minha e não
+    // arquivada (validado no servidor). Organização interna: nunca vai ao devedor. Ausente/
+    // null/[] = sem categoria. Substitui o antigo `categoria_id` único.
+    categoria_ids: z.array(z.uuid()).nullish(),
     // Fase A: custo opcional (centavos, >=0). Dado interno do dono; habilita o resultado.
     // Saiu do formulário, mas o contrato segue aceitando (dormente) para não quebrar callers.
     valor_custo_centavos: z.number().int().min(0).nullish(),
@@ -203,9 +205,9 @@ export const editarAvisoBody = z
     pix_chave: z.string().trim().min(1).max(140).optional(),
     pix_titular: z.string().trim().min(1).max(120).optional(),
     pix_banco: z.string().trim().min(1).max(80).optional(),
-    // E16 H16.3: trocar/remover a categoria. Edição LIVRE (não abre reaprovação do
-    // devedor): categoria é dado interno do dono. `null` remove a categoria; ausente = mantém.
-    categoria_id: z.uuid().nullish(),
+    // E16 H16.3 (multi): trocar/limpar as categorias. Edição LIVRE (não abre reaprovação do
+    // devedor): categoria é dado interno do dono. `[]`/`null` limpam todas; ausente = mantém.
+    categoria_ids: z.array(z.uuid()).nullish(),
     // Fase A: custo (centavos, >=0). Também interno e LIVRE. `null` limpa; ausente = mantém.
     // Dormente (saiu do formulário), mas o contrato segue aceitando para não quebrar callers.
     valor_custo_centavos: z.number().int().min(0).nullish(),
@@ -223,7 +225,7 @@ export const editarAvisoBody = z
       b.pix_chave !== undefined ||
       b.pix_titular !== undefined ||
       b.pix_banco !== undefined ||
-      b.categoria_id !== undefined ||
+      b.categoria_ids !== undefined ||
       b.valor_custo_centavos !== undefined ||
       b.itens !== undefined,
     { message: 'informe ao menos um campo para editar' },
@@ -490,6 +492,50 @@ export const buscarPessoaResposta = z.object({
 })
 export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
 
+// ---- E18 H18.4 / E15 H15.8: lista central de clientes + renomear ----
+// GET /v1/pessoas: lista agregada por TELEFONE da outra ponta (identidade, E15). Cada cliente
+// traz o nome mais recente, telefone SÓ no corpo (nunca em rota/log, H13.8), os quatro totais
+// da relação (H15.2), sinais de última compra/inatividade e um `ref_aviso_id` representativo
+// (para reusar as rotas por avisoId sem expor o telefone).
+export const clienteSchema = z.object({
+  ref_aviso_id: z.uuid(),
+  telefone: telefoneE164,
+  nome: z.string(),
+  a_receber_centavos: z.number().int(),
+  a_receber_qtd: z.number().int(),
+  recebido_centavos: z.number().int(),
+  recebido_qtd: z.number().int(),
+  a_pagar_centavos: z.number().int(),
+  a_pagar_qtd: z.number().int(),
+  pago_centavos: z.number().int(),
+  pago_qtd: z.number().int(),
+  ultima_compra: dataCombinada.nullable(),
+  dias_desde_ultima_compra: z.number().int().nullable(),
+  inativo: z.boolean(),
+})
+export type Cliente = z.infer<typeof clienteSchema>
+
+export const listaClientesResposta = z.object({
+  itens: z.array(clienteSchema),
+  total: z.number().int(),
+})
+export type ListaClientesResposta = z.infer<typeof listaClientesResposta>
+
+// PATCH /v1/pessoas/:avisoId: renomear o cliente. O telefone é resolvido NO SERVIDOR a partir
+// do avisoId (nunca telefone na URL/log, H15.7/H15.8). Reescreve `nome_devedor` em todos os
+// combinados daquele telefone onde sou COBRADOR; edição livre (dado interno de exibição).
+export const renomearClienteBody = z.object({
+  nome: z.string().trim().min(1).max(120),
+})
+export type RenomearClienteBody = z.infer<typeof renomearClienteBody>
+
+export const renomearClienteResposta = z.object({
+  telefone: telefoneE164,
+  nome: z.string(),
+  afetados: z.number().int(),
+})
+export type RenomearClienteResposta = z.infer<typeof renomearClienteResposta>
+
 // POST /v1/itens/buscar-por-nome (autocomplete do nome do item ao montar o pedido).
 // Espelha o autocomplete de pessoa: o termo vai no CORPO de um POST (consistência com a
 // família de buscas; corpo não é logado). Sugere descrições de itens já usadas pelo criador.
@@ -537,6 +583,33 @@ export type AtualizarCategoriaBody = z.infer<typeof atualizarCategoriaBody>
 
 export const listaCategoriasResposta = z.array(categoriaSchema)
 export type ListaChavesPixResposta = z.infer<typeof listaChavesPixResposta>
+
+// ---- Produtos (E17) ----
+// Catálogo do dono: nome (1..80) + preço de venda (centavos, >= 0). Sem custo, sem categoria.
+// H17.1: criar.
+export const criarProdutoBody = z.object({
+  nome: z.string().trim().min(1).max(80),
+  preco_venda_centavos: z.number().int().min(0),
+})
+export type CriarProdutoBody = z.infer<typeof criarProdutoBody>
+
+// H17.2/H17.3/H17.4: editar (renomear/preço) ou arquivar (soft-delete). Parcial; ao menos um
+// campo. Renomear PROPAGA para a descrição dos itens que referenciam o produto (servidor);
+// mudar o preço NÃO propaga (snapshot congelado nos combinados existentes).
+export const atualizarProdutoBody = z
+  .object({
+    nome: z.string().trim().min(1).max(80).optional(),
+    preco_venda_centavos: z.number().int().min(0).optional(),
+    arquivado: z.boolean().optional(),
+  })
+  .refine(
+    (b) => b.nome !== undefined || b.preco_venda_centavos !== undefined || b.arquivado !== undefined,
+    { message: 'informe ao menos um campo para atualizar' },
+  )
+export type AtualizarProdutoBody = z.infer<typeof atualizarProdutoBody>
+
+export const listaProdutosResposta = z.array(produtoSchema)
+export type ListaProdutosResposta = z.infer<typeof listaProdutosResposta>
 
 // POST: cria uma chave; padrao=true torna-a a padrão (zera as outras).
 // titular + banco (0044) obrigatórios: a chave precisa carregá-los para o aviso herdar.

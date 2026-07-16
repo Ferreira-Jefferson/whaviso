@@ -1,20 +1,22 @@
 // Editor da composição do pedido (o que foi vendido). Cada linha é um produto (descrição +
 // quantidade + preço unitário). O total dos itens É o valor do combinado (derivado): não há
-// mais campo de valor avulso. OBRIGATÓRIO: ao menos um item. A descrição tem autocomplete
-// baseado em itens que o próprio dono já cadastrou. Componente CONTROLADO (o pai é dono do
-// estado: NovoAviso via react-hook-form; o modal de edição via useState), sem importar RHF.
+// mais campo de valor avulso. OBRIGATÓRIO: ao menos um item. A descrição sugere PRODUTOS do
+// catálogo (E17): escolher um preenche descrição + preço e grava o vínculo produto_id; texto
+// livre mantém produto_id nulo (item avulso). Também sugere descrições já usadas (H2.8).
+// Componente CONTROLADO (o pai é dono do estado: NovoAviso via react-hook-form; o modal de
+// edição via useState), sem importar RHF.
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button, InfoHint, Input, MoneyInput } from '@/shared/ui'
 import { brl } from '@/shared/format'
 import type { ItemPedido } from '@/shared/contracts'
-import { useBuscarItemPorNome } from '../api'
+import { useBuscarItemPorNome, useProdutosCatalogo } from '../api'
 
 function somaItens(itens: ItemPedido[]): number {
   return itens.reduce((s, it) => s + it.qtd * it.valor_unit_centavos, 0)
 }
 
-const ITEM_VAZIO: ItemPedido = { descricao: '', qtd: 1, valor_unit_centavos: 0 }
+const ITEM_VAZIO: ItemPedido = { descricao: '', qtd: 1, valor_unit_centavos: 0, produto_id: null }
 
 export function ItensPedido({
   value,
@@ -30,7 +32,18 @@ export function ItensPedido({
   const [linhaAtiva, setLinhaAtiva] = useState<number | null>(null)
   const [prefixoItem, setPrefixoItem] = useState<string | null>(null)
   const sugestoes = useBuscarItemPorNome(linhaAtiva !== null ? prefixoItem : null)
-  const itensSugestao = sugestoes.data?.itens ?? []
+  const descricoesSugestao = sugestoes.data?.itens ?? []
+  // E17: catálogo do dono para sugerir produtos. Filtro por prefixo é no cliente (lista curta).
+  const catalogo = useProdutosCatalogo()
+  const termo = (prefixoItem ?? '').trim().toLowerCase()
+  const produtosSugestao =
+    termo.length >= 2
+      ? (catalogo.data ?? []).filter((p) => p.nome.toLowerCase().includes(termo)).slice(0, 6)
+      : []
+  // Descrições (H2.8) que NÃO são nome de um produto sugerido (evita duplicar a mesma linha).
+  const nomesProdutos = new Set(produtosSugestao.map((p) => p.nome.toLowerCase()))
+  const descricoesFiltradas = descricoesSugestao.filter((d) => !nomesProdutos.has(d.trim().toLowerCase()))
+  const temSugestao = produtosSugestao.length > 0 || descricoesFiltradas.length > 0
 
   function atualizar(indice: number, patch: Partial<ItemPedido>) {
     onChange(value.map((it, i) => (i === indice ? { ...it, ...patch } : it)))
@@ -72,7 +85,9 @@ export function ItensPedido({
                 }}
                 onChange={(e) => {
                   const texto = e.target.value
-                  atualizar(i, { descricao: texto })
+                  // Editar o texto desfaz o vínculo com um produto do catálogo (item vira avulso):
+                  // o preço passa a ser livre e não acompanha mais aquele produto.
+                  atualizar(i, { descricao: texto, produto_id: null })
                   setLinhaAtiva(i)
                   const t = texto.trim()
                   setPrefixoItem(t.length >= 2 ? t : null)
@@ -82,21 +97,45 @@ export function ItensPedido({
                   window.setTimeout(() => setLinhaAtiva((atual) => (atual === i ? null : atual)), 120)
                 }}
               />
-              {linhaAtiva === i && itensSugestao.length > 0 && (
+              {linhaAtiva === i && temSugestao && (
                 <ul
                   className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-input border border-linha bg-cartao py-1 shadow-lg"
                   role="listbox"
-                  aria-label="Itens já usados"
+                  aria-label="Produtos e itens já usados"
                 >
-                  {itensSugestao.map((descricao) => (
-                    <li key={descricao}>
+                  {/* Produtos do catálogo (E17): escolher preenche descrição + preço + vínculo. */}
+                  {produtosSugestao.map((p) => (
+                    <li key={`prod-${p.id}`}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-tinta hover:bg-salvia-claro"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          atualizar(i, {
+                            descricao: p.nome,
+                            valor_unit_centavos: p.preco_venda_centavos,
+                            produto_id: p.id,
+                          })
+                          setLinhaAtiva(null)
+                          setPrefixoItem(null)
+                        }}
+                      >
+                        <span className="truncate">{p.nome}</span>
+                        <span className="shrink-0 text-xs tabular text-tinta-2">
+                          {brl(p.preco_venda_centavos)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                  {/* Descrições já usadas (H2.8): item avulso (sem vínculo com o catálogo). */}
+                  {descricoesFiltradas.map((descricao) => (
+                    <li key={`desc-${descricao}`}>
                       <button
                         type="button"
                         className="flex w-full items-center px-3 py-2 text-left text-sm text-tinta hover:bg-salvia-claro"
-                        // mousedown (antes do blur do input) evita fechar a lista antes do clique.
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
-                          atualizar(i, { descricao })
+                          atualizar(i, { descricao, produto_id: null })
                           setLinhaAtiva(null)
                           setPrefixoItem(null)
                         }}

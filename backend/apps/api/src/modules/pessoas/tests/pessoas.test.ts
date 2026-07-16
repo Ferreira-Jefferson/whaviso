@@ -231,3 +231,71 @@ describe('pessoas: última compra e inatividade (A4)', () => {
     expect(b.inativo).toBe(false)
   })
 })
+
+// E18 H18.4 / E15 H15.8: lista central de clientes (agregada por telefone) + renomear.
+describe('pessoas: lista de clientes e renomear (integração)', () => {
+  let uid: string
+  const CL = '+5511900000401'
+
+  beforeAll(async () => {
+    uid = await criarUsuario('Dono clientes')
+  })
+  afterAll(async () => {
+    await limparUsuario(uid)
+  })
+
+  it('GET /pessoas agrega por telefone com os quatro totais e nome mais recente', async () => {
+    // Dois combinados do mesmo número, nomes diferentes; o mais recente dita o nome.
+    await insReceber(uid, 'Ana', CL, 'pago', 5000, '2026-06-01')
+    await insReceber(uid, 'Ana Paula', CL, 'programado', 3000, '2026-06-10')
+
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({ method: 'GET', url: '/v1/pessoas', headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    const cliente = r.json().itens.find((c: { telefone: string }) => c.telefone === CL)
+    expect(cliente).toBeTruthy()
+    expect(cliente.nome).toBe('Ana Paula') // nome mais recente
+    expect(cliente.recebido_centavos).toBe(5000)
+    expect(cliente.a_receber_centavos).toBe(3000)
+    expect(cliente.ref_aviso_id).toBeTruthy() // referência por avisoId (telefone nunca em rota)
+  })
+
+  it('PATCH /pessoas/:avisoId renomeia todos os combinados do telefone (só como cobrador)', async () => {
+    const ref = await insReceber(uid, 'Ana Paula', CL, 'programado', 3000, '2026-06-20')
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/v1/pessoas/${ref}`,
+      headers: AUTH,
+      payload: { nome: 'Ana Paula Souza' },
+    })
+    expect(r.statusCode).toBe(200)
+    expect(r.json().telefone).toBe(CL)
+    expect(r.json().afetados).toBeGreaterThanOrEqual(3) // todos os combinados receber do número
+
+    // Todos os combinados daquele número passam a exibir o novo nome.
+    const lista = await app.inject({ method: 'GET', url: '/v1/pessoas', headers: AUTH })
+    await app.close()
+    const cliente = lista.json().itens.find((c: { telefone: string }) => c.telefone === CL)
+    expect(cliente.nome).toBe('Ana Paula Souza')
+  })
+
+  it('renomear isola por dono: não toca combinados de outra conta com o mesmo telefone', async () => {
+    const outro = await criarUsuario('Outro dono')
+    const refOutro = await insReceber(outro, 'Cliente do outro', CL, 'programado', 1000, '2026-06-05')
+
+    const app = await criarAppTeste(uid)
+    const meuRef = await insReceber(uid, 'Meu nome', CL, 'programado', 1000, '2026-06-06')
+    await app.inject({ method: 'PATCH', url: `/v1/pessoas/${meuRef}`, headers: AUTH, payload: { nome: 'Renomeado por mim' } })
+    await app.close()
+
+    // O combinado do OUTRO dono (mesmo telefone) permanece intocado.
+    const { rows } = await poolSuper.query<{ nome_devedor: string }>(
+      `select nome_devedor from public.avisos where id = $1`,
+      [refOutro],
+    )
+    await limparUsuario(outro)
+    expect(rows[0]!.nome_devedor).toBe('Cliente do outro')
+  })
+})

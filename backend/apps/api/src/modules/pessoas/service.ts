@@ -2,8 +2,10 @@ import type { Pool } from '@whaviso/shared/db'
 import type {
   BuscarPessoaResposta,
   GrupoPessoa,
+  ListaClientesResposta,
   PessoaCombinadosResposta,
   PessoaResumoResposta,
+  RenomearClienteResposta,
 } from '@whaviso/shared/contracts'
 import { naoEncontrado } from '../../shared/http_errors'
 import * as repo from './repo'
@@ -61,6 +63,39 @@ export async function combinados(
     grupos[i]!.itens.push(aviso)
   }
   return { grupos, total: linhas.length }
+}
+
+/**
+ * E18 H18.4 / E15 H15.8: lista central de clientes (agregada por telefone). Marca `inativo`
+ * pelo mesmo critério do resumo (A4): sem nada ativo a receber E última venda além do limiar.
+ */
+export async function listarClientes(pool: Pool, uid: string): Promise<ListaClientesResposta> {
+  const linhas = await repo.listarClientes(pool, uid)
+  const itens = linhas.map((c) => ({
+    ...c,
+    inativo:
+      c.a_receber_qtd === 0 &&
+      c.dias_desde_ultima_compra !== null &&
+      c.dias_desde_ultima_compra >= INATIVO_DIAS,
+  }))
+  return { itens, total: itens.length }
+}
+
+/**
+ * E15 H15.8: renomeia o cliente. Resolve o telefone da outra ponta NO SERVIDOR a partir do
+ * avisoId (nunca telefone em rota/log, H15.7) e reescreve `nome_devedor` em todos os meus
+ * combinados daquele telefone onde sou cobrador. Edição livre (dado interno de exibição).
+ */
+export async function renomearCliente(
+  pool: Pool,
+  uid: string,
+  avisoId: string,
+  nome: string,
+): Promise<RenomearClienteResposta> {
+  const ref = await repo.resolverPessoaPorAviso(pool, uid, avisoId)
+  if (!ref) throw naoEncontrado(PESSOA_INEXISTENTE)
+  const afetados = await repo.renomearNomeDevedor(pool, uid, ref.telefone, nome)
+  return { telefone: ref.telefone, nome, afetados }
 }
 
 /** Autocomplete de pessoa ao criar (H15.6): sugestões por prefixo de telefone. */

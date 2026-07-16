@@ -150,9 +150,11 @@ export async function criarAviso(
       }
     }
 
-    // E16 H16.3: se veio categoria, precisa ser MINHA e não arquivada (defesa no servidor).
-    if (body.categoria_id && !(await repo.categoriaValidaDoDono(cli, uid, body.categoria_id))) {
-      throw regraNegocio('categoria_invalida', 'A categoria escolhida não existe ou não é sua.')
+    // E16 H16.3 (multi): as categorias que vierem precisam ser MINHAS e não arquivadas
+    // (defesa no servidor). Dedup para o count bater na validação.
+    const categoriaIds = [...new Set(body.categoria_ids ?? [])]
+    if (categoriaIds.length > 0 && !(await repo.categoriasValidasDoDono(cli, uid, categoriaIds))) {
+      throw regraNegocio('categoria_invalida', 'Uma das categorias escolhidas não existe ou não é sua.')
     }
 
     // O valor do combinado é DERIVADO da soma dos itens (autoridade do servidor). O contrato
@@ -189,7 +191,6 @@ export async function criarAviso(
       pix_titular: body.pix_titular ?? null,
       pix_banco: body.pix_banco ?? null,
       pix_tipo: pixTipo,
-      categoria_id: body.categoria_id ?? null,
       valor_custo_centavos: body.valor_custo_centavos ?? null,
       // Composição do pedido (itens): obrigatória; a soma vira o valor_centavos acima.
       itens: body.itens,
@@ -209,12 +210,14 @@ export async function criarAviso(
       // Materializa as N ocorrências já na agenda (free PODE montar um recorrente na
       // agenda; o envio é que fica barrado, H11.2). Datas em America/Sao_Paulo.
       if (rec) await repo.inserirOcorrencias(cli, aviso.id, rec.datas)
+      // E16 (multi): grava as categorias na junção (idempotente; [] não insere nada).
+      if (categoriaIds.length > 0) await repo.definirCategorias(cli, aviso.id, categoriaIds)
       // Preserva direcao E modo na auditoria (G-B3: não perder a direcao).
       await repo.inserirEvento(cli, aviso.id, 'criado', criadorPapel, {
         direcao: body.direcao,
         modo: 'agenda',
       })
-      return { aviso }
+      return { aviso: { ...aviso, categoria_ids: categoriaIds } }
     }
 
     // ---- Modo ENVIAR: nasce aguardando_aceite. O aceite é 100% pelo WhatsApp (E5): o
@@ -240,6 +243,9 @@ export async function criarAviso(
     // mini-ciclo, gerado pelo zap no aceite). Datas em America/Sao_Paulo.
     if (rec) await repo.inserirOcorrencias(cli, aviso.id, rec.datas)
 
+    // E16 (multi): grava as categorias na junção (idempotente; [] não insere nada).
+    if (categoriaIds.length > 0) await repo.definirCategorias(cli, aviso.id, categoriaIds)
+
     // H11.4: o modo ENVIAR ATIVA o aviso (nasce aguardando_aceite, entra no ciclo). Reserva
     // os créditos JÁ AGORA (saldo_livre -> reservado), na MESMA transação/lock. Sem saldo,
     // recusa com `saldo_insuficiente` (o item NÃO é criado; nada se perde, a UI mostra a CTA
@@ -257,7 +263,7 @@ export async function criarAviso(
     // CONVIDADO na MESMA transação; o zap drena e manda o template combinado.resumo.
     await enfileirarConvite(cli, aviso)
 
-    return { aviso }
+    return { aviso: { ...aviso, categoria_ids: categoriaIds } }
   })
 }
 
@@ -564,18 +570,20 @@ export async function editarAviso(
     // E11 H11.2: editar é UNIVERSAL (não há mais teto de edições por plano). O único
     // limite do produto é o saldo de créditos (consumido só no disparo, não na edição).
 
-    // E16 H16.3: categoria é edição LIVRE (dado interno do dono; NUNCA abre reaprovação),
-    // separada dos campos do acordo. Valida posse e aplica direto, em qualquer estado vivo.
-    const mudaCategoria = body.categoria_id !== undefined
+    // E16 H16.3 (multi): categorias são edição LIVRE (dado interno do dono; NUNCA abre
+    // reaprovação), separadas dos campos do acordo. Valida posse e aplica direto (delete-all
+    // + insert na junção), em qualquer estado vivo. [] limpa todas; ausente = mantém.
+    const mudaCategorias = body.categoria_ids !== undefined
+    const novasCategorias = [...new Set(body.categoria_ids ?? [])]
     if (
-      mudaCategoria &&
-      body.categoria_id &&
-      !(await repo.categoriaValidaDoDono(cli, uid, body.categoria_id))
+      mudaCategorias &&
+      novasCategorias.length > 0 &&
+      !(await repo.categoriasValidasDoDono(cli, uid, novasCategorias))
     ) {
-      throw regraNegocio('categoria_invalida', 'A categoria escolhida não existe ou não é sua.')
+      throw regraNegocio('categoria_invalida', 'Uma das categorias escolhidas não existe ou não é sua.')
     }
-    if (mudaCategoria) await repo.atualizarCategoria(cli, id, body.categoria_id ?? null)
-    const categoriaFinal = mudaCategoria ? (body.categoria_id ?? null) : aviso.categoria_id
+    if (mudaCategorias) await repo.definirCategorias(cli, id, novasCategorias)
+    const categoriasFinal = mudaCategorias ? novasCategorias : (aviso.categoria_ids ?? [])
 
     // Fase A: custo é dado INTERNO do dono, também edição LIVRE (nunca abre reaprovação).
     const mudaCusto = body.valor_custo_centavos !== undefined
@@ -613,7 +621,7 @@ export async function editarAviso(
         reaprovacao: false,
         interno: true,
       })
-      return { ...aviso, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal, itens: itensFinal }
+      return { ...aviso, categoria_ids: categoriasFinal, valor_custo_centavos: custoFinal, itens: itensFinal }
     }
 
     if (livre) {
@@ -624,7 +632,7 @@ export async function editarAviso(
         await repo.atualizarPixTipo(cli, id, await resolverPixTipo(cli, aviso.cobrador_id, campos.pix_chave))
       }
       await repo.inserirEvento(cli, id, 'editado', aviso.criador_papel, { reaprovacao: false })
-      return { ...aviso, ...campos, categoria_id: categoriaFinal, valor_custo_centavos: custoFinal, itens: itensFinal }
+      return { ...aviso, ...campos, categoria_ids: categoriasFinal, valor_custo_centavos: custoFinal, itens: itensFinal }
     }
 
     // Pós-aceite (campos do acordo): snapshot do "antes", aplica os novos dados, vai para
@@ -647,7 +655,7 @@ export async function editarAviso(
     return {
       ...aviso,
       ...campos,
-      categoria_id: categoriaFinal,
+      categoria_ids: categoriasFinal,
       valor_custo_centavos: custoFinal,
       itens: itensFinal,
       status: 'aguardando_aprovacao_aviso_editado',

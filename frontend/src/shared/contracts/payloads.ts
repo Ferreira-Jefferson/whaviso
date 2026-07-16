@@ -21,6 +21,7 @@ import {
   itemPedidoSchema,
   motivoAviso,
   perfilSchema,
+  produtoSchema,
   somaItensCentavos,
   telefoneE164,
   templateSchema,
@@ -75,8 +76,8 @@ export const criarAvisoBody = z
     // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = ciclo completo.
     // Gated por plano (cadencia_configuravel) no servidor.
     cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
-    // E16 / Fase A: categoria (opcional, minha e não arquivada) e custo interno (>=0).
-    categoria_id: z.uuid().nullish(),
+    // E16 (multi) / Fase A: categorias (0..N, minhas e não arquivadas) e custo interno (>=0).
+    categoria_ids: z.array(z.uuid()).nullish(),
     // Custo saiu do formulário; contrato segue aceitando (dormente) para não quebrar callers.
     valor_custo_centavos: z.number().int().min(0).nullish(),
     // Composição do pedido OBRIGATÓRIA (>=1 item): o valor do combinado é DERIVADO da soma
@@ -186,9 +187,9 @@ export const editarAvisoBody = z
     pix_chave: z.string().trim().min(1).max(140).optional(),
     pix_titular: z.string().trim().min(1).max(120).optional(),
     pix_banco: z.string().trim().min(1).max(80).optional(),
-    // E16 / Fase A: categoria e custo são internos e LIVRES (não abrem reaprovação).
-    // null limpa; ausente mantém.
-    categoria_id: z.uuid().nullish(),
+    // E16 (multi) / Fase A: categorias e custo são internos e LIVRES (não abrem reaprovação).
+    // `[]`/null limpam; ausente mantém.
+    categoria_ids: z.array(z.uuid()).nullish(),
     valor_custo_centavos: z.number().int().min(0).nullish(),
     // Composição do pedido (itens). Presente = substitui (>=1 item); ausente = mantém. Sem
     // null (limpar quebraria o valor derivado). O valor é DERIVADO da soma: mudar os itens de
@@ -203,7 +204,7 @@ export const editarAvisoBody = z
       b.pix_chave !== undefined ||
       b.pix_titular !== undefined ||
       b.pix_banco !== undefined ||
-      b.categoria_id !== undefined ||
+      b.categoria_ids !== undefined ||
       b.valor_custo_centavos !== undefined ||
       b.itens !== undefined,
     { message: 'informe ao menos um campo para editar' },
@@ -379,6 +380,45 @@ export const buscarPessoaResposta = z.object({
 })
 export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
 
+// ---- E18 H18.4 / E15 H15.8: lista central de clientes + renomear ---- espelho do backend.
+// GET /v1/pessoas: agregada por telefone (telefone só no corpo); ref_aviso_id representativo.
+export const clienteSchema = z.object({
+  ref_aviso_id: z.uuid(),
+  telefone: telefoneE164,
+  nome: z.string(),
+  a_receber_centavos: z.number().int(),
+  a_receber_qtd: z.number().int(),
+  recebido_centavos: z.number().int(),
+  recebido_qtd: z.number().int(),
+  a_pagar_centavos: z.number().int(),
+  a_pagar_qtd: z.number().int(),
+  pago_centavos: z.number().int(),
+  pago_qtd: z.number().int(),
+  ultima_compra: dataCombinada.nullable(),
+  dias_desde_ultima_compra: z.number().int().nullable(),
+  inativo: z.boolean(),
+})
+export type Cliente = z.infer<typeof clienteSchema>
+
+export const listaClientesResposta = z.object({
+  itens: z.array(clienteSchema),
+  total: z.number().int(),
+})
+export type ListaClientesResposta = z.infer<typeof listaClientesResposta>
+
+// PATCH /v1/pessoas/:avisoId: renomear (telefone resolvido no servidor; nunca em rota/log).
+export const renomearClienteBody = z.object({
+  nome: z.string().trim().min(1).max(120),
+})
+export type RenomearClienteBody = z.infer<typeof renomearClienteBody>
+
+export const renomearClienteResposta = z.object({
+  telefone: telefoneE164,
+  nome: z.string(),
+  afetados: z.number().int(),
+})
+export type RenomearClienteResposta = z.infer<typeof renomearClienteResposta>
+
 // POST /v1/itens/buscar-por-nome (autocomplete do nome do item ao montar o pedido). O termo
 // vai no CORPO (espelha o backend). Devolve descrições de itens já usadas pelo criador.
 export const buscarItemBody = z.object({
@@ -422,6 +462,28 @@ export const atualizarCategoriaBody = z
 export type AtualizarCategoriaBody = z.infer<typeof atualizarCategoriaBody>
 
 export const listaCategoriasResposta = z.array(categoriaSchema)
+
+// ---- Produtos (E17) ---- espelho do backend.
+export const criarProdutoBody = z.object({
+  nome: z.string().trim().min(1).max(80),
+  preco_venda_centavos: z.number().int().min(0),
+})
+export type CriarProdutoBody = z.infer<typeof criarProdutoBody>
+
+export const atualizarProdutoBody = z
+  .object({
+    nome: z.string().trim().min(1).max(80).optional(),
+    preco_venda_centavos: z.number().int().min(0).optional(),
+    arquivado: z.boolean().optional(),
+  })
+  .refine(
+    (b) => b.nome !== undefined || b.preco_venda_centavos !== undefined || b.arquivado !== undefined,
+    { message: 'informe ao menos um campo para atualizar' },
+  )
+export type AtualizarProdutoBody = z.infer<typeof atualizarProdutoBody>
+
+export const listaProdutosResposta = z.array(produtoSchema)
+export type ListaProdutosResposta = z.infer<typeof listaProdutosResposta>
 export type ListaChavesPixResposta = z.infer<typeof listaChavesPixResposta>
 
 export const criarChavePixBody = z.object({

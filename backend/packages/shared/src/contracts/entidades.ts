@@ -72,12 +72,29 @@ export const categoriaSchema = z.object({
 })
 export type Categoria = z.infer<typeof categoriaSchema>
 
+// E17: produto do CATÁLOGO do dono (nome + preço de venda). Dado INTERNO do dono; nunca vai
+// para mensagem ao devedor. Sem custo, sem categoria (decisão E17). `preco_venda_centavos` em
+// centavos, >= 0. Isolado por conta; nome único entre ativos; arquivar = soft-delete.
+export const produtoSchema = z.object({
+  id: z.uuid(),
+  nome: z.string().min(1).max(80),
+  preco_venda_centavos: z.number().int().min(0),
+  arquivado: z.boolean(),
+  criado_em: z.coerce.date(),
+  atualizado_em: z.coerce.date(),
+})
+export type Produto = z.infer<typeof produtoSchema>
+
 // Fase A (estudo revendedores): item OPCIONAL do pedido. Dado INTERNO do dono (composição do
 // que foi vendido); nunca vai para mensagem ao devedor. `valor_unit_centavos` em centavos, >=0.
+// E17: `produto_id` (opcional) vincula o item a um produto do catálogo; descrição/valor_unit
+// continuam sendo SNAPSHOT congelado (editar o produto não recalcula este item). null/ausente =
+// item avulso (texto livre, sem vínculo com o catálogo).
 export const itemPedidoSchema = z.object({
   descricao: z.string().trim().min(1).max(80),
   qtd: z.number().int().min(1).max(9999),
   valor_unit_centavos: z.number().int().min(0),
+  produto_id: z.uuid().nullish(),
 })
 export type ItemPedido = z.infer<typeof itemPedidoSchema>
 
@@ -109,9 +126,10 @@ export const avisoSchema = z.object({
   // Denormalizados no aviso (instantâneo do combinado), nunca logados (H13/segurança).
   pix_titular: z.string().max(120).nullable(),
   pix_banco: z.string().max(80).nullable(),
-  // E16: categoria (opcional) do combinado. nullish: nem toda projeção do Aviso a traz
-  // (ex.: recortes que não selecionam a coluna); quando presente, é o id da categoria.
-  categoria_id: z.uuid().nullish(),
+  // E16 (multi, 2026-07-16): categorias (0..N) do combinado, via junção aviso_categorias.
+  // nullish: nem toda projeção do Aviso as traz (ex.: recortes que não fazem o join); quando
+  // presente, é a lista de ids das categorias. Substitui o antigo `categoria_id` único.
+  categoria_ids: z.array(z.uuid()).nullish(),
   // Fase A (estudo revendedores): custo opcional (centavos, >=0). Dado INTERNO do dono
   // (nunca vai ao devedor); habilita o resultado/lucro no painel. null = não informado.
   valor_custo_centavos: z.number().int().min(0).nullish(),

@@ -3,7 +3,7 @@
 // quebra por categoria e clientes inativos. Só leitura: consome GET /v1/painel/metricas
 // (tudo calculado no servidor). Linguagem sem termos proibidos, neutra quanto a gênero.
 import { PiggyBank, Users, Tags, Clock } from 'lucide-react'
-import { Card, EmptyState, MoneyText, PageHeader, Spinner, StatCard } from '@/shared/ui'
+import { Card, EmptyState, MoneyText, Spinner, StatCard } from '@/shared/ui'
 import { usePainelMetricas } from '../api'
 
 // Mascara o número (mantém só os 4 últimos), para não expor telefone inteiro na tela.
@@ -25,13 +25,10 @@ export default function MetricasPage() {
 
   if (isError || !data) {
     return (
-      <div>
-        <PageHeader titulo="Resultado" />
-        <EmptyState
-          titulo="Não deu para carregar agora"
-          descricao="Tente de novo em instantes."
-        />
-      </div>
+      <EmptyState
+        titulo="Não deu para carregar agora"
+        descricao="Tente de novo em instantes."
+      />
     )
   }
 
@@ -39,10 +36,9 @@ export default function MetricasPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        titulo="Resultado"
-        descricao="Como vai o seu negócio: o que recebeu, o que ainda tem a receber e quanto rendeu."
-      />
+      <p className="text-sm text-tinta-2">
+        Como vai o seu negócio: o que recebeu, o que ainda tem a receber e quanto rendeu.
+      </p>
 
       {/* Números principais */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

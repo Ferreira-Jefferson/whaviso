@@ -71,12 +71,26 @@ export const categoriaSchema = z.object({
 })
 export type Categoria = z.infer<typeof categoriaSchema>
 
+// E17: produto do catálogo (nome + preço de venda). Interno do dono; nunca vai ao devedor.
+// Sem custo, sem categoria. Espelha o backend.
+export const produtoSchema = z.object({
+  id: z.uuid(),
+  nome: z.string().min(1).max(80),
+  preco_venda_centavos: z.number().int().min(0),
+  arquivado: z.boolean(),
+  criado_em: z.coerce.date(),
+  atualizado_em: z.coerce.date(),
+})
+export type Produto = z.infer<typeof produtoSchema>
+
 // Fase A: item OPCIONAL do pedido (composição do que foi vendido). Interno do dono; nunca
-// vai ao devedor. Espelha o backend. valor_unit_centavos em centavos, >=0.
+// vai ao devedor. Espelha o backend. valor_unit_centavos em centavos, >=0. E17: `produto_id`
+// (opcional) vincula ao catálogo; descrição/preço são snapshot congelado. null = item avulso.
 export const itemPedidoSchema = z.object({
   descricao: z.string().trim().min(1).max(80),
   qtd: z.number().int().min(1).max(9999),
   valor_unit_centavos: z.number().int().min(0),
+  produto_id: z.uuid().nullish(),
 })
 export type ItemPedido = z.infer<typeof itemPedidoSchema>
 
@@ -106,9 +120,9 @@ export const avisoSchema = z.object({
   // Titular + banco da chave Pix (compõem a 2ª msg do Pix ao devedor, E7 H7.3).
   pix_titular: z.string().max(120).nullable(),
   pix_banco: z.string().max(80).nullable(),
-  // E16 / Fase A: categoria (opcional) e custo interno do combinado. nullish: nem toda
+  // E16 (multi) / Fase A: categorias (0..N) e custo interno do combinado. nullish: nem toda
   // projeção do Aviso os traz. Nunca vão ao devedor; habilitam organização e resultado.
-  categoria_id: z.uuid().nullish(),
+  categoria_ids: z.array(z.uuid()).nullish(),
   valor_custo_centavos: z.number().int().min(0).nullish(),
   // Fase A: composição opcional do pedido (itens). Interno; nunca vai ao devedor. nullish:
   // nem toda projeção do Aviso a traz (a lista por período não seleciona a coluna).

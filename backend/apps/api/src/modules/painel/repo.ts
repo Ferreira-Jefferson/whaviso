@@ -168,11 +168,16 @@ export async function metricas(pool: Pool, f: FiltroMetricas): Promise<PainelMet
     params.push(f.ate)
     cond.push(`data_combinada <= $${params.length}`)
   }
+  // E16 (multi): filtro "contém" via junção (o total geral segue lido de public.avisos sem
+  // join, então não infla; o exists só restringe quais combinados entram no escopo).
   if (f.categoria_id) {
     params.push(f.categoria_id)
-    cond.push(`categoria_id = $${params.length}`)
+    cond.push(
+      `exists (select 1 from public.aviso_categorias ac
+                where ac.aviso_id = public.avisos.id and ac.categoria_id = $${params.length})`,
+    )
   } else if (f.sem_categoria) {
-    cond.push('categoria_id is null')
+    cond.push(`not exists (select 1 from public.aviso_categorias ac where ac.aviso_id = public.avisos.id)`)
   }
   const where = cond.join(' and ')
 
@@ -209,27 +214,45 @@ export async function metricas(pool: Pool, f: FiltroMetricas): Promise<PainelMet
     params,
   )
 
-  // 3) Quebra por categoria (respeita só o período, não o filtro de categoria: é a visão geral).
+  // 3) Quebra por categoria (respeita só o período, não o filtro de categoria: é a visão
+  //    geral). E18 H18.3 (multi): ATRIBUIÇÃO INTEGRAL. Cada combinado soma o valor CHEIO em
+  //    CADA categoria a que pertence (via junção); mais um bucket "sem categoria" (null) para
+  //    os sem vínculo. Os buckets podem SE SOBREPOR e NÃO somam ao total geral (que é lido de
+  //    avisos sem join, seção 1, logo não infla). Período em a.data_combinada nos dois ramos.
   const catParams: unknown[] = [f.uid]
-  const catCond: string[] = ['a.cobrador_id = $1']
+  const periodoCat: string[] = []
   if (f.de) {
     catParams.push(f.de)
-    catCond.push(`a.data_combinada >= $${catParams.length}`)
+    periodoCat.push(`and a.data_combinada >= $${catParams.length}`)
   }
   if (f.ate) {
     catParams.push(f.ate)
-    catCond.push(`a.data_combinada <= $${catParams.length}`)
+    periodoCat.push(`and a.data_combinada <= $${catParams.length}`)
   }
+  const pc = periodoCat.join(' ')
   const porCategoria = await pool.query(
-    `select a.categoria_id, c.nome, c.cor,
-            coalesce(sum(a.valor_centavos) filter (where a.status='pago'),0)::bigint as recebido_c,
-            coalesce(sum(a.valor_centavos) filter (where a.status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
-            coalesce(sum(a.valor_centavos - a.valor_custo_centavos) filter (where a.status='pago' and a.valor_custo_centavos is not null),0)::bigint as lucro_c,
+    `select categoria_id, nome, cor,
+            coalesce(sum(valor_centavos) filter (where status='pago'),0)::bigint as recebido_c,
+            coalesce(sum(valor_centavos) filter (where status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
+            coalesce(sum(valor_centavos - valor_custo_centavos) filter (where status='pago' and valor_custo_centavos is not null),0)::bigint as lucro_c,
             count(*)::int as qtd
-       from public.avisos a
-       left join public.categorias c on c.id = a.categoria_id
-      where ${catCond.join(' and ')}
-      group by a.categoria_id, c.nome, c.cor
+       from (
+         -- Cada vínculo do combinado com uma categoria (atribuição integral: valor cheio).
+         select c.id as categoria_id, c.nome, c.cor,
+                a.valor_centavos, a.valor_custo_centavos, a.status
+           from public.aviso_categorias ac
+           join public.avisos a    on a.id = ac.aviso_id
+           join public.categorias c on c.id = ac.categoria_id
+          where a.cobrador_id = $1 ${pc}
+         union all
+         -- Bucket "sem categoria" (combinados sem nenhum vínculo).
+         select null::uuid as categoria_id, null::text as nome, null::text as cor,
+                a.valor_centavos, a.valor_custo_centavos, a.status
+           from public.avisos a
+          where a.cobrador_id = $1 ${pc}
+            and not exists (select 1 from public.aviso_categorias ac where ac.aviso_id = a.id)
+       ) t
+      group by categoria_id, nome, cor
       order by recebido_c desc`,
     catParams,
   )

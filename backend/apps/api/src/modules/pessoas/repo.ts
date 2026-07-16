@@ -187,6 +187,109 @@ export async function combinadosPorPessoa(
   return rows.map((l) => ({ aviso: mapear(l), nome_outra_ponta: l.nome_outra_ponta }))
 }
 
+export interface LinhaCliente {
+  ref_aviso_id: string
+  telefone: string
+  nome: string
+  a_receber_centavos: number
+  a_receber_qtd: number
+  recebido_centavos: number
+  recebido_qtd: number
+  a_pagar_centavos: number
+  a_pagar_qtd: number
+  pago_centavos: number
+  pago_qtd: number
+  ultima_compra: string | null
+  dias_desde_ultima_compra: number | null
+}
+
+/**
+ * E18 H18.4 / E15 H15.8: lista central de clientes, agregada pelo TELEFONE da OUTRA PONTA
+ * (identidade, H15.1), com os quatro totais por relação (H15.2), o nome mais recente daquele
+ * número, um `ref_aviso_id` representativo (o combinado mais recente, para reusar as rotas por
+ * avisoId sem expor telefone) e a última compra/dias. Isolamento por uid. Calculado no banco.
+ */
+export async function listarClientes(pool: Pool, uid: string): Promise<LinhaCliente[]> {
+  const { rows } = await pool.query<{
+    ref_aviso_id: string
+    telefone: string
+    nome: string
+    a_receber_c: string
+    a_receber_q: number
+    recebido_c: string
+    recebido_q: number
+    a_pagar_c: string
+    a_pagar_q: number
+    pago_c: string
+    pago_q: number
+    ultima_compra: string | null
+    dias_ultima: number | null
+  }>(
+    `select
+       (array_agg(ref_aviso_id order by data_combinada desc, criado_em desc))[1] as ref_aviso_id,
+       telefone,
+       (array_agg(nome order by data_combinada desc, criado_em desc))[1] as nome,
+       coalesce(sum(valor) filter (where papel='cobrador' and status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
+       count(*) filter (where papel='cobrador' and status in (${ATIVOS_SQL}))::int as a_receber_q,
+       coalesce(sum(valor) filter (where papel='cobrador' and status='pago'),0)::bigint as recebido_c,
+       count(*) filter (where papel='cobrador' and status='pago')::int as recebido_q,
+       coalesce(sum(valor) filter (where papel='devedor' and status in (${ATIVOS_SQL})),0)::bigint as a_pagar_c,
+       count(*) filter (where papel='devedor' and status in (${ATIVOS_SQL}))::int as a_pagar_q,
+       coalesce(sum(valor) filter (where papel='devedor' and status='pago'),0)::bigint as pago_c,
+       count(*) filter (where papel='devedor' and status='pago')::int as pago_q,
+       to_char(max(data_combinada) filter (where papel='cobrador'),'YYYY-MM-DD') as ultima_compra,
+       (current_date - max(data_combinada) filter (where papel='cobrador'))::int as dias_ultima
+     from (
+       select id as ref_aviso_id, telefone_devedor as telefone, nome_devedor as nome,
+              data_combinada, criado_em, 'cobrador'::text as papel, status, valor_centavos as valor
+         from public.avisos
+        where cobrador_id = $1 and telefone_devedor is not null
+       union all
+       select id, telefone_cobrador, coalesce(nome_cobrador, nome_devedor),
+              data_combinada, criado_em, 'devedor'::text, status, valor_centavos
+         from public.avisos
+        where devedor_profile_id = $1 and telefone_cobrador is not null
+     ) s
+     group by telefone
+     order by nome asc`,
+    [uid],
+  )
+  return rows.map((r) => ({
+    ref_aviso_id: r.ref_aviso_id,
+    telefone: r.telefone,
+    nome: r.nome,
+    a_receber_centavos: Number(r.a_receber_c),
+    a_receber_qtd: r.a_receber_q,
+    recebido_centavos: Number(r.recebido_c),
+    recebido_qtd: r.recebido_q,
+    a_pagar_centavos: Number(r.a_pagar_c),
+    a_pagar_qtd: r.a_pagar_q,
+    pago_centavos: Number(r.pago_c),
+    pago_qtd: r.pago_q,
+    ultima_compra: r.ultima_compra ?? null,
+    dias_desde_ultima_compra: r.dias_ultima === null ? null : Number(r.dias_ultima),
+  }))
+}
+
+/**
+ * E15 H15.8: renomeia o cliente reescrevendo `nome_devedor` em TODOS os combinados onde sou
+ * COBRADOR daquele telefone. Escopado ao dono (cobrador_id = uid). Retorna quantos combinados
+ * foram afetados. Edição livre (dado interno de exibição; não toca no acordo).
+ */
+export async function renomearNomeDevedor(
+  pool: Pool,
+  uid: string,
+  telefone: string,
+  nome: string,
+): Promise<number> {
+  const { rowCount } = await pool.query(
+    `update public.avisos set nome_devedor = $3
+      where cobrador_id = $1 and telefone_devedor = $2`,
+    [uid, telefone, nome],
+  )
+  return rowCount ?? 0
+}
+
 /**
  * Autocomplete ao criar (H15.6): nomes/números já usados em combinados que EU CRIEI e cujo
  * número da outra ponta bate com o prefixo digitado. Match por prefixo (LIKE), telefone no

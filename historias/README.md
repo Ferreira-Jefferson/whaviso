@@ -3,7 +3,7 @@
 > **Objetivo:** descrever o sistema do ponto de vista de quem usa, em histórias testáveis, para depois validar o que já está implementado e o que falta.
 > **Fonte de verdade:** estas histórias. Quando o código ou os docs (PROJETO.md / CLAUDE.md) divergirem do que está aqui, é o código/doc que deve mudar, não a história. Sempre que uma divergência aparecer, ela é sinalizada (ver legenda de validação) e explicada.
 > **Base de consulta:** [PROJETO.md](../PROJETO.md) (visão de produto) e [CLAUDE.md](../CLAUDE.md) (regras e arquitetura) servem de referência, não de autoridade sobre as histórias.
-> **Status:** 13 épicos escritos (fase 1 concluída). Próxima fase: validar cada história contra o código (legenda de validação).
+> **Status:** 18 épicos escritos. Próxima fase: validar cada história contra o código (legenda de validação).
 > **Linguagem:** sem travessão (regra de ouro do produto). Sem "dívida/cobrança/atraso/devendo/inadimplência". Mensagens **neutras quanto a gênero** (ver convenções abaixo).
 
 ## Como ler
@@ -68,6 +68,9 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 | 13 | Linguagem, opt-out e compliance | [13-compliance.md](13-compliance.md) | escrito |
 | 14 | Cadastro da chave pix pelo cobrador (fluxo invertido) | [14-cadastro-chave-pix-cobrador.md](14-cadastro-chave-pix-cobrador.md) | escrito |
 | 15 | Combinados por pessoa (visão de contato) | [15-combinados-por-pessoa.md](15-combinados-por-pessoa.md) | escrito |
+| 16 | Categorias (organização por marca/linha, multi) | [16-categorias.md](16-categorias.md) | escrito |
+| 17 | Produtos / Catálogo (mini-estoque) | [17-produtos.md](17-produtos.md) | escrito |
+| 18 | Gestão (área com abas) | [18-gestao.md](18-gestao.md) | escrito |
 
 ## Dívidas técnicas levantadas durante a escrita
 

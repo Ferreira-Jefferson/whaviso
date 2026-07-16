@@ -12,6 +12,11 @@ IDENTIDADE o TELEFONE da outra ponta (o nome é só rótulo). Só leitura + soli
 - POST /v1/pessoas/buscar-por-telefone: autocomplete ao criar (H15.6). O número (parcial)
   vai no CORPO, nunca em query/URL; devolve `{ nome, telefone }` dos combinados que o
   próprio usuário criou e cujo número bate com o prefixo.
+- GET /v1/pessoas (E18 H18.4): lista central de clientes agregada por telefone (4 totais,
+  nome mais recente, ref_aviso_id representativo, inativo). Telefone só no corpo.
+- PATCH /v1/pessoas/:avisoId (E15 H15.8): renomeia o cliente. Resolve o telefone no servidor
+  a partir do avisoId e reescreve `avisos.nome_devedor` em todos os combinados daquele
+  telefone onde sou cobrador (escrita no módulo avisos; edição livre, dado interno).
 
 ## Entry points
 - `index.ts`: plugin Fastify registrado em `src/routes.ts` sob `/v1`
@@ -24,6 +29,7 @@ IDENTIDADE o TELEFONE da outra ponta (o nome é só rótulo). Só leitura + soli
 
 ## Tabelas
 - lê de: avisos
+- escreve em: avisos.nome_devedor (renomear cliente, H15.8; escopado ao dono cobrador)
 
 ## Contratos
 - payloads em `@whaviso/shared/contracts` (pessoaResumoResposta, pessoaCombinadosResposta,

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { ArrowLeft, Check, Loader2, X } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -16,7 +16,6 @@ import {
   PageHeader,
   PhoneInput,
   SegmentedControl,
-  Select,
   Spinner,
   WhatsAppPreview,
 } from '@/shared/ui'
@@ -38,38 +37,27 @@ import {
   useCategorias,
   useCombinadoPreview,
   useCriarAviso,
-  useCriarCategoria,
 } from '../api'
 import { novoAvisoSchema, MAX_MOTIVO_CARACTERES, type NovoAvisoForm } from '../schemas'
 import { AvisoCriado } from '../components/AvisoCriado'
 import { RepetirCombinado } from '../components/RepetirCombinado'
 import { CadenciaLembretes } from '../components/CadenciaLembretes'
 import { ItensPedido } from '../components/ItensPedido'
+import { SeletorCategorias } from '../components/SeletorCategorias'
 
 const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
   { value: 'receber', label: 'Vou receber' },
   { value: 'pagar', label: 'Vou pagar' },
 ]
 
-// Valor sentinela da 1ª opção do select de categoria: escolher "+ Nova categoria" não é uma
-// categoria, é a AÇÃO de criar uma (o select vira um input). Não colide com '' nem com UUIDs.
-const NOVA_CATEGORIA = '__nova__'
-// Sentinela da opção "Outros" enquanto ela ainda não existe como categoria do dono: ao
-// escolhê-la, criamos a categoria "Outros" e a selecionamos. Se o dono já tem uma "Outros",
-// usamos o id real dela (sem sentinela). "Outros" fica sempre por último; o padrão é sem categoria.
-const OUTROS_CATEGORIA = '__outros__'
-const NOME_OUTROS = 'Outros'
-
 export default function NovoAvisoPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const criar = useCriarAviso()
   const perfil = usePerfil()
-  // E16: categorias do usuário para o SELECT + criação inline de uma nova categoria.
+  // E16 (multi): categorias do usuário, só para exibir os NOMES na revisão. A seleção/criação
+  // vive dentro do SeletorCategorias (componente controlado).
   const categorias = useCategorias()
-  const criarCategoria = useCriarCategoria()
-  const [mostrarNovaCat, setMostrarNovaCat] = useState(false)
-  const [novaCatNome, setNovaCatNome] = useState('')
   // E15 H15.5: quando cheguei da tela da pessoa, o nome + telefone vêm por STATE de
   // navegação (nunca na URL, H15.7) e pré-preenchem o formulário.
   const pessoaPrefill = (location.state as { pessoa?: { nome?: string; telefone?: string | null } } | null)
@@ -123,41 +111,11 @@ export default function NovoAvisoPage() {
       pix_chave: '',
       pix_titular: '',
       pix_banco: '',
-      categoria_id: '',
+      categoria_ids: [],
       // Itens obrigatórios: começa com uma linha vazia (o valor do combinado vem da soma).
-      itens: [{ descricao: '', qtd: 1, valor_unit_centavos: 0 }],
+      itens: [{ descricao: '', qtd: 1, valor_unit_centavos: 0, produto_id: null }],
     },
   })
-
-  // Cria uma categoria inline e já a seleciona no formulário (H16.1/H16.3).
-  async function criarCategoriaInline() {
-    const nome = novaCatNome.trim()
-    if (!nome) return
-    try {
-      const c = await criarCategoria.mutateAsync({ nome })
-      setValue('categoria_id', c.id)
-      setNovaCatNome('')
-      setMostrarNovaCat(false)
-    } catch (e) {
-      setErroGeral(e instanceof ApiError ? e.message : 'Não foi possível criar a categoria.')
-    }
-  }
-
-  // Sai do modo "criar categoria" sem criar nada (volta ao select, mantendo a seleção atual).
-  function cancelarNovaCat() {
-    setNovaCatNome('')
-    setMostrarNovaCat(false)
-  }
-
-  // Escolher "Outros" quando ela ainda não existe: cria a categoria "Outros" e a seleciona.
-  async function selecionarOutros() {
-    try {
-      const c = await criarCategoria.mutateAsync({ nome: NOME_OUTROS })
-      setValue('categoria_id', c.id)
-    } catch (e) {
-      setErroGeral(e instanceof ApiError ? e.message : 'Não foi possível usar a categoria Outros.')
-    }
-  }
 
   const direcao = watch('direcao')
   // H4.1: o modo (enviar o combinado agora x só salvar) não é mais um seletor à parte;
@@ -206,8 +164,8 @@ export default function NovoAvisoPage() {
         ...payload,
         motivo: dados.motivo,
         data_combinada: dados.data_combinada,
-        // E16: categoria ('' = sem categoria). Interna; nunca vai ao devedor.
-        categoria_id: dados.categoria_id ? dados.categoria_id : null,
+        // E16 (multi): categorias (0..N). Internas; nunca vão ao devedor.
+        categoria_ids: dados.categoria_ids ?? [],
         // Itens obrigatórios: o servidor DERIVA o valor combinado da soma deles.
         itens: dados.itens,
         // E6 H6.10: recorrência (facilitador, todos os planos) + cadência (gated por plano
@@ -404,109 +362,26 @@ export default function NovoAvisoPage() {
             )}
           />
 
-          {/* E16: categoria (interna, nunca vai para a outra pessoa) ao lado da data combinada
-              (do acordo). A data desceu para cá porque o valor avulso deixou de existir. */}
+          {/* E16 (multi): categorias (internas, nunca vão para a outra pessoa) ao lado da data
+              combinada (do acordo). A data desceu para cá porque o valor avulso deixou de existir. */}
           <div className="grid gap-5 sm:grid-cols-2">
             <Field
-              label="Categoria (opcional)"
-              dica="Organize por marca ou linha. Não aparece para a outra pessoa."
+              label="Categorias (opcional)"
+              dica="Organize por marca ou linha. Pode escolher mais de uma. Não aparece para a outra pessoa."
             >
-              {mostrarNovaCat ? (
-                // Modo criar: o select virou um input com os ícones DENTRO dele: check confirma
-                // (cria e já seleciona) e x cancela. Enter/Esc fazem o mesmo pelo teclado.
-                <div className="relative">
-                  <Input
-                    autoFocus
-                    value={novaCatNome}
-                    onChange={(e) => setNovaCatNome(e.target.value)}
-                    placeholder="Nome da nova categoria"
-                    maxLength={40}
-                    autoComplete="off"
-                    aria-label="Nome da nova categoria"
-                    className="pr-20"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        void criarCategoriaInline()
-                      } else if (e.key === 'Escape') {
-                        cancelarNovaCat()
-                      }
-                    }}
+              <Controller
+                control={control}
+                name="categoria_ids"
+                render={({ field }) => (
+                  <SeletorCategorias
+                    value={field.value ?? []}
+                    onChange={field.onChange}
+                    onErro={setErroGeral}
                   />
-                  <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-                    <button
-                      type="button"
-                      aria-label="Criar categoria"
-                      disabled={criarCategoria.isPending || novaCatNome.trim().length === 0}
-                      onClick={criarCategoriaInline}
-                      className="rounded-lg border border-salvia/40 p-1.5 text-salvia transition-colors hover:bg-salvia-claro disabled:cursor-not-allowed disabled:border-linha disabled:text-tinta-2/50 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-                    >
-                      {criarCategoria.isPending ? (
-                        <Loader2 strokeWidth={1.75} className="size-4 animate-spin" />
-                      ) : (
-                        <Check strokeWidth={2} className="size-4" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Cancelar"
-                      onClick={cancelarNovaCat}
-                      className="rounded-lg border border-linha p-1.5 text-tinta-2 transition-colors hover:bg-areia hover:text-barro focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-                    >
-                      <X strokeWidth={2} className="size-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <Controller
-                  control={control}
-                  name="categoria_id"
-                  render={({ field }) => {
-                    // "Outros" fica SEMPRE por último. Se o dono já tem uma "Outros", usamos o
-                    // id real dela (e a tiramos da lista do meio para não duplicar); senão,
-                    // mostramos a opção com a sentinela (criada ao ser escolhida).
-                    const cats = categorias.data ?? []
-                    const outros = cats.find((c) => c.nome.trim().toLowerCase() === NOME_OUTROS.toLowerCase())
-                    const demais = cats.filter((c) => c.id !== outros?.id)
-                    return (
-                      <Select
-                        ariaLabel="Categoria"
-                        value={field.value ?? ''}
-                        // A 1ª opção "+ Nova categoria" é uma AÇÃO (abre o input de criação, sem
-                        // mexer na seleção). "Outros" cria/seleciona a categoria Outros. As demais
-                        // selecionam normalmente.
-                        onChange={(v) => {
-                          if (v === NOVA_CATEGORIA) {
-                            setMostrarNovaCat(true)
-                            return
-                          }
-                          if (v === OUTROS_CATEGORIA) {
-                            void selecionarOutros()
-                            return
-                          }
-                          field.onChange(v)
-                        }}
-                        options={[
-                          // Destacada (fundo verde-claro + verde + negrito) para o olho perceber
-                          // que é uma ação clicável, distinta das categorias de verdade.
-                          {
-                            value: NOVA_CATEGORIA,
-                            label: '+ Nova categoria',
-                            className: 'bg-salvia-claro font-semibold text-salvia',
-                          },
-                          { value: '', label: 'Sem categoria' },
-                          ...demais.map((c) => ({ value: c.id, label: c.nome })),
-                          outros
-                            ? { value: outros.id, label: outros.nome }
-                            : { value: OUTROS_CATEGORIA, label: NOME_OUTROS },
-                        ]}
-                      />
-                    )
-                  }}
-                />
-              )}
+                )}
+              />
               <Link
-                to="/app/categorias"
+                to="/app/gestao/categorias"
                 className="mt-1 self-start text-xs text-tinta-2 hover:underline"
               >
                 Gerenciar categorias
@@ -626,8 +501,10 @@ export default function NovoAvisoPage() {
       {revisando && (
         <RevisarModal
           valores={getValues()}
-          categoriaNome={
-            categorias.data?.find((c) => c.id === getValues('categoria_id'))?.nome ?? null
+          categoriaNomes={
+            (getValues('categoria_ids') ?? [])
+              .map((id) => categorias.data?.find((c) => c.id === id)?.nome)
+              .filter((n): n is string => Boolean(n))
           }
           ehReceber={ehReceber}
           salvando={isSubmitting}
@@ -645,14 +522,14 @@ export default function NovoAvisoPage() {
 // Mesmo padrão de overlay do EditarModal/AtivarModal (DetalheAviso).
 function RevisarModal({
   valores,
-  categoriaNome,
+  categoriaNomes,
   ehReceber,
   salvando,
   onSalvar,
   onFechar,
 }: {
   valores: NovoAvisoForm
-  categoriaNome: string | null
+  categoriaNomes: string[]
   ehReceber: boolean
   salvando: boolean
   onSalvar: (modo: 'enviar' | 'agenda') => void
@@ -713,8 +590,10 @@ function RevisarModal({
             <dd className="mt-0.5 text-tinta">{dataPtBR(valores.data_combinada)}</dd>
           </div>
           <div>
-            <dt className="text-tinta-2">Categoria</dt>
-            <dd className="mt-0.5 text-tinta">{categoriaNome ?? 'Sem categoria'}</dd>
+            <dt className="text-tinta-2">{categoriaNomes.length > 1 ? 'Categorias' : 'Categoria'}</dt>
+            <dd className="mt-0.5 text-tinta">
+              {categoriaNomes.length > 0 ? categoriaNomes.join(', ') : 'Sem categoria'}
+            </dd>
           </div>
           {valores.telefone_devedor && (
             <div>

@@ -93,8 +93,21 @@ Como **sistema (api + front)**, quero que a visão por pessoa não exponha o tel
 
 ---
 
+### H15.8: Lista central de clientes e editar o nome em modal 🟢 `[+]`
+Como **usuário com conta**, quero uma lista de todos os meus clientes e poder editar o nome de um deles ali mesmo, sem navegar para outra tela, para gerir contatos de forma leve (a tela de detalhe por página é vista como burocrática).
+*Critérios de aceite:*
+- [ ] Há uma **lista central de clientes** (a outra ponta dos meus combinados, identidade pelo telefone, H15.1), agregada por número: nome mais recente daquele número, telefone **mascarado** na tela, e os quatro totais da relação (H15.2). Vive na área de Gestão (Épico 18, aba Clientes).
+- [ ] A lista roda no **servidor** (H9.8), isolada por `profile.id`, e cada cliente é referenciado por um **id de combinado representativo** (nunca pelo telefone em rota/log, H15.7).
+- [ ] Abrir um cliente mostra os detalhes **em modal** (totais + combinados agrupados por nome, H15.2/H15.3), sem trocar de página. A página por deep-link (`/pessoa/:avisoId`) **permanece** para os acessos existentes.
+- [ ] Posso **editar o nome** do cliente no modal. Salvar atualiza o `nome_devedor` de **todos os meus combinados daquele telefone** em que sou cobrador, resolvendo o telefone **no servidor** a partir do id de combinado (nunca telefone em rota/log).
+- [ ] A edição do nome é **livre** (dado interno de exibição; não abre reaprovação nem toca no acordo com a outra ponta) e **escopada à minha conta** (nunca renomeia combinados de outra conta, mesmo que compartilhem o telefone).
+- [ ] Como a identidade é o telefone e o nome é só rótulo (H15.1), renomear afeta o rótulo, nunca o agrupamento: os combinados continuam sendo "da mesma pessoa" pelo número.
+
+---
+
 ### Decisões tomadas
 - **Pessoa = outra ponta, identidade pelo telefone (E.164).** Sem tabela de contatos. O **nome é só rótulo**: selecionar qualquer nome de um número mostra todos os combinados daquele número, mesmo com nomes diferentes.
+- **Lista central de clientes + edição do nome em modal (H15.8, 2026-07-16):** a gestão de clientes ganha uma lista (na área Gestão, Épico 18) e a edição do nome acontece em modal, propagando por telefone (escopada ao dono). Segue **sem tabela de contatos** (a identidade continua sendo o telefone); editar o nome só reescreve `nome_devedor` nos meus combinados daquele número.
 - **Lista agrupada por nome**, e **cada combinado exibe o nome registrado nele** (não um nome único derivado).
 - **Busca por nome** para chegar à pessoa (resolve para o número); a visão sempre reúne tudo do número.
 - **Nova tela de detalhe da pessoa** (rota própria por id de combinado), acessível da lista/painel, do detalhe do combinado e da busca por nome. Não substitui o painel; é um recorte por pessoa.
@@ -109,7 +122,7 @@ Como **sistema (api + front)**, quero que a visão por pessoa não exponha o tel
 - Nenhuma pendente para o comportamento. O **layout fino** (disposição dos quatro totais, dos grupos de nome e do CTA "Novo combinado") sai na implementação com o design system atual, reaproveitando componentes do painel.
 
 ### Fora de escopo deste épico
-- ❌ Cadastro/edição de contatos como entidade própria (não há tabela de contatos; a pessoa é derivada do telefone).
+- ❌ Cadastro de contatos como **entidade própria** (não há tabela de contatos; a pessoa é derivada do telefone). Editar o **nome** (H15.8) não cria entidade: só reescreve `nome_devedor` nos meus combinados daquele número.
 - ❌ Regras de criação de combinado (Épicos 2/3), aceite (Épico 5), ciclo (Épico 6), confirmação (Épico 8): esta visão só as **aciona**, não as redefine.
 - ❌ Totais gerais e "precisa de você" do painel (Épico 9): aqui os totais são **por pessoa/número**.
 - ❌ Créditos de envio e CTA de compra (Épico 11); edição de textos/rótulos pelo owner (Épico 12).

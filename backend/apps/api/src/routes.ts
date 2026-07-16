@@ -9,6 +9,7 @@ import { painelRoutes } from './modules/painel'
 import { pessoasRoutes } from './modules/pessoas'
 import { itensRoutes } from './modules/itens'
 import { categoriasRoutes } from './modules/categorias'
+import { produtosRoutes } from './modules/produtos'
 import { adminRoutes } from './modules/admin'
 import { billingRoutes } from './modules/billing'
 
@@ -22,6 +23,7 @@ export const registrarModulos: FastifyPluginAsync = async (app) => {
   await app.register(pessoasRoutes)
   await app.register(itensRoutes)
   await app.register(categoriasRoutes)
+  await app.register(produtosRoutes)
   await app.register(adminRoutes)
   await app.register(billingRoutes)
 }

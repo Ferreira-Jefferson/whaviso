@@ -1,8 +1,7 @@
 // E16: gerência de categorias (/app/categorias). Criar, renomear, trocar cor e arquivar
 // (soft-delete). Categoria é organização interna do dono; nunca vai para o devedor.
 import { useState } from 'react'
-import { ArrowLeft, Archive, Check, Pencil, X } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { Archive, Check, Pencil, X } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -10,7 +9,6 @@ import {
   EmptyState,
   Field,
   Input,
-  PageHeader,
   Spinner,
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
@@ -20,7 +18,6 @@ import { useAtualizarCategoria, useCategorias, useCriarCategoria } from '../api'
 const COR_PADRAO = '#1e4d3b'
 
 export default function CategoriasPage() {
-  const navigate = useNavigate()
   const lista = useCategorias()
   const criar = useCriarCategoria()
   const atualizar = useAtualizarCategoria()
@@ -72,17 +69,10 @@ export default function CategoriasPage() {
   const categorias = lista.data ?? []
 
   return (
-    <div className="animate-rise">
-      <PageHeader
-        titulo="Categorias"
-        descricao="Organize seus combinados por marca ou linha. Só você vê; nunca aparece para a outra pessoa."
-        acoes={
-          <Button variante="ghost" onClick={() => navigate('/app')}>
-            <ArrowLeft strokeWidth={1.75} className="size-4" />
-            Voltar
-          </Button>
-        }
-      />
+    <div>
+      <p className="mb-4 text-sm text-tinta-2">
+        Organize seus combinados por marca ou linha. Só você vê; nunca aparece para a outra pessoa.
+      </p>
 
       {erro && (
         <Banner tom="erro" className="mb-4">

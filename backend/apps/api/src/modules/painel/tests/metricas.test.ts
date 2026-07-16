@@ -23,13 +23,21 @@ interface Ins {
 }
 
 async function ins(uid: string, r: Ins): Promise<void> {
-  await poolSuper.query(
+  // E16 multi: categoria vive na junção aviso_categorias, não em avisos.categoria_id.
+  const { rows } = await poolSuper.query<{ id: string }>(
     `insert into public.avisos
        (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
-        pix_chave, motivo, valor_centavos, data_combinada, categoria_id, valor_custo_centavos)
-     values ($1,'receber','cobrador',$2,$3,$4,'c@pix.com','pedido',$5,$6,$7,$8)`,
-    [uid, r.status, r.nome, r.tel, r.valor, r.data, r.cat, r.custo],
+        pix_chave, motivo, valor_centavos, data_combinada, valor_custo_centavos)
+     values ($1,'receber','cobrador',$2,$3,$4,'c@pix.com','pedido',$5,$6,$7)
+     returning id`,
+    [uid, r.status, r.nome, r.tel, r.valor, r.data, r.custo],
   )
+  if (r.cat) {
+    await poolSuper.query(
+      `insert into public.aviso_categorias (aviso_id, categoria_id) values ($1,$2)`,
+      [rows[0]!.id, r.cat],
+    )
+  }
 }
 
 describe('painel: métricas de negócio (integração)', () => {
@@ -89,5 +97,63 @@ describe('painel: métricas de negócio (integração)', () => {
     expect(b.inativos).toHaveLength(1)
     expect(b.inativos[0]).toMatchObject({ telefone: C, nome: 'Cida' })
     expect(b.inativos[0].dias).toBeGreaterThan(60)
+  })
+})
+
+// E18 H18.3: com multi-categoria, a quebra por categoria usa ATRIBUIÇÃO INTEGRAL. Um
+// combinado em 2 categorias soma o valor CHEIO em cada uma (buckets se sobrepõem), enquanto
+// o total geral (lido de avisos sem join) NÃO infla.
+describe('painel: métricas por categoria com atribuição integral (multi)', () => {
+  let uid: string
+
+  beforeAll(async () => {
+    uid = await criarUsuario('Revendedora multi')
+    const cat = async (nome: string) =>
+      (await poolSuper.query<{ id: string }>(
+        `insert into public.categorias (profile_id, nome) values ($1,$2) returning id`,
+        [uid, nome],
+      )).rows[0]!.id
+    const natura = await cat('Natura')
+    const presentes = await cat('Presentes')
+    // Um único pago de 10000 em DUAS categorias.
+    const { rows } = await poolSuper.query<{ id: string }>(
+      `insert into public.avisos
+         (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
+          pix_chave, motivo, valor_centavos, data_combinada)
+       values ($1,'receber','cobrador','pago','Ana','+5511900000301','c@pix.com','pedido',10000,'2026-07-01')
+       returning id`,
+      [uid],
+    )
+    await poolSuper.query(
+      `insert into public.aviso_categorias (aviso_id, categoria_id) values ($1,$2),($1,$3)`,
+      [rows[0]!.id, natura, presentes],
+    )
+  })
+  afterAll(async () => {
+    await limparUsuario(uid)
+  })
+
+  it('cada categoria recebe o valor cheio; a soma dos buckets excede o total geral', async () => {
+    const app = await criarAppTeste(uid)
+    const b = (await app.inject({ method: 'GET', url: '/v1/painel/metricas', headers: AUTH })).json()
+    await app.close()
+
+    // Total geral: um único combinado de 10000 (lido sem join, não infla).
+    expect(b.recebido_centavos).toBe(10000)
+    expect(b.recebido_qtd).toBe(1)
+
+    // Cada categoria soma o valor CHEIO (atribuição integral).
+    const natura = b.por_categoria.find((c: { nome: string | null }) => c.nome === 'Natura')
+    const presentes = b.por_categoria.find((c: { nome: string | null }) => c.nome === 'Presentes')
+    expect(natura).toMatchObject({ recebido_centavos: 10000, qtd: 1 })
+    expect(presentes).toMatchObject({ recebido_centavos: 10000, qtd: 1 })
+
+    // Soma dos buckets (20000) > total geral (10000): buckets se sobrepõem, não somam ao total.
+    const somaBuckets = b.por_categoria.reduce(
+      (s: number, c: { recebido_centavos: number }) => s + c.recebido_centavos,
+      0,
+    )
+    expect(somaBuckets).toBe(20000)
+    expect(somaBuckets).toBeGreaterThan(b.recebido_centavos)
   })
 })

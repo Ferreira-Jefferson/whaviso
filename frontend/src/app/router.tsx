@@ -12,6 +12,7 @@ import { Spinner } from '@/shared/ui'
 import { PublicLayout } from './layouts/PublicLayout'
 import { LegalLayout } from './layouts/LegalLayout'
 import { AppShell } from './layouts/AppShell'
+import { GestaoLayout } from './layouts/GestaoLayout'
 import { ErrorBoundary } from './ErrorBoundary'
 import { AppError } from './AppError'
 import {
@@ -26,10 +27,11 @@ import { PoliticaPrivacidadePage, TermosUsoPage } from '@/modules/legal'
 import { LoginPage, OnboardingPage } from '@/modules/auth'
 import { AcaoAvisoPage, SairLembretesPage } from '@/modules/aceite'
 import { PainelPage, MetricasNegocioPage } from '@/modules/painel'
-import { PessoaPage } from '@/modules/pessoas'
+import { PessoaPage, ClientesPage } from '@/modules/pessoas'
 import { NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
 import { CreditosPage } from '@/modules/billing'
 import { CategoriasPage } from '@/modules/categorias'
+import { ProdutosPage } from '@/modules/produtos'
 import { ContaPage } from '@/modules/conta'
 import {
   MeusCombinadosPage,
@@ -138,8 +140,21 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <PainelPage /> },
-          { path: 'metricas', element: <MetricasNegocioPage /> },
-          { path: 'categorias', element: <CategoriasPage /> },
+          // E18: área "Gestão" com abas (Resultados/Clientes/Produtos/Categorias). A aba
+          // Resultados é o index; as demais são filhas. Cada uma tem deep-link próprio.
+          {
+            path: 'gestao',
+            element: <GestaoLayout />,
+            children: [
+              { index: true, element: <MetricasNegocioPage /> },
+              { path: 'clientes', element: <ClientesPage /> },
+              { path: 'produtos', element: <ProdutosPage /> },
+              { path: 'categorias', element: <CategoriasPage /> },
+            ],
+          },
+          // Rotas antigas redirecionam para as abas de Gestão (nenhum link antigo quebra).
+          { path: 'metricas', element: <Navigate to="/app/gestao" replace /> },
+          { path: 'categorias', element: <Navigate to="/app/gestao/categorias" replace /> },
           { path: 'avisos', element: <RedirectAvisos /> },
           { path: 'avisos/novo', element: <NovoAvisoPage /> },
           { path: 'avisos/:id', element: <DetalheAvisoPage /> },

@@ -3,8 +3,11 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
   buscarPessoaBody,
   buscarPessoaResposta,
+  listaClientesResposta,
   pessoaCombinadosResposta,
   pessoaResumoResposta,
+  renomearClienteBody,
+  renomearClienteResposta,
 } from '@whaviso/shared/contracts'
 import { z } from 'zod'
 import * as service from './service'
@@ -15,6 +18,13 @@ const idParam = z.object({ avisoId: z.uuid() })
 
 export const pessoasRoutes: FastifyPluginAsync = async (raiz) => {
   const app = raiz.withTypeProvider<ZodTypeProvider>()
+
+  // E18 H18.4: lista central de clientes (agregada por telefone). Telefone só no corpo.
+  app.get(
+    '/pessoas',
+    { preHandler: app.autenticar, schema: { response: { 200: listaClientesResposta } } },
+    (req) => service.listarClientes(app.pool, req.userId),
+  )
 
   // H15.1/H15.2: resumo da pessoa (telefone resolvido no servidor + quatro totais).
   app.get(
@@ -28,6 +38,17 @@ export const pessoasRoutes: FastifyPluginAsync = async (raiz) => {
     '/pessoas/:avisoId/combinados',
     { preHandler: app.autenticar, schema: { params: idParam, response: { 200: pessoaCombinadosResposta } } },
     (req) => service.combinados(app.pool, req.userId, req.params.avisoId),
+  )
+
+  // E15 H15.8: renomear cliente. avisoId na rota (nunca telefone); nome no corpo. Propaga
+  // por telefone (resolvido no servidor) em todos os meus combinados onde sou cobrador.
+  app.patch(
+    '/pessoas/:avisoId',
+    {
+      preHandler: app.autenticar,
+      schema: { params: idParam, body: renomearClienteBody, response: { 200: renomearClienteResposta } },
+    },
+    (req) => service.renomearCliente(app.pool, req.userId, req.params.avisoId, req.body.nome),
   )
 
   // H15.6: autocomplete ao criar. Telefone (parcial) vai no CORPO (POST), nunca em rota.

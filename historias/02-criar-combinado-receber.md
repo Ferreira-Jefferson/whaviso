@@ -101,7 +101,8 @@ Como **cobrador (revendedor)**, quero montar o combinado listando os **itens do 
 - [ ] O **valor do combinado é a soma** dos itens (quantidade x preço unitário), calculada pelo servidor (autoridade). O total é exibido em modo leitura e é o valor que aparece no aceite e nas mensagens ao devedor.
 - [ ] O **total precisa ser maior que zero** (não dá para salvar/enviar um pedido de valor zero).
 - [ ] A **composição por item é interna** do dono: a outra pessoa vê **apenas o valor total**, nunca a lista de itens.
-- [ ] Ao digitar a **descrição** de um item, o formulário sugere **descrições já usadas** pelo próprio dono em combinados anteriores (autocomplete), análogo ao autocomplete de pessoa por telefone (H15.6). Escolher uma sugestão preenche a descrição daquela linha.
+- [ ] Ao digitar a **descrição** de um item, o formulário sugere **produtos do catálogo** (Épico 17) e descrições já usadas; escolher um produto preenche a **descrição** e o **preço unitário** e grava o vínculo `produto_id`. Texto livre (sem produto) segue valendo, com `produto_id` vazio. O preço vindo do catálogo é ponto de partida (o valor do combinado é sempre o snapshot dos itens; editar o produto depois não recalcula este combinado, Épico 17 H17.3).
+- [ ] Posso **cadastrar um produto novo inline** (Épico 17 H17.1) ali no montar do pedido, sem trocar de tela.
 - [ ] **Não existe custo por item** nesta versão: o dono informa só o preço de venda. (Custo por item pode virar feature futura, se solicitado.)
 
 ---

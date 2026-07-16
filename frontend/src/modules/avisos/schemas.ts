@@ -36,6 +36,8 @@ export const novoAvisoSchema = z
         descricao: z.string(),
         qtd: z.number().int(),
         valor_unit_centavos: z.number().int(),
+        // E17: vínculo opcional com um produto do catálogo (snapshot de descrição/preço fica).
+        produto_id: z.uuid().nullish(),
       }),
     ),
     motivo: z
@@ -53,8 +55,8 @@ export const novoAvisoSchema = z
     // invertido a chave é de terceiro e não exigimos esses dados aqui.
     pix_titular: z.string().trim().max(120, 'Nome muito longo.').optional(),
     pix_banco: z.string().trim().max(80, 'Nome muito longo.').optional(),
-    // E16: categoria (opcional; '' = sem categoria). Nunca vai ao devedor; ajuda a organizar.
-    categoria_id: z.string().optional(),
+    // E16 (multi): categorias (0..N). Nunca vão ao devedor; ajudam a organizar.
+    categoria_ids: z.array(z.uuid()).optional(),
   })
   // Itens obrigatórios: >=1 item, todos com descrição, e total > 0 (uma mensagem por vez, em
   // ordem de prioridade). Vale nos dois modos (enviar e agenda): sem itens não há valor.

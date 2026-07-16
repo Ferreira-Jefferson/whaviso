@@ -9,9 +9,13 @@ A identidade é o TELEFONE (o nome é rótulo): a rota carrega um id de COMBINAD
 api resolve o telefone no servidor (H15.1/H15.7). Só leitura + solicitação (H9.8).
 
 ## Entry points
-- `index.ts`: `PessoaPage` (lazy), montada em `app/router.tsx` sob `/app`
-- `api.ts`: hooks TanStack Query (usePessoaResumo, usePessoaCombinados)
-- `pages/Pessoa.tsx`: tela (reaproveita StatCard/TableResponsive/StatusBadge de `@/shared/ui`)
+- `index.ts`: `PessoaPage` (lazy, `/app/pessoa/:avisoId`) e `ClientesPage` (lazy, aba Clientes
+  da Gestão, `/app/gestao/clientes`, E18 H18.4).
+- `api.ts`: hooks TanStack Query (usePessoaResumo, usePessoaCombinados, usePessoas,
+  useRenomearCliente).
+- `pages/Pessoa.tsx`: tela por deep-link (mantida). `pages/Clientes.tsx`: lista central.
+- `components/ClienteModal.tsx`: detalhe do cliente em modal (totais + combinados + renomear),
+  via ModalPortal. Renomear propaga por telefone (servidor); telefone mascarado na tela.
 
 ## Fronteiras
 - NÃO importa outros módulos (lint feature-first). Reaproveita só `@/shared/*`.

@@ -1,19 +1,85 @@
 // Camada de dados do módulo pessoas (E15): visão por pessoa/contato.
 // A pessoa é referenciada por um id de COMBINADO (UUID): a api resolve o telefone da
 // outra ponta no servidor (H15.7). Estado de servidor 100% via TanStack Query.
-import { useQuery } from '@tanstack/react-query'
-import { apiClient } from '@/shared/api_client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiClient, ApiError } from '@/shared/api_client'
 import {
+  listaClientesResposta,
   pessoaCombinadosResposta,
   pessoaResumoResposta,
+  renomearClienteResposta,
+  type ListaClientesResposta,
   type PessoaCombinadosResposta,
   type PessoaResumoResposta,
+  type RenomearClienteResposta,
 } from '@/shared/contracts'
 
 export const pessoasKeys = {
   todos: ['pessoas'] as const,
+  lista: ['pessoas', 'lista'] as const,
   resumo: (avisoId: string) => ['pessoas', 'resumo', avisoId] as const,
   combinados: (avisoId: string) => ['pessoas', 'combinados', avisoId] as const,
+}
+
+/**
+ * GET /v1/pessoas (E18 H18.4): lista central de clientes (agregada por telefone). Telefone só
+ * no corpo (nunca em rota/log); cada cliente traz um ref_aviso_id representativo. Degrada
+ * 404 -> [] (backend antigo sem a rota).
+ */
+export function usePessoas() {
+  return useQuery({
+    queryKey: pessoasKeys.lista,
+    queryFn: async ({ signal }) => {
+      try {
+        return await apiClient.get<ListaClientesResposta>('/pessoas', {
+          schema: listaClientesResposta,
+          signal,
+        })
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.code === 'rota_inexistente')) {
+          return { itens: [], total: 0 }
+        }
+        throw e
+      }
+    },
+  })
+}
+
+/**
+ * PATCH /v1/pessoas/:avisoId (E15 H15.8): renomeia o cliente. O telefone é resolvido no
+ * servidor a partir do avisoId (nunca telefone em rota/log). Otimista sobre a lista
+ * ['pessoas','lista']; onSettled invalida ['pessoas'], ['avisos'] e ['painel'] (o nome muda
+ * em toda parte que exibe combinados daquele número).
+ */
+export function useRenomearCliente() {
+  const qc = useQueryClient()
+  return useMutation<RenomearClienteResposta, Error, { refAvisoId: string; telefone: string; nome: string }>({
+    mutationFn: ({ refAvisoId, nome }) =>
+      apiClient.patch<RenomearClienteResposta>(`/pessoas/${refAvisoId}`, {
+        body: { nome },
+        schema: renomearClienteResposta,
+      }),
+    onMutate: async ({ telefone, nome }) => {
+      await qc.cancelQueries({ queryKey: pessoasKeys.lista })
+      const anterior = qc.getQueryData<ListaClientesResposta>(pessoasKeys.lista)
+      if (anterior) {
+        qc.setQueryData<ListaClientesResposta>(pessoasKeys.lista, {
+          ...anterior,
+          itens: anterior.itens.map((c) => (c.telefone === telefone ? { ...c, nome } : c)),
+        })
+      }
+      return { anterior }
+    },
+    onError: (_e, _v, ctx) => {
+      const c = ctx as { anterior?: ListaClientesResposta } | undefined
+      if (c?.anterior) qc.setQueryData(pessoasKeys.lista, c.anterior)
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: pessoasKeys.todos })
+      void qc.invalidateQueries({ queryKey: ['avisos'] })
+      void qc.invalidateQueries({ queryKey: ['painel'] })
+    },
+  })
 }
 
 /** GET /v1/pessoas/:avisoId/resumo: telefone resolvido no servidor + os quatro totais. */
