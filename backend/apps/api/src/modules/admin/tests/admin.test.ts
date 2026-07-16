@@ -370,7 +370,7 @@ describe('admin (integração)', () => {
     const app = await criarAppTeste(owner)
     const r = await app.inject({
       method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
-      payload: { chave: 'resposta.optout', nome_meta: 'resposta_optout_ruim', conteudo: { texto: 'sobre sua dívida' }, variaveis: [] },
+      payload: { chave: 'resposta.optout', conteudo: { texto: 'sobre sua dívida' }, variaveis: [] },
     })
     await app.close()
     expect(r.statusCode).toBe(422)
@@ -382,7 +382,7 @@ describe('admin (integração)', () => {
     const app = await criarAppTeste(owner)
     const r = await app.inject({
       method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
-      payload: { chave: 'resposta.optout', nome_meta: 'resposta_optout_dash', conteudo: { texto: 'Oi — tudo certo' }, variaveis: [] },
+      payload: { chave: 'resposta.optout', conteudo: { texto: 'Oi — tudo certo' }, variaveis: [] },
     })
     await app.close()
     expect(r.statusCode).toBe(422)
@@ -415,7 +415,7 @@ describe('admin (integração)', () => {
     const r = await app.inject({
       method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
       payload: {
-        chave: 'resposta.optout', nome_meta: 'resposta_optout_genero',
+        chave: 'resposta.optout',
         conteudo: { texto: 'Sou a Ana, falo sobre o combinado' }, variaveis: [],
       },
     })
@@ -425,8 +425,8 @@ describe('admin (integração)', () => {
     expect(Array.isArray(body.avisos_genero)).toBe(true)
     expect(body.avisos_genero.length).toBeGreaterThan(0) // "Sou a" acende o alerta
 
-    // limpeza
-    await poolSuper.query(`delete from public.templates where nome_meta='resposta_optout_genero'`)
+    // limpeza: o nome_meta é derivado pelo servidor; remove as versões propostas (versao>1).
+    await poolSuper.query(`delete from public.templates where chave='resposta.optout' and versao > 1`)
   })
 
   // H13.10/H13.3: texto neutro não acende alerta de gênero.
@@ -445,12 +445,15 @@ describe('admin (integração)', () => {
     const app = await criarAppTeste(owner)
     const nova = await app.inject({
       method: 'POST', url: '/v1/admin/mensagens', headers: AUTH,
-      payload: { chave: 'resposta.optout', nome_meta: 'resposta_optout_v2', conteudo: { texto: 'Pronto, sem mais lembretes. 🙂' }, variaveis: [] },
+      payload: { chave: 'resposta.optout', conteudo: { texto: 'Pronto, sem mais lembretes.' }, variaveis: [] },
     })
     expect(nova.statusCode).toBe(201)
     const id = nova.json().id
     expect(nova.json().status_meta).toBe('pendente')
     expect(nova.json().ativo).toBe(false)
+    // Nome derivado pelo servidor: base da versão ativa (resposta_optout) + próximo número.
+    expect(nova.json().nome_meta).toBe('resposta_optout_2')
+    expect(nova.json().versao).toBe(2)
 
     const semAprovar = await app.inject({ method: 'POST', url: `/v1/admin/mensagens/${id}/ativar`, headers: AUTH })
     expect(semAprovar.statusCode).toBe(409)
@@ -477,14 +480,12 @@ describe('admin (integração)', () => {
     expect(ativas.rowCount).toBe(1)
     expect(ativas.rows[0].id).toBe(id)
 
-    // limpeza: reativa o seed e remove as versões de teste.
+    // limpeza: reativa o seed e remove as versões de teste (nome derivado -> por versao).
     await poolSuper.query(`update public.templates set ativo=false where id=$1`, [id])
     await poolSuper.query(
       `update public.templates set ativo=true where chave='resposta.optout' and nome_meta='resposta_optout'`,
     )
-    await poolSuper.query(
-      `delete from public.templates where nome_meta in ('resposta_optout_v2','resposta_optout_ruim')`,
-    )
+    await poolSuper.query(`delete from public.templates where chave='resposta.optout' and versao > 1`)
   })
 
   // H13.4: opt-out visível em TODA mensagem do ciclo. "Templates do ciclo" = as

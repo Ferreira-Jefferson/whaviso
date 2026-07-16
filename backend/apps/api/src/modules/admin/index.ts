@@ -156,16 +156,36 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
           'O texto contém travessão. Use vírgula, dois-pontos ou parênteses.',
         )
       }
+      // O nome_meta é DERIVADO no servidor, nunca vem do cliente: cada versão de uma
+      // (chave, contexto) recebe um nome próprio (base + próximo número), para que ao
+      // submeter à Meta seja um template NOVO (CREATE) sem colidir nem mexer no aprovado.
+      // base = nome da versão ativa (ou mais recente) sem o sufixo numérico; a 1ª versão
+      // de uma chave nova deriva da própria chave. versao = max por (chave, contexto) + 1.
       const { rows } = await app.pool.query(
         `insert into public.templates (chave, contexto, nome_meta, idioma, conteudo, variaveis, versao, status_meta, ativo, categoria, exemplos)
-         values ($1,$2,$3,$4,$5::jsonb,$6::jsonb,
-           coalesce((select max(versao)+1 from public.templates where nome_meta=$3), 1),
-           'pendente', false, $7, $8::jsonb)
+         select $1, $2::template_contexto,
+           case
+             when v.max_versao is null
+               then replace($1, '.', '_') || case when $2::template_contexto = 'revisao' then '_revisao' else '' end
+             else v.base || '_' || (v.max_versao + 1)
+           end,
+           $3, $4::jsonb, $5::jsonb,
+           coalesce(v.max_versao, 0) + 1,
+           'pendente', false, $6, $7::jsonb
+         from (
+           select
+             max(versao) as max_versao,
+             (select regexp_replace(nome_meta, '_[0-9]+$', '')
+                from public.templates
+               where chave = $1 and contexto = $2::template_contexto
+               order by ativo desc, versao desc
+               limit 1) as base
+           from public.templates where chave = $1 and contexto = $2::template_contexto
+         ) v
          returning id, chave, nome_meta, versao, status_meta, ativo`,
         [
           req.body.chave,
           req.body.contexto,
-          req.body.nome_meta,
           req.body.idioma,
           JSON.stringify(req.body.conteudo),
           JSON.stringify(req.body.variaveis),

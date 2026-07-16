@@ -159,6 +159,15 @@ function Conteudo({
   const base = (baseId ? daChave.find((t) => t.id === baseId) : undefined) ?? null
   const temBase = base !== null
 
+  // Nome do template na Meta é DERIVADO (não editável): cada versão vira um template
+  // novo na Meta sem colidir. Espelha a regra do servidor (POST /admin/mensagens):
+  // base = nome da versão ativa (ou mais recente) sem o sufixo numérico; próximo número
+  // = maior versao de (chave, contexto) + 1. A 1ª versão de uma chave nova deriva da chave.
+  const nomeMetaDerivado =
+    daChave.length === 0
+      ? chave.replace(/\./g, '_') + (ctx === 'revisao' ? '_revisao' : '')
+      : `${(noAr ?? daChave[0])!.nome_meta.replace(/_\d+$/, '')}_${daChave[0]!.versao + 1}`
+
   return (
     <div className="animate-rise">
       <Voltar />
@@ -216,7 +225,7 @@ function Conteudo({
           chave={chave}
           contexto={ctx}
           meta={meta}
-          sugestaoNomeMeta={base?.nome_meta}
+          nomeMetaDerivado={nomeMetaDerivado}
           sugestaoBotoes={base?.conteudo.botoes}
           // Semeia o editor com a versão base (texto reconvertido para tokens
           // nomeados; categoria da Meta), para propor a partir dela em vez do zero.
@@ -534,7 +543,7 @@ function NovaProposta({
   chave,
   contexto,
   meta,
-  sugestaoNomeMeta,
+  nomeMetaDerivado,
   sugestaoBotoes,
   sugestaoTexto,
   sugestaoCategoria,
@@ -545,7 +554,8 @@ function NovaProposta({
   chave: string
   contexto: ContextoTemplate
   meta: MensagemItem
-  sugestaoNomeMeta?: string
+  // Nome do template na Meta, DERIVADO pelo servidor (não editável). Mostrado só p/ conferência.
+  nomeMetaDerivado: string
   sugestaoBotoes?: BotaoTemplate[]
   sugestaoTexto?: string
   sugestaoCategoria?: CategoriaTemplate
@@ -555,11 +565,6 @@ function NovaProposta({
   temBase: boolean
   onLimpar: () => void
 }) {
-  // Default do nome: o da versão ativa do contexto, ou derivado da chave (a
-  // variante de revisão recebe sufixo para não colidir com o nome do padrão).
-  const nomePadrao =
-    chave.replace(/\./g, '_') + (contexto === 'revisao' ? '_revisao' : '')
-  const [nomeMeta, setNomeMeta] = useState(sugestaoNomeMeta ?? nomePadrao)
   // Texto e categoria nascem da versão ativa (se houver), para o owner propor a
   // partir dela; o componente remonta por contexto (key={ctx}), reancorando o seed.
   const [corpo, setCorpo] = useState(sugestaoTexto ?? '')
@@ -612,8 +617,7 @@ function NovaProposta({
   const textoLint = [corpo, ...botoesConteudo.map((b) => b.rotulo)].join(' ')
   const palavraProibida = textoLint.trim() ? lintLinguagem(textoLint) : null
   const rotulosOk = botoesConteudo.every((b) => b.rotulo.length > 0)
-  const podeEnviar =
-    corpoIndexado.trim().length > 0 && nomeMeta.trim().length > 0 && rotulosOk && !palavraProibida
+  const podeEnviar = corpoIndexado.trim().length > 0 && rotulosOk && !palavraProibida
 
   useLayoutEffect(() => {
     const alvo = caretAlvo.current
@@ -681,7 +685,6 @@ function NovaProposta({
         chave,
         contexto,
         idioma: 'pt_BR',
-        nome_meta: nomeMeta.trim(),
         conteudo: conteudoAtual,
         variaveis,
         categoria,
@@ -729,7 +732,12 @@ function NovaProposta({
       </div>
 
       <Field label="Nome do template na Meta">
-        <Input value={nomeMeta} onChange={(e) => setNomeMeta(e.target.value)} placeholder="ex.: resposta_ja_paguei" />
+        {/* Gerado automaticamente (base da versão atual + próximo número): cada versão
+            é um template novo na Meta, sem colidir com a aprovada. Não editável. */}
+        <div className="flex items-center gap-2 rounded-input border border-linha bg-papel-2 px-3 py-2.5">
+          <span className="font-mono text-sm text-tinta">{nomeMetaDerivado}</span>
+          <span className="ml-auto text-xs text-tinta-2">gerado automaticamente</span>
+        </div>
       </Field>
 
       <Field label="Categoria na Meta">

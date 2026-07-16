@@ -860,7 +860,8 @@ export const novaMensagemBody = z
   .object({
     chave: z.string().trim().min(1).max(80),
     contexto: contextoTemplate.default('padrao'),
-    nome_meta: z.string().trim().min(1).max(120),
+    // nome_meta NÃO vem mais do cliente: o servidor deriva (base + próximo número) para
+    // que cada versão vire um template novo na Meta sem colidir. Ver POST /admin/mensagens.
     idioma: z.string().default('pt_BR'),
     conteudo: conteudoTemplate,
     variaveis: z.array(z.string()).default([]),
