@@ -114,17 +114,18 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     await app.close()
   })
 
-  it('H4.1: telefone da outra ponta é OPCIONAL na agenda (receber e invertido)', async () => {
+  it('H4.1: telefone da outra ponta é OBRIGATÓRIO na agenda (rejeita nas duas direções)', async () => {
     const app = await criarAppTeste(uid)
+    // Receber sem telefone_devedor: rejeitado mesmo na agenda (o Pix pode faltar; o telefone não).
     const rReceber = await app.inject({
       method: 'POST',
       url: '/v1/avisos',
       headers: AUTH,
       payload: corpoReceber({ modo: 'agenda', telefone_devedor: null, pix_chave: null, pix_titular: null, pix_banco: null }),
     })
-    expect(rReceber.statusCode).toBe(201)
-    expect(rReceber.json().aviso.status).toBe('sem_aviso')
+    expect(rReceber.statusCode).toBe(400)
 
+    // Invertido (pagar) sem telefone_cobrador: também rejeitado na agenda.
     const rInv = await app.inject({
       method: 'POST',
       url: '/v1/avisos',
@@ -136,7 +137,38 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
         motivo: 'aluguel',
         itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }],
         data_combinada: '2026-12-20',
-        // sem nome_cobrador/telefone_cobrador/pix: tudo diferido para ativar
+        // sem telefone_cobrador: o telefone da outra ponta é obrigatório mesmo na agenda
+      },
+    })
+    expect(rInv.statusCode).toBe(400)
+    await app.close()
+  })
+
+  it('H4.1: com telefone o Pix segue DIFERIDO na agenda (cria sem Pix nas duas direções)', async () => {
+    const app = await criarAppTeste(uid)
+    // Receber com telefone mas SEM Pix: aceito na agenda (Pix cobrado só ao ativar, H4.3).
+    const rReceber = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: corpoReceber({ modo: 'agenda', pix_chave: null, pix_titular: null, pix_banco: null }),
+    })
+    expect(rReceber.statusCode).toBe(201)
+    expect(rReceber.json().aviso.status).toBe('sem_aviso')
+
+    // Invertido com telefone_cobrador (nome_cobrador segue opcional na agenda) e sem Pix: aceito.
+    const rInv = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: {
+        direcao: 'pagar',
+        modo: 'agenda',
+        nome_devedor: 'Eu',
+        telefone_cobrador: '+5511944443333',
+        motivo: 'aluguel',
+        itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }],
+        data_combinada: '2026-12-20',
       },
     })
     expect(rInv.statusCode).toBe(201)
@@ -220,12 +252,12 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     await app.close()
   })
 
-  it('H4.3: ativar pede telefone/Pix faltante → dado_obrigatorio_ativacao, sem transitar', async () => {
+  it('H4.3: ativar pede Pix faltante → dado_obrigatorio_ativacao, sem transitar', async () => {
     const app = await criarAppTeste(uid)
-    // Agenda sem telefone nem Pix.
+    // Agenda COM telefone (obrigatório desde a criação, H4.1) mas SEM Pix (diferido na agenda).
     const criado = await app.inject({
       method: 'POST', url: '/v1/avisos', headers: AUTH,
-      payload: corpoReceber({ modo: 'agenda', telefone_devedor: null, pix_chave: null, pix_titular: null, pix_banco: null }),
+      payload: corpoReceber({ modo: 'agenda', pix_chave: null, pix_titular: null, pix_banco: null }),
     })
     const id = criado.json().aviso.id
     const ativar = await app.inject({ method: 'POST', url: `/v1/avisos/${id}/ativar`, headers: AUTH, payload: {} })
@@ -234,10 +266,10 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     // Não transitou.
     expect(await contarPorStatus(uid, 'sem_aviso')).toBe(1)
 
-    // Agora ativa fornecendo os dados no corpo.
+    // Agora ativa fornecendo o Pix no corpo.
     const ok = await app.inject({
       method: 'POST', url: `/v1/avisos/${id}/ativar`, headers: AUTH,
-      payload: { telefone_devedor: '+5511977776666', pix_chave: 'x@pix.com', pix_titular: 'X', pix_banco: 'Banco' },
+      payload: { pix_chave: 'x@pix.com', pix_titular: 'X', pix_banco: 'Banco' },
     })
     expect(ok.statusCode).toBe(200)
     expect(ok.json().aviso.status).toBe('aguardando_aceite')
@@ -253,7 +285,9 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     const criado = await app.inject({
       method: 'POST', url: '/v1/avisos', headers: AUTH,
       payload: {
-        direcao: 'pagar', modo: 'agenda', nome_devedor: 'Eu', motivo: 'aluguel',
+        // telefone_cobrador é obrigatório desde a criação (H4.1); Pix segue diferido na agenda.
+        direcao: 'pagar', modo: 'agenda', nome_devedor: 'Eu', telefone_cobrador: '+5511944443333',
+        motivo: 'aluguel',
         itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }], data_combinada: '2026-12-20',
       },
     })
@@ -372,7 +406,9 @@ describe('E4 modo agenda (integração com whaviso_dev)', () => {
     const criado = await app.inject({
       method: 'POST', url: '/v1/avisos', headers: AUTH,
       payload: {
-        direcao: 'pagar', modo: 'agenda', nome_devedor: 'Eu', motivo: 'aluguel',
+        // telefone_cobrador obrigatório desde a criação (H4.1), inclusive na agenda invertida.
+        direcao: 'pagar', modo: 'agenda', nome_devedor: 'Eu', telefone_cobrador: '+5511944443333',
+        motivo: 'aluguel',
         itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 5000 }], data_combinada: '2026-12-20',
       },
     })

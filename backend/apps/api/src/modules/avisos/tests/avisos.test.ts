@@ -31,12 +31,16 @@ function corpoAviso(over: Record<string, unknown> = {}) {
 }
 
 // E11: anotação de AGENDA (modo agenda) NÃO reserva crédito; serve para exercitar o teto
-// de agenda (balde único) sem esbarrar em saldo. Telefone/Pix são opcionais na agenda.
+// de agenda (balde único) sem esbarrar em saldo. Só o Pix é diferido na agenda; o telefone
+// da outra ponta é OBRIGATÓRIO mesmo na agenda (H4.1), por isso o helper já o traz nas duas
+// pontas (receber usa telefone_devedor; pagar invertido usa telefone_cobrador).
 function corpoAvisoAgenda(over: Record<string, unknown> = {}) {
   return {
     direcao: 'receber',
     modo: 'agenda',
     nome_devedor: 'Maria',
+    telefone_devedor: '+5511999998888',
+    telefone_cobrador: '+5511988887777',
     motivo: 'mensalidade',
     itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }],
     data_combinada: '2026-12-15',

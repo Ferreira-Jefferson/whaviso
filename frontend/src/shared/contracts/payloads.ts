@@ -87,14 +87,22 @@ export const criarAvisoBody = z
     message: 'o total dos itens precisa ser maior que zero',
     path: ['itens'],
   })
-  // No modo `agenda` (H4.1) telefone e Pix são opcionais (cobrados só ao ativar).
-  .refine((b) => b.modo === 'agenda' || b.direcao !== 'receber' || b.telefone_devedor != null, {
+  // WhatsApp (telefone) da outra ponta é OBRIGATÓRIO em TODOS os modos, inclusive `agenda`
+  // (H4.1): identifica quem combinou. Só o Pix segue DIFERIDO na agenda (cobrado ao ativar),
+  // então os refines de telefone NÃO têm a leniência de `agenda`; os de Pix mantêm.
+  .refine((b) => b.direcao !== 'receber' || b.telefone_devedor != null, {
     message: 'telefone_devedor é obrigatório para receber',
     path: ['telefone_devedor'],
   })
-  .refine((b) => b.modo === 'agenda' || b.direcao !== 'pagar' || (b.nome_cobrador != null && b.telefone_cobrador != null), {
-    message: 'nome_cobrador e telefone_cobrador são obrigatórios para pagar',
+  .refine((b) => b.direcao !== 'pagar' || b.telefone_cobrador != null, {
+    message: 'telefone_cobrador é obrigatório para pagar',
     path: ['telefone_cobrador'],
+  })
+  // O NOME da outra ponta (cobrador) no invertido segue a leniência de agenda: exigido só ao
+  // enviar. Só o telefone deixou de ser opcional na agenda.
+  .refine((b) => b.modo === 'agenda' || b.direcao !== 'pagar' || b.nome_cobrador != null, {
+    message: 'nome_cobrador é obrigatório para pagar',
+    path: ['nome_cobrador'],
   })
   .refine((b) => b.modo === 'agenda' || b.direcao !== 'receber' || (b.pix_chave != null && b.pix_chave.length > 0), {
     message: 'a chave Pix é obrigatória',

@@ -22,6 +22,8 @@ function bodyAgenda(nome: string, categoria_id?: string) {
     direcao: 'receber' as const,
     modo: 'agenda' as const,
     nome_devedor: nome,
+    // Telefone da outra ponta é obrigatório mesmo na agenda (H4.1); só o Pix é diferido.
+    telefone_devedor: '+5511999998888',
     motivo: 'pedido do catalogo',
     itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 8990 }],
     data_combinada: '2026-08-01',

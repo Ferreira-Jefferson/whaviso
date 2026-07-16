@@ -33,6 +33,8 @@ async function semearAviso(
       direcao: 'receber',
       modo: 'agenda',
       nome_devedor: 'Cliente',
+      // Telefone da outra ponta é obrigatório mesmo na agenda (H4.1); só o Pix é diferido.
+      telefone_devedor: '+5511999998888',
       motivo: 'pedido do catalogo',
       itens,
       data_combinada: '2026-08-01',
