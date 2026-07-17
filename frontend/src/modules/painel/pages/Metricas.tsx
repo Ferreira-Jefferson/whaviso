@@ -1,8 +1,8 @@
 // Fase A: "Resultado" (/app/metricas). Saúde do negócio de quem vende: recebido, a
-// receber, lucro (só onde o custo foi informado), ticket médio, melhores clientes,
-// quebra por categoria e clientes inativos. Só leitura: consome GET /v1/painel/metricas
+// receber, lucro (só onde o custo foi informado), ticket médio, melhores clientes e
+// quebra por categoria. Só leitura: consome GET /v1/painel/metricas
 // (tudo calculado no servidor). Linguagem sem termos proibidos, neutra quanto a gênero.
-import { PiggyBank, Users, Tags, Clock } from 'lucide-react'
+import { PiggyBank, Users, Tags } from 'lucide-react'
 import { Card, EmptyState, MoneyText, Spinner, StatCard } from '@/shared/ui'
 import { usePainelMetricas } from '../api'
 
@@ -146,33 +146,6 @@ export default function MetricasPage() {
         )}
       </section>
 
-      {/* Inativos */}
-      <section className="flex flex-col gap-3">
-        <h2 className="flex items-center gap-2 font-display text-xl text-salvia">
-          <Clock strokeWidth={1.75} className="size-5" />
-          Faz tempo que não compram
-        </h2>
-        {data.inativos.length === 0 ? (
-          <Card className="text-sm text-tinta-2">
-            Ninguém sumido por aqui. Todos os seus clientes têm movimento recente.
-          </Card>
-        ) : (
-          <Card className="flex flex-col divide-y divide-linha p-0">
-            {data.inativos.map((c, i) => (
-              <div
-                key={`${c.telefone ?? c.nome}-${i}`}
-                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
-              >
-                <span className="text-tinta">
-                  {c.nome}
-                  <span className="ml-2 text-xs text-tinta-2">{mascararTelefone(c.telefone)}</span>
-                </span>
-                <span className="text-sm text-tinta-2">há {c.dias} dias</span>
-              </div>
-            ))}
-          </Card>
-        )}
-      </section>
     </div>
   )
 }
