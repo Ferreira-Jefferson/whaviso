@@ -69,6 +69,9 @@ export function useCriarAviso() {
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: avisosKeys.todos })
+      // E17/E18: registrar o combinado popula o catálogo (itens viram produtos). Key STRING
+      // ['produtos'], a mesma do módulo produtos e do autocomplete do pedido.
+      void qc.invalidateQueries({ queryKey: ['produtos'] })
     },
   })
 }
@@ -302,6 +305,8 @@ function invalidarTudo(qc: ReturnType<typeof useQueryClient>, id: string) {
   void qc.invalidateQueries({ queryKey: avisosKeys.combinadoEnvio(id) })
   void qc.invalidateQueries({ queryKey: avisosKeys.todos })
   void qc.invalidateQueries({ queryKey: PAINEL_PREFIXO })
+  // E17/E18: editar/ativar pode ter incluído itens novos, que viram produtos no catálogo.
+  void qc.invalidateQueries({ queryKey: ['produtos'] })
 }
 
 // Resposta dos endpoints de recebimento: { status }.

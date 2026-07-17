@@ -61,6 +61,62 @@ describe('produtos (integração)', () => {
     expect(lista.json().map((p: { nome: string }) => p.nome)).toEqual(['Base líquida', 'Batom vermelho'])
   })
 
+  it('registrar um combinado com item de texto livre cria o produto no catálogo (E18)', async () => {
+    const app = await criarAppTeste(uid)
+    const criado = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: {
+        direcao: 'receber' as const,
+        modo: 'agenda' as const,
+        nome_devedor: 'Ana',
+        telefone_devedor: '+5511999997777',
+        motivo: 'venda',
+        itens: [{ descricao: 'Perfume Essencial', qtd: 1, valor_unit_centavos: 5000 }],
+        data_combinada: '2026-08-01',
+      },
+    })
+    const avisoId = criado.json().aviso.id
+    expect(avisoId).toBeTruthy()
+
+    // O produto apareceu no catálogo, com o preço do item.
+    const lista = (await app.inject({ method: 'GET', url: '/v1/produtos', headers: AUTH })).json()
+    const prod = lista.find((p: { nome: string }) => p.nome === 'Perfume Essencial')
+    expect(prod).toBeTruthy()
+    expect(prod.preco_venda_centavos).toBe(5000)
+
+    // O item do combinado ficou vinculado ao produto (produto_id gravado no snapshot).
+    const aviso = (await app.inject({ method: 'GET', url: `/v1/avisos/${avisoId}`, headers: AUTH })).json()
+    await app.close()
+    expect(aviso.itens[0].produto_id).toBe(prod.id)
+  })
+
+  it('item de texto livre reusa produto existente (case-insensitive) sem duplicar nem trocar o preço', async () => {
+    const app = await criarAppTeste(uid)
+    await criarProduto(app, 'Sabonete', 800) // catálogo com preço 800
+    await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: {
+        direcao: 'receber' as const,
+        modo: 'agenda' as const,
+        nome_devedor: 'Bia',
+        telefone_devedor: '+5511999997777',
+        motivo: 'venda',
+        // Mesmo nome (case diferente) e preço diferente no item.
+        itens: [{ descricao: 'sabonete', qtd: 1, valor_unit_centavos: 1200 }],
+        data_combinada: '2026-08-01',
+      },
+    })
+    const lista = (await app.inject({ method: 'GET', url: '/v1/produtos', headers: AUTH })).json()
+    await app.close()
+    const sab = lista.filter((p: { nome: string }) => p.nome.toLowerCase() === 'sabonete')
+    expect(sab).toHaveLength(1) // não duplicou
+    expect(sab[0].preco_venda_centavos).toBe(800) // preço do catálogo intacto (snapshot no item)
+  })
+
   it('renomear PROPAGA a descrição dos itens (sem tocar no preço); arquivar some da lista', async () => {
     const app = await criarAppTeste(uid)
     const prod = (await criarProduto(app, 'Batom', 2990)).json()

@@ -112,11 +112,13 @@ describe('avisos (integração com whaviso_dev)', () => {
     })
     expect(r.statusCode).toBe(201)
     const criado = r.json().aviso
-    expect(criado.itens).toEqual(itens)
+    // E18: cada item de texto livre vira/reusa um produto e ganha o vínculo produto_id.
+    const esperado = itens.map((i) => ({ ...i, produto_id: expect.any(String) }))
+    expect(criado.itens).toEqual(esperado)
     // Persistiu no jsonb: lê de volta pelo detalhe.
     const det = await app.inject({ method: 'GET', url: `/v1/avisos/${criado.id}`, headers: AUTH })
     expect(det.statusCode).toBe(200)
-    expect(det.json().itens).toEqual(itens)
+    expect(det.json().itens).toEqual(esperado)
     // Itens são INTERNOS: nunca vão ao devedor (não aparecem na notificação enfileirada).
     const { rows } = await poolSuper.query(
       `select * from public.notificacoes_cobrador where aviso_id=$1 and tipo='combinado_enviar'`,

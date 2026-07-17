@@ -32,6 +32,7 @@ import {
 } from '../../shared/planos'
 import { enfileirarConvite, enfileirarNotificacaoDevedor, enfileirarNotificacao } from '../../shared/notificacoes'
 import { estadosDoGrupo } from '../../shared/estados'
+import { garantirProdutosDosItens } from '../../shared/catalogo'
 import * as repo from './repo'
 
 export interface AvisoCriado {
@@ -164,6 +165,11 @@ export async function criarAviso(
       throw regraNegocio('valor_invalido', 'O total dos itens precisa ser maior que zero.')
     }
 
+    // E17/E18: registrar o combinado popula o catálogo. Cada item vira/reusa um produto do
+    // dono (upsert por nome) e grava `produto_id` no snapshot do item, para Gestão > Produtos
+    // listar junto o que foi cadastrado direto e o que nasceu de combinados. Sum inalterada.
+    const itens = await garantirProdutosDosItens(cli, uid, body.itens)
+
     // No invertido, o telefone do devedor (alvo dos lembretes) é o do criador. Na agenda
     // pode ser null (o perfil pode nem ter telefone ainda); resolvido/exigido ao ativar.
     const telefoneCriador = ehReceber ? null : await repo.telefoneDoPerfil(cli, uid)
@@ -192,8 +198,9 @@ export async function criarAviso(
       pix_banco: body.pix_banco ?? null,
       pix_tipo: pixTipo,
       valor_custo_centavos: body.valor_custo_centavos ?? null,
-      // Composição do pedido (itens): obrigatória; a soma vira o valor_centavos acima.
-      itens: body.itens,
+      // Composição do pedido (itens): obrigatória; a soma vira o valor_centavos acima. Já com
+      // `produto_id` preenchido (vínculo ao catálogo).
+      itens,
     }
 
     // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM envio. ----
@@ -594,7 +601,9 @@ export async function editarAviso(
     // total é uma alteração do ACORDO (valor + itens andam juntos: snapshot + reaprovação
     // pós-aceite, abaixo). Editar os itens mantendo o total (ex.: corrigir uma descrição) é
     // interno e LIVRE (aplicado direto, nunca abre reaprovação; não vai ao devedor).
-    const itensNovos = body.itens
+    // E17/E18: itens editados também populam/reusam o catálogo (mesmo upsert da criação).
+    const itensNovos =
+      body.itens !== undefined ? await garantirProdutosDosItens(cli, uid, body.itens) : undefined
     const novoValor = itensNovos !== undefined ? somaItensCentavos(itensNovos) : aviso.valor_centavos
     if (itensNovos !== undefined && novoValor <= 0) {
       throw regraNegocio('valor_invalido', 'O total dos itens precisa ser maior que zero.')

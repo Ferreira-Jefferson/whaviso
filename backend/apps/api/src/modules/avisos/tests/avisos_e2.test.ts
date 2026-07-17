@@ -259,13 +259,19 @@ describe('E2 H2.5/H2.6/H2.7: editar (sub-ciclo), pausar/reativar, cancelar', () 
     expect(r.json().status).toBe('programado')
     // Valor E composição voltaram ao estado anterior (item default de 9900).
     expect(r.json().valor_centavos).toBe(9900)
-    expect(r.json().itens).toEqual([{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }])
+    // E18: o item de texto livre ganhou vínculo ao catálogo (produto_id) ao criar; o snapshot
+    // restaurado no desfazer preserva esse vínculo.
+    expect(r.json().itens).toEqual([
+      { descricao: 'Item', qtd: 1, valor_unit_centavos: 9900, produto_id: expect.any(String) },
+    ])
     // Confirma na fonte (jsonb persistido).
     const { rows } = await poolSuper.query<{ valor_centavos: string; itens: unknown }>(
       `select valor_centavos::bigint as valor_centavos, itens from public.avisos where id=$1`, [id],
     )
     expect(Number(rows[0]!.valor_centavos)).toBe(9900)
-    expect(rows[0]!.itens).toEqual([{ descricao: 'Item', qtd: 1, valor_unit_centavos: 9900 }])
+    expect(rows[0]!.itens).toEqual([
+      { descricao: 'Item', qtd: 1, valor_unit_centavos: 9900, produto_id: expect.any(String) },
+    ])
   })
 
   it('H2.5: não pode editar de novo enquanto há edição aguardando aprovação', async () => {

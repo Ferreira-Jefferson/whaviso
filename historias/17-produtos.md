@@ -51,7 +51,7 @@ Como **usuário com conta**, quero tirar um produto que não vendo mais da lista
 Como **criador (cobrador ou devedor)**, quero escolher um produto do catálogo ao montar os itens do combinado, para preencher descrição e preço sem redigitar.
 *Critérios de aceite:*
 - [ ] Ao montar o pedido (Épicos 2/3), o campo de descrição do item **sugere produtos do catálogo**. Escolher um preenche a **descrição** e o **preço unitário** do item e grava o vínculo `produto_id` (referência ao produto).
-- [ ] Posso continuar digitando **texto livre** (sem escolher produto): o item vale normalmente, com `produto_id` vazio (item avulso, sem vínculo com o catálogo).
+- [ ] Posso continuar digitando **texto livre** (sem escolher produto). **Ao REGISTRAR o combinado**, cada item de texto livre **vira ou reusa** um produto do catálogo (upsert por nome, case-insensitive, entre os ativos) e grava o `produto_id` no snapshot do item. Assim o cadastro de produto acontece nos **dois lugares** (aba Produtos e ao registrar um combinado) e o catálogo lista **tudo junto**. Produto novo nasce com o preço do item; produto já existente **não** tem o preço sobrescrito (o valor do combinado segue o snapshot do item).
 - [ ] O preço vem do catálogo apenas como **ponto de partida**: posso ajustar o preço unitário daquele item sem alterar o produto no catálogo (o valor do combinado é sempre o snapshot dos itens).
 - [ ] O vínculo `produto_id` é **interno** (nunca vai ao devedor); serve só para a propagação de nome (H17.3) e para relatórios futuros.
 
@@ -63,7 +63,7 @@ Como **criador (cobrador ou devedor)**, quero escolher um produto do catálogo a
 - **Snapshot congelado no item do combinado:** o item guarda `descricao` + `valor_unit_centavos` copiados na criação, mais um `produto_id` opcional só como vínculo. Editar o produto **não** recalcula combinados existentes.
 - **Nome propaga, preço não:** editar o nome reescreve a `descricao` dos itens com aquele `produto_id` (correção de rótulo); editar o preço vale só para combinados novos.
 - **Arquivar, nunca apagar** (soft-delete `arquivado`), coerente com a regra de não-DELETE. **Exceção de engenharia:** o produto é catálogo/configuração como `templates`? Não; segue a regra de não-DELETE de negócio (só soft-delete).
-- **Criável de dois lugares:** aba Produtos (Gestão, Épico 18) e inline no Novo combinado.
+- **Criável de dois lugares, listado junto:** aba Produtos (Gestão, Épico 18) e ao **registrar um combinado** (revisado 2026-07-17: cada item vira/reusa um produto por upsert de nome, gravando `produto_id`). Motivo: se você já digitou os itens nos combinados, eles devem aparecer no catálogo sem recadastrar. O snapshot do item continua congelado; o catálogo é só o rótulo + preço de partida.
 - **Nunca vaza para o devedor:** produto e `itens` são organização interna do dono.
 
 ### Fora de escopo deste épico
