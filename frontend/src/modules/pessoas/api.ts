@@ -47,33 +47,23 @@ export function usePessoas() {
 
 /**
  * PATCH /v1/pessoas/:avisoId (E15 H15.8): renomeia o cliente. O telefone é resolvido no
- * servidor a partir do avisoId (nunca telefone em rota/log). Otimista sobre a lista
- * ['pessoas','lista']; onSettled invalida ['pessoas'], ['avisos'] e ['painel'] (o nome muda
- * em toda parte que exibe combinados daquele número).
+ * servidor a partir do avisoId (nunca telefone em rota/log). `nomeAtual` (opcional) escopa a
+ * um GRUPO de nome; ausente = número inteiro. onSettled invalida ['pessoas'], ['avisos'] e
+ * ['painel'] (o nome muda em toda parte que exibe combinados daquele número); sem otimismo
+ * na lista porque, por grupo, nem sempre o nome exibido do cliente (o mais recente) muda.
  */
 export function useRenomearCliente() {
   const qc = useQueryClient()
-  return useMutation<RenomearClienteResposta, Error, { refAvisoId: string; telefone: string; nome: string }>({
-    mutationFn: ({ refAvisoId, nome }) =>
+  return useMutation<
+    RenomearClienteResposta,
+    Error,
+    { refAvisoId: string; telefone: string; nome: string; nomeAtual?: string }
+  >({
+    mutationFn: ({ refAvisoId, nome, nomeAtual }) =>
       apiClient.patch<RenomearClienteResposta>(`/pessoas/${refAvisoId}`, {
-        body: { nome },
+        body: { nome, ...(nomeAtual && { nome_atual: nomeAtual }) },
         schema: renomearClienteResposta,
       }),
-    onMutate: async ({ telefone, nome }) => {
-      await qc.cancelQueries({ queryKey: pessoasKeys.lista })
-      const anterior = qc.getQueryData<ListaClientesResposta>(pessoasKeys.lista)
-      if (anterior) {
-        qc.setQueryData<ListaClientesResposta>(pessoasKeys.lista, {
-          ...anterior,
-          itens: anterior.itens.map((c) => (c.telefone === telefone ? { ...c, nome } : c)),
-        })
-      }
-      return { anterior }
-    },
-    onError: (_e, _v, ctx) => {
-      const c = ctx as { anterior?: ListaClientesResposta } | undefined
-      if (c?.anterior) qc.setQueryData(pessoasKeys.lista, c.anterior)
-    },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: pessoasKeys.todos })
       void qc.invalidateQueries({ queryKey: ['avisos'] })

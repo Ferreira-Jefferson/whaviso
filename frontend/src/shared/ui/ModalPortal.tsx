@@ -12,11 +12,15 @@ export function ModalPortal({
   onFechar,
   children,
   className,
+  largura = 'max-w-lg',
 }: {
   ariaLabel: string
   onFechar: () => void
   children: ReactNode
   className?: string
+  // Largura máxima no desktop (classe Tailwind max-w-*). No mobile é sempre w-full
+  // com o padding do overlay. Default max-w-lg; conteúdo mais denso pede mais.
+  largura?: string
 }) {
   return createPortal(
     <div
@@ -29,7 +33,7 @@ export function ModalPortal({
         if (e.target === e.currentTarget) onFechar()
       }}
     >
-      <Card className={cn('flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto', className)}>
+      <Card className={cn('flex max-h-[85vh] w-full flex-col gap-4 overflow-y-auto', largura, className)}>
         {children}
       </Card>
     </div>,

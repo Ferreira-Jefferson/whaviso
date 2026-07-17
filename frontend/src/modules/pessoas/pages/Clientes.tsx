@@ -1,16 +1,14 @@
 // E18 H18.4: aba Clientes da Gestão (/app/gestao/clientes). Lista central de clientes
-// (agregada por telefone, identidade pelo número, E15). A linha abre um modal com os totais
-// e os combinados; dá para renomear ali (propaga por telefone). Telefone mascarado na tela.
+// (agregada por telefone, identidade pelo número, E15). Cada linha mostra o número (completo,
+// formatado) como identidade e a lista de nomes registrados nele (o nome varia por combinado;
+// não há um nome único). A linha abre um modal com os totais e os combinados, onde dá para
+// renomear por grupo de nome. O número é dado do próprio dono (nunca vai em rota/log, H15.7).
 import { useState } from 'react'
 import { Card, EmptyState, MoneyText, Spinner } from '@/shared/ui'
+import { telefone as fmtTelefone } from '@/shared/format'
 import type { Cliente } from '@/shared/contracts'
 import { usePessoas } from '../api'
 import { ClienteModal } from '../components/ClienteModal'
-
-// Mascara o número (mantém só os 4 últimos): telefone não é exibido inteiro na lista.
-function mascararTelefone(tel: string): string {
-  return tel.length <= 4 ? tel : `${'•'.repeat(3)} ${tel.slice(-4)}`
-}
 
 export default function ClientesPage() {
   const lista = usePessoas()
@@ -43,15 +41,17 @@ export default function ClientesPage() {
               className="flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-salvia-claro focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-salvia"
             >
               <span className="min-w-0">
-                <span className="block truncate text-tinta">{c.nome}</span>
-                <span className="flex items-center gap-2 text-xs text-tinta-2">
-                  {mascararTelefone(c.telefone)}
+                <span className="flex items-center gap-2 text-tinta">
+                  {fmtTelefone(c.telefone)}
                   {c.inativo && (
-                    <span className="rounded-pill bg-ambar-claro px-2 py-0.5 font-medium text-ambar">
+                    <span className="rounded-pill bg-ambar-claro px-2 py-0.5 text-xs font-medium text-ambar">
                       parado há um tempo
                     </span>
                   )}
                 </span>
+                {c.nomes.length > 0 && (
+                  <span className="block truncate text-xs text-tinta-2">{c.nomes.join(', ')}</span>
+                )}
               </span>
               <span className="shrink-0 text-right text-sm">
                 {c.a_receber_centavos > 0 ? (

@@ -40,9 +40,9 @@ Como **usuário com conta**, quero a quebra por categoria mesmo quando um combin
 ### H18.4: Aba Clientes (lista central + ver/editar em modal) 🟢 `[+]`
 Como **usuário com conta**, quero uma lista de todos os meus clientes e poder ver/editar cada um sem sair da tela, para gerir meus contatos sem a burocracia de navegar para outra página.
 *Critérios de aceite:*
-- [ ] A aba lista **os clientes** (a outra ponta dos meus combinados, identidade pelo telefone, Épico 15), agregando por número: nome mais recente, telefone **mascarado** na tela, e os quatro totais da relação.
+- [ ] A aba lista **os clientes** (a outra ponta dos meus combinados, identidade pelo telefone, Épico 15), agregando por número: o **número (completo, formatado)** como identidade e a **lista de nomes** registrados nele (sem eleger um nome único), e os quatro totais da relação. O número é dado do próprio dono (exibido a ele; nunca em rota/log, H15.7).
 - [ ] Abrir um cliente mostra os detalhes **em modal** (não navega para outra tela; resolve a queixa de a tela "Pessoa" ser burocrática por levar a outra página). O modal reaproveita o conteúdo da visão por pessoa (Épico 15): totais + combinados agrupados por nome.
-- [ ] Posso **editar o nome** do cliente no modal; salvar propaga o novo nome para todos os meus combinados daquele telefone (Épico 15 atualizado, H15.8).
+- [ ] O cabeçalho do modal mostra **só o número (formatado)** como identidade estável (não há nome único no topo, o nome varia por combinado); posso **editar o nome por grupo** (cada grupo de nome tem seu lápis), e salvar reescreve o nome só dos combinados daquele grupo onde sou cobrador (Épico 15 atualizado, H15.8).
 - [ ] O deep-link antigo da tela da pessoa (`/pessoa/:avisoId`) continua funcionando (a página não é removida; a lista/modal é a via nova).
 - [ ] Telefone **nunca** em URL/query/log: a lista referencia cada cliente por um id de combinado representativo; edição resolve o telefone no servidor (Épico 15 H15.7).
 

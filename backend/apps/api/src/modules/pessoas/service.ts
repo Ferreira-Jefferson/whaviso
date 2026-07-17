@@ -83,18 +83,20 @@ export async function listarClientes(pool: Pool, uid: string): Promise<ListaClie
 
 /**
  * E15 H15.8: renomeia o cliente. Resolve o telefone da outra ponta NO SERVIDOR a partir do
- * avisoId (nunca telefone em rota/log, H15.7) e reescreve `nome_devedor` em todos os meus
- * combinados daquele telefone onde sou cobrador. Edição livre (dado interno de exibição).
+ * avisoId (nunca telefone em rota/log, H15.7) e reescreve `nome_devedor` nos meus combinados
+ * daquele telefone onde sou cobrador. `nomeAtual` (opcional) escopa a um GRUPO de nome (só os
+ * combinados com esse nome); ausente = número inteiro. Edição livre (dado interno de exibição).
  */
 export async function renomearCliente(
   pool: Pool,
   uid: string,
   avisoId: string,
   nome: string,
+  nomeAtual?: string,
 ): Promise<RenomearClienteResposta> {
   const ref = await repo.resolverPessoaPorAviso(pool, uid, avisoId)
   if (!ref) throw naoEncontrado(PESSOA_INEXISTENTE)
-  const afetados = await repo.renomearNomeDevedor(pool, uid, ref.telefone, nome)
+  const afetados = await repo.renomearNomeDevedor(pool, uid, ref.telefone, nome, nomeAtual)
   return { telefone: ref.telefone, nome, afetados }
 }
 

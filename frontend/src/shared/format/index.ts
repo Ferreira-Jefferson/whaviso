@@ -96,6 +96,27 @@ export function rotuloStatusAviso(status: StatusAviso, papelDoUsuario?: PapelAvi
   return ROTULO_STATUS_AVISO[status]
 }
 
+// Rótulo CURTO (uma palavra) para contextos densos, ex.: badge em tabela/lista. Mantém
+// a linguagem das Regras de Ouro (sem termos proibidos, gênero neutro). Não substitui o
+// mapa completo (fonte da verdade nos detalhes); é só a versão compacta.
+export const ROTULO_STATUS_AVISO_CURTO: Record<StatusAviso, string> = {
+  sem_aviso: 'Anotação',
+  aguardando_aceite: 'Aguardando',
+  programado: 'Programado',
+  aguardando_aprovacao_aviso_editado: 'Revisão',
+  pausado: 'Pausado',
+  informado_pago: 'Informado',
+  desregistrado: 'Desativado',
+  pago: 'Recebido',
+  cancelado: 'Cancelado',
+  recusado: 'Recusado',
+  expirado: 'Encerrado',
+}
+
+export function rotuloStatusAvisoCurto(status: StatusAviso): string {
+  return ROTULO_STATUS_AVISO_CURTO[status]
+}
+
 // ---- Rótulos de status do envio (processando é exibido como agendado) ----
 export const ROTULO_STATUS_ENVIO: Record<StatusEnvio, string> = {
   agendado: 'Agendado',

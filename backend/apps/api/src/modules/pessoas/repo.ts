@@ -190,7 +190,9 @@ export async function combinadosPorPessoa(
 export interface LinhaCliente {
   ref_aviso_id: string
   telefone: string
-  nome: string
+  // Todos os nomes registrados naquele número, mais recente primeiro e com repetição (o
+  // serviço deduplica). A identidade é o número; o nome é só rótulo e pode variar (H15.1).
+  nomes: string[]
   a_receber_centavos: number
   a_receber_qtd: number
   recebido_centavos: number
@@ -205,15 +207,16 @@ export interface LinhaCliente {
 
 /**
  * E18 H18.4 / E15 H15.8: lista central de clientes, agregada pelo TELEFONE da OUTRA PONTA
- * (identidade, H15.1), com os quatro totais por relação (H15.2), o nome mais recente daquele
- * número, um `ref_aviso_id` representativo (o combinado mais recente, para reusar as rotas por
- * avisoId sem expor telefone) e a última compra/dias. Isolamento por uid. Calculado no banco.
+ * (identidade, H15.1), com os quatro totais por relação (H15.2), TODOS os nomes registrados
+ * naquele número (mais recente primeiro; o serviço deduplica), um `ref_aviso_id` representativo
+ * (o combinado mais recente, para reusar as rotas por avisoId sem expor telefone) e a última
+ * compra/dias. Isolamento por uid. Calculado no banco.
  */
 export async function listarClientes(pool: Pool, uid: string): Promise<LinhaCliente[]> {
   const { rows } = await pool.query<{
     ref_aviso_id: string
     telefone: string
-    nome: string
+    nomes: string[]
     a_receber_c: string
     a_receber_q: number
     recebido_c: string
@@ -228,7 +231,7 @@ export async function listarClientes(pool: Pool, uid: string): Promise<LinhaClie
     `select
        (array_agg(ref_aviso_id order by data_combinada desc, criado_em desc))[1] as ref_aviso_id,
        telefone,
-       (array_agg(nome order by data_combinada desc, criado_em desc))[1] as nome,
+       array_agg(nome order by data_combinada desc, criado_em desc) as nomes,
        coalesce(sum(valor) filter (where papel='cobrador' and status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
        count(*) filter (where papel='cobrador' and status in (${ATIVOS_SQL}))::int as a_receber_q,
        coalesce(sum(valor) filter (where papel='cobrador' and status='pago'),0)::bigint as recebido_c,
@@ -251,13 +254,14 @@ export async function listarClientes(pool: Pool, uid: string): Promise<LinhaClie
         where devedor_profile_id = $1 and telefone_cobrador is not null
      ) s
      group by telefone
-     order by nome asc`,
+     order by (array_agg(nome order by data_combinada desc, criado_em desc))[1] asc`,
     [uid],
   )
   return rows.map((r) => ({
     ref_aviso_id: r.ref_aviso_id,
     telefone: r.telefone,
-    nome: r.nome,
+    // Deduplica preservando a ordem (mais recente primeiro) e descarta vazios.
+    nomes: [...new Set((r.nomes ?? []).filter((n) => n && n.trim() !== ''))],
     a_receber_centavos: Number(r.a_receber_c),
     a_receber_qtd: r.a_receber_q,
     recebido_centavos: Number(r.recebido_c),
@@ -272,20 +276,23 @@ export async function listarClientes(pool: Pool, uid: string): Promise<LinhaClie
 }
 
 /**
- * E15 H15.8: renomeia o cliente reescrevendo `nome_devedor` em TODOS os combinados onde sou
- * COBRADOR daquele telefone. Escopado ao dono (cobrador_id = uid). Retorna quantos combinados
- * foram afetados. Edição livre (dado interno de exibição; não toca no acordo).
+ * E15 H15.8: renomeia o cliente reescrevendo `nome_devedor` nos combinados onde sou COBRADOR
+ * daquele telefone. Escopado ao dono (cobrador_id = uid). Quando `nomeAtual` é informado,
+ * escopa a um GRUPO de nome (só os combinados cujo `nome_devedor` bate com ele); ausente =
+ * número inteiro. Retorna quantos combinados foram afetados. Edição livre (não toca no acordo).
  */
 export async function renomearNomeDevedor(
   pool: Pool,
   uid: string,
   telefone: string,
   nome: string,
+  nomeAtual?: string,
 ): Promise<number> {
   const { rowCount } = await pool.query(
     `update public.avisos set nome_devedor = $3
-      where cobrador_id = $1 and telefone_devedor = $2`,
-    [uid, telefone, nome],
+      where cobrador_id = $1 and telefone_devedor = $2
+        and ($4::text is null or nome_devedor = $4)`,
+    [uid, telefone, nome, nomeAtual ?? null],
   )
   return rowCount ?? 0
 }

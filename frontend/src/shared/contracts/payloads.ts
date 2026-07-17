@@ -382,10 +382,11 @@ export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
 
 // ---- E18 H18.4 / E15 H15.8: lista central de clientes + renomear ---- espelho do backend.
 // GET /v1/pessoas: agregada por telefone (telefone só no corpo); ref_aviso_id representativo.
+// A identidade é o número; `nomes` é a lista de rótulos registrados nele (mais recente primeiro).
 export const clienteSchema = z.object({
   ref_aviso_id: z.uuid(),
   telefone: telefoneE164,
-  nome: z.string(),
+  nomes: z.array(z.string()),
   a_receber_centavos: z.number().int(),
   a_receber_qtd: z.number().int(),
   recebido_centavos: z.number().int(),
@@ -407,8 +408,10 @@ export const listaClientesResposta = z.object({
 export type ListaClientesResposta = z.infer<typeof listaClientesResposta>
 
 // PATCH /v1/pessoas/:avisoId: renomear (telefone resolvido no servidor; nunca em rota/log).
+// `nome_atual` (opcional) escopa a um GRUPO de nome (H15.8); ausente = número inteiro.
 export const renomearClienteBody = z.object({
   nome: z.string().trim().min(1).max(120),
+  nome_atual: z.string().trim().min(1).max(120).optional(),
 })
 export type RenomearClienteBody = z.infer<typeof renomearClienteBody>
 

@@ -1,7 +1,7 @@
 // StatusBadge: ÚNICA FONTE de cor + rótulo de status do aviso (plano seção 1).
 // Linguagem segue as Regras de Ouro (rótulos em shared/format).
 import type { PapelAviso, StatusAviso } from '../contracts'
-import { rotuloStatusAviso } from '../format'
+import { rotuloStatusAviso, rotuloStatusAvisoCurto } from '../format'
 import { cn } from './cn'
 
 const ESTILO: Record<StatusAviso, string> = {
@@ -20,12 +20,15 @@ const ESTILO: Record<StatusAviso, string> = {
 
 // `papel` (opcional): papel do usuário NAQUELE combinado, para o rótulo relativo da
 // H9.3 (cobrador vê `informado_pago` como "Aguardando sua confirmação").
+// `curto`: rótulo de uma palavra, para contextos densos (tabela/lista). Ignora `papel`.
 export function StatusBadge({
   status,
   papel,
+  curto = false,
 }: {
   status: StatusAviso
   papel?: PapelAviso | null
+  curto?: boolean
 }) {
   return (
     <span
@@ -34,7 +37,7 @@ export function StatusBadge({
         ESTILO[status],
       )}
     >
-      {rotuloStatusAviso(status, papel ?? undefined)}
+      {curto ? rotuloStatusAvisoCurto(status) : rotuloStatusAviso(status, papel ?? undefined)}
     </span>
   )
 }

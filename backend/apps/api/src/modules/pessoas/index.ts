@@ -40,15 +40,16 @@ export const pessoasRoutes: FastifyPluginAsync = async (raiz) => {
     (req) => service.combinados(app.pool, req.userId, req.params.avisoId),
   )
 
-  // E15 H15.8: renomear cliente. avisoId na rota (nunca telefone); nome no corpo. Propaga
-  // por telefone (resolvido no servidor) em todos os meus combinados onde sou cobrador.
+  // E15 H15.8: renomear cliente. avisoId na rota (nunca telefone); nome no corpo. Escopa a um
+  // grupo de nome quando `nome_atual` vem no corpo; senão, o número inteiro. Onde sou cobrador.
   app.patch(
     '/pessoas/:avisoId',
     {
       preHandler: app.autenticar,
       schema: { params: idParam, body: renomearClienteBody, response: { 200: renomearClienteResposta } },
     },
-    (req) => service.renomearCliente(app.pool, req.userId, req.params.avisoId, req.body.nome),
+    (req) =>
+      service.renomearCliente(app.pool, req.userId, req.params.avisoId, req.body.nome, req.body.nome_atual),
   )
 
   // H15.6: autocomplete ao criar. Telefone (parcial) vai no CORPO (POST), nunca em rota.

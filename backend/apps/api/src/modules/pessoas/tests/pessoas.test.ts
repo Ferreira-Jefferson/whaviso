@@ -244,8 +244,8 @@ describe('pessoas: lista de clientes e renomear (integração)', () => {
     await limparUsuario(uid)
   })
 
-  it('GET /pessoas agrega por telefone com os quatro totais e nome mais recente', async () => {
-    // Dois combinados do mesmo número, nomes diferentes; o mais recente dita o nome.
+  it('GET /pessoas agrega por telefone com os quatro totais e a lista de nomes', async () => {
+    // Dois combinados do mesmo número, nomes diferentes; a lista traz os dois (recente primeiro).
     await insReceber(uid, 'Ana', CL, 'pago', 5000, '2026-06-01')
     await insReceber(uid, 'Ana Paula', CL, 'programado', 3000, '2026-06-10')
 
@@ -255,7 +255,7 @@ describe('pessoas: lista de clientes e renomear (integração)', () => {
     expect(r.statusCode).toBe(200)
     const cliente = r.json().itens.find((c: { telefone: string }) => c.telefone === CL)
     expect(cliente).toBeTruthy()
-    expect(cliente.nome).toBe('Ana Paula') // nome mais recente
+    expect(cliente.nomes).toEqual(['Ana Paula', 'Ana']) // mais recente primeiro, deduplicado
     expect(cliente.recebido_centavos).toBe(5000)
     expect(cliente.a_receber_centavos).toBe(3000)
     expect(cliente.ref_aviso_id).toBeTruthy() // referência por avisoId (telefone nunca em rota)
@@ -278,7 +278,32 @@ describe('pessoas: lista de clientes e renomear (integração)', () => {
     const lista = await app.inject({ method: 'GET', url: '/v1/pessoas', headers: AUTH })
     await app.close()
     const cliente = lista.json().itens.find((c: { telefone: string }) => c.telefone === CL)
-    expect(cliente.nome).toBe('Ana Paula Souza')
+    // Sem nome_atual, renomeou o número inteiro: todos os combinados de CL viram um nome só.
+    expect(cliente.nomes).toEqual(['Ana Paula Souza'])
+  })
+
+  it('PATCH com nome_atual renomeia SÓ o grupo daquele nome (H15.8)', async () => {
+    const tel = '+5511900000402'
+    const refA = await insReceber(uid, 'Grupo A', tel, 'programado', 1000, '2026-06-20')
+    const refB = await insReceber(uid, 'Grupo B', tel, 'programado', 2000, '2026-06-21')
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/v1/pessoas/${refA}`,
+      headers: AUTH,
+      payload: { nome: 'Grupo A Novo', nome_atual: 'Grupo A' },
+    })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json().afetados).toBe(1) // só o combinado do grupo "Grupo A"
+
+    const { rows } = await poolSuper.query<{ id: string; nome_devedor: string }>(
+      `select id, nome_devedor from public.avisos where id = any($1)`,
+      [[refA, refB]],
+    )
+    const porId = new Map(rows.map((x) => [x.id, x.nome_devedor]))
+    expect(porId.get(refA)).toBe('Grupo A Novo')
+    expect(porId.get(refB)).toBe('Grupo B') // o outro grupo do mesmo número fica intocado
   })
 
   it('renomear isola por dono: não toca combinados de outra conta com o mesmo telefone', async () => {

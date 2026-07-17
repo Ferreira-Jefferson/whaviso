@@ -493,14 +493,15 @@ export const buscarPessoaResposta = z.object({
 export type BuscarPessoaResposta = z.infer<typeof buscarPessoaResposta>
 
 // ---- E18 H18.4 / E15 H15.8: lista central de clientes + renomear ----
-// GET /v1/pessoas: lista agregada por TELEFONE da outra ponta (identidade, E15). Cada cliente
-// traz o nome mais recente, telefone SÓ no corpo (nunca em rota/log, H13.8), os quatro totais
-// da relação (H15.2), sinais de última compra/inatividade e um `ref_aviso_id` representativo
-// (para reusar as rotas por avisoId sem expor o telefone).
+// GET /v1/pessoas: lista agregada por TELEFONE da outra ponta (identidade, E15). A identidade é
+// o NÚMERO; o nome é só rótulo e pode variar por combinado, então cada cliente traz a LISTA de
+// nomes registrados naquele número (mais recente primeiro, deduplicada), não um nome único.
+// Telefone SÓ no corpo (nunca em rota/log, H13.8), os quatro totais da relação (H15.2), sinais
+// de última compra/inatividade e um `ref_aviso_id` representativo (rotas por avisoId sem telefone).
 export const clienteSchema = z.object({
   ref_aviso_id: z.uuid(),
   telefone: telefoneE164,
-  nome: z.string(),
+  nomes: z.array(z.string()),
   a_receber_centavos: z.number().int(),
   a_receber_qtd: z.number().int(),
   recebido_centavos: z.number().int(),
@@ -522,10 +523,13 @@ export const listaClientesResposta = z.object({
 export type ListaClientesResposta = z.infer<typeof listaClientesResposta>
 
 // PATCH /v1/pessoas/:avisoId: renomear o cliente. O telefone é resolvido NO SERVIDOR a partir
-// do avisoId (nunca telefone na URL/log, H15.7/H15.8). Reescreve `nome_devedor` em todos os
-// combinados daquele telefone onde sou COBRADOR; edição livre (dado interno de exibição).
+// do avisoId (nunca telefone na URL/log, H15.7/H15.8). Reescreve `nome_devedor` nos combinados
+// daquele telefone onde sou COBRADOR; edição livre (dado interno de exibição). `nome_atual`
+// (opcional): escopa a um GRUPO de nome (H15.8), só renomeando os combinados cujo nome bate com
+// ele; ausente = número inteiro (retrocompat). Nome não é sensível (pode ir no corpo, H15.7).
 export const renomearClienteBody = z.object({
   nome: z.string().trim().min(1).max(120),
+  nome_atual: z.string().trim().min(1).max(120).optional(),
 })
 export type RenomearClienteBody = z.infer<typeof renomearClienteBody>
 
