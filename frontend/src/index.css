@@ -75,6 +75,23 @@
     font-variant-numeric: tabular-nums;
     font-weight: 700;
   }
+
+  /* Seletor de cor (categorias): a cor preenche o botão todo. O nativo desenha
+     o swatch com padding/borda por dentro; zeramos para virar um bloco de cor. */
+  input[type='color'] {
+    padding: 0;
+  }
+  input[type='color']::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  input[type='color']::-webkit-color-swatch {
+    border: none;
+    border-radius: calc(var(--radius-input) - 1px);
+  }
+  input[type='color']::-moz-color-swatch {
+    border: none;
+    border-radius: calc(var(--radius-input) - 1px);
+  }
 }
 
 /* Motion discreto, CSS-only. Respeita prefers-reduced-motion globalmente. */

@@ -25,9 +25,10 @@ export default function CategoriasPage() {
   const [nome, setNome] = useState('')
   const [cor, setCor] = useState(COR_PADRAO)
   const [erro, setErro] = useState<string | null>(null)
-  // Edição inline: id em edição + valor do nome sendo digitado.
+  // Edição inline: id em edição + nome e cor sendo editados.
   const [editId, setEditId] = useState<string | null>(null)
   const [editNome, setEditNome] = useState('')
+  const [editCor, setEditCor] = useState(COR_PADRAO)
 
   async function criarCategoria() {
     const n = nome.trim()
@@ -42,18 +43,28 @@ export default function CategoriasPage() {
     }
   }
 
-  async function salvarNome(c: Categoria) {
+  async function salvarEdicao(c: Categoria) {
     const n = editNome.trim()
-    if (!n || n === c.nome) {
+    if (!n) {
+      setEditId(null)
+      return
+    }
+    const mudouNome = n !== c.nome
+    // editCor parte de c.cor ?? COR_PADRAO; só envia se o usuário mexeu no seletor.
+    const mudouCor = editCor !== (c.cor ?? COR_PADRAO)
+    if (!mudouNome && !mudouCor) {
       setEditId(null)
       return
     }
     setErro(null)
     try {
-      await atualizar.mutateAsync({ id: c.id, body: { nome: n } })
+      await atualizar.mutateAsync({
+        id: c.id,
+        body: { ...(mudouNome && { nome: n }), ...(mudouCor && { cor: editCor }) },
+      })
       setEditId(null)
     } catch (e) {
-      setErro(e instanceof ApiError ? e.message : 'Não foi possível renomear.')
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar.')
     }
   }
 
@@ -130,13 +141,15 @@ export default function CategoriasPage() {
         <Card className="flex flex-col divide-y divide-linha p-0">
           {categorias.map((c) => (
             <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-              <span
-                aria-hidden
-                className="size-4 shrink-0 rounded-full border border-linha"
-                style={{ backgroundColor: c.cor ?? 'transparent' }}
-              />
               {editId === c.id ? (
                 <>
+                  <input
+                    type="color"
+                    value={editCor}
+                    onChange={(e) => setEditCor(e.target.value)}
+                    aria-label={`Cor de ${c.nome}`}
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded-input border border-linha bg-cartao"
+                  />
                   <Input
                     value={editNome}
                     onChange={(e) => setEditNome(e.target.value)}
@@ -149,7 +162,7 @@ export default function CategoriasPage() {
                     variante="ghost"
                     aria-label="Salvar"
                     loading={atualizar.isPending}
-                    onClick={() => void salvarNome(c)}
+                    onClick={() => void salvarEdicao(c)}
                   >
                     <Check strokeWidth={1.75} className="size-4" />
                   </Button>
@@ -159,14 +172,20 @@ export default function CategoriasPage() {
                 </>
               ) : (
                 <>
+                  <span
+                    aria-hidden
+                    className="size-4 shrink-0 rounded-full border border-linha"
+                    style={{ backgroundColor: c.cor ?? 'transparent' }}
+                  />
                   <span className="flex-1 text-tinta">{c.nome}</span>
                   <Button
                     type="button"
                     variante="ghost"
-                    aria-label={`Renomear ${c.nome}`}
+                    aria-label={`Editar ${c.nome}`}
                     onClick={() => {
                       setEditId(c.id)
                       setEditNome(c.nome)
+                      setEditCor(c.cor ?? COR_PADRAO)
                     }}
                   >
                     <Pencil strokeWidth={1.75} className="size-4" />
