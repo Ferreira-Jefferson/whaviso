@@ -117,24 +117,27 @@ describe('inbound de botões (integração)', () => {
     await limpar(cobradorId)
   })
 
-  it('"Ver Pix" entrega uma vez por combinado: solicitou_pix 1x, re-tap não reenvia (H7.3)', async () => {
+  it('"Ver Pix": re-tap real (novo wamid) REENVIA a chave; solicitou_pix só 1x (H7.3, revisão 2026-07-20)', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({
       dataCombinada: '2026-12-15',
       pixChave: '11999990000',
     })
     const whats = clienteWhatsFake()
     const deps = { pool: poolSuper, logger, whats }
-    await processarBotao(deps, evento('ver_pix', avisoId))
-    await processarBotao(deps, evento('ver_pix', avisoId))
+    // Dois toques REAIS (wamids distintos): a chave é reenviada a cada toque explícito.
+    await processarBotao(deps, { ...evento('ver_pix', avisoId), wamid: 'w_ver_pix_1' })
+    await processarBotao(deps, { ...evento('ver_pix', avisoId), wamid: 'w_ver_pix_2' })
 
-    // solicitou_pix gravado SÓ no 1º toque (G-C3).
+    // solicitou_pix gravado SÓ no 1º toque (marca de intenção; não duplica).
     const ev = await poolSuper.query(
       `select count(*)::int as n from public.eventos_aviso where aviso_id=$1 and tipo='solicitou_pix'`,
       [avisoId],
     )
     expect(ev.rows[0].n).toBe(1)
-    // Entrega única: a chave saiu só na 1ª vez (sem titular/banco, só a 1ª msg).
-    expect(whats.enviadas).toHaveLength(1)
+    // Sem titular/banco: 1 mensagem por toque. Dois toques reais = 2 envios (reenviou).
+    expect(whats.enviadas).toHaveLength(2)
+    expect(whats.enviadas[0]!.texto).toContain('11999990000')
+    expect(whats.enviadas[1]!.texto).toContain('11999990000')
     const entrega = await poolSuper.query(`select entrega_chave_status from public.avisos where id=$1`, [avisoId])
     expect(entrega.rows[0].entrega_chave_status).toBe('entregue')
     await limpar(cobradorId)

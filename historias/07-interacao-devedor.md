@@ -43,7 +43,7 @@ Como **devedor**, quero ver a chave Pix com o nome e o banco de quem recebe, par
   - [ ] **1ª:** só a chave, fácil de copiar, ex.: *"Chave de pagamento: [chave]"*.
   - [ ] **2ª:** o titular e o banco, ex.: *"Em nome de [nome], banco [banco]."*
 - [ ] O evento **`solicitou_pix`** é registrado **apenas no primeiro toque** (sinal de intenção, visível no painel, Épico 9); toques seguintes não registram de novo.
-- [ ] A chave é entregue **uma única vez por combinado**: depois de entregue, novos toques **não reenviam** (a pessoa já tem a chave). **Exceção:** se o servidor detectar **falha de envio mesmo após os 3 retrys** (Épico 6 H6.8), a entrega pode ser refeita.
+- [ ] A chave é **(re)enviada a cada toque** em "Chave Pix" de um combinado ativo (as duas mensagens acima). Um toque é um **pedido explícito do devedor**, não spam: a resposta é **réplica na janela de 24h** e **não consome crédito** (igual ao menu e à cortesia "encerrado"). *(Revisado em 2026-07-20: antes a entrega era única por combinado e o re-toque ficava em silêncio; na prática, tocar e não ver nada parecia app quebrado, principalmente com vários combinados na mesma conversa.)*
 - [ ] Tocar "Chave Pix" **não muda o estado** do combinado.
 - [ ] A chave, o nome e o banco **nunca** aparecem em log.
 
@@ -91,7 +91,7 @@ Como **sistema (zap)**, quero mapear cada toque ao combinado exato pelo `aviso_i
 Como **devedor**, quero que valha o que está mais recente, para não acionar por engano um botão de uma mensagem antiga.
 *Critérios de aceite:*
 - [ ] Apenas os botões do **último aviso enviado** do combinado têm efeito; tocar um botão de uma mensagem **anterior** do mesmo combinado **não dispara ação de estado**.
-- [ ] Isso vale para os três botões, inclusive **Chave Pix** (entrega uma vez por combinado, e só pelo último aviso).
+- [ ] Isso vale para os três botões, inclusive **Chave Pix** (reenviada a cada toque, mas **só pelo último aviso**: tocar "Chave Pix" numa mensagem antiga do mesmo combinado não reenvia, cai na cortesia "encerrado").
 - [ ] Se o combinado já está em **estado terminal** (`pago`, `cancelado`, `recusado`, `expirado`), tocar qualquer botão **não reabre** o combinado nem dispara ação.
 - [ ] Nesses casos o devedor recebe uma resposta neutra, ex.: *"Este combinado já foi encerrado, não há mais nada a fazer por aqui."*
 - [ ] Se o `aviso_id` for inválido/desconhecido, o toque é ignorado **sem vazar** se o combinado existe ou não.

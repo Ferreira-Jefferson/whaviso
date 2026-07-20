@@ -68,7 +68,7 @@ describe('E7 interação do devedor', () => {
     await limpar(cobradorId)
   })
 
-  // --- H7.3: chave pix, duas mensagens, entrega única, 2ª falha --------------
+  // --- H7.3: chave pix, duas mensagens, reenvio a cada toque, 2ª falha --------------
   it('"Chave Pix" envia 2 mensagens (chave; titular+banco) e marca entregue', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({
       dataCombinada: '2026-12-15',
@@ -150,6 +150,32 @@ describe('E7 interação do devedor', () => {
     const e2 = await poolSuper.query(`select entrega_chave_status from public.avisos where id=$1`, [avisoId])
     expect(e2.rows[0].entrega_chave_status).toBeNull() // segue reentregável para um NOVO toque
     await limpar(cobradorId)
+  })
+
+  // --- H7.3 / H7.6: dois combinados do MESMO devedor entregam o próprio Pix -----------
+  // Regressão do caso real (2026-07-20): o devedor tem 2 combinados; tocar "Chave Pix" no
+  // 1º entregou, no 2º "não veio nada". Causa: o 2º já tinha sido entregue num dia anterior
+  // e a regra antiga (entrega única) o calava. Agora cada toque reentrega, e cada combinado
+  // usa a PRÓPRIA chave (H7.6: isolado por aviso_id, inclusive com cobradores diferentes).
+  it('H7.3/H7.6: 2 combinados do mesmo devedor entregam cada um a sua chave; re-tap reenvia', async () => {
+    const a = await criarAvisoPendente({ dataCombinada: '2026-12-15', pixChave: 'chaveA@pix.com' })
+    const b = await criarAvisoPendente({ dataCombinada: '2026-12-15', pixChave: 'chaveB@pix.com' })
+    const whats = clienteWhatsFake()
+    const deps = { pool: poolSuper, logger, whats }
+    // Toca "Chave Pix" no 1º e no 2º (wamids distintos = toques reais).
+    await processarBotao(deps, { ...botao('ver_pix', a.avisoId), wamid: 'w_vp_a1' })
+    await processarBotao(deps, { ...botao('ver_pix', b.avisoId), wamid: 'w_vp_b1' })
+    // Simula o 2º já ter sido entregue antes (dia anterior): antes isso o calava.
+    await poolSuper.query(`update public.avisos set entrega_chave_status='entregue' where id=$1`, [b.avisoId])
+    // Re-tap no 2º (novo wamid): agora REENVIA (não fica em silêncio).
+    await processarBotao(deps, { ...botao('ver_pix', b.avisoId), wamid: 'w_vp_b2' })
+
+    expect(whats.enviadas).toHaveLength(3)
+    expect(whats.enviadas[0]!.texto).toContain('chaveA@pix.com') // 1º combinado: sua chave
+    expect(whats.enviadas[1]!.texto).toContain('chaveB@pix.com') // 2º combinado: sua chave
+    expect(whats.enviadas[2]!.texto).toContain('chaveB@pix.com') // re-tap do 2º: reenviou
+    await limpar(a.cobradorId)
+    await limpar(b.cobradorId)
   })
 
   // --- H7.4 / H7.5: opt-out + reativar ------------------------------------------------

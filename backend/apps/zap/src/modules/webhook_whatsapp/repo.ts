@@ -72,9 +72,9 @@ export interface ResultadoBotao {
   /** H5.3: presente só no ACEITE aplicado e quando o convidado ainda não tem profile. */
   conta?: ContaConvidado
   /**
-   * H7.3/H7.7: o service pede a entrega da chave em DUAS mensagens (chave; titular+banco)
-   * e só depois marca a entrega. true = a chave ainda não foi entregue (entregar agora);
-   * false = já entregue (não reenviar). Só vem preenchido no `ver_pix` aplicado.
+   * H7.3/H7.7: o service entrega a chave em DUAS mensagens (chave; titular+banco). true em
+   * TODO `ver_pix` aplicado com chave cadastrada (a chave é reenviada a cada toque, revisão
+   * 2026-07-20); só vem indefinido quando não há chave (aí o service responde resposta.sem_pix).
    */
   entregarPix?: boolean
   /**
@@ -585,9 +585,7 @@ export async function aplicarAcaoBotao(
     }
 
     if (acao === 'ver_pix') {
-      // H7.3: não altera status. Entrega a chave UMA VEZ por combinado: se já entregue,
-      // não reenvia (entregarPix=false) e NÃO registra `solicitou_pix` de novo (só no 1o
-      // toque). Sem chave cadastrada: responde resposta.sem_pix.
+      // H7.3: não altera status. Sem chave cadastrada: responde resposta.sem_pix.
       if (!aviso.pix_chave) {
         return {
           aplicado: true,
@@ -597,26 +595,25 @@ export async function aplicarAcaoBotao(
           chaveResposta: 'resposta.sem_pix',
         }
       }
-      const jaEntregue = aviso.entrega_chave_status === 'entregue'
-      if (!jaEntregue) {
-        // 1o toque (ou reentrega após falha): registra `solicitou_pix` só na 1a vez.
-        const { rows: ev } = await cli.query<{ n: number }>(
-          `select count(*)::int as n from public.eventos_aviso
-            where aviso_id=$1 and tipo='solicitou_pix'`,
+      // H7.3: o evento `solicitou_pix` marca a INTENÇÃO e é gravado só no 1o toque (sinal
+      // do painel, E9); toques seguintes não duplicam o evento.
+      const { rows: ev } = await cli.query<{ n: number }>(
+        `select count(*)::int as n from public.eventos_aviso
+          where aviso_id=$1 and tipo='solicitou_pix'`,
+        [avisoId],
+      )
+      if ((ev[0]?.n ?? 0) === 0) {
+        await cli.query(
+          `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'solicitou_pix','devedor')`,
           [avisoId],
         )
-        if ((ev[0]?.n ?? 0) === 0) {
-          await cli.query(
-            `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'solicitou_pix','devedor')`,
-            [avisoId],
-          )
-        }
       }
-      // Já entregue: idempotente e SILENCIOSO (a pessoa já tem a chave; não reenvia,
-      // H7.3). Sem chaveResposta -> o service não responde nada.
-      if (jaEntregue) {
-        return { aplicado: true, novoStatus: aviso.status, telefone: aviso.telefone_devedor, pixChave: null }
-      }
+      // H7.3 (revisado 2026-07-20): um toque em "Chave Pix" é um pedido EXPLÍCITO do devedor,
+      // não spam. SEMPRE reentrega a chave (as 2 mensagens), inclusive se já entregue antes.
+      // É réplica na janela de 24h e não consome crédito. Antes havia supressão por
+      // `entrega_chave_status='entregue'` (re-toque em silêncio); ficava parecendo app quebrado,
+      // sobretudo com vários combinados na mesma conversa. A regra do último aviso (H7.7) já
+      // barrou acima o toque numa mensagem antiga; aqui é sempre o aviso corrente.
       return {
         aplicado: true,
         novoStatus: aviso.status,
