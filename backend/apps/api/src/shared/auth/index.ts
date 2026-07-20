@@ -60,6 +60,9 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
         issuer,
         // Supabase sempre emite tokens de usuário com aud=authenticated.
         audience: 'authenticated',
+        // Fixa o algoritmo da chave ativa do projeto (JWKS assimétrico ES256):
+        // fecha algorithm-confusion (ex.: aceitar HS* assinado com a chave pública).
+        algorithms: ['ES256'],
       })
       if (!payload.sub) throw new Error('sem sub')
       req.userId = payload.sub
@@ -85,6 +88,7 @@ const plugin: FastifyPluginAsync<AuthOpcoes> = async (app, opcoes) => {
       const { payload } = await jwtVerify(header.slice('Bearer '.length), jwks, {
         issuer,
         audience: 'authenticated',
+        algorithms: ['ES256'], // mesma trava de algoritmo do `verificar` (ver acima)
       })
       if (payload.sub) {
         req.userId = payload.sub

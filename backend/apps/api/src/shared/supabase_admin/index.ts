@@ -7,9 +7,8 @@
 // login por WhatsApp da H1.2). O trigger handle_new_user cria o profile (nome vazio)
 // e a assinatura FREE; por isso fazemos o BACKFILL do nome aqui (M1).
 //
-// SEGREDO DE SERVIDOR: usa a SERVICE ROLE KEY. NUNCA exponha no front. Precedente:
-// scripts/criar_usuario_confirmado.ts (cria por e-mail; aqui é por telefone), incluindo
-// o tratamento idempotente do 422 (telefone já existe).
+// SEGREDO DE SERVIDOR: usa a SERVICE ROLE KEY. NUNCA exponha no front. Trata o 422 de
+// forma idempotente (telefone já existe) para não abrir janela de corrida no aceite.
 //
 // REGRA DE OURO: nunca logar telefone. Em erro, só o status/código, sem o número.
 

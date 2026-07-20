@@ -37,9 +37,10 @@ Aplicado no código (branch `development`), com lint e typecheck passando nos 3 
 - **Risco enquanto não feito:** cenário de borda: se um usuário Google digita por engano o telefone de outra pessoa, quem controla aquele número, ao logar por OTP, é mesclado à conta Google alheia. Não é explorável ativamente por um atacante (ele não controla o `profiles.telefone` da vítima).
 - **Correção recomendada (produto):** ao detectar merge, exigir confirmação explícita de posse da conta Google (re-auth Google) antes de conceder a sessão mesclada, e/ou notificar a conta Google, em vez de devolver o magic token silenciosamente.
 
-### D4. API L2 (BAIXA): fixar o algoritmo do JWT (`algorithms`)
-- **Por que não agora:** pinar o algoritmo ERRADO quebra 100% da autenticação. O código usa JWKS assimétrico (ES256 ou RS256); não foi possível confirmar com certeza qual o projeto Supabase usa sem consultar o JWKS ao vivo. O jose já rejeita `alg: none` e não casa HS* com chave assimétrica, então a exposição é baixa.
-- **Correção recomendada:** buscar `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`, ler o `alg` da chave ativa, e então adicionar `algorithms: ['<alg-real>']` nas duas chamadas `jwtVerify` de `apps/api/src/shared/auth/index.ts`. Não chutar.
+### D4. API L2 (BAIXA): fixar o algoritmo do JWT (`algorithms`) — ✅ RESOLVIDO (2026-07-20)
+- **O que era:** as chamadas `jwtVerify` não fixavam o algoritmo; teoricamente abria margem para algorithm-confusion. O jose já rejeitava `alg: none` e não casava HS* com chave assimétrica, então a exposição sempre foi baixa.
+- **Correção aplicada:** consultado o JWKS ao vivo (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`) → chave ativa é **ES256**. Adicionado `algorithms: ['ES256']` nas duas chamadas `jwtVerify` de `apps/api/src/shared/auth/index.ts` (`verificar` e `autenticarOpcional`). Typecheck + lint OK.
+- **Manutenção:** se o projeto Supabase trocar a chave para RS256 no futuro, atualizar esse array (a auth quebra 100% se o algoritmo real divergir do fixado).
 
 ### D5. Migração de sessão para cookie HttpOnly no frontend (BAIXA)
 - **Por que não agora:** exigiria um proxy de auth e mudança de arquitetura. O `supabase-js` usa localStorage por padrão.
