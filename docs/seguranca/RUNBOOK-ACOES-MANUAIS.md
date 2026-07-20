@@ -100,10 +100,11 @@ nginx -t && systemctl reload nginx
 
 ---
 
-## 6. Painel do Supabase (configuração, não código)  ✅ CONCLUÍDO 2026-07-07 (2 exceções abaixo)
+## 6. Painel do Supabase (configuração, não código)  ✅ CONCLUÍDO 2026-07-07 (exceções abaixo)
 
 Itens do checklist de produção do Supabase que dependem do painel:
 
+- [ ] **⚠️ Authentication > Sign In / Providers > Phone > Test OTP: REMOVER qualquer número de teste.** Um par número+código fixo cadastrado aqui loga SEM enviar mensagem e SEM Google, aceitando o código hardcoded: é uma porta de entrada em produção para quem souber/adivinhar o par (sessão completa, ignora Google e WhatsApp). Foi criado durante o desenvolvimento para testar o login sem esperar o OTP real; hoje o OTP já entrega em números reais, então o número de teste não serve mais e só é risco. **Ação: abrir o painel, apagar todos os pares de Test OTP, salvar.** (Não aparece no código, é 100% config de painel; por isso não dá para fechar por deploy.) Pendente de confirmação sua.
 - [x] **Authentication > Rate Limits**: revisados; mantidos os defaults seguros (verificação de OTP 30/5min por IP; envio de SMS 30/h global). É a proteção real de brute-force do login (o OTP é validado pelo Supabase, não pela api).
 - [x] **Tokens/Sessão**: **Refresh Token Rotation** + **Reuse Detection** ligados ("Detect and revoke potentially compromised refresh tokens" = ON, reuse interval 10s). Access token TTL no default (3600s).
 - [x] **OTP expiry** <= 3600s: Phone 600s, Email 3600s.
@@ -140,7 +141,7 @@ Registrados em [RISCOS-ACEITOS-E-DIFERIDOS.md](RISCOS-ACEITOS-E-DIFERIDOS.md), p
 - [ ] **H1**: tirar a `service_role` do zap (endpoint interno na api para criar conta no aceite).
 - [ ] **Inbox de inbound do WhatsApp** (ACHADOS 1/2/3 do zap): tabela `inbound_whatsapp` com `unique(wamid)`, gravar antes do 200, dedupe + idempotência.
 - [ ] **API M2**: decisão de produto sobre o merge de conta por telefone não verificado.
-- [ ] **API L2**: fixar `algorithms` do JWT após confirmar o alg do JWKS do projeto.
+- [x] **API L2 (2026-07-20)**: `algorithms: ['ES256']` fixado no JWT (alg confirmado no JWKS do projeto). Ver D4 em RISCOS-ACEITOS-E-DIFERIDOS.md.
 - [ ] (Qualidade) tornar os testes de integração do zap determinísticos quanto a timezone.
 
 ---

@@ -4,6 +4,8 @@ Companheiro de [AUDITORIA-SEGURANCA.md](AUDITORIA-SEGURANCA.md). Aqui ficam os a
 
 A regra que guiou a separação: correção segura e localizada (hardening) foi aplicada já; mudança arquitetural, que altera comportamento de entrega, ou que depende de decisão de produto foi diferida e documentada aqui. Ações que só o dono do projeto aplica (servidor, chaves, painel) estão no [RUNBOOK-ACOES-MANUAIS.md](RUNBOOK-ACOES-MANUAIS.md).
 
+> **Atualização 2026-07-20 (rodada de revisão da "brecha de login sem Google"):** confirmado que NÃO há bypass de auth no código do runtime (frontend e api só aceitam Google ou WhatsApp OTP, JWT verificado via JWKS; o `Bearer x` vive só no harness de teste). Uma varredura de segurança ampla não achou nenhum risco novo resolvível no código. Nesta rodada: **D4 resolvido** (`algorithms: ['ES256']` no JWT, ver abaixo) e **removido o script morto `backend/scripts/criar_usuario_confirmado.ts`** (login por e-mail/senha não existe mais na UI, então era código morto que ainda expunha o uso da service_role). A "maneira de testar sem o Google" que motivou a revisão era o **Test OTP no painel do Supabase** (config, não código): virou ação manual pendente no passo 6 do [RUNBOOK-ACOES-MANUAIS.md](RUNBOOK-ACOES-MANUAIS.md).
+
 ---
 
 ## 1. O que FOI corrigido nesta rodada (resumo)
