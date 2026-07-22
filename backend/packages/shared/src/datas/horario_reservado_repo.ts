@@ -4,10 +4,13 @@
 // livre, wrap, fallback, 10min) está em `horario_reservado.ts`.
 //
 // CORRIDA (D-HORARIO): a unicidade global de segundo é da LÓGICA, não de índice único.
-// Para dois aceites concorrentes não escolherem o mesmo segundo (nem violarem os 10min do
-// mesmo devedor), travamos as linhas ATIVAS com horário reservado (`FOR UPDATE`) antes de
-// ler os ocupados: o 2º aceite espera o 1º comitar e relê o conjunto já com o novo segundo.
-// No volume do produto (<100 clientes) o lock do conjunto ativo é barato e correto.
+// O `FOR UPDATE` nas linhas ATIVAS com horário reservado só serializa quando já existe
+// alguma linha ocupada pra travar: dois PRIMEIROS aceites concorrentes (nenhum dos dois
+// tem `horario_reservado_seg` ainda) não travam nada entre si e leem o conjunto vazio ao
+// mesmo tempo, colidindo no mesmo segundo (H6.9). Por isso um advisory lock (por transação,
+// liberado no commit/rollback) serializa TODA alocação antes de ler os ocupados: o 2º
+// aceite espera o 1º comitar e só então relê, já com o novo segundo visível.
+// No volume do produto (<100 clientes) serializar toda alocação é barato e correto.
 
 import type { PoolClient } from '../db'
 import { calcularAgendamentos } from './index'
@@ -27,6 +30,10 @@ async function lerOcupados(
   avisoId: string,
   telefoneDevedor: string | null,
 ): Promise<{ globais: Set<number>; doDevedor: number[] }> {
+  // Advisory lock global da alocação: sem isso, dois PRIMEIROS aceites concorrentes não
+  // têm linha nenhuma pra travar entre si (ver comentário do topo do arquivo).
+  await cli.query('select pg_advisory_xact_lock(hashtext($1)::bigint)', ['whaviso.horario_reservado'])
+
   // Trava todas as linhas ativas com segundo reservado: serializa a alocação concorrente.
   // Exclui o próprio aviso (idempotência: re-reserva não conta o próprio segundo antigo).
   const { rows } = await cli.query<{ horario_reservado_seg: number; telefone_devedor: string | null }>(
