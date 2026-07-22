@@ -5,13 +5,14 @@
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Star, Trash2 } from 'lucide-react'
+import { Pencil, Star, Trash2 } from 'lucide-react'
 import {
   Banner,
   Button,
   Card,
   ChavePixInput,
   ConfirmDialog,
+  Dialog,
   Field,
   Input,
   PageHeader,
@@ -208,6 +209,7 @@ function GerenciadorChavesPix() {
   const { cadastrar, salvando } = useCadastrarChavePix()
   const [erro, setErro] = useState<string | null>(null)
   const [aArquivar, setAArquivar] = useState<ChavePix | null>(null)
+  const [aEditar, setAEditar] = useState<ChavePix | null>(null)
 
   // Estado do form de cadastro (cada tela monta o seu; salvar vem do hook).
   const [tipo, setTipo] = useState<TipoChavePix | ''>('')
@@ -390,6 +392,15 @@ function GerenciadorChavesPix() {
                 <Button
                   type="button"
                   variante="ghost"
+                  onClick={() => setAEditar(c)}
+                  disabled={atualizar.isPending}
+                  aria-label="Editar chave"
+                >
+                  <Pencil strokeWidth={1.75} className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variante="ghost"
                   onClick={() => setAArquivar(c)}
                   disabled={atualizar.isPending}
                   aria-label="Remover chave"
@@ -414,6 +425,107 @@ function GerenciadorChavesPix() {
       >
         A chave deixa de aparecer ao criar novos combinados. Combinados já criados não mudam.
       </ConfirmDialog>
+
+      <EditarChavePixDialog
+        chave={aEditar}
+        onFechar={() => setAEditar(null)}
+      />
     </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+function EditarChavePixDialog({
+  chave,
+  onFechar,
+}: {
+  chave: ChavePix | null
+  onFechar: () => void
+}) {
+  const atualizar = useAtualizarChavePix()
+  const [titular, setTitular] = useState('')
+  const [banco, setBanco] = useState('')
+  const [rotulo, setRotulo] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!chave) return
+    setTitular(chave.titular ?? '')
+    setBanco(chave.banco ?? '')
+    setRotulo(chave.rotulo ?? '')
+    setErro(null)
+  }, [chave])
+
+  async function salvar() {
+    if (!chave) return
+    setErro(null)
+    try {
+      await atualizar.mutateAsync({
+        id: chave.id,
+        body: { titular, banco, rotulo: rotulo || null },
+      })
+      onFechar()
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar a chave.')
+    }
+  }
+
+  return (
+    <Dialog
+      aberto={chave !== null}
+      onFechar={onFechar}
+      titulo="Editar chave Pix"
+      acoes={
+        <>
+          <Button
+            variante="primary"
+            className="w-full"
+            loading={atualizar.isPending}
+            onClick={salvar}
+          >
+            Salvar
+          </Button>
+          <Button
+            variante="secondary"
+            className="w-full"
+            disabled={atualizar.isPending}
+            onClick={onFechar}
+          >
+            Cancelar
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <Banner tom="info">
+          A chave em si ({chave?.chave}) não muda aqui. Titular e banco atualizados valem
+          só para os próximos combinados: os já criados mantêm os dados de quando foram
+          feitos.
+        </Banner>
+        {erro && <Banner tom="erro">{erro}</Banner>}
+        <Field label="Nome do titular da chave">
+          <Input
+            autoComplete="off"
+            value={titular}
+            onChange={(e) => setTitular(e.target.value)}
+          />
+        </Field>
+        <Field label="Banco da chave">
+          <Input
+            autoComplete="off"
+            value={banco}
+            onChange={(e) => setBanco(e.target.value)}
+          />
+        </Field>
+        <Field label="Apelido (opcional)">
+          <Input
+            autoComplete="off"
+            value={rotulo}
+            onChange={(e) => setRotulo(e.target.value)}
+          />
+        </Field>
+      </div>
+    </Dialog>
   )
 }
