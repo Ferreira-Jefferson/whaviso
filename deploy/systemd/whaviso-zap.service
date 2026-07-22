@@ -18,7 +18,12 @@ EnvironmentFile=/etc/whaviso/zap.env
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/env npm run start
 Restart=on-failure
-RestartSec=10
+# Backoff geometrico: comeca em 1s e cresce a cada falha ate o teto de 5min,
+# onde fica tentando pra sempre (sem desistir, StartLimitIntervalSec=0).
+RestartSec=1
+RestartSteps=9
+RestartMaxDelaySec=300
+StartLimitIntervalSec=0
 
 # Area de escrita de runtime do zap, fora do checkout (que fica imutavel). Persiste
 # entre deploys e reboots. Nao apague este diretorio.

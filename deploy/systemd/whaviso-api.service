@@ -13,7 +13,12 @@ EnvironmentFile=/etc/whaviso/api.env
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/env npm run start
 Restart=on-failure
-RestartSec=5
+# Backoff geometrico: comeca em 1s e cresce a cada falha ate o teto de 5min,
+# onde fica tentando pra sempre (sem desistir, StartLimitIntervalSec=0).
+RestartSec=1
+RestartSteps=9
+RestartMaxDelaySec=300
+StartLimitIntervalSec=0
 
 # ── Hardening (systemd sandbox) ──
 NoNewPrivileges=true
