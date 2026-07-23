@@ -905,6 +905,28 @@ export async function recusarDadoIncorreto(pool: Pool, uid: string, id: string):
 }
 
 /**
+ * Item 7 (wave 2): reporte já aprovado cuja correção ainda não foi aplicada (nenhuma
+ * edição enviada desde a aprovação). Existe porque aprovar pode acontecer por WhatsApp
+ * (texto "aprovar", grupo 1E) em vez do botão do painel: nesse caminho não há resposta
+ * HTTP síncrona pra carregar o reporte, então o painel PRECISA perguntar ao abrir o
+ * combinado se há uma correção aprovada esperando revisão, pra reabrir a mesma edição
+ * pré-preenchida/destacada que `aprovarDadoIncorreto` devolve no caminho pelo painel.
+ * Mesma visibilidade do detalhe (cobrador dono OU devedor vinculado): não é uma ação, só
+ * leitura de algo que o devedor já sabe (é o que ele mesmo reportou).
+ */
+export async function obterReporteAprovadoPendente(
+  pool: Pool,
+  uid: string,
+  id: string,
+): Promise<ResolucaoReporte['reporte'] | null> {
+  const aviso = await repo.buscarAvisoVisivel(pool, id, uid)
+  if (!aviso) throw naoEncontrado('Aviso não encontrado')
+  const reporte = await repo.reporteAprovadoPendenteDeEdicao(pool, id)
+  if (!reporte) return null
+  return { campo: reporte.campo, dados: reporte.dados_corretos }
+}
+
+/**
  * Item 21: código curto do combinado, por rota dedicada (o campo ainda não entra no
  * contrato Zod geral do Aviso nesta rodada, ver nota do grupo 1B). Mesma visibilidade
  * do detalhe (cobrador dono OU devedor vinculado).

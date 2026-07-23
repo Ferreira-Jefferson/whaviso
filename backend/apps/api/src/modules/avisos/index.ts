@@ -107,6 +107,19 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
     async (req) => service.recusarDadoIncorreto(app.pool, req.userId, req.params.id),
   )
 
+  // Item 7 (wave 2): reporte já aprovado (por WhatsApp ou pelo painel) cuja correção
+  // ainda não foi aplicada. O painel consulta isto ao abrir o combinado pra reabrir a
+  // edição pré-preenchida/destacada mesmo quando a aprovação não veio da resposta
+  // síncrona do POST acima (aprovação por WhatsApp não tem essa resposta).
+  app.get(
+    '/avisos/:id/reporte-aprovado-pendente',
+    {
+      preHandler: app.autenticar,
+      schema: { params: idParam, response: { 200: z.object({ reporte: resolverReporteResposta.shape.reporte.nullable() }) } },
+    },
+    async (req) => ({ reporte: await service.obterReporteAprovadoPendente(app.pool, req.userId, req.params.id) }),
+  )
+
   // Item 21 (migration 0093): código curto do combinado, por rota dedicada (o avisoSchema
   // geral ainda não carrega `codigo` nesta rodada). Mesma visibilidade do detalhe.
   app.get(

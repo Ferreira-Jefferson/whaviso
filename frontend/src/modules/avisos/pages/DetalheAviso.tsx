@@ -5,7 +5,7 @@
 // - Ações: confirmar/desmarcar recebimento (OTIMISTA, reversível);
 //   cancelar (PESSIMISTA, ConfirmDialog). Invalidação cobre detalhe+lista+resumo.
 // Linguagem das Regras de Ouro: só recebido/combinado/encerrar (ver linguagem.ts).
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router'
 import {
@@ -77,6 +77,7 @@ import {
   useReengajar,
   useRecusarDadoIncorreto,
   useRejeitarPagamento,
+  useReporteAprovadoPendente,
 } from '../api'
 import { AvisoCriado } from '../components/AvisoCriado'
 import { ProgressoRecorrencia } from '../components/ProgressoRecorrencia'
@@ -205,6 +206,19 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const [confirmarCancelar, setConfirmarCancelar] = useState(false)
   const [editando, setEditando] = useState(false)
   const [reporteParaEditar, setReporteParaEditar] = useState<AvisoReporte | null>(null)
+  // Item 7 (wave 2): a aprovação pode ter acontecido por WhatsApp (texto "aprovar" ao
+  // telefone do cobrador, grupo 1E), que resolve o reporte direto no banco sem passar
+  // pela resposta síncrona de `aprovarDadoIncorreto` acima. Sem isto, abrir o combinado
+  // depois de aprovar por WhatsApp mostraria só um `programado` normal, sem reabrir a
+  // edição pré-preenchida/destacada prometida (H7.9). Só habilita quando `programado`
+  // (único estado em que uma aprovação recente ainda pode estar pendente de edição).
+  const reporteAprovadoPendente = useReporteAprovadoPendente(id, aviso.status === 'programado')
+  useEffect(() => {
+    if (reporteAprovadoPendente.data && !reporteParaEditar) {
+      setReporteParaEditar(reporteAprovadoPendente.data)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reporteAprovadoPendente.data])
   const [confirmarRecusarReporte, setConfirmarRecusarReporte] = useState(false)
   const [ativando, setAtivando] = useState(false)
   // H9.5 / H8.1: ao confirmar pelo painel, a mensagem ao devedor sai em ~1min e dá para

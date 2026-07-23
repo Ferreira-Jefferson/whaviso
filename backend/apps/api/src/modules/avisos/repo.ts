@@ -872,3 +872,35 @@ export async function resolverReporte(
     [reporteId, resolucao],
   )
 }
+
+export interface ReporteResolvidoRecente {
+  campo: CampoReporte
+  dados_corretos: DadosReporte
+}
+
+/**
+ * Reporte de dado incorreto já APROVADO cuja correção ainda não foi aplicada: o ÚLTIMO
+ * evento do aviso é `dado_incorreto_aprovado`. Sem coluna nova: uma edição normal em
+ * seguida (PATCH /avisos/:id) gera um evento `editado` mais recente, e este método passa
+ * a devolver null (a correção já foi tratada). Necessário porque a aprovação pode
+ * acontecer por WhatsApp (texto "aprovar" ao telefone do cobrador, grupo 1E wave 2), que
+ * resolve `avisos_reportes` direto pelo zap e não tem uma resposta HTTP síncrona para o
+ * painel carregar o reporte (só `POST /avisos/:id/aprovar-dado-incorreto` tem isso).
+ */
+export async function reporteAprovadoPendenteDeEdicao(
+  ex: Executor,
+  avisoId: string,
+): Promise<ReporteResolvidoRecente | null> {
+  const { rows } = await ex.query<{ tipo: string; detalhes: { reporte_id?: string } | null }>(
+    `select tipo, detalhes from public.eventos_aviso
+      where aviso_id = $1 order by criado_em desc limit 1`,
+    [avisoId],
+  )
+  const ultimo = rows[0]
+  if (!ultimo || ultimo.tipo !== 'dado_incorreto_aprovado' || !ultimo.detalhes?.reporte_id) return null
+  const { rows: repRows } = await ex.query<ReporteResolvidoRecente>(
+    `select campo, dados_corretos from public.avisos_reportes where id = $1`,
+    [ultimo.detalhes.reporte_id],
+  )
+  return repRows[0] ?? null
+}

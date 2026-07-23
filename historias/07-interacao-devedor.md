@@ -1,6 +1,6 @@
 # Épico 7: Interação do devedor (Já paguei / Chave Pix / Desativar lembretes)
 
-> O devedor **não conversa**: não existe chat humano, IA, nem Pix automático. Ele só interage pelos **três botões** que acompanham toda mensagem do ciclo (Épico 6): **Já paguei**, **Chave Pix** e **Desativar lembretes**.
+> O devedor **não conversa**: não existe chat humano, IA, nem Pix automático. Ele só interage pelos **três botões** que acompanham toda mensagem do ciclo (Épico 6): **Já paguei**, **Chave Pix** e **Desativar lembretes**, mais o **menu de opções** por texto livre (H7.1) que agora também cobre reportar um dado incorreto do combinado já em andamento (H7.8/H7.9, item 7).
 > Cada toque chega ao `zap` como um evento de webhook **autenticado por HMAC**, carregando o **`aviso_id`** (e o identificador do aviso/etapa) no payload, nunca o token, para o Whaviso saber exatamente de qual combinado e de qual mensagem se trata.
 > **Regra central:** só os botões do **último aviso enviado** do combinado têm efeito; botões de mensagens anteriores ficam inertes (ver H7.7).
 > Este épico cobre **o que cada botão faz** e a resposta que o devedor recebe. As notificações ao cobrador ficam no Épico 10; a confirmação do pagamento, no Épico 8; a abrangência/compliance do opt-out, no Épico 13.
@@ -15,6 +15,7 @@ Como **devedor**, quero responder com um toque e não ter que digitar nada, para
 - [ ] Não há chat humano, IA, nem Pix automático: o Whaviso **não responde livremente** a texto do devedor.
 - [ ] Se o devedor **digita texto livre**:
   - [ ] **Texto livre do devedor:** a conta responde com um **menu de opções** com as ações disponíveis (Já paguei / Chave Pix / Desativar lembretes) referente ao(s) combinado(s) ativo(s). **Disponível para todas as contas** (não há distinção de plano; modelo de créditos, Épico 11). O menu é resposta a texto, não um lembrete, e **não consome crédito de envio**.
+  - [ ] O menu também explica como **reportar um dado incorreto** do combinado já em andamento: valor, data ou nome/motivo (H7.8). Como a Meta limita a 3 botões rápidos por mensagem (já ocupados por Já paguei/Chave Pix/Desativar lembretes), esse caminho é por **texto numerado**, não por um 4º botão.
   - [ ] O menu é um **conjunto fechado de opções, não um chat**: o Whaviso não conversa (Épico 13 H13.7). Fora dos botões/menu, silêncio.
 - [ ] Cada toque de botão é um evento de webhook **autenticado por HMAC**; o payload traz o **`aviso_id`** e o identificador do aviso/etapa, nunca o token nem dado sensível.
 - [ ] Toda resposta respeita as regras de linguagem (neutra de gênero, sem palavras proibidas).
@@ -40,7 +41,7 @@ Como **devedor**, quero ver a chave Pix com o nome e o banco de quem recebe, par
 - [ ] O botão **Chave Pix** aparece em **todas as etapas** (o Pix é obrigatório nos dois fluxos, Épico 6); o rótulo **pode conter a palavra "Pix"** (a precaução de bloqueio era da época do WhatsApp não oficial, resolvida com a migração para a Meta Cloud API oficial), editável pelo owner (Épico 12).
 - [ ] A chave salva pelo cobrador inclui **nome do titular** e **banco**; esses dados compõem a resposta.
 - [ ] Ao tocar, o Whaviso envia **duas mensagens em sequência** (intervalo de até **3 segundos** entre elas):
-  - [ ] **1ª:** só a chave, fácil de copiar, ex.: *"Chave de pagamento: [chave]"*.
+  - [ ] **1ª:** a chave, fácil de copiar, ex.: *"Chave de pagamento: [chave]"*, seguida do **Pix Copia e Cola** (BR Code estático, padrão EMV do Banco Central): um texto adicional que a maioria dos apps de banco reconhece e oferece para colar/ler direto, sem precisar digitar a chave nem o valor. Gerado por função **pura** (sem gateway nem integração paga), a partir da chave, do titular e do valor combinado; a cidade do titular usa um **placeholder fixo e genérico** (o cadastro de chave pix não guarda a cidade real, e não é escopo coletar esse dado). Se a geração falhar por algum motivo inesperado, a chave em texto (o essencial) ainda sai normalmente: o Copia e Cola é um extra, nunca bloqueia a entrega.
   - [ ] **2ª:** o titular e o banco, ex.: *"Em nome de [nome], banco [banco]."*
 - [ ] O evento **`solicitou_pix`** é registrado **apenas no primeiro toque** (sinal de intenção, visível no painel, Épico 9); toques seguintes não registram de novo.
 - [ ] A chave é **(re)enviada a cada toque** em "Chave Pix" de um combinado ativo (as duas mensagens acima). Um toque é um **pedido explícito do devedor**, não spam: a resposta é **réplica na janela de 24h** e **não consome crédito** (igual ao menu e à cortesia "encerrado"). *(Revisado em 2026-07-20: antes a entrega era única por combinado e o re-toque ficava em silêncio; na prática, tocar e não ver nada parecia app quebrado, principalmente com vários combinados na mesma conversa.)*
@@ -98,6 +99,32 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 
 ---
 
+### H7.8: Reportar um dado incorreto do combinado já aceito 🟢
+Como **devedor**, quero avisar que o valor, a data ou o nome/motivo deste combinado está errado, mesmo depois de já ter aceitado, para que quem fez o combinado corrija antes de eu continuar recebendo lembretes.
+*Critérios de aceite:*
+- [ ] Vale só para um combinado **ativo** (`programado`); não se aplica ao aceite (esse já tem o sinal simples "algum dado está incorreto" da H5.4, sem texto livre, que continua igual).
+- [ ] Os campos que podem ser reportados são **valor**, **data** ou **nome/motivo** (os dois últimos contam como uma única opção, por serem normalmente reportados juntos). A **chave Pix não entra aqui**: ela já tem seu próprio sinal dedicado ("Chave Pix incorreta" no cadastro do cobrador, Épico 14).
+- [ ] O devedor escolhe o campo por um **número** (1 = valor, 2 = data, 3 = nome ou motivo) e informa, na mesma mensagem, a **informação que considera correta** (ex.: *"1 250,00"*, *"2 20/08/2026"*, *"3 Aluguel de agosto"*). Não é um botão (a Meta limita a 3 botões rápidos por mensagem, já ocupados) nem um chat de várias mensagens: uma única mensagem no formato "opção + informação" basta.
+- [ ] Se o formato não for reconhecido (ex.: um valor ou data que não fazem sentido), o Whaviso **pede para tentar de novo**, sem registrar nada e sem mudar o estado do combinado.
+- [ ] Ao reportar com sucesso, o combinado vai para o estado **`aguardando_aprovacao_dado_incorreto`** e o **ciclo de lembretes fica pausado** (igual a uma edição aguardando aprovação, Épico 2 H2.5) até o cobrador decidir (H7.9).
+- [ ] O devedor recebe uma confirmação neutra de que a observação foi registrada e que os lembretes ficam pausados até a revisão.
+- [ ] O **cobrador é notificado** do reporte (Épico 10), pelo mesmo sinal já usado para "algum dado está incorreto" (não é preciso um aviso novo).
+- [ ] **Idempotente:** só há **um reporte pendente por vez** por combinado; reportar de novo enquanto já há um pendente **não faz nada** (silêncio), pois o combinado já saiu de `programado`.
+- [ ] A transição registra evento de auditoria (append-only).
+
+---
+
+### H7.9: O cobrador decide o dado reportado como incorreto 🟢
+Como **cobrador**, quero aprovar ou recusar o que o devedor reportou como incorreto, para corrigir o combinado quando for o caso ou mantê-lo como estava quando não for.
+*Critérios de aceite:*
+- [ ] O cobrador pode decidir **pelo painel** (reabre a edição do combinado **já pré-preenchida** com o que o devedor informou como correto, com **destaque visual** nos campos alterados, para conferir antes de confirmar/enviar) **ou por WhatsApp** (respondendo com a palavra "aprovar" ou "recusar" à notificação do reporte), roteado por **telefone do cobrador** (mesma disciplina de segurança da confirmação de pagamento, H8.5): só o telefone do cobrador daquele combinado decide, nunca o do devedor.
+- [ ] **Aprovar não aplica a correção por si só**: o combinado volta a `programado` (o ciclo é reprogramado) e, pelo painel, a edição pré-preenchida ainda precisa ser confirmada/enviada (mesmo caminho de uma edição normal, Épico 2 H2.5, com reaprovação do devedor se o combinado já foi aceito). Aprovar por WhatsApp direciona o cobrador a abrir o aplicativo para concluir.
+- [ ] **Recusar** mantém os dados como estavam: o combinado volta a `programado` (o ciclo é reprogramado) e nada muda no acordo.
+- [ ] Cada decisão fecha o reporte (nunca apaga a linha, regra de não-DELETE) e registra evento de auditoria.
+- [ ] **Idempotente:** decidir de novo um reporte já resolvido **não faz nada**.
+
+---
+
 ### Divergências com a definição atual
 
 > "Ver Pix" como mensagem separada, evento `solicitou_pix` e "o devedor não conversa" já estão no PROJETO.md (§3.3/§3.4). As divergências abaixo vêm de mudanças das histórias e de riscos do canal.
@@ -109,14 +136,19 @@ Como **devedor**, quero que valha o que está mais recente, para não acionar po
 - **Só o último aviso age (H7.7):** exige que o payload do botão identifique **o aviso/etapa**, e que o sistema saiba qual é o último envio do combinado, para invalidar botões de mensagens antigas. Não existe hoje.
 - **Menu de opções para texto livre:** resposta automática ao texto livre do devedor, **disponível para todas as contas** (não há mais distinção de plano; modelo de carteira de créditos, Épico 11). A resposta do menu é uma réplica dentro da janela de atendimento, não um lembrete, então **não consome crédito de envio**. Lógica nova.
 - **Fallback de resposta numerada (resiliência):** além dos botões interativos oficiais da Meta, o sistema mantém um **fallback** de resposta numerada como resiliência geral do canal, não como workaround pendente.
+- **Pix Copia e Cola (BR Code) na entrega da chave (H7.3):** a 1ª mensagem passa a levar, além da chave em texto, o payload EMV estático (função pura, sem gateway pago). Novo, além do que estava aqui.
+- **Reportar dado incorreto depois do aceite (H7.8/H7.9), item 7:** até aqui só existia o sinal simples do ACEITE (H5.4/Épico 2, "algum dado está incorreto", sem texto livre, só notifica). Esse sinal **continua igual** e vale só antes do aceite. O que é novo é um mecanismo **estruturado** para o combinado já ACEITO (`programado`): o devedor aponta QUAL campo (valor/data/nome ou motivo, nunca Pix) e a informação correta; o combinado pausa em `aguardando_aprovacao_dado_incorreto` até o cobrador aprovar (reabre a edição pré-preenchida e destacada no painel, ou "aprovar" por WhatsApp) ou recusar. Novo estado na máquina, nova tabela de reporte (append-only), novo caminho de captura por texto.
 
 ### Decisões tomadas
 - **Texto livre:** todas as contas recebem um menu de opções (não há distinção de plano; modelo de créditos, Épico 11). Depois de "Já paguei", nem isso (silêncio total para aquele combinado).
 - **"Já paguei" idempotente e silencioso na repetição** (não reenvia nada).
-- **"Chave Pix" entrega duas mensagens** (chave; depois titular + banco, até 3s de intervalo), **uma vez por combinado**, `solicitou_pix` só no 1º toque, reenvio só em falha de servidor.
+- **"Chave Pix" entrega duas mensagens** (chave, com o Pix Copia e Cola anexado; depois titular + banco, até 3s de intervalo), **uma vez por combinado**, `solicitou_pix` só no 1º toque, reenvio só em falha de servidor.
 - **Opt-out = estado `desregistrado`, reversível** (botão Ativar lembretes), só o combinado em questão, libera o horário reservado.
 - **Reativação** pega novo horário reservado, mensagem sem botão, e notifica o cobrador só se a notificação de saída já tiver saído; notificação de saída atrasada em **1 minuto**.
 - **Só os botões do último aviso agem** (H7.7); "Chave Pix" após encerrado: nada (só uma vez por combinado, só no último aviso).
+- **Campos reportáveis como incorretos pós-aceite (H7.8):** valor, data e nome/motivo (agrupados como uma opção). A chave Pix **não entra** (tem o sinal próprio "Chave Pix incorreta", Épico 14).
+- **Captura por texto, não por um 4º botão (H7.8):** a Meta limita a 3 botões rápidos por mensagem; o devedor escolhe o campo por número e informa a correção na mesma mensagem (ex.: *"1 250,00"*).
+- **Aprovar não aplica a correção sozinho (H7.9):** sempre reabre a edição (pré-preenchida e destacada) para o cobrador confirmar, seja pelo painel ou avisado a abrir o app depois de "aprovar" no WhatsApp; **recusar** não precisa de nenhum passo extra.
 
 ### Decisões em aberto
 - Nenhuma pendente neste épico.

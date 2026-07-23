@@ -187,6 +187,73 @@ describe('item 7: aprovar/recusar dado reportado como incorreto', () => {
     expect(r.json().error.code).toBe('sem_reporte_pendente')
   })
 
+  it('GET reporte-aprovado-pendente: null quando não há reporte aprovado recente', async () => {
+    const avisoId = await criarAceito()
+    const app = await criarAppTeste(cobrador)
+    const r = await app.inject({ method: 'GET', url: `/v1/avisos/${avisoId}/reporte-aprovado-pendente`, headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    expect(r.json().reporte).toBeNull()
+  })
+
+  it('GET reporte-aprovado-pendente: devolve o reporte depois de aprovar pelo painel (POST síncrono)', async () => {
+    const avisoId = await criarAceito()
+    await reportarDadoIncorreto(avisoId, 'valor', { valor_centavos: 12000 })
+    const app1 = await criarAppTeste(cobrador)
+    await app1.inject({ method: 'POST', url: `/v1/avisos/${avisoId}/aprovar-dado-incorreto`, headers: AUTH })
+    await app1.close()
+
+    const app2 = await criarAppTeste(cobrador)
+    const r = await app2.inject({ method: 'GET', url: `/v1/avisos/${avisoId}/reporte-aprovado-pendente`, headers: AUTH })
+    await app2.close()
+    expect(r.json().reporte).toEqual({ campo: 'valor', dados: { valor_centavos: 12000 } })
+  })
+
+  it('GET reporte-aprovado-pendente: devolve o reporte quando a aprovação veio direto do banco (simula o zap/WhatsApp)', async () => {
+    const avisoId = await criarAceito()
+    await reportarDadoIncorreto(avisoId, 'nome_motivo', { motivo: 'aluguel de setembro' })
+    // Mesma sequência que o zap faz ao aprovar por WhatsApp (grupo 1E, wave 2): resolve o
+    // reporte e registra o evento direto no banco, sem passar pelo POST síncrono acima.
+    const rep = await poolSuper.query<{ id: string }>(
+      `select id::text as id from public.avisos_reportes where aviso_id = $1`,
+      [avisoId],
+    )
+    await poolSuper.query(
+      `update public.avisos_reportes set resolucao = 'aprovado', resolvido_em = now() where id = $1`,
+      [rep.rows[0]!.id],
+    )
+    await poolSuper.query(`update public.avisos set status = 'programado' where id = $1`, [avisoId])
+    await poolSuper.query(
+      `insert into public.eventos_aviso (aviso_id, tipo, ator, detalhes)
+       values ($1, 'dado_incorreto_aprovado', 'cobrador', jsonb_build_object('reporte_id', $2::text, 'campo', 'nome_motivo'))`,
+      [avisoId, rep.rows[0]!.id],
+    )
+
+    const app = await criarAppTeste(cobrador)
+    const r = await app.inject({ method: 'GET', url: `/v1/avisos/${avisoId}/reporte-aprovado-pendente`, headers: AUTH })
+    await app.close()
+    expect(r.json().reporte).toEqual({ campo: 'nome_motivo', dados: { motivo: 'aluguel de setembro' } })
+  })
+
+  it('GET reporte-aprovado-pendente: some depois que o cobrador edita (a correção já foi tratada)', async () => {
+    const avisoId = await criarAceito()
+    await reportarDadoIncorreto(avisoId, 'valor', { valor_centavos: 8000 })
+    const app1 = await criarAppTeste(cobrador)
+    await app1.inject({ method: 'POST', url: `/v1/avisos/${avisoId}/aprovar-dado-incorreto`, headers: AUTH })
+    await app1.inject({
+      method: 'PATCH',
+      url: `/v1/avisos/${avisoId}`,
+      headers: AUTH,
+      payload: { itens: [{ descricao: 'Item', qtd: 1, valor_unit_centavos: 8000 }] },
+    })
+    await app1.close()
+
+    const app2 = await criarAppTeste(cobrador)
+    const r = await app2.inject({ method: 'GET', url: `/v1/avisos/${avisoId}/reporte-aprovado-pendente`, headers: AUTH })
+    await app2.close()
+    expect(r.json().reporte).toBeNull()
+  })
+
   it('editar direto enquanto há reporte pendente -> 409 reporte_em_aprovacao', async () => {
     const avisoId = await criarAceito()
     await reportarDadoIncorreto(avisoId, 'nome_motivo', { motivo: 'aluguel' })

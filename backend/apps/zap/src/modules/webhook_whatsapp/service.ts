@@ -22,10 +22,16 @@ interface Log {
 
 // E14: além das ações de convite/ciclo, o webhook reconhece `solicitar_pix` (pedido do
 // devedor no lembrete) e as ações do wizard de chave (informar/pular/corrigir/confirmar).
+// Item 7 (wave 2, migration 0099): aprovar_correcao/recusar_correcao decidem um reporte
+// de dado incorreto PÓS-aceite (não confundir com `dado_incorreto`, sinal simples do
+// CONVITE, H5.4). Hoje chegam pelo fallback de texto "aprovar"/"recusar" (mais abaixo);
+// entram em ACOES_BOTAO já agora para, se um botão de verdade existir num template
+// aprovado na Meta no futuro, funcionar sem mudança nenhuma aqui.
 const ACOES_BOTAO = [
   'ja_paguei', 'optout', 'ver_pix', 'ativar', 'aceite', 'recusa', 'dado_incorreto', 'confirmar', 'rejeitar',
   'solicitar_pix',
   'informar_pix', 'pix_pular', 'pix_corrigir', 'pix_confirma_tipo', 'pix_corrige_tipo', 'pix_confirmar',
+  'aprovar_correcao', 'recusar_correcao',
 ] as const
 type AcaoBotaoPayload = (typeof ACOES_BOTAO)[number]
 
@@ -336,6 +342,152 @@ async function garantirContaNoAceite(
   }
 }
 
+// Item 7 (wave 2): o COBRADOR resolve, por texto, um reporte de dado incorreto pendente
+// (aprovar/recusar). Palavra em vez de número: evita colidir com o "1"/"2"/"3" do
+// fallback do CONVITE (acima) e com a resposta numerada do wizard de Pix, e não exige
+// que o devedor/cobrador conheçam um `aviso_id` (a localização é pelo TELEFONE, H8.5).
+const DECISAO_CORRECAO_POR_TEXTO: Record<string, 'aprovar_correcao' | 'recusar_correcao'> = {
+  aprovar: 'aprovar_correcao',
+  recusar: 'recusar_correcao',
+}
+
+// Item 7 (wave 2): opção numerada de qual campo está incorreto, no MESMO texto que já
+// traz a informação correta (formato "<opção> <valor>", ex.: "1 250,00"). Sem sessão
+// multi-etapa (decisão de UX): um wizard de 2 mensagens exigiria uma tabela de sessão
+// nova (fora do escopo desta rodada, que só toca service/repo/index do módulo); uma
+// única mensagem cobre o mesmo resultado com bem menos risco. Pix NÃO entra (sinal
+// próprio `pix_incorreto`, 0035): só os 3 campos decididos (valor/data/nome ou motivo).
+const CAMPO_REPORTE_POR_NUMERO: Record<string, repo.CampoReporte> = {
+  '1': 'valor',
+  '2': 'data',
+  '3': 'nome_motivo',
+}
+
+interface RelatoDadoIncorreto {
+  campo: repo.CampoReporte
+  bruto: string
+}
+
+/** Reconhece "<1|2|3> <texto>" (a opção do campo + a informação correta). Não colide com
+ *  o fallback "1"/"2"/"3" isolados (aceite/dado_incorreto/recusa do convite): esse exige
+ *  match EXATO do dígito, sem nada depois. */
+function parsearRelatoDadoIncorreto(textoBruto: string): RelatoDadoIncorreto | null {
+  const m = textoBruto.trim().match(/^([123])\s+([\s\S]+)$/)
+  if (!m) return null
+  const campo = CAMPO_REPORTE_POR_NUMERO[m[1]!]
+  if (!campo) return null
+  return { campo, bruto: m[2]!.trim() }
+}
+
+/**
+ * Converte um valor em reais escrito à mão ("250,00", "250.00", "1.250,00", "R$ 250",
+ * "250") para centavos. Vírgula com 1-2 dígitos depois é separador decimal (formato BR;
+ * pontos antes dela são milhar, removidos). Sem vírgula nesse padrão, um PONTO com
+ * exatamente 2 dígitos depois também é tratado como decimal (ex.: "250.00"); qualquer
+ * outro ponto/vírgula é milhar (removido). Formato inválido ou valor <= 0 -> null.
+ */
+function parseValorBr(texto: string): number | null {
+  const limpo = texto.replace(/r\$/i, '').trim()
+  if (!limpo) return null
+  let normalizado: string
+  if (/,\d{1,2}$/.test(limpo)) {
+    normalizado = limpo.replace(/\./g, '').replace(',', '.')
+  } else if (/\.\d{2}$/.test(limpo) && !limpo.includes(',')) {
+    normalizado = limpo
+  } else {
+    normalizado = limpo.replace(/[.,]/g, '')
+  }
+  if (!/^\d+(\.\d{1,2})?$/.test(normalizado)) return null
+  const numero = Number(normalizado)
+  if (!Number.isFinite(numero) || numero <= 0) return null
+  return Math.round(numero * 100)
+}
+
+/** Converte "dd/mm/aaaa" para 'YYYY-MM-DD', validando o calendário (não só o formato). */
+function parseDataBr(texto: string): string | null {
+  const m = texto.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!m) return null
+  const dia = Number(m[1])
+  const mes = Number(m[2])
+  const ano = Number(m[3])
+  const data = new Date(Date.UTC(ano, mes - 1, dia))
+  const valido = data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia
+  if (!valido) return null
+  return `${String(ano).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+
+/**
+ * Nome/motivo corrigido: aceita "nome | motivo" (pipe separa os dois; um lado pode ficar
+ * vazio quando só o outro está errado) ou texto livre simples, que vai só para `motivo`
+ * (a correção mais comum: descrição do que é o combinado). Vazio -> null.
+ */
+function parseNomeOuMotivo(texto: string): repo.DadosReporte | null {
+  if (texto.includes('|')) {
+    const [nomeBruto, ...resto] = texto.split('|')
+    const nome = nomeBruto!.trim()
+    const motivo = resto.join('|').trim()
+    const dados: repo.DadosReporte = {}
+    if (nome) dados.nome_devedor = nome
+    if (motivo) dados.motivo = motivo
+    return dados.nome_devedor || dados.motivo ? dados : null
+  }
+  const motivo = texto.trim()
+  return motivo ? { motivo } : null
+}
+
+/** Monta `dados_corretos` (formato de `avisos_reportes`, migration 0092) a partir do
+ *  texto livre informado para o campo escolhido. null = formato não reconhecido. */
+function montarDadosCorretos(campo: repo.CampoReporte, bruto: string): repo.DadosReporte | null {
+  if (campo === 'valor') {
+    const centavos = parseValorBr(bruto)
+    return centavos != null ? { valor_centavos: centavos } : null
+  }
+  if (campo === 'data') {
+    const iso = parseDataBr(bruto)
+    return iso ? { data_combinada: iso } : null
+  }
+  return parseNomeOuMotivo(bruto)
+}
+
+/**
+ * Item 7 (wave 2): grava o reporte do devedor (dado incorreto pós-aceite) e responde a
+ * confirmação, ou pede para tentar de novo quando o formato não é reconhecido (sem
+ * criar reporte nem mudar o estado do combinado).
+ */
+async function tratarReporteDadoIncorreto(
+  deps: DepsInbound,
+  telefone: string,
+  avisoId: string,
+  relato: RelatoDadoIncorreto,
+): Promise<void> {
+  const dados = montarDadosCorretos(relato.campo, relato.bruto)
+  if (!dados) {
+    await responder(deps, telefone, 'resposta.dado_incorreto_formato_invalido', { refId: avisoId })
+    return
+  }
+  const registrado = await repo.registrarReporteDadoIncorreto(deps.pool, avisoId, telefone, relato.campo, dados)
+  if (!registrado) return // idempotente/silencioso (H7.2): toque duplo ou estado já mudou.
+  await responder(deps, telefone, 'resposta.dado_incorreto_registrado', { refId: avisoId })
+}
+
+/**
+ * Item 7 (wave 2): o COBRADOR digitou "aprovar"/"recusar". Localiza pelo TELEFONE o
+ * combinado com reporte pendente e reusa `aplicarEResponder` (mesmo pipeline dos botões
+ * de confirmar/rejeitar pagamento): valida de novo o telefone contra o alvo cobrador
+ * (M4/H8.9) dentro da mesma transação da decisão. Retorna false quando não há reporte
+ * pendente para este telefone (o texto cai no fluxo normal, sem responder nada aqui).
+ */
+async function tratarResolucaoCorrecao(
+  deps: DepsInbound,
+  telefone: string,
+  acao: 'aprovar_correcao' | 'recusar_correcao',
+): Promise<boolean> {
+  const pendente = await repo.localizarReportePendentePorTelefoneCobrador(deps.pool, telefone)
+  if (!pendente) return false
+  await aplicarEResponder(deps, pendente.avisoId, acao, { telefone })
+  return true
+}
+
 /**
  * Processa uma mensagem de TEXTO do devedor/convidado. Sem login no inbound (G3): o
  * vínculo é sempre por telefone. Como o Whaviso INICIA a conversa mandando o combinado
@@ -345,6 +497,10 @@ async function garantirContaNoAceite(
  * Ramos:
  *  - número de teste / wizard de Pix ativo → tratados antes (não entram aqui).
  *  - texto = "1"/"2"/"3" e há combinado pendente de aceite p/ o telefone → age como botão.
+ *  - texto = "aprovar"/"recusar" e o telefone é o COBRADOR de um reporte pendente (item 7,
+ *    wave 2) → aprova/recusa o dado reportado como incorreto.
+ *  - texto = "<1|2|3> <informação correta>" e o telefone tem combinado ATIVO (item 7,
+ *    wave 2) → registra o reporte de dado incorreto pós-aceite.
  *  - qualquer outro texto: se o telefone tem combinado acionável → menu de opções; senão
  *    fica em SILÊNCIO (não vira conversa nem gasta envio).
  * Nunca loga telefone/Pix (regra de ouro).
@@ -372,6 +528,10 @@ export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Pr
     return
   }
 
+  // Item 7 (wave 2): o COBRADOR resolve um reporte pendente digitando "aprovar"/"recusar".
+  const decisaoTexto = DECISAO_CORRECAO_POR_TEXTO[evento.texto.trim().toLowerCase()]
+  if (decisaoTexto && (await tratarResolucaoCorrecao(deps, telefone, decisaoTexto))) return
+
   // H7.1 / E11 H11.2: texto LIVRE de um DEVEDOR (sem chat/IA). Se o telefone tem
   // combinado(s) ATIVO(s) que ainda aceitam ação (programado) -> menu de opções (G-C1:
   // nunca lista informado_pago/desregistrado/terminais). O menu é UNIVERSAL (réplica, não
@@ -379,6 +539,13 @@ export async function processarTexto(deps: DepsInbound, evento: EventoTexto): Pr
   // conversa mandando o combinado com botões (E5), então não há mais "pedir número".
   const combinados = await repo.listarCombinadosParaMenu(deps.pool, telefone)
   if (combinados.length > 0) {
+    // Item 7 (wave 2): "<1|2|3> <informação correta>" reporta um dado incorreto do
+    // combinado ATIVO em vez de abrir o menu (mesma mensagem cobre escolha + valor).
+    const relato = parsearRelatoDadoIncorreto(evento.texto)
+    if (relato) {
+      await tratarReporteDadoIncorreto(deps, telefone, combinados[0]!.id, relato)
+      return
+    }
     await responder(deps, telefone, 'resposta.menu_opcoes', { refId: combinados[0]!.id })
   }
 }

@@ -36,6 +36,29 @@ export type AcaoBotao =
   // E14 H14.3: pedido do devedor (botão no lembrete invertido sem chave) que dispara a
   // oferta de cadastro de chave ao cobrador (Gatilho B).
   | 'solicitar_pix'
+  // Item 7 (wave 2, migration 0099): o COBRADOR aprova/recusa, por telefone, um dado
+  // reportado como incorreto PÓS-aceite (não confundir com `dado_incorreto`, que é o
+  // sinal simples do CONVITE, H5.4). Hoje chega ao service pelo fallback de texto
+  // "aprovar"/"recusar" (mesmo pipeline de aplicarAcaoBotao); se um botão de verdade
+  // vier a existir num template aprovado na Meta, já funciona por aqui também.
+  | 'aprovar_correcao'
+  | 'recusar_correcao'
+
+/** Campo do combinado que o devedor apontou como incorreto (espelha o CHECK de
+ *  `avisos_reportes.campo`, migration 0092). Pix NÃO entra (sinal próprio, `pix_incorreto`,
+ *  0035). Mesmo enum do lado api (apps/api/src/modules/avisos/repo.ts): cada app é
+ *  self-contained e mantém sua própria cópia, sem importar um do outro. */
+export type CampoReporte = 'valor' | 'data' | 'nome_motivo'
+
+/** Valores que o DEVEDOR informou como corretos ao reportar (formato depende de
+ *  `campo`); o zap ESCREVE (nunca resolve), a api lê para reabrir a edição pré-preenchida
+ *  no painel (0092). Espelha `DadosReporte` do lado api. */
+export interface DadosReporte {
+  valor_centavos?: number
+  data_combinada?: string
+  nome_devedor?: string
+  motivo?: string
+}
 
 /** Etapa do ciclo carregada no botão (H7.7); re-exportada para o service tipar o parse. */
 export type AcaoBotaoEtapa = EtapaEnvio
@@ -353,6 +376,60 @@ export async function aplicarAcaoBotao(
       // H8.2/C2: notifica o devedor (neutro), idempotente/coalescível por (aviso_id, tipo).
       await enfileirarNotificacaoDevedor(cli, alvoNotif, 'rejeicao')
       return { aplicado: true, novoStatus: 'programado', telefone: alvoCobrador, pixChave: null, chaveResposta: 'resposta.rejeitado' }
+    }
+
+    // ----- Item 7 (wave 2): COBRADOR aprova/recusa um dado reportado como incorreto,
+    // por telefone (mesmo roteamento/anti-vazamento de confirmar/rejeitar acima). Só
+    // decide QUAL reporte pendente fecha (resolucao) e devolve o combinado a `programado`;
+    // a correção em si (aplicar os novos dados) segue exigindo o painel (decisão da 0092:
+    // "aprovar não aplica a edição sozinha"). Zap tem grant column-level pra isto (0099):
+    // só `resolucao`/`resolvido_em`, nunca os campos do acordo.
+    if (acao === 'aprovar_correcao' || acao === 'recusar_correcao') {
+      const alvoCobrador = aviso.cobrador_id ? aviso.cobrador_profile_telefone : aviso.telefone_cobrador
+      if (!alvoCobrador) return null
+      if (opcoes.telefoneRespondente == null || opcoes.telefoneRespondente !== alvoCobrador) {
+        return null
+      }
+      if (aviso.status !== 'aguardando_aprovacao_dado_incorreto') {
+        // Idempotente/silencioso: toque duplo ou já resolvido por outro canal (painel).
+        return { aplicado: false, novoStatus: aviso.status, telefone: alvoCobrador, pixChave: null }
+      }
+      const { rows: repRows } = await cli.query<{ id: string; campo: CampoReporte }>(
+        `select id::text as id, campo from public.avisos_reportes
+          where aviso_id=$1 and resolucao='pendente'
+          order by criado_em desc limit 1
+          for update`,
+        [avisoId],
+      )
+      const reporte = repRows[0]
+      if (!reporte) {
+        return { aplicado: false, novoStatus: aviso.status, telefone: alvoCobrador, pixChave: null }
+      }
+      const decisao = acao === 'aprovar_correcao' ? 'aprovado' : 'recusado'
+      await cli.query(
+        `update public.avisos_reportes set resolucao=$2, resolvido_em=now() where id=$1`,
+        [reporte.id, decisao],
+      )
+      await cli.query(`update public.avisos set status='programado' where id=$1`, [avisoId])
+      await cli.query(
+        `insert into public.eventos_aviso (aviso_id, tipo, ator, detalhes)
+         values ($1, $2::tipo_evento, 'cobrador', jsonb_build_object('reporte_id',$3::text,'campo',$4::text,'via','telefone'))`,
+        [
+          avisoId,
+          acao === 'aprovar_correcao' ? 'dado_incorreto_aprovado' : 'dado_incorreto_recusado',
+          reporte.id,
+          reporte.campo,
+        ],
+      )
+      // H6.7: retoma o ciclo (horário reservado preservado na suspensão).
+      await reprogramarCiclo(cli, { avisoId, telefoneDevedor: aviso.telefone_devedor })
+      return {
+        aplicado: true,
+        novoStatus: 'programado',
+        telefone: alvoCobrador,
+        pixChave: null,
+        chaveResposta: acao === 'aprovar_correcao' ? 'resposta.correcao_aprovada' : 'resposta.correcao_recusada',
+      }
     }
 
     // ----- Botões do CONVITE (aceite/recusa/dado_incorreto): só em aguardando_aceite. -----
@@ -748,6 +825,100 @@ export async function listarCombinadosParaMenu(
     [telefone],
   )
   return rows.map((r) => ({ id: r.id }))
+}
+
+// ---- Item 7 (wave 2, migration 0099): reporte de dado incorreto PÓS-aceite ------------
+
+/**
+ * O DEVEDOR reporta, por texto, um campo do combinado ATIVO (`programado`) como
+ * incorreto, com o valor que ele considera correto. Numa transação: valida o telefone
+ * contra `telefone_devedor` (H7.6/G-M1, mesma disciplina das demais ações do ciclo) e o
+ * estado (só a partir de `programado`; qualquer outro estado é idempotente/silencioso:
+ * toque duplo, reporte já em análise, etc.), grava o reporte (`avisos_reportes`, só
+ * INSERT: o zap nunca resolve), suspende o ciclo (`aguardando_aprovacao_dado_incorreto`,
+ * o trigger da 0092 cancela os envios pendentes) e enfileira a notificação ao cobrador
+ * (mesmo TipoNotificacao do sinal simples do convite, `combinado_dado_incorreto`: não
+ * exige valor novo em TipoNotificacao). Retorna true se o reporte foi de fato registrado
+ * (para o service responder a confirmação); false = ignorado sem efeito (sem resposta).
+ */
+export async function registrarReporteDadoIncorreto(
+  pool: Pool,
+  avisoId: string,
+  telefoneDevedor: string,
+  campo: CampoReporte,
+  dados: DadosReporte,
+): Promise<boolean> {
+  return comTransacao(pool, async (cli) => {
+    const { rows } = await cli.query<{
+      status: string
+      telefone_devedor: string | null
+      criador_papel: 'cobrador' | 'devedor'
+      cobrador_id: string | null
+      devedor_profile_id: string | null
+      telefone_cobrador: string | null
+    }>(
+      `select status, telefone_devedor, criador_papel, cobrador_id, devedor_profile_id, telefone_cobrador
+         from public.avisos where id=$1 for update`,
+      [avisoId],
+    )
+    const aviso = rows[0]
+    if (!aviso) return false
+    // H7.6/G-M1: só o telefone do DEVEDOR (alvo dos lembretes) reporta; nunca o cobrador.
+    if (aviso.telefone_devedor == null || aviso.telefone_devedor !== telefoneDevedor) return false
+    // Só a partir de `programado` (idempotente/silencioso em qualquer outro estado: o
+    // combinado já está em revisão de edição, já em revisão de outro reporte, já pago
+    // etc.). O índice único parcial de `avisos_reportes` também depende disto: só há
+    // reporte pendente enquanto o aviso está neste estado.
+    if (aviso.status !== 'programado') return false
+
+    await cli.query(
+      `insert into public.avisos_reportes (aviso_id, campo, dados_corretos) values ($1,$2,$3::jsonb)`,
+      [avisoId, campo, JSON.stringify(dados)],
+    )
+    await cli.query(`update public.avisos set status='aguardando_aprovacao_dado_incorreto' where id=$1`, [avisoId])
+    await cli.query(
+      `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'dado_incorreto_reportado','devedor')`,
+      [avisoId],
+    )
+    await enfileirarNotificacao(
+      cli,
+      {
+        id: avisoId,
+        criador_papel: aviso.criador_papel,
+        cobrador_id: aviso.cobrador_id,
+        devedor_profile_id: aviso.devedor_profile_id,
+        telefone_cobrador: aviso.telefone_cobrador,
+        telefone_devedor: aviso.telefone_devedor,
+      },
+      'combinado_dado_incorreto',
+    )
+    return true
+  })
+}
+
+/**
+ * Localiza, pelo TELEFONE DO COBRADOR (com conta = telefone do profile; sem conta =
+ * `telefone_cobrador`, mesmo roteamento de confirmar/rejeitar pagamento, H8.5/C4),
+ * o combinado com um reporte de dado incorreto PENDENTE de decisão. Usado pelo
+ * fallback de texto "aprovar"/"recusar" para achar QUAL combinado resolver (o texto,
+ * ao contrário do botão, não carrega o `aviso_id`). Sem lock (leitura); a decisão em
+ * si serializa dentro de `aplicarAcaoBotao` (FOR UPDATE).
+ */
+export async function localizarReportePendentePorTelefoneCobrador(
+  pool: Pool,
+  telefone: string,
+): Promise<{ avisoId: string } | null> {
+  const { rows } = await pool.query<{ id: string }>(
+    `select a.id
+       from public.avisos a
+       left join public.profiles pc on pc.id = a.cobrador_id
+      where a.status = 'aguardando_aprovacao_dado_incorreto'
+        and coalesce(pc.telefone, a.telefone_cobrador) = $1
+      order by a.criado_em desc
+      limit 1`,
+    [telefone],
+  )
+  return rows[0] ? { avisoId: rows[0].id } : null
 }
 
 /** Atualiza o status de entrega de um envio pelo wamid. Ignora wamid desconhecido. */

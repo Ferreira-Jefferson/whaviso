@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ApiError } from '@/shared/api_client'
 import {
+  avisoReporteSchema,
   avisoSchema,
   buscarItemResposta,
   buscarPessoaResposta,
@@ -19,6 +20,7 @@ import {
   statusAviso,
   type Aviso,
   type AtivarAvisoBody,
+  type AvisoReporte,
   type BuscarItemResposta,
   type BuscarPessoaResposta,
   type Categoria,
@@ -514,6 +516,32 @@ export function useRecusarDadoIncorreto(id: string) {
   return useMutation<Aviso, Error, void>({
     mutationFn: () => apiClient.post<Aviso>(`/avisos/${id}/recusar-dado-incorreto`, { schema: avisoSchema }),
     onSuccess: () => invalidarTudo(qc, id),
+  })
+}
+
+const reporteAprovadoPendenteResposta = z.object({ reporte: avisoReporteSchema.nullable() })
+
+/**
+ * GET /v1/avisos/:id/reporte-aprovado-pendente (item 7, wave 2): reporte já aprovado cuja
+ * correção ainda não foi aplicada. Cobre a aprovação por WhatsApp (texto "aprovar" ao
+ * telefone do cobrador, grupo 1E), que não passa pela resposta síncrona de
+ * `useAprovarDadoIncorreto`: sem isto, o painel nunca saberia que precisa reabrir a
+ * edição pré-preenchida/destacada quando a aprovação não veio de um clique aqui dentro.
+ * `habilitado` (default: só quando o aviso está `programado`, o único estado em que uma
+ * aprovação recente ainda pode estar pendente de edição) evita a consulta na maioria das
+ * telas, onde nunca há nada a devolver.
+ */
+export function useReporteAprovadoPendente(id: string, habilitado = true) {
+  return useQuery({
+    queryKey: ['avisos', 'reporte-aprovado-pendente', id],
+    enabled: habilitado,
+    queryFn: async ({ signal }) => {
+      const r = await apiClient.get<{ reporte: AvisoReporte | null }>(`/avisos/${id}/reporte-aprovado-pendente`, {
+        schema: reporteAprovadoPendenteResposta,
+        signal,
+      })
+      return r.reporte
+    },
   })
 }
 
