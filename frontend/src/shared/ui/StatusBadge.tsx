@@ -9,6 +9,7 @@ const ESTILO: Record<StatusAviso, string> = {
   aguardando_aceite: 'bg-salvia-claro text-salvia',
   programado: 'bg-ambar-claro text-ambar',
   aguardando_aprovacao_aviso_editado: 'bg-ambar-claro text-ambar',
+  aguardando_aprovacao_dado_incorreto: 'bg-ambar-claro text-ambar',
   pausado: 'bg-papel-2 text-barro',
   informado_pago: 'bg-revisao-claro text-revisao',
   desregistrado: 'bg-papel-2 text-barro',

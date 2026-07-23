@@ -27,6 +27,7 @@ const ATIVOS: ReadonlySet<StatusAviso> = new Set<StatusAviso>([
   'informado_pago',
   'pausado',
   'aguardando_aprovacao_aviso_editado',
+  'aguardando_aprovacao_dado_incorreto',
   'desregistrado',
 ])
 const ehAtivo = (s: StatusAviso) => ATIVOS.has(s)

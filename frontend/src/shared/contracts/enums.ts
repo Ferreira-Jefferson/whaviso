@@ -16,6 +16,10 @@ export const statusAviso = z.enum([
   'aguardando_aceite',
   'programado',
   'aguardando_aprovacao_aviso_editado',
+  // Item 7 (migration 0092): o devedor reportou valor/data/nome-motivo como incorreto;
+  // aguarda o cobrador aprovar (reabre a edição pré-preenchida) ou recusar. Suspende os
+  // lembretes, igual aguardando_aprovacao_aviso_editado.
+  'aguardando_aprovacao_dado_incorreto',
   'pausado',
   'informado_pago',
   'desregistrado',
