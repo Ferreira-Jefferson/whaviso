@@ -227,6 +227,9 @@ export const ROTULO_EVENTO: Record<TipoEvento, string> = {
   expirado: 'Encerrado sem confirmação',
   solicitou_pix: 'Pediu a chave Pix',
   recusado: 'Combinado recusado',
+  dado_incorreto_reportado: 'Reportou um dado incorreto',
+  dado_incorreto_aprovado: 'Correção aprovada',
+  dado_incorreto_recusado: 'Correção recusada',
 }
 
 // ---- Rótulos do ator de um evento ----

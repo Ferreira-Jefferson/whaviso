@@ -137,3 +137,18 @@ export type AcaoDevedor = z.infer<typeof acaoDevedor>
 
 export const tipoChavePix = z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria'])
 export type TipoChavePix = z.infer<typeof tipoChavePix>
+
+// H10.10: central de notificações (item 6, feedback 2026-07-22). `origem` distingue a
+// outbox de onde o item veio (a central UNE duas tabelas); `tipo` são só as categorias que
+// entram nesta leva. O `TipoNotificacao` completo (optout, reativação, encerramento,
+// edição, etc., em apps/api/src/shared/notificacoes) segue só WhatsApp/auditoria, de fora
+// da central por decisão deliberada de escopo (ver historias/10-notificacoes-cobrador.md).
+export const origemNotificacaoCentral = z.enum(['cobrador', 'billing'])
+export type OrigemNotificacaoCentral = z.infer<typeof origemNotificacaoCentral>
+
+export const tipoNotificacaoCentral = z.enum([
+  'pagamento_informado',
+  'combinado_dado_incorreto',
+  'recarga',
+])
+export type TipoNotificacaoCentral = z.infer<typeof tipoNotificacaoCentral>

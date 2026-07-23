@@ -5,11 +5,13 @@ import {
   contextoTemplate,
   direcaoAviso,
   etapaEnvio,
+  origemNotificacaoCentral,
   papelAviso,
   statusAviso,
   statusEnvio,
   statusMetaTemplate,
   tipoChavePix,
+  tipoNotificacaoCentral,
 } from './enums'
 import {
   avisoSchema,
@@ -1005,6 +1007,45 @@ export const previewMensagemResposta = z.object({
   avisos_genero: z.array(z.string()).default([]),
 })
 export type PreviewMensagemResposta = z.infer<typeof previewMensagemResposta>
+
+// ---- H10.10: central de notificações (GET /v1/notificacoes) ----
+// Item 6 (feedback 2026-07-22): feed cronológico das notificações do PRÓPRIO usuário,
+// unindo `notificacoes_cobrador` (pagamento_informado, combinado_dado_incorreto; o
+// enfileiramento já roteia para o alvo certo em qualquer papel/fluxo, ver
+// apps/api/src/shared/notificacoes) e `notificacoes_billing` (recarga). Não é o "precisa
+// de você" do painel (H9.2, pendências ABERTAS por combinado); é o histórico do que já
+// aconteceu. Sem texto pronto: o front monta o rótulo a partir de `tipo` (como ROTULO_EVENTO).
+export const notificacoesCentralQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+})
+export type NotificacoesCentralQuery = z.infer<typeof notificacoesCentralQuery>
+
+export const notificacaoCentralSchema = z.object({
+  id: z.uuid(),
+  origem: origemNotificacaoCentral,
+  tipo: tipoNotificacaoCentral,
+  // Presente só para origem 'cobrador' (a notificação aponta um combinado); 'billing'
+  // (recarga) não tem aviso, o link é para /app/creditos.
+  aviso_id: z.uuid().nullable(),
+  criado_em: z.coerce.date(),
+  lida: z.boolean(),
+})
+export type NotificacaoCentral = z.infer<typeof notificacaoCentralSchema>
+
+export const notificacoesCentralResposta = z.object({
+  itens: z.array(notificacaoCentralSchema),
+  // Contagem de não lidas TOTAL (não limitada por `limit`): é o número do badge do sino.
+  nao_lidas: z.number().int(),
+})
+export type NotificacoesCentralResposta = z.infer<typeof notificacoesCentralResposta>
+
+// POST /v1/notificacoes/marcar-lidas: marca TODAS as não lidas do usuário como lidas de
+// uma vez (decisão de mecanismo mais simples que cobre o caso de uso real: abrir o sino e
+// a lista para de contar como pendente). Idempotente (nada para marcar = marcadas 0).
+export const marcarNotificacoesLidasResposta = z.object({
+  marcadas: z.number().int(),
+})
+export type MarcarNotificacoesLidasResposta = z.infer<typeof marcarNotificacoesLidasResposta>
 
 // ---- Envelope de erro padrão ----
 export const erroResposta = z.object({

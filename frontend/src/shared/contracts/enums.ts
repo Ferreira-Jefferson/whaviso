@@ -76,6 +76,12 @@ export const tipoEvento = z.enum([
   'expirado',
   'solicitou_pix',
   'recusado',
+  // Item 7 (migration 0092): reporte de dado incorreto (valor/data/nome-motivo).
+  // 'dado_incorreto_reportado' é gravado pelo webhook do zap; os outros dois pela api
+  // ao o cobrador aprovar/recusar.
+  'dado_incorreto_reportado',
+  'dado_incorreto_aprovado',
+  'dado_incorreto_recusado',
 ])
 export type TipoEvento = z.infer<typeof tipoEvento>
 

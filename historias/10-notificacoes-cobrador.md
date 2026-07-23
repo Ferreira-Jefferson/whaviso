@@ -98,6 +98,42 @@ Como **sistema (zap)**, quero uma fila simples (sem Redis) que espace os envios 
 
 ---
 
+### H10.10: Central de notificações no painel (leitura + marcar como lida) 🟢
+Como **cobrador** (ou devedor-criador no invertido), quero ver num só lugar o que já
+aconteceu (pagamento informado, dado incorreto reportado, solicitação de créditos), para
+acompanhar sem depender só do WhatsApp.
+*Critérios de aceite:*
+- [ ] A central é um **feed cronológico** (mais recentes primeiro) do que já foi
+  enfileirado, acessível pelo sino do cabeçalho comum do painel (`AppShell`). Não é o
+  "precisa de você" da H9.2 (pendências ABERTAS por combinado): é o **histórico** do que
+  já aconteceu, os dois são complementares.
+- [ ] Só **estas categorias** entram na central nesta leva (decisão deliberada de
+  escopo, extensível depois): "já paguei" (`pagamento_informado`, sinônimo de "pagamento
+  reportado" no vocabulário do dono do produto), "dado incorreto reportado"
+  (`combinado_dado_incorreto`) e "solicitação de créditos" (recarga enfileirada em
+  `notificacoes_billing`). Os demais `TipoNotificacao` do Épico 10 (aceite, recusa,
+  optout, reativação) e de outros épicos (encerramento, status alterado, rejeição,
+  reengajamento, edição a aprovar/recusada) **não entram**: continuam só WhatsApp/
+  auditoria, sem mudança de comportamento.
+- [ ] **Mecanismo de "lida":** coluna `lida_em` (nullable; NULL = não lida) em
+  `notificacoes_cobrador` e em `notificacoes_billing`. Abrir a central marca **todas** as
+  não lidas do usuário como lidas de uma vez (mais simples que cobre o caso de uso real);
+  idempotente (reabrir sem pendências novas não falha nem duplica nada).
+- [ ] O contador de não lidas do sino conta o **total pendente**, não só os itens
+  trazidos pelo feed (que tem um limite de exibição).
+- [ ] **Isolamento:** cada usuário só vê as próprias notificações (nunca vaza dado de
+  outra conta), pelo mesmo id de perfil autenticado.
+- [ ] Clique num item da central navega ao contexto: para as de `notificacoes_cobrador`,
+  ao combinado (`/app/avisos/:id`); para a de crédito, à tela de Créditos
+  (`/app/creditos`).
+- [ ] Sem texto pronto vindo do banco: o rótulo exibido é montado no front a partir da
+  categoria (mesmo espírito de `ROTULO_EVENTO`, mas um mapa PRÓPRIO: a central lê
+  `TipoNotificacao`/outbox de billing, não `tipo_evento`, os dois são enums diferentes).
+- [ ] Linguagem neutra quanto a gênero, sem palavras proibidas, sem travessão. Nenhum
+  dado sensível (telefone, Pix, valor de recarga) é logado.
+
+---
+
 ### Divergências com a definição atual
 
 > A outbox `notificacoes_cobrador` (api enfileira, zap drena) já é a arquitetura decidida (CLAUDE.md). As divergências vêm dos eventos e janelas novos.
@@ -120,6 +156,13 @@ Como **sistema (zap)**, quero uma fila simples (sem Redis) que espace os envios 
 - **Idempotência e antiduplicação** por evento/combinado.
 - **Canal principal é o WhatsApp:** avisos sempre por WhatsApp; o painel/site é segunda opção, não substitui o canal. Não há preferência que desligue o WhatsApp.
 - **Fila de saída simples (H10.9):** só banco (sem Redis), espaçamento de 10 min por destinatário e **cancelamento conservador** de itens superados, nas duas filas (cobrador e devedor); ponto crítico com testes dedicados.
+- **Central de notificações (H10.10):** feed cronológico no painel (sino no `AppShell`),
+  unindo `notificacoes_cobrador` (só `pagamento_informado`/`combinado_dado_incorreto`) e
+  `notificacoes_billing` (recarga). Mecanismo de "lida" é a coluna `lida_em` (NULL = não
+  lida); abrir a central marca TODAS as não lidas de uma vez (mais simples, idempotente).
+  Isolamento por perfil autenticado; sem texto pronto no banco (o front monta o rótulo a
+  partir da categoria). Escopo deliberadamente restrito às 3 categorias do item 6 do
+  feedback: os demais tipos de notificação seguem só WhatsApp/auditoria nesta leva.
 
 ### Decisões em aberto
 - Nenhuma pendente neste épico.
@@ -130,3 +173,7 @@ Como **sistema (zap)**, quero uma fila simples (sem Redis) que espace os envios 
 - ❌ Como as pendências aparecem no painel ("precisa de você") (Épico 9).
 - ❌ Limites de envio (saldo de créditos) e o que conta como envio (Épico 11).
 - ❌ Edição dos textos das notificações pelo owner (Épico 12).
+- ❌ **Na central (H10.10):** aceite, recusa, optout, reativação, encerramento, status
+  alterado, rejeição, reengajamento e edição a aprovar/recusada. Decisão deliberada de
+  escopo (item 6 do feedback cobre só 4 categorias); esses tipos seguem só WhatsApp,
+  extensível depois se o produto pedir.

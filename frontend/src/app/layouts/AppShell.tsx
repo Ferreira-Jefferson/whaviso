@@ -7,6 +7,7 @@ import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router'
 import { LogOut, Inbox, LayoutDashboard, MoreHorizontal, X } from 'lucide-react'
 import { useAuth, useRole, useTemVinculoDevedor } from '@/shared/auth'
 import { cn, BellLogo } from '@/shared/ui'
+import { SinoNotificacoes } from '@/modules/notificacoes'
 import { NAV_POR_SECAO, NAV_OWNER, secaoDaRota, rotaAtiva, type NavItem } from './nav'
 import { AssinaturaBanner } from '../AssinaturaBanner'
 
@@ -72,10 +73,13 @@ export function AppShell() {
     <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr]">
       {/* Sidebar (lg+) */}
       <aside className="hidden border-r border-linha bg-papel-2 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
-        <Link to="/" className="flex items-center gap-2 px-6 py-6 text-salvia">
-          <BellLogo className="size-6 text-dourado" />
-          <span className="font-display text-xl font-semibold">whaviso</span>
-        </Link>
+        <div className="flex items-center justify-between px-6 py-6">
+          <Link to="/" className="flex items-center gap-2 text-salvia">
+            <BellLogo className="size-6 text-dourado" />
+            <span className="font-display text-xl font-semibold">whaviso</span>
+          </Link>
+          <SinoNotificacoes />
+        </div>
         <nav className="flex flex-col gap-1 px-3">
           {ehOwner ? (
             <>
@@ -110,14 +114,17 @@ export function AppShell() {
             <BellLogo className="size-5 text-dourado" />
             <span className="font-display text-lg font-semibold">whaviso</span>
           </span>
-          <button
-            type="button"
-            onClick={sair}
-            aria-label="Sair"
-            className="flex items-center gap-1.5 text-sm text-tinta-2 hover:text-salvia"
-          >
-            <LogOut strokeWidth={1.75} className="size-5" />
-          </button>
+          <span className="flex items-center gap-1">
+            <SinoNotificacoes />
+            <button
+              type="button"
+              onClick={sair}
+              aria-label="Sair"
+              className="flex items-center gap-1.5 p-2 text-sm text-tinta-2 hover:text-salvia"
+            >
+              <LogOut strokeWidth={1.75} className="size-5" />
+            </button>
+          </span>
         </header>
 
         {/* Banner discreto de status da assinatura do cobrador (Fase 7). */}
