@@ -13,6 +13,10 @@ export const statusAviso = z.enum([
   'aguardando_aceite',
   'programado',
   'aguardando_aprovacao_aviso_editado',
+  // Item 7 (migration 0092): o devedor reportou valor/data/nome-motivo como incorreto;
+  // aguarda o cobrador aprovar (reabre a edição pré-preenchida) ou recusar. Suspende os
+  // lembretes, igual aguardando_aprovacao_aviso_editado (ver validar_transicao_aviso).
+  'aguardando_aprovacao_dado_incorreto',
   'pausado',
   'informado_pago',
   'desregistrado',
@@ -69,6 +73,12 @@ export const tipoEvento = z.enum([
   'expirado',
   'solicitou_pix',
   'recusado',
+  // Item 7 (migration 0092): reporte de dado incorreto (valor/data/nome-motivo).
+  // `dado_incorreto_reportado` é gravado pelo grupo 1E (webhook do zap, wave 2); os
+  // outros dois pela api ao o cobrador aprovar/recusar (service.ts deste módulo).
+  'dado_incorreto_reportado',
+  'dado_incorreto_aprovado',
+  'dado_incorreto_recusado',
 ])
 export type TipoEvento = z.infer<typeof tipoEvento>
 

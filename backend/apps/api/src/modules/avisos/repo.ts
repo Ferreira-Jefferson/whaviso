@@ -142,6 +142,9 @@ export interface NovoAviso {
   acao_token_hash: string | null
   /** E5/H5.7: expiração FIXA de 7 dias do combinado em aguardando_aceite (now()+7d). null no agenda. */
   convite_expira_em: Date | null
+  /** Item 21: código curto do combinado (6 alfanumérico, sem ambíguos), gerado pelo
+   *  serviço (node:crypto) ANTES do insert, já conferido único (ver gerarCodigoUnico). */
+  codigo: string
 }
 
 export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso> {
@@ -153,10 +156,10 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
         recorrencia_tipo, recorrencia_freq, recorrencia_intervalo,
         ocorrencias_total, ocorrencia_atual, cadencia_etapas,
         aceite_token_hash, aceite_token_expira_em, acao_token_hash, convite_expira_em,
-        valor_custo_centavos, itens, pix_tipo)
+        valor_custo_centavos, itens, pix_tipo, codigo)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
              coalesce($18,1),$19,$20,$21::etapa_envio[],$22,$23,$24,$25,$26,$27::jsonb,
-             $28::tipo_chave_pix)
+             $28::tipo_chave_pix,$29)
      returning ${COLS}`,
     [
       novo.cobrador_id, novo.devedor_profile_id, novo.direcao, novo.criador_papel, novo.status,
@@ -172,9 +175,36 @@ export async function inserirAviso(ex: Executor, novo: NovoAviso): Promise<Aviso
       // passamos a string JSON (null = coluna null). Espelha inserirEdicao/atualizarItens.
       novo.itens == null ? null : JSON.stringify(novo.itens),
       novo.pix_tipo ?? null,
+      novo.codigo,
     ],
   )
   return mapear(rows[0]!)
+}
+
+/**
+ * Item 21: existe algum aviso com este código? Usado pelo serviço para conferir
+ * disponibilidade ANTES do insert (defesa em profundidade: a coluna também tem índice
+ * único, que é quem realmente garante a unicidade sob corrida).
+ */
+export async function codigoExiste(ex: Executor, codigo: string): Promise<boolean> {
+  const { rows } = await ex.query<{ existe: boolean }>(
+    `select exists(select 1 from public.avisos where codigo = $1) as existe`,
+    [codigo],
+  )
+  return rows[0]?.existe ?? false
+}
+
+/**
+ * Item 21: lê só o código do combinado. Rota dedicada (GET /avisos/:id/codigo): o
+ * campo `codigo` ainda não entra no contrato Zod geral do Aviso nesta rodada (ver nota
+ * do grupo 1B no relatório), então é exposto separado em vez de ir dentro de `Aviso`.
+ */
+export async function buscarCodigo(ex: Executor, avisoId: string): Promise<string | null> {
+  const { rows } = await ex.query<{ codigo: string | null }>(
+    `select codigo from public.avisos where id = $1`,
+    [avisoId],
+  )
+  return rows[0]?.codigo ?? null
 }
 
 export async function inserirEvento(
@@ -494,20 +524,25 @@ export async function atualizarPixTipo(ex: Executor, id: string, tipo: TipoChave
  * Materializa as N ocorrências de um combinado recorrente (índice 1..N, status
  * 'programado'). Idempotente: ON CONFLICT (aviso_id, indice) não duplica. As datas vêm
  * já expandidas pelo serviço (`expandirOcorrencias`, em America/Sao_Paulo).
+ *
+ * P2 (auditoria de SQL): batch único via unnest, em vez de até MAX_OCORRENCIAS (60)
+ * INSERTs sequenciais. `datas` vazio não dispara query (unnest de array vazio já
+ * devolveria 0 linhas, mas evitamos a viagem ao banco à toa).
  */
 export async function inserirOcorrencias(
   ex: Executor,
   avisoId: string,
   datas: string[],
 ): Promise<void> {
-  for (let i = 0; i < datas.length; i++) {
-    await ex.query(
-      `insert into public.aviso_ocorrencias (aviso_id, indice, data_combinada, status)
-         values ($1, $2, $3, 'programado')
-       on conflict (aviso_id, indice) do nothing`,
-      [avisoId, i + 1, datas[i]],
-    )
-  }
+  if (datas.length === 0) return
+  const indices = datas.map((_, i) => i + 1)
+  await ex.query(
+    `insert into public.aviso_ocorrencias (aviso_id, indice, data_combinada, status)
+       select $1, idx, dt, 'programado'
+         from unnest($2::int[], $3::date[]) as t(idx, dt)
+     on conflict (aviso_id, indice) do nothing`,
+    [avisoId, indices, datas],
+  )
 }
 
 /** Ocorrências do combinado (ordem por índice). Para o "k de N" e o desmembramento no painel. */
@@ -786,4 +821,54 @@ export async function atualizarItens(
     id,
     itens == null ? null : JSON.stringify(itens),
   ])
+}
+
+// ---- Reporte de dado incorreto (item 7, migration 0092) --------------------------------
+
+/** Campo do combinado que o devedor apontou como incorreto. Pix NÃO entra (sinal
+ *  próprio, `pix_incorreto`, 0035). Espelha o CHECK de `avisos_reportes.campo`. */
+export type CampoReporte = 'valor' | 'data' | 'nome_motivo'
+
+/** Valores que o DEVEDOR informou como CORRETOS ao reportar (formato depende de
+ *  `campo`): o zap (grupo 1E) escreve; a api só lê para reabrir a edição pré-preenchida. */
+export interface DadosReporte {
+  valor_centavos?: number | null
+  data_combinada?: string | null
+  nome_devedor?: string | null
+  motivo?: string | null
+}
+
+export interface ReportePendente {
+  id: string
+  campo: CampoReporte
+  dados_corretos: DadosReporte
+}
+
+/**
+ * Reporte PENDENTE (resolucao='pendente') do aviso, com os dados corretos informados
+ * pelo devedor. FOR UPDATE: serializa aprovar/recusar concorrentes (mesmo padrão de
+ * `edicaoPendente`).
+ */
+export async function reportePendente(ex: Executor, avisoId: string): Promise<ReportePendente | null> {
+  const { rows } = await ex.query<ReportePendente>(
+    `select id::text as id, campo, dados_corretos
+       from public.avisos_reportes
+      where aviso_id = $1 and resolucao = 'pendente'
+      order by criado_em desc limit 1
+      for update`,
+    [avisoId],
+  )
+  return rows[0] ?? null
+}
+
+/** Fecha o reporte (aprovado/recusado). Append-only update (nunca DELETE). */
+export async function resolverReporte(
+  ex: Executor,
+  reporteId: string,
+  resolucao: 'aprovado' | 'recusado',
+): Promise<void> {
+  await ex.query(
+    `update public.avisos_reportes set resolucao = $2, resolvido_em = now() where id = $1`,
+    [reporteId, resolucao],
+  )
 }

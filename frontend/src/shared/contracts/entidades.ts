@@ -17,6 +17,7 @@ import {
   tipoChavePix,
   tipoEvento,
   tipoMidiaTemplate,
+  type StatusAviso,
 } from './enums'
 
 export const telefoneE164 = z
@@ -160,6 +161,40 @@ export const ocorrenciaSchema = z.object({
   criado_em: z.coerce.date(),
 })
 export type Ocorrencia = z.infer<typeof ocorrenciaSchema>
+
+// ---- Item 7 (migration 0092, grupo 1B): reporte de dado incorreto ----------------------
+// Campo do combinado que o DEVEDOR apontou como incorreto ao aceitar/interagir pelo
+// WhatsApp (valor, data ou nome/motivo agrupados; chave Pix NÃO entra, tem sinal
+// próprio). Espelha o CHECK de `avisos_reportes.campo` no backend. O schema de resposta
+// das rotas POST /avisos/:id/aprovar-dado-incorreto e /recusar-dado-incorreto vive LOCAL
+// em backend/apps/api/src/modules/avisos/index.ts nesta rodada (o contrato geral do
+// Aviso ainda não carrega reporte/código, ver nota abaixo); este tipo aqui é o espelho
+// para o front consumir a mesma forma.
+export const campoReporteAviso = z.enum(['valor', 'data', 'nome_motivo'])
+export type CampoReporteAviso = z.infer<typeof campoReporteAviso>
+
+export const avisoReporteSchema = z.object({
+  campo: campoReporteAviso,
+  // Valores que o devedor informou como CORRETOS ao reportar (formato depende de `campo`).
+  dados: z.object({
+    valor_centavos: z.number().int().positive().nullish(),
+    data_combinada: z.string().nullish(),
+    nome_devedor: z.string().nullish(),
+    motivo: z.string().nullish(),
+  }),
+})
+export type AvisoReporte = z.infer<typeof avisoReporteSchema>
+
+export const resolverReporteResposta = z.object({
+  aviso: avisoSchema,
+  reporte: avisoReporteSchema,
+})
+export type ResolverReporteResposta = z.infer<typeof resolverReporteResposta>
+
+// Item 7 (migration 0092): o novo status já está em `statusAviso` (enums.ts) e portanto
+// em `Aviso['status']`. Mantemos esta constante só para quem prefere comparar por nome
+// em vez de literal solto (StatusBadge.tsx e shared/format já têm entrada para o valor).
+export const STATUS_AGUARDANDO_APROVACAO_DADO_INCORRETO = 'aguardando_aprovacao_dado_incorreto' as const satisfies StatusAviso
 
 export const envioSchema = z.object({
   id: z.uuid(),

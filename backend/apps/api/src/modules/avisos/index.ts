@@ -19,6 +19,30 @@ import * as service from './service'
 
 const idParam = z.object({ id: z.uuid() })
 
+// Item 7 (migration 0092): resposta de aprovar/recusar um reporte de dado incorreto.
+// Schema LOCAL (não em @whaviso/shared/contracts): o contrato geral do Aviso ainda não
+// carrega `codigo`/reporte nesta rodada (ver nota do grupo 1B no relatório); manter aqui
+// evita tocar em backend/packages/shared/src/contracts/entidades.ts ou payloads.ts, fora
+// do escopo desta tarefa.
+const campoReporteSchema = z.enum(['valor', 'data', 'nome_motivo'])
+const dadosReporteSchema = z.object({
+  valor_centavos: z.number().int().positive().nullish(),
+  data_combinada: z.string().nullish(),
+  nome_devedor: z.string().nullish(),
+  motivo: z.string().nullish(),
+})
+const resolverReporteResposta = z.object({
+  aviso: avisoSchema,
+  reporte: z.object({
+    campo: campoReporteSchema,
+    dados: dadosReporteSchema,
+  }),
+})
+
+// Item 21 (migration 0093): código do combinado, por rota dedicada (mesma razão acima:
+// `codigo` ainda não entra no avisoSchema geral nesta rodada).
+const codigoAvisoResposta = z.object({ codigo: z.string() })
+
 export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
   const app = raiz.withTypeProvider<ZodTypeProvider>()
   app.post(
@@ -65,6 +89,30 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
     '/avisos/:id/desfazer-edicao',
     { preHandler: app.autenticar, schema: { params: idParam, response: { 200: avisoSchema } } },
     async (req) => service.desfazerEdicao(app.pool, req.userId, req.params.id),
+  )
+
+  // Item 7 (migration 0092): o cobrador APROVA o dado reportado como incorreto pelo
+  // devedor. Devolve o aviso (já de volta a `programado`) + o reporte (campo + dados
+  // corretos), para o painel reabrir a edição pré-preenchida/destacada.
+  app.post(
+    '/avisos/:id/aprovar-dado-incorreto',
+    { preHandler: app.autenticar, schema: { params: idParam, response: { 200: resolverReporteResposta } } },
+    async (req) => service.aprovarDadoIncorreto(app.pool, req.userId, req.params.id),
+  )
+
+  // Item 7: o cobrador RECUSA o dado reportado (o combinado segue como estava).
+  app.post(
+    '/avisos/:id/recusar-dado-incorreto',
+    { preHandler: app.autenticar, schema: { params: idParam, response: { 200: avisoSchema } } },
+    async (req) => service.recusarDadoIncorreto(app.pool, req.userId, req.params.id),
+  )
+
+  // Item 21 (migration 0093): código curto do combinado, por rota dedicada (o avisoSchema
+  // geral ainda não carrega `codigo` nesta rodada). Mesma visibilidade do detalhe.
+  app.get(
+    '/avisos/:id/codigo',
+    { preHandler: app.autenticar, schema: { params: idParam, response: { 200: codigoAvisoResposta } } },
+    async (req) => ({ codigo: await service.obterCodigo(app.pool, req.userId, req.params.id) }),
   )
 
   // H2.7: pausar / reativar um combinado aceito.

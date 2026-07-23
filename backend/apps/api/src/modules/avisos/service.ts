@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import type { Pool, PoolClient } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
 import { aceiteExpiraEm, conviteExpiraEm, expandirOcorrencias, formatarDataBr, formatarValorBr } from '@whaviso/shared/datas'
@@ -83,6 +84,37 @@ function montarRecorrencia(
     },
     datas,
   }
+}
+
+// Item 21: código curto do combinado, pensado para ser lido/digitado por humano (já
+// usado em mensagens do zap, hoje derivado ad-hoc do id). Maiúsculo, 6 caracteres,
+// exclui os ambíguos 0/O/1/I/L. Não sequencial (não vaza volume de combinados).
+const ALFABETO_CODIGO_COMBINADO = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+const TAMANHO_CODIGO_COMBINADO = 6
+const TENTATIVAS_CODIGO_COMBINADO = 10
+
+/** Uma amostra do código (aleatoriedade CRIPTOGRÁFICA via node:crypto, nunca Math.random). */
+function gerarCodigoCombinado(): string {
+  let codigo = ''
+  for (let i = 0; i < TAMANHO_CODIGO_COMBINADO; i++) {
+    codigo += ALFABETO_CODIGO_COMBINADO[randomInt(ALFABETO_CODIGO_COMBINADO.length)]
+  }
+  return codigo
+}
+
+/**
+ * Gera um código de combinado ÚNICO (item 21), com retry em colisão: confere
+ * disponibilidade antes do insert (o índice único da coluna é quem garante a unicidade
+ * de fato sob corrida; aqui só evitamos abortar a transação no caminho feliz). Espaço
+ * de 32^6 (~1bi) torna a colisão rara; TENTATIVAS_CODIGO_COMBINADO é só uma defesa
+ * contra um cenário patológico (ex.: bug gerando sempre o mesmo valor).
+ */
+async function gerarCodigoUnico(cli: PoolClient): Promise<string> {
+  for (let tentativa = 0; tentativa < TENTATIVAS_CODIGO_COMBINADO; tentativa++) {
+    const codigo = gerarCodigoCombinado()
+    if (!(await repo.codigoExiste(cli, codigo))) return codigo
+  }
+  throw new Error('nao foi possivel gerar um codigo de combinado unico')
 }
 
 /**
@@ -181,6 +213,9 @@ export async function criarAviso(
       ? await resolverPixTipo(cli, ehReceber ? uid : null, body.pix_chave)
       : null
 
+    // Item 21: código curto do combinado (gerado sempre, agenda ou enviar).
+    const codigo = await gerarCodigoUnico(cli)
+
     const camposComuns = {
       cobrador_id: ehReceber ? uid : null,
       devedor_profile_id: ehReceber ? null : uid,
@@ -201,6 +236,7 @@ export async function criarAviso(
       // Composição do pedido (itens): obrigatória; a soma vira o valor_centavos acima. Já com
       // `produto_id` preenchido (vínculo ao catálogo).
       itens,
+      codigo,
     }
 
     // ---- H4.1: modo AGENDA: nasce sem_aviso, SEM envio. ----
@@ -541,6 +577,9 @@ const VIVOS: StatusAviso[] = [
   'programado',
   'pausado',
   'aguardando_aprovacao_aviso_editado',
+  // Item 7: aguardando o cobrador aprovar/recusar um dado reportado como incorreto.
+  // Cancelável (mirror do trigger); editável só depois de resolver (guarda acima).
+  'aguardando_aprovacao_dado_incorreto',
   'informado_pago',
   'desregistrado',
 ]
@@ -570,6 +609,15 @@ export async function editarAviso(
     if (aviso.status === 'aguardando_aprovacao_aviso_editado') {
       // Já há uma edição aguardando decisão do devedor: desfaça ou aguarde antes de reeditar.
       throw conflito('edicao_em_aprovacao', 'Já existe uma edição aguardando aprovação. Desfaça-a antes de editar de novo.')
+    }
+    if (aviso.status === 'aguardando_aprovacao_dado_incorreto') {
+      // Item 7: há um dado reportado como incorreto aguardando decisão do cobrador
+      // (aprovar/recusar); resolva-o antes de editar direto (aprovar já reabre a edição
+      // pré-preenchida, então este PATCH normal só roda DEPOIS, já em `programado`).
+      throw conflito(
+        'reporte_em_aprovacao',
+        'Há um dado reportado como incorreto aguardando sua decisão. Aprove ou recuse antes de editar.',
+      )
     }
 
     const livre = EDICAO_LIVRE.includes(aviso.status)
@@ -771,6 +819,102 @@ export async function recusarEdicao(cli: PoolClient, id: string): Promise<void> 
   await reprogramarCiclo(cli, { avisoId: id, telefoneDevedor: null })
   const alvo = await repo.buscarParaNotificar(cli, id)
   if (alvo) await enfileirarNotificacao(cli, alvo, 'edicao_recusada')
+}
+
+/** Resultado de resolver um reporte de dado incorreto (item 7, migration 0092). */
+export interface ResolucaoReporte {
+  aviso: Aviso
+  reporte: { campo: repo.CampoReporte; dados: repo.DadosReporte }
+}
+
+/**
+ * Item 7: o COBRADOR APROVA o dado reportado como incorreto pelo devedor
+ * (aguardando_aprovacao_dado_incorreto -> programado). Decisão do dono: aprovar NÃO
+ * aplica a edição sozinho, devolve o reporte (campo + dados corretos informados pelo
+ * devedor) para o painel reabrir o fluxo de EDIÇÃO já existente, pré-preenchido e
+ * destacado (o cobrador confirma/envia como uma edição normal, PATCH /avisos/:id).
+ * Espelha o mecanismo de `aprovarEdicao` (mesma tabela de resolução append-only, mesmo
+ * reprogramarCiclo), mas sobre `avisos_reportes` em vez de `avisos_edicoes`.
+ */
+export async function aprovarDadoIncorreto(pool: Pool, uid: string, id: string): Promise<ResolucaoReporte> {
+  return comTransacao(pool, async (cli) => {
+    // Só o COBRADOR (dono do combinado) resolve o reporte (contrato com o grupo 1E: o
+    // zap só ESCREVE o reporte quando o devedor aponta; quem decide é sempre o cobrador).
+    const aviso = await repo.buscarComoCobrador(cli, id, uid)
+    if (!aviso) throw naoEncontrado('Aviso não encontrado')
+    if (aviso.status !== 'aguardando_aprovacao_dado_incorreto') {
+      throw conflito(
+        'sem_reporte_pendente',
+        'Não há dado reportado como incorreto aguardando decisão.',
+      )
+    }
+    const reporte = await repo.reportePendente(cli, id)
+    if (!reporte) {
+      throw conflito('sem_reporte_pendente', 'Não há dado reportado como incorreto aguardando decisão.')
+    }
+    await repo.resolverReporte(cli, reporte.id, 'aprovado')
+    await repo.atualizarStatus(cli, id, 'programado')
+    // Marca no evento QUAL reporte originou a volta a programado (distingue de uma
+    // reativação comum), para quem ler eventos_aviso entender a origem sem precisar de
+    // coluna nova em avisos_edicoes: a própria EDIÇÃO que o cobrador enviar em seguida
+    // (PATCH /avisos/:id) é uma edição normal, e não carrega marca alguma daqui.
+    await repo.inserirEvento(cli, id, 'dado_incorreto_aprovado', aviso.criador_papel, {
+      reporte_id: reporte.id,
+      campo: reporte.campo,
+    })
+    // TODO(escopo): notificar o devedor que o reporte foi aprovado exige um novo valor em
+    // TipoNotificacao (backend/apps/api/src/shared/notificacoes/index.ts), fora do escopo
+    // desta rodada (arquivo não listado). Ver nota no relatório do grupo 1B.
+    await reprogramarCiclo(cli, { avisoId: id, telefoneDevedor: aviso.telefone_devedor })
+    return {
+      aviso: { ...aviso, status: 'programado' },
+      reporte: { campo: reporte.campo, dados: reporte.dados_corretos },
+    }
+  })
+}
+
+/**
+ * Item 7: o COBRADOR RECUSA o dado reportado como incorreto (o combinado segue como
+ * estava; aguardando_aprovacao_dado_incorreto -> programado, ciclo reprogramado).
+ */
+export async function recusarDadoIncorreto(pool: Pool, uid: string, id: string): Promise<Aviso> {
+  return comTransacao(pool, async (cli) => {
+    const aviso = await repo.buscarComoCobrador(cli, id, uid)
+    if (!aviso) throw naoEncontrado('Aviso não encontrado')
+    if (aviso.status !== 'aguardando_aprovacao_dado_incorreto') {
+      throw conflito(
+        'sem_reporte_pendente',
+        'Não há dado reportado como incorreto aguardando decisão.',
+      )
+    }
+    const reporte = await repo.reportePendente(cli, id)
+    if (!reporte) {
+      throw conflito('sem_reporte_pendente', 'Não há dado reportado como incorreto aguardando decisão.')
+    }
+    await repo.resolverReporte(cli, reporte.id, 'recusado')
+    await repo.atualizarStatus(cli, id, 'programado')
+    await repo.inserirEvento(cli, id, 'dado_incorreto_recusado', aviso.criador_papel, {
+      reporte_id: reporte.id,
+      campo: reporte.campo,
+    })
+    // TODO(escopo): mesma nota acima (notificar o devedor da recusa exige um novo valor
+    // em TipoNotificacao, fora do escopo desta rodada).
+    await reprogramarCiclo(cli, { avisoId: id, telefoneDevedor: aviso.telefone_devedor })
+    return { ...aviso, status: 'programado' }
+  })
+}
+
+/**
+ * Item 21: código curto do combinado, por rota dedicada (o campo ainda não entra no
+ * contrato Zod geral do Aviso nesta rodada, ver nota do grupo 1B). Mesma visibilidade
+ * do detalhe (cobrador dono OU devedor vinculado).
+ */
+export async function obterCodigo(pool: Pool, uid: string, id: string): Promise<string> {
+  const aviso = await repo.buscarAvisoVisivel(pool, id, uid)
+  if (!aviso) throw naoEncontrado('Aviso não encontrado')
+  const codigo = await repo.buscarCodigo(pool, id)
+  if (!codigo) throw naoEncontrado('Aviso não encontrado')
+  return codigo
 }
 
 /**

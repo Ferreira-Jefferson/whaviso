@@ -5,7 +5,7 @@
 // - Ações: confirmar/desmarcar recebimento (OTIMISTA, reversível);
 //   cancelar (PESSIMISTA, ConfirmDialog). Invalidação cobre detalhe+lista+resumo.
 // Linguagem das Regras de Ouro: só recebido/combinado/encerrar (ver linguagem.ts).
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router'
 import {
@@ -20,6 +20,7 @@ import {
   Pause,
   Play,
   Send,
+  ShieldAlert,
   Undo2,
   Users,
 } from 'lucide-react'
@@ -32,6 +33,7 @@ import {
   DateInput,
   EmptyState,
   Field,
+  IconePendencia,
   Input,
   MoneyText,
   PageHeader,
@@ -48,17 +50,19 @@ import {
   rotuloAtor,
   telefone,
 } from '@/shared/format'
-import type { Aviso, EventoAviso, ItemPedido, PapelAviso } from '@/shared/contracts'
+import type { Aviso, AvisoReporte, EventoAviso, ItemPedido, PapelAviso } from '@/shared/contracts'
 import type { EditarAvisoBody } from '@/shared/contracts'
 import type { AtivarAvisoBody, CriarAvisoResposta } from '@/shared/contracts'
-import { somaItensCentavos } from '@/shared/contracts'
+import { somaItensCentavos, STATUS_AGUARDANDO_APROVACAO_DADO_INCORRETO } from '@/shared/contracts'
 import { ItensPedido } from '../components/ItensPedido'
 import { ApiError } from '@/shared/api_client'
 import { usePerfil } from '@/shared/auth'
 import { useSemSaldo } from '@/shared/plano'
 import {
+  useAprovarDadoIncorreto,
   useAtivarAviso,
   useAviso,
+  useAvisoCodigo,
   useAvisoEnvios,
   useAvisoEventos,
   useCombinadoEnvio,
@@ -71,10 +75,66 @@ import {
   usePausarAviso,
   useReativarAviso,
   useReengajar,
+  useRecusarDadoIncorreto,
   useRejeitarPagamento,
 } from '../api'
 import { AvisoCriado } from '../components/AvisoCriado'
 import { ProgressoRecorrencia } from '../components/ProgressoRecorrencia'
+
+// Item 1 (feedback 2026-07-22): primeiro erro REAL entre as mutações da tela, de forma
+// GENÉRICA (não uma lista fixa de nomes de botão): cobre Reengajar e qualquer outra
+// ação que hoje engula um erro de saldo. Quando é `saldo_insuficiente`/`agenda_cheia`
+// (ApiError.isLimiteDeSaldo), a tela mostra sempre o MESMO banner + link para
+// /app/creditos usado hoje só no Ativar (ver AtivarModal), em vez do erro cru.
+function primeiroErro(mutacoes: ReadonlyArray<{ isError: boolean; error: unknown }>): Error | null {
+  for (const m of mutacoes) {
+    if (m.isError && m.error instanceof Error) return m.error
+  }
+  return null
+}
+
+// Item 8 (feedback 2026-07-22): pendência do aviso, decidida no CLIENTE a partir do
+// status, para destacar visualmente que o combinado precisa de uma ação do cobrador.
+type PendenciaAviso =
+  | 'confirmar_pagamento'
+  | 'aprovar_dado_incorreto'
+  | 'aprovar_edicao'
+  | 'sem_saldo_ativar'
+  | null
+
+function tooltipDaPendencia(pendencia: PendenciaAviso): string {
+  switch (pendencia) {
+    case 'confirmar_pagamento':
+      return 'O devedor informou que pagou. Confirme ou rejeite o pagamento.'
+    case 'aprovar_dado_incorreto':
+      return 'O devedor reportou um dado incorreto no combinado. Aprove ou recuse a correção.'
+    case 'aprovar_edicao':
+      return 'Você editou o combinado. Aguardando aprovação do devedor para retomar os lembretes.'
+    case 'sem_saldo_ativar':
+      return 'Sem créditos suficientes para ativar este combinado.'
+    case null:
+      return ''
+  }
+}
+
+// Item 7: envolve um campo do EditarModal com destaque visual (cor) quando ele veio de
+// uma aprovação de reporte de dado incorreto, para o cobrador ver o que mudou.
+function CampoDestacado({ ativo, children }: { ativo: boolean; children: ReactNode }) {
+  if (!ativo) return <>{children}</>
+  return (
+    <div className="-m-2 rounded-card border border-ambar/40 bg-ambar-claro/50 p-2">
+      {children}
+    </div>
+  )
+}
+
+function pendenciaDoAviso(status: Aviso['status'], ehAgenda: boolean, semSaldo: boolean): PendenciaAviso {
+  if (status === 'informado_pago') return 'confirmar_pagamento'
+  if (status === STATUS_AGUARDANDO_APROVACAO_DADO_INCORRETO) return 'aprovar_dado_incorreto'
+  if (status === 'aguardando_aprovacao_aviso_editado') return 'aprovar_edicao'
+  if (ehAgenda && semSaldo) return 'sem_saldo_ativar'
+  return null
+}
 
 export default function DetalheAvisoPage() {
   const { id = '' } = useParams()
@@ -135,8 +195,17 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const reativar = useReativarAviso(id)
   const ativar = useAtivarAviso(id)
   const marcarPago = useMarcarPagoAgenda(id)
+  // Item 7: aprovar reabre a edição pré-preenchida (guardamos o reporte devolvido);
+  // recusar só volta o combinado a `programado`.
+  const aprovarDadoIncorreto = useAprovarDadoIncorreto(id)
+  const recusarDadoIncorreto = useRecusarDadoIncorreto(id)
+  // Item 21: código curto do combinado (rota dedicada; degrada para null se ainda não
+  // existir no backend em execução, ex.: migration 0093 pendente de aplicar no cloud).
+  const codigo = useAvisoCodigo(id)
   const [confirmarCancelar, setConfirmarCancelar] = useState(false)
   const [editando, setEditando] = useState(false)
+  const [reporteParaEditar, setReporteParaEditar] = useState<AvisoReporte | null>(null)
+  const [confirmarRecusarReporte, setConfirmarRecusarReporte] = useState(false)
   const [ativando, setAtivando] = useState(false)
   // H9.5 / H8.1: ao confirmar pelo painel, a mensagem ao devedor sai em ~1min e dá para
   // reverter (reabrir) nesse intervalo. A AUTORIDADE é a api/zap (agendar_para); o front
@@ -150,6 +219,9 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const ehAgenda = aviso.status === 'sem_aviso'
   const emRevisao = aviso.status === 'informado_pago'
   const emReaprovacao = aviso.status === 'aguardando_aprovacao_aviso_editado'
+  const emAprovacaoDadoIncorreto = aviso.status === STATUS_AGUARDANDO_APROVACAO_DADO_INCORRETO
+  // Item 8: pendência a destacar (badge "Precisa de você" no cabeçalho).
+  const pendencia = pendenciaDoAviso(aviso.status, ehAgenda, semSaldo)
   const podeConfirmar = aviso.status === 'programado' || emRevisao
   const podeRejeitar = emRevisao
   const podeDesmarcar = aviso.status === 'pago'
@@ -160,14 +232,19 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
     'programado',
     'pausado',
     'aguardando_aprovacao_aviso_editado',
+    STATUS_AGUARDANDO_APROVACAO_DADO_INCORRETO,
     'informado_pago',
     'desregistrado',
   ]
   const podeCancelar = VIVOS_CANCELAVEIS.includes(aviso.status)
-  // H2.5/H4.4: editar em qualquer fase viva (menos enquanto já há edição a aprovar). Na
-  // agenda (sem_aviso) a edição é livre e vale nos dois fluxos.
+  // H2.5/H4.4: editar em qualquer fase viva (menos enquanto já há edição a aprovar OU um
+  // dado reportado como incorreto a aprovar/recusar, item 7). Na agenda (sem_aviso) a
+  // edição é livre e vale nos dois fluxos.
   const podeEditar =
-    (ehReceber || ehAgenda) && VIVOS_CANCELAVEIS.includes(aviso.status) && !emReaprovacao
+    (ehReceber || ehAgenda) &&
+    VIVOS_CANCELAVEIS.includes(aviso.status) &&
+    !emReaprovacao &&
+    !emAprovacaoDadoIncorreto
   // Pós-aceite a edição exige nova aprovação do devedor.
   const editaExigeAprovacao = aviso.status !== 'aguardando_aceite' && aviso.status !== 'sem_aviso'
   // H2.7: pausar só de programado; reativar só de pausado.
@@ -198,7 +275,18 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
       <PageHeader
         titulo={aviso.nome_devedor}
         descricao={`${ROTULO_DIRECAO[aviso.direcao]} · ${aviso.motivo}`}
-        acoes={<StatusBadge status={aviso.status} papel={meuPapel} />}
+        acoes={
+          <div className="flex items-center gap-2">
+            {/* Item 8: pendência do aviso (precisa de uma ação sua). */}
+            {pendencia && (
+              <span className="inline-flex items-center gap-1 rounded-pill bg-ambar-claro px-2 py-1 text-xs font-medium text-ambar">
+                <IconePendencia tipo="aviso" tooltip={tooltipDaPendencia(pendencia)} className="size-3" />
+                Precisa de você
+              </span>
+            )}
+            <StatusBadge status={aviso.status} papel={meuPapel} />
+          </div>
+        }
       />
 
       {/* E15 H15.1: atalho para a visão da pessoa (todos os combinados do mesmo número).
@@ -308,6 +396,43 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
             </Card>
           )}
 
+          {/* Item 7: a pessoa reportou um dado do combinado como incorreto (valor, data ou
+              nome/motivo); aguarda o cobrador aprovar (reabre a edição pré-preenchida com
+              o que a pessoa informou como correto) ou recusar (mantém como estava). */}
+          {emAprovacaoDadoIncorreto && (
+            <Card className="flex items-start gap-3 border-ambar/30 bg-ambar-claro">
+              <ShieldAlert strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-ambar" />
+              <div className="flex-1">
+                <p className="font-medium text-ambar">A pessoa reportou um dado incorreto</p>
+                <p className="mt-0.5 text-sm text-tinta-2">
+                  Enquanto isso, os lembretes deste combinado ficam pausados. Ao aprovar, você
+                  revisa a correção antes de confirmar; ao recusar, o combinado segue como está.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    onClick={() =>
+                      aprovarDadoIncorreto.mutate(undefined, {
+                        onSuccess: (r) => setReporteParaEditar(r.reporte),
+                      })
+                    }
+                    loading={aprovarDadoIncorreto.isPending}
+                  >
+                    <CheckCircle2 strokeWidth={1.75} className="size-4" />
+                    Revisar e aprovar
+                  </Button>
+                  <Button
+                    variante="secondary"
+                    onClick={() => setConfirmarRecusarReporte(true)}
+                    loading={recusarDadoIncorreto.isPending}
+                  >
+                    <XCircle strokeWidth={1.75} className="size-4" />
+                    Recusar
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* H9.5/H8.1: janela de ~1min após confirmar. A mensagem ao devedor ainda não
               saiu; reabrir agora a cancela (a pessoa não recebe nada). Sem regra no front. */}
           {confirmadoAgora && aviso.status === 'pago' && (
@@ -336,6 +461,14 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
 
           <Card>
             <dl className="grid grid-cols-2 gap-4 text-sm">
+              {/* Item 21: código curto do combinado (rota dedicada; degrada em silêncio
+                  se ainda não existir no backend em execução). */}
+              {codigo.data && (
+                <div>
+                  <dt className="text-tinta-2">Código do combinado</dt>
+                  <dd className="mt-0.5 font-medium tracking-wide text-tinta">{codigo.data}</dd>
+                </div>
+              )}
               <div>
                 <dt className="text-tinta-2">Valor</dt>
                 <dd className="mt-0.5">
@@ -599,23 +732,43 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
             )}
 
             {!ehAgenda && !podeConfirmar && !podeRejeitar && !podeDesmarcar && !podeCancelar &&
-              !podePausar && !podeReativar && !podeReengajar && !podeEditar && !emReaprovacao && (
+              !podePausar && !podeReativar && !podeReengajar && !podeEditar && !emReaprovacao &&
+              !emAprovacaoDadoIncorreto && (
               <p className="text-sm text-tinta-2">Nenhuma ação disponível para este estado.</p>
             )}
 
-            {(confirmar.isError || rejeitar.isError || desmarcar.isError || cancelar.isError ||
-              editar.isError || desfazer.isError || pausar.isError || reativar.isError ||
-              reengajar.isError || marcarPago.isError) && (
-              <Banner tom="erro">
-                <span className="inline-flex items-center gap-1.5">
-                  <AlertTriangle strokeWidth={1.75} className="size-4" />
-                  {(editar.error instanceof Error && editar.error.message) ||
-                    (marcarPago.error instanceof Error && marcarPago.error.message) ||
-                    (reengajar.error instanceof Error && reengajar.error.message) ||
-                    'Não foi possível concluir. Tente novamente.'}
-                </span>
-              </Banner>
-            )}
+            {/* Item 1 (feedback 2026-07-22): primeiro erro REAL de QUALQUER mutação da
+                tela (helper genérico, sem lista fixa de botões: cobre Reengajar e
+                qualquer outra ação futura). Erro de saldo insuficiente sempre mostra o
+                mesmo banner + link para /app/creditos usado hoje só no Ativar; os demais
+                erros seguem no banner simples de sempre. `ativar` fica de fora (já tem o
+                próprio tratamento dedicado dentro do AtivarModal). */}
+            {(() => {
+              const erro = primeiroErro([
+                confirmar, rejeitar, desmarcar, cancelar, editar, desfazer, pausar,
+                reativar, reengajar, marcarPago, aprovarDadoIncorreto, recusarDadoIncorreto,
+              ])
+              if (!erro) return null
+              const ehSaldo = erro instanceof ApiError && erro.isLimiteDeSaldo
+              if (ehSaldo) {
+                return (
+                  <Banner tom="info">
+                    {erro.message}{' '}
+                    <Link to="/app/creditos" className="font-medium underline">
+                      Recarregar créditos
+                    </Link>
+                  </Banner>
+                )
+              }
+              return (
+                <Banner tom="erro">
+                  <span className="inline-flex items-center gap-1.5">
+                    <AlertTriangle strokeWidth={1.75} className="size-4" />
+                    {erro.message || 'Não foi possível concluir. Tente novamente.'}
+                  </span>
+                </Banner>
+              )
+            })()}
           </Card>
         </div>
       </div>
@@ -666,35 +819,125 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
           onFechar={() => setEditando(false)}
         />
       )}
+
+      {/* Item 7: aprovar reabre a edição pré-preenchida com o que a pessoa informou como
+          correto, com o(s) campo(s) alterado(s) destacado(s), para o cobrador revisar
+          antes de confirmar/enviar (a edição em si segue o caminho normal do PATCH,
+          incluindo reaprovação do devedor se o combinado já foi aceito). */}
+      {reporteParaEditar && (
+        <EditarModal
+          aviso={aviso}
+          exigeAprovacao={editaExigeAprovacao}
+          salvando={editar.isPending}
+          valoresIniciais={valoresDoReporte(reporteParaEditar, aviso)}
+          destaques={destaquesDoReporte(reporteParaEditar.campo)}
+          onSalvar={(body) =>
+            editar.mutate(body, { onSuccess: () => setReporteParaEditar(null) })
+          }
+          onFechar={() => setReporteParaEditar(null)}
+        />
+      )}
+
+      <ConfirmDialog
+        aberto={confirmarRecusarReporte}
+        titulo="Recusar o dado reportado?"
+        textoConfirmar="Sim, recusar"
+        textoCancelar="Voltar"
+        carregando={recusarDadoIncorreto.isPending}
+        onConfirmar={() =>
+          recusarDadoIncorreto.mutate(undefined, {
+            onSuccess: () => setConfirmarRecusarReporte(false),
+          })
+        }
+        onCancelar={() => setConfirmarRecusarReporte(false)}
+      >
+        O combinado segue com os dados atuais, sem nenhuma alteração. Os lembretes voltam a
+        sair normalmente.
+      </ConfirmDialog>
     </div>
   )
 }
 
+/**
+ * Item 7: converte o reporte aprovado em valores iniciais para o EditarModal (a
+ * pré-preenchida). `valor` vira um único item sintético com o total corrigido (mesmo
+ * recurso já usado para avisos legados sem itens, ver `itensIniciais` no EditarModal).
+ */
+function valoresDoReporte(
+  reporte: AvisoReporte,
+  aviso: Aviso,
+): Partial<{ nome_devedor: string; motivo: string; data_combinada: string; itens: ItemPedido[] }> {
+  const d = reporte.dados
+  if (reporte.campo === 'valor' && d.valor_centavos != null) {
+    return { itens: [{ descricao: aviso.motivo, qtd: 1, valor_unit_centavos: d.valor_centavos }] }
+  }
+  if (reporte.campo === 'data' && d.data_combinada) {
+    return { data_combinada: d.data_combinada }
+  }
+  if (reporte.campo === 'nome_motivo') {
+    const v: Partial<{ nome_devedor: string; motivo: string }> = {}
+    if (d.nome_devedor) v.nome_devedor = d.nome_devedor
+    if (d.motivo) v.motivo = d.motivo
+    return v
+  }
+  return {}
+}
+
+/** Quais campos do EditarModal destacar (mudaram por causa da aprovação do reporte). */
+function destaquesDoReporte(campo: AvisoReporte['campo']): ReadonlySet<CampoDestacavel> {
+  if (campo === 'valor') return new Set(['itens'])
+  if (campo === 'data') return new Set(['data_combinada'])
+  return new Set(['nome_devedor', 'motivo'])
+}
+
+// Item 7: campos do EditarModal que podem ser destacados por virem de uma aprovação de
+// reporte de dado incorreto (em vez de uma edição manual normal).
+type CampoDestacavel = 'nome_devedor' | 'motivo' | 'data_combinada' | 'itens'
+
 // H2.5: modal de edição (reusa Inputs simples). Para combinado JÁ aceito, mostra o
 // aviso de confirmação com o texto exato da história antes de salvar (a alteração vai
 // para aprovação do devedor e pausa os lembretes).
+//
+// Item 7: `valoresIniciais`/`destaques` (opcionais) reabrem este MESMO modal já
+// pré-preenchido com o que a pessoa informou como correto ao aprovar um reporte de dado
+// incorreto, destacando visualmente os campos alterados (para o cobrador ver o que
+// mudou antes de confirmar/enviar). O CÁLCULO de "o que mudou" (montar/itensMudou)
+// sempre compara contra o `aviso` ORIGINAL, nunca contra o valor pré-preenchido: assim
+// o corpo enviado ao PATCH carrega a correção mesmo se o cobrador só clicar Salvar.
 function EditarModal({
   aviso,
   exigeAprovacao,
   salvando,
+  valoresIniciais,
+  destaques,
   onSalvar,
   onFechar,
 }: {
   aviso: Aviso
   exigeAprovacao: boolean
   salvando: boolean
+  valoresIniciais?: Partial<{
+    nome_devedor: string
+    motivo: string
+    data_combinada: string
+    itens: ItemPedido[]
+  }>
+  destaques?: ReadonlySet<CampoDestacavel>
   onSalvar: (body: EditarAvisoBody) => void
   onFechar: () => void
 }) {
-  const [nome, setNome] = useState(aviso.nome_devedor)
-  const [motivo, setMotivo] = useState(aviso.motivo)
-  const [data, setData] = useState(aviso.data_combinada)
+  const [nome, setNome] = useState(valoresIniciais?.nome_devedor ?? aviso.nome_devedor)
+  const [motivo, setMotivo] = useState(valoresIniciais?.motivo ?? aviso.motivo)
+  const [data, setData] = useState(valoresIniciais?.data_combinada ?? aviso.data_combinada)
   const [pix, setPix] = useState(aviso.pix_chave ?? '')
   const [titular, setTitular] = useState(aviso.pix_titular ?? '')
   const [banco, setBanco] = useState(aviso.pix_banco ?? '')
   const [confirmando, setConfirmando] = useState(false)
   // O valor do combinado vem dos itens. Avisos antigos sem itens ganham uma linha semente
   // (descrição = motivo, preço = valor atual), preservando o total até o dono ajustar.
+  // `itensIniciais` é sempre a BASELINE do `aviso` original (para "o que mudou" bater
+  // certo); o valor MOSTRADO no formulário pode partir de `valoresIniciais.itens`
+  // (correção de um reporte aprovado), por isso os dois ficam separados.
   const itensIniciais = useMemo<ItemPedido[]>(
     () =>
       aviso.itens && aviso.itens.length > 0
@@ -702,7 +945,7 @@ function EditarModal({
         : [{ descricao: aviso.motivo, qtd: 1, valor_unit_centavos: aviso.valor_centavos }],
     [aviso],
   )
-  const [itens, setItens] = useState<ItemPedido[]>(itensIniciais)
+  const [itens, setItens] = useState<ItemPedido[]>(valoresIniciais?.itens ?? itensIniciais)
 
   const totalItens = somaItensCentavos(itens)
   const itensMudou = JSON.stringify(itens) !== JSON.stringify(itensIniciais)
@@ -768,16 +1011,30 @@ function EditarModal({
         >
         <Card className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto">
           <h2 className="text-lg text-salvia">Editar combinado</h2>
-          <Field label="Nome de quem vai pagar">
-            <Input value={nome} onChange={(e) => setNome(e.target.value)} />
-          </Field>
-          <Field label="Sobre o quê">
-            <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-          </Field>
-          <ItensPedido value={itens} onChange={setItens} erro={erroItens} />
-          <Field label="Data combinada">
-            <DateInput value={data} onChange={(e) => setData(e.target.value)} />
-          </Field>
+          {destaques && destaques.size > 0 && (
+            <Banner tom="info">
+              Os campos marcados em destaque abaixo foram alterados porque você aprovou o
+              dado reportado como incorreto. Confira antes de salvar.
+            </Banner>
+          )}
+          <CampoDestacado ativo={destaques?.has('nome_devedor') ?? false}>
+            <Field label="Nome de quem vai pagar">
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+            </Field>
+          </CampoDestacado>
+          <CampoDestacado ativo={destaques?.has('motivo') ?? false}>
+            <Field label="Sobre o quê">
+              <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+            </Field>
+          </CampoDestacado>
+          <CampoDestacado ativo={destaques?.has('itens') ?? false}>
+            <ItensPedido value={itens} onChange={setItens} erro={erroItens} />
+          </CampoDestacado>
+          <CampoDestacado ativo={destaques?.has('data_combinada') ?? false}>
+            <Field label="Data combinada">
+              <DateInput value={data} onChange={(e) => setData(e.target.value)} />
+            </Field>
+          </CampoDestacado>
           <Field label="Chave Pix">
             <Input value={pix} onChange={(e) => setPix(e.target.value)} />
           </Field>

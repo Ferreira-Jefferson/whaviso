@@ -3,7 +3,7 @@
 > Fluxo **receber**: quem cria é o **cobrador** (vai receber) e convida o **devedor** (vai pagar e recebe os lembretes).
 > Ao criar, o combinado nasce em **aguardando_aceite** e **não dispara lembrete nenhum** até o aceite (Épico 5).
 > Convenções que valem como regra: dinheiro em **centavos** (int), datas de negócio em **America/Sao_Paulo**.
-> Identificação: o combinado é enviado direto ao WhatsApp do devedor (resumo + botões, via Meta Cloud API); não há token nem número de convite. Ver H2.2 e a seção de divergências.
+> Identificação: o combinado é enviado direto ao WhatsApp do devedor (resumo + botões, via Meta Cloud API); não há token nem número de convite. Todo combinado tem um **código curto** (referência humana, não usado para localizar o envio). Ver H2.2 e a seção de divergências.
 
 ---
 
@@ -29,6 +29,7 @@ Como **cobrador**, quero que o combinado seja enviado direto ao WhatsApp do deve
 - [ ] Ao criar/ativar no modo enviar, o combinado nasce em **`aguardando_aceite`** e o Whaviso envia o **resumo do combinado + botões** direto ao WhatsApp do devedor (Meta Cloud API), sem depender de o cobrador repassar link ou número.
 - [ ] O resumo traz os dados do acordo (motivo, valor em reais, data em `America/Sao_Paulo`) e os botões de aceite (aceitar / algum dado incorreto / recusar), detalhados no Épico 5.
 - [ ] O combinado é localizado pelo próprio envio (o `aviso_id` viaja no payload do botão), não por número que o devedor precise digitar.
+- [ ] Todo combinado ganha, ao ser criado, um **código curto** para referência humana entre cobrador e devedor (ex.: mencionar "o combinado XXXXXX" numa conversa): **6 caracteres alfanuméricos, maiúsculos**, excluindo os caracteres ambíguos (**0/O, 1/I/L**), gerado com **aleatoriedade criptográfica** e **não sequencial** (não revela quantos combinados já existem). O código **não serve para localizar** o envio nem substitui o botão de resposta (isso continua pelo `aviso_id` do payload); é só um rótulo legível.
 - [ ] Enquanto o devedor não responde, **nenhum lembrete** é programado nem disparado.
 - [ ] O detalhamento do aceite em si (botões, respostas, expiração) fica no Épico 5.
 

@@ -15,6 +15,7 @@ import {
   listaCategoriasResposta,
   listaProdutosResposta,
   ocorrenciaSchema,
+  resolverReporteResposta,
   statusAviso,
   type Aviso,
   type AtivarAvisoBody,
@@ -32,6 +33,7 @@ import {
   type Envio,
   type EventoAviso,
   type Ocorrencia,
+  type ResolverReporteResposta,
   type StatusAviso,
 } from '@/shared/contracts'
 import { z } from 'zod'
@@ -486,6 +488,59 @@ export function useMarcarPagoAgenda(id: string) {
   return useMutation<Aviso, Error, void>({
     mutationFn: () => apiClient.post<Aviso>(`/avisos/${id}/marcar-pago-agenda`, { schema: avisoSchema }),
     onSuccess: () => invalidarTudo(qc, id),
+  })
+}
+
+/**
+ * POST /v1/avisos/:id/aprovar-dado-incorreto (item 7): o cobrador aprova o dado
+ * reportado como incorreto pelo devedor. Devolve o aviso (de volta a `programado`) + o
+ * reporte (campo + dados corretos), para o painel reabrir a edição pré-preenchida.
+ * PESSIMISTA: o resultado abre o modal de edição, então precisa do reporte de volta.
+ */
+export function useAprovarDadoIncorreto(id: string) {
+  const qc = useQueryClient()
+  return useMutation<ResolverReporteResposta, Error, void>({
+    mutationFn: () =>
+      apiClient.post<ResolverReporteResposta>(`/avisos/${id}/aprovar-dado-incorreto`, {
+        schema: resolverReporteResposta,
+      }),
+    onSuccess: () => invalidarTudo(qc, id),
+  })
+}
+
+/** POST /v1/avisos/:id/recusar-dado-incorreto (item 7): o combinado segue como estava. */
+export function useRecusarDadoIncorreto(id: string) {
+  const qc = useQueryClient()
+  return useMutation<Aviso, Error, void>({
+    mutationFn: () => apiClient.post<Aviso>(`/avisos/${id}/recusar-dado-incorreto`, { schema: avisoSchema }),
+    onSuccess: () => invalidarTudo(qc, id),
+  })
+}
+
+const codigoAvisoResposta = z.object({ codigo: z.string() })
+
+/**
+ * GET /v1/avisos/:id/codigo (item 21): código curto do combinado. Rota DEDICADA (o
+ * contrato geral do Aviso ainda não carrega `codigo` nesta rodada, ver nota em
+ * shared/contracts/entidades.ts). Degrada em 404 (backend sem a migration/rota ainda
+ * aplicada) para null, mesmo padrão de useCombinadoEnvio/useAvisoOcorrencias.
+ */
+export function useAvisoCodigo(id: string, habilitado = true) {
+  return useQuery({
+    queryKey: ['avisos', 'codigo', id],
+    enabled: habilitado,
+    queryFn: async ({ signal }) => {
+      try {
+        const r = await apiClient.get<{ codigo: string }>(`/avisos/${id}/codigo`, {
+          schema: codigoAvisoResposta,
+          signal,
+        })
+        return r.codigo
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.code === 'rota_inexistente')) return null
+        throw e
+      }
+    },
   })
 }
 
