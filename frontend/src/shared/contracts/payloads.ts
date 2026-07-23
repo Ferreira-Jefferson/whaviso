@@ -526,6 +526,13 @@ export const adminMetricasResposta = z.object({
   avisos_por_status: z.record(z.string(), z.number().int()),
   envios_por_status: z.record(z.string(), z.number().int()),
   total_usuarios: z.number().int(),
+  // Item 18 (aditivo): resumo financeiro AGREGADO do sistema inteiro (visão do owner).
+  // Só números agregados: nenhum nome/telefone/combinado individual.
+  recebido_centavos: z.number().int(),
+  recebido_qtd: z.number().int(),
+  a_receber_centavos: z.number().int(),
+  a_receber_qtd: z.number().int(),
+  ticket_medio_centavos: z.number().int(),
 })
 export type AdminMetricasResposta = z.infer<typeof adminMetricasResposta>
 
@@ -812,6 +819,14 @@ export const painelMetricasResposta = z.object({
   melhores_clientes: z.array(melhorClienteSchema),
   por_categoria: z.array(metricaCategoriaSchema),
   inativos: z.array(clienteInativoSchema),
+  // E18 H18.2 (item 17, aditivo): engajamento do devedor e conclusão dos combinados.
+  // Só TOTAL nesta leva (não por cliente). Ver espelho em
+  // backend/packages/shared/src/contracts/payloads.ts para a explicação completa.
+  solicitou_pix_qtd: z.number().int(),
+  mensagens_lidas_qtd: z.number().int(),
+  mensagens_com_status_qtd: z.number().int(),
+  taxa_combinados_concluidos: z.number().nullable(),
+  tempo_medio_confirmacao_dias: z.number().nullable(),
 })
 export type PainelMetricasResposta = z.infer<typeof painelMetricasResposta>
 

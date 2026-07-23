@@ -2,7 +2,7 @@
 // receber, lucro (só onde o custo foi informado), ticket médio, melhores clientes e
 // quebra por categoria. Só leitura: consome GET /v1/painel/metricas
 // (tudo calculado no servidor). Linguagem sem termos proibidos, neutra quanto a gênero.
-import { PiggyBank, Users, Tags } from 'lucide-react'
+import { Activity, PiggyBank, Users, Tags } from 'lucide-react'
 import { Card, EmptyState, MoneyText, Spinner, StatCard } from '@/shared/ui'
 import { usePainelMetricas } from '../api'
 
@@ -113,6 +113,49 @@ export default function MetricasPage() {
             ))}
           </Card>
         )}
+      </section>
+
+      {/* E18 H18.2 (item 17): engajamento do devedor e conclusão dos combinados. Só TOTAL
+          nesta leva (não por cliente, decisão registrada no plano de implementação). */}
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 font-display text-xl text-salvia">
+          <Activity strokeWidth={1.75} className="size-5" />
+          Engajamento e conclusão
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="flex flex-col gap-2">
+            <span className="text-sm text-tinta-2">Combinados concluídos</span>
+            <span className="tabular text-2xl text-salvia">
+              {data.taxa_combinados_concluidos === null
+                ? 'sem dados'
+                : `${Math.round(data.taxa_combinados_concluidos * 100)}%`}
+            </span>
+            <span className="text-xs text-tinta-2">
+              dos combinados que já chegaram a um resultado final
+            </span>
+          </Card>
+          <Card className="flex flex-col gap-2">
+            <span className="text-sm text-tinta-2">Tempo até confirmação</span>
+            <span className="tabular text-2xl text-salvia">
+              {data.tempo_medio_confirmacao_dias === null
+                ? 'sem dados'
+                : `${data.tempo_medio_confirmacao_dias} dias`}
+            </span>
+            <span className="text-xs text-tinta-2">média do "já paguei" até você confirmar</span>
+          </Card>
+          <Card className="flex flex-col gap-2">
+            <span className="text-sm text-tinta-2">Mensagens lidas</span>
+            <span className="tabular text-2xl text-salvia">{data.mensagens_lidas_qtd}</span>
+            <span className="text-xs text-tinta-2">
+              de {data.mensagens_com_status_qtd} com status de entrega
+            </span>
+          </Card>
+          <Card className="flex flex-col gap-2">
+            <span className="text-sm text-tinta-2">Chave Pix consultada</span>
+            <span className="tabular text-2xl text-salvia">{data.solicitou_pix_qtd}</span>
+            <span className="text-xs text-tinta-2">vezes que a outra ponta pediu a chave</span>
+          </Card>
+        </div>
       </section>
 
       {/* Melhores clientes */}

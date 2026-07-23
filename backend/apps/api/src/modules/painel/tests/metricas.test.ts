@@ -157,3 +157,90 @@ describe('painel: métricas por categoria com atribuição integral (multi)', ()
     expect(somaBuckets).toBeGreaterThan(b.recebido_centavos)
   })
 })
+
+// E18 H18.2 (item 17): indicadores extra da aba Resultados. SÓ TOTAL nesta leva (não por
+// cliente, decisão registrada no plano de implementação).
+describe('painel: métricas - engajamento e conclusão (item 17)', () => {
+  let uid: string
+
+  beforeAll(async () => {
+    uid = await criarUsuario('Revendedora engajamento')
+  })
+  afterAll(async () => {
+    await limparUsuario(uid)
+  })
+
+  it('agrega solicitou_pix, mensagens lidas, taxa de conclusão e tempo médio até confirmação', async () => {
+    // Combinado PAGO: 1 clique em "ver chave Pix", "já paguei" -> confirmado 2 dias depois,
+    // e 2 envios (1 lido, 1 só entregue).
+    const pago = await poolSuper.query<{ id: string }>(
+      `insert into public.avisos
+         (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
+          pix_chave, motivo, valor_centavos, data_combinada)
+       values ($1,'receber','cobrador','pago','Ana','+5511900000501','c@pix.com','pedido',10000,'2026-07-01')
+       returning id`,
+      [uid],
+    )
+    const avisoId = pago.rows[0]!.id
+    await poolSuper.query(
+      `insert into public.eventos_aviso (aviso_id, tipo, ator) values ($1,'solicitou_pix','devedor')`,
+      [avisoId],
+    )
+    await poolSuper.query(
+      `insert into public.eventos_aviso (aviso_id, tipo, ator, criado_em)
+       values ($1,'ja_paguei_devedor','devedor','2026-07-03 10:00:00+00')`,
+      [avisoId],
+    )
+    await poolSuper.query(
+      `insert into public.eventos_aviso (aviso_id, tipo, ator, criado_em)
+       values ($1,'confirmado_cobrador','cobrador','2026-07-05 10:00:00+00')`,
+      [avisoId],
+    )
+    await poolSuper.query(
+      `insert into public.envios (aviso_id, etapa, status, agendado_para, entrega_status)
+       values ($1,'d','enviado', now(), 'read')`,
+      [avisoId],
+    )
+    await poolSuper.query(
+      `insert into public.envios (aviso_id, etapa, status, agendado_para, entrega_status)
+       values ($1,'d_mais_1','enviado', now(), 'delivered')`,
+      [avisoId],
+    )
+
+    // Combinado CANCELADO: compõe a taxa de conclusão (1 pago de 2 terminais = 50%).
+    await poolSuper.query(
+      `insert into public.avisos
+         (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
+          pix_chave, motivo, valor_centavos, data_combinada)
+       values ($1,'receber','cobrador','cancelado','Bia','+5511900000502','c@pix.com','pedido',5000,'2026-07-02')`,
+      [uid],
+    )
+
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({ method: 'GET', url: '/v1/painel/metricas', headers: AUTH })
+    await app.close()
+    expect(r.statusCode).toBe(200)
+    const b = r.json()
+
+    expect(b.solicitou_pix_qtd).toBe(1)
+    expect(b.mensagens_lidas_qtd).toBe(1)
+    expect(b.mensagens_com_status_qtd).toBe(2)
+    expect(b.taxa_combinados_concluidos).toBeCloseTo(0.5)
+    expect(b.tempo_medio_confirmacao_dias).toBeCloseTo(2, 0)
+  })
+
+  it('sem eventos/confirmações, os indicadores voltam zerados/nulos (nunca quebram)', async () => {
+    const outro = await criarUsuario('Revendedora sem histórico')
+    const app = await criarAppTeste(outro)
+    const r = await app.inject({ method: 'GET', url: '/v1/painel/metricas', headers: AUTH })
+    await app.close()
+    await limparUsuario(outro)
+    expect(r.statusCode).toBe(200)
+    const b = r.json()
+    expect(b.solicitou_pix_qtd).toBe(0)
+    expect(b.mensagens_lidas_qtd).toBe(0)
+    expect(b.mensagens_com_status_qtd).toBe(0)
+    expect(b.taxa_combinados_concluidos).toBeNull()
+    expect(b.tempo_medio_confirmacao_dias).toBeNull()
+  })
+})

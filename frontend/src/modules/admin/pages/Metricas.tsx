@@ -3,7 +3,7 @@
 // envios por status e taxas derivadas (aceite, opt-out, falhas de envio).
 // Barras CSS simples (sem lib de gráfico, plano seção 2). Linguagem das Regras
 // de Ouro em toda string (ver shared/contracts/linguagem.ts).
-import { Activity, BellRing, Send, Users } from 'lucide-react'
+import { Activity, ArrowDownLeft, BellRing, Clock, Send, Users } from 'lucide-react'
 import {
   AlternarVisaoOwner,
   Banner,
@@ -12,6 +12,7 @@ import {
   GraficoBarras,
   PageHeader,
   Skeleton,
+  StatCard,
   type BarraGrafico,
 } from '@/shared/ui'
 import { ROTULO_STATUS_AVISO, ROTULO_STATUS_ENVIO } from '@/shared/format'
@@ -143,6 +144,34 @@ export default function MetricasPage() {
           valor={taxaFalha === null ? 'sem dados' : `${taxaFalha}%`}
           detalhe={`${falhas} de ${totalEnvios} lembretes`}
           icone={<Send strokeWidth={1.75} className="size-4" />}
+        />
+      </div>
+
+      {/* Item 18: resumo financeiro AGREGADO do sistema inteiro (visão do owner), mesmos
+          três números do resumo de resultado do usuário (H9.2/H18.2), somando TODOS os
+          cobradores. Só números agregados: nenhum nome/telefone/combinado individual (mesma
+          régua do owner-só-vê-templates-de-config, não conteúdo de cliente). */}
+      <h2 className="mt-8 text-lg text-salvia">Resultado do sistema</h2>
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          rotulo="Recebido"
+          centavos={data.recebido_centavos}
+          tom="folha"
+          icone={<ArrowDownLeft strokeWidth={1.75} className="size-4" />}
+          detalhe={`${data.recebido_qtd} ${data.recebido_qtd === 1 ? 'combinado' : 'combinados'}`}
+        />
+        <StatCard
+          rotulo="A receber"
+          centavos={data.a_receber_centavos}
+          tom="ambar"
+          icone={<Clock strokeWidth={1.75} className="size-4" />}
+          detalhe={`${data.a_receber_qtd} ${data.a_receber_qtd === 1 ? 'combinado' : 'combinados'}`}
+        />
+        <StatCard
+          rotulo="Ticket médio"
+          centavos={data.ticket_medio_centavos}
+          tom="neutro"
+          detalhe="por combinado recebido, no sistema inteiro"
         />
       </div>
 

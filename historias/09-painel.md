@@ -118,6 +118,18 @@ Como **sistema (api + front)**, quero que o painel seja um espelho seguro do ban
 
 ---
 
+### H9.9: Resumo compacto de resultado no Painel (papel cobrador) 🟢
+Como **usuário com conta que também é cobrador**, quero ver um resumo do meu resultado como negócio já na tela do Painel, sem precisar abrir Gestão, para ter uma visão completa num único lugar.
+*Critérios de aceite:*
+- [ ] Ao lado dos totais por papel (H9.2), o Painel mostra uma seção compacta com os números principais do resultado do papel **cobrador**: **recebido**, **a receber** e **ticket médio**.
+- [ ] Os números vêm do mesmo cálculo já usado na aba **Resultados** de Gestão (Épico 18 H18.2), calculado no backend; o Painel não recalcula nada.
+- [ ] A seção usa o **mesmo filtro de período** (De/Até) do resto do Painel: um filtro só rege a página inteira.
+- [ ] A seção **só aparece** para quem já tem algum histórico como cobrador (ao menos um combinado a receber ou recebido no período); quem só é devedor não vê uma seção vazia.
+- [ ] Um link leva à aba **Resultados** de Gestão para o detalhe completo (melhores clientes, por categoria, inativos); esta história não duplica esse detalhe, só resume os três números principais.
+- [ ] Não altera a área de Gestão (H18.1 permanece exatamente como está): nenhuma aba é removida, nenhum redirecionamento muda.
+
+---
+
 ### Divergências com a definição atual
 
 > O painel por papel ("a receber"/"a pagar") já é a direção do produto (CLAUDE.md). As divergências vêm dos estados e eventos novos que as histórias introduziram.
@@ -139,6 +151,7 @@ Como **sistema (api + front)**, quero que o painel seja um espelho seguro do ban
 - **Status de entrega** dos avisos visível (enviado/falha/retry), sem dado sensível.
 - **Painel só leitura + solicitação:** nenhuma regra de negócio no front; revalida após ação; free só visualiza; isolamento por usuário.
 - **Desmembramento por período: estado global manda nas ocorrências futuras.** No filtro por período, ocorrência ainda `programado` herda o estado global do combinado (pausado/cancelado/recusado/expirado/sem_aviso/etc.); ocorrência já `informado_pago`/`pago` mantém o próprio (decisão do produto, ver critério em H9.6). Sem filtro de período, o recorrente continua como **um combinado** (uma linha, badge "k de N").
+- **Resumo de resultado no Painel (H9.9, 2026-07-22):** o Painel ganha uma seção compacta com recebido/a receber/ticket médio do papel cobrador, ao lado dos totais por papel, reaproveitando o mesmo cálculo da aba Resultados de Gestão (Épico 18 H18.2) e o mesmo filtro de período. Só aparece para quem tem histórico como cobrador. Não altera a área de Gestão (H18.1 continua igual).
 
 ### Decisões em aberto
 - Nenhuma pendente. As duas anteriores foram resolvidas em 2026-06-26:

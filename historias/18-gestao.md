@@ -23,6 +23,8 @@ Como **usuário com conta (papel cobrador)**, quero ver a saúde do meu negócio
 - [ ] A aba mostra, para o papel **cobrador** (o que vendo/recebo), no período escolhido: recebido, a receber, ticket médio, melhores clientes, quebra por categoria e clientes inativos (mesmos números do Épico 9 / painel, calculados no servidor).
 - [ ] O **total geral** (recebido / a receber) é lido dos combinados **sem cruzar por categoria**, então bate com o painel e não infla.
 - [ ] Tudo no servidor (H9.8), isolado por `profile.id`; telefone só no corpo das respostas (nunca em rota/log).
+- [ ] **Indicadores de engajamento e conclusão (item 17, 2026-07-22, aditivo):** a aba mostra também, no mesmo período/escopo: a **taxa de combinados concluídos** (proporção de `pago` entre os combinados que já chegaram a um estado final: `pago`, `cancelado`, `recusado` ou `expirado`), o **tempo médio até confirmação** (dias entre o devedor informar "já paguei" e o cobrador confirmar), quantas vezes a **chave Pix foi consultada** pela outra ponta (evento `solicitou_pix`, Épico 7 H7.3) e quantas **mensagens foram lidas** (envios com `entrega_status='read'`, sobre o total com qualquer status de entrega). Linguagem sempre neutra (nunca "calote" nem qualquer termo de `linguagem.ts`).
+- [ ] Nesta leva, esses quatro indicadores são **só TOTAL** (agregado do período/escopo), **não** quebrados por cliente; quebrar por cliente é aditivo e fica para uma leva futura, se o produto pedir.
 
 ---
 
@@ -63,6 +65,7 @@ Como **usuário com conta**, quero gerenciar produtos e categorias dentro da mes
 - **Atribuição integral por categoria** (H18.3): com multi-categoria, cada combinado soma o valor cheio em cada categoria; buckets podem se sobrepor e não somam ao total. O total geral é sempre lido sem join, então nunca infla.
 - **Clientes = lista + modal** (H18.4), resolvendo a queixa de a tela "Pessoa" ser burocrática; a página por deep-link permanece.
 - **Redirects preservados:** as rotas antigas de "Resultado" e "Categorias" redirecionam para as abas de Gestão.
+- **Indicadores de engajamento e conclusão (H18.2, item 17, 2026-07-22):** taxa de combinados concluídos, tempo médio até confirmação, cliques em "ver chave Pix" e mensagens lidas, agregados por período/escopo (sem cruzar por categoria nem por cliente nesta leva). Decisão de escopo: **só total**, não por cliente, para manter simples e reduzir exposição; quebra por cliente é aditiva e pode entrar depois.
 
 ### Fora de escopo deste épico
 - ❌ Regras de criação/edição de combinado, categorias e produtos: vivem nos Épicos 2/3, 16 e 17; aqui só se **aciona**.

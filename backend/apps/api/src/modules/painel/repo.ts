@@ -273,6 +273,87 @@ export async function metricas(pool: Pool, f: FiltroMetricas): Promise<PainelMet
     [f.uid, f.inativoDias],
   )
 
+  // 5) E18 H18.2 (item 17, aditivo): engajamento do devedor + conclusão dos combinados.
+  // SÓ TOTAL nesta leva (não por cliente: decisão registrada no plano, mais simples e
+  // menor exposição, reversível/aditivo depois). Mesmo escopo da seção 1 (cobrador_id +
+  // período + categoria), mas com o alias `a` (o where da seção 1 é sem alias).
+  const paramsEng: unknown[] = [f.uid]
+  const condEng: string[] = ['a.cobrador_id = $1']
+  if (f.de) {
+    paramsEng.push(f.de)
+    condEng.push(`a.data_combinada >= $${paramsEng.length}`)
+  }
+  if (f.ate) {
+    paramsEng.push(f.ate)
+    condEng.push(`a.data_combinada <= $${paramsEng.length}`)
+  }
+  if (f.categoria_id) {
+    paramsEng.push(f.categoria_id)
+    condEng.push(
+      `exists (select 1 from public.aviso_categorias ac
+                where ac.aviso_id = a.id and ac.categoria_id = $${paramsEng.length})`,
+    )
+  } else if (f.sem_categoria) {
+    condEng.push(`not exists (select 1 from public.aviso_categorias ac where ac.aviso_id = a.id)`)
+  }
+  const whereEng = condEng.join(' and ')
+
+  // Cliques em "ver chave Pix" (solicitou_pix, H7.3) dos combinados no escopo.
+  const solicitouPix = await pool.query(
+    `select count(*)::int as n
+       from public.eventos_aviso e
+       join public.avisos a on a.id = e.aviso_id
+      where e.tipo = 'solicitou_pix' and ${whereEng}`,
+    paramsEng,
+  )
+
+  // Mensagens lidas (envios.entrega_status='read') sobre o total com QUALQUER status de
+  // entrega (denominador honesto: nem todo envio tem status ainda, ex.: acabou de sair).
+  const leitura = await pool.query(
+    `select
+        count(*) filter (where en.entrega_status = 'read')::int as lidas_q,
+        count(*) filter (where en.entrega_status is not null)::int as com_status_q
+       from public.envios en
+       join public.avisos a on a.id = en.aviso_id
+      where ${whereEng}`,
+    paramsEng,
+  )
+
+  // Taxa de combinados concluídos: pago sobre os que chegaram a um estado FINAL (pago,
+  // cancelado, recusado, expirado). Linguagem neutra (nunca "calote"/palavra proibida).
+  const concluidos = await pool.query(
+    `select
+        count(*) filter (where status = 'pago')::int as pago_q,
+        count(*) filter (where status in ('cancelado','recusado','expirado'))::int as nao_pago_q
+       from public.avisos where ${where}`,
+    params,
+  )
+  const pagoQ = concluidos.rows[0].pago_q as number
+  const naoPagoQ = concluidos.rows[0].nao_pago_q as number
+  const denomConcluidos = pagoQ + naoPagoQ
+  const taxaConcluidos = denomConcluidos > 0 ? pagoQ / denomConcluidos : null
+
+  // Tempo médio até confirmação: do "já paguei" do devedor (ja_paguei_devedor) até a
+  // confirmação do cobrador (confirmado_cobrador), em dias. Um combinado pode reabrir e
+  // ser confirmado de novo; usa o PRIMEIRO "já paguei" e o ÚLTIMO "confirmado" POSTERIOR
+  // a ele (aproxima o ciclo mais comum: informar -> confirmar, sem exigir 1-para-1).
+  const tempoConfirmacao = await pool.query(
+    `select avg(extract(epoch from (conf.criado_em - inf.criado_em)) / 86400.0) as dias
+       from public.avisos a
+       join lateral (
+         select min(criado_em) as criado_em from public.eventos_aviso
+          where aviso_id = a.id and tipo = 'ja_paguei_devedor'
+       ) inf on inf.criado_em is not null
+       join lateral (
+         select max(criado_em) as criado_em from public.eventos_aviso
+          where aviso_id = a.id and tipo = 'confirmado_cobrador'
+       ) conf on conf.criado_em is not null and conf.criado_em > inf.criado_em
+      where ${whereEng}`,
+    paramsEng,
+  )
+  const diasRaw = tempoConfirmacao.rows[0].dias as string | number | null
+  const tempoMedioConfirmacaoDias = diasRaw === null ? null : Math.round(Number(diasRaw) * 10) / 10
+
   return {
     recebido_centavos: recebido,
     recebido_qtd: recebidoQ,
@@ -303,5 +384,10 @@ export async function metricas(pool: Pool, f: FiltroMetricas): Promise<PainelMet
       ultima_data: i.ultima_data,
       dias: i.dias,
     })),
+    solicitou_pix_qtd: solicitouPix.rows[0].n,
+    mensagens_lidas_qtd: leitura.rows[0].lidas_q,
+    mensagens_com_status_qtd: leitura.rows[0].com_status_q,
+    taxa_combinados_concluidos: taxaConcluidos,
+    tempo_medio_confirmacao_dias: tempoMedioConfirmacaoDias,
   }
 }

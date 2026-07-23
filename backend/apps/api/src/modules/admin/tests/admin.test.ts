@@ -323,6 +323,37 @@ describe('admin (integração)', () => {
     expect(comPeriodo.statusCode).toBe(200)
   })
 
+  // Item 18: resumo financeiro AGREGADO do sistema (owner), aditivo ao GET /admin/metricas.
+  // Período isolado (2018) para não colidir com dados de outros testes na mesma base.
+  it('GET /admin/metricas expõe o resumo financeiro do sistema (recebido/a receber/ticket médio), sem PII', async () => {
+    const cobrador = await criarUsuario('Cobradora resumo sistema')
+    await poolSuper.query(
+      `insert into public.avisos
+         (cobrador_id, direcao, criador_papel, status, nome_devedor, telefone_devedor,
+          pix_chave, motivo, valor_centavos, data_combinada)
+       values
+         ($1,'receber','cobrador','pago','Fulana Teste','+5511900000601','c@pix.com','pedido',10000,'2018-06-01'),
+         ($1,'receber','cobrador','programado','Ciclana Teste','+5511900000602','c@pix.com','pedido',4000,'2018-06-02')`,
+      [cobrador],
+    )
+    const app = await criarAppTeste(owner)
+    const r = await app.inject({
+      method: 'GET', url: '/v1/admin/metricas?de=2018-01-01&ate=2018-12-31', headers: AUTH,
+    })
+    await app.close()
+    await limparUsuario(cobrador)
+
+    expect(r.statusCode).toBe(200)
+    const b = r.json()
+    expect(b.recebido_centavos).toBe(10000)
+    expect(b.recebido_qtd).toBe(1)
+    expect(b.a_receber_centavos).toBe(4000)
+    expect(b.a_receber_qtd).toBe(1)
+    expect(b.ticket_medio_centavos).toBe(10000)
+    // Só números agregados: nenhum nome/telefone individual no payload.
+    expect(JSON.stringify(b)).not.toMatch(/Fulana Teste|Ciclana Teste|\+5511900000601/)
+  })
+
   // ---- Templates UNIFICADOS por chave (/admin/mensagens) ----
 
   it('owner lista mensagens (família resposta.* do seed)', async () => {

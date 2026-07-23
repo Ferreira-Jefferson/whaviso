@@ -33,7 +33,12 @@ export const painelKeys = {
   metricas: (periodo: PeriodoResumo) => ['painel', 'metricas', periodo] as const,
 }
 
-/** GET /v1/painel/metricas: saúde do negócio (papel cobrador), calculada no backend. */
+/**
+ * GET /v1/painel/metricas: saúde do negócio (papel cobrador), calculada no backend.
+ * `placeholderData: keepPreviousData` (item 14): ao trocar o período, mantém os números
+ * antigos visíveis (com `isFetching=true`) em vez de cair para `isLoading` e desmontar a
+ * tela; quem consome usa `isFetching` para acender um Skeleton pontual, não a tela toda.
+ */
 export function usePainelMetricas(periodo: PeriodoResumo = {}) {
   return useQuery({
     queryKey: painelKeys.metricas(periodo),
@@ -43,10 +48,16 @@ export function usePainelMetricas(periodo: PeriodoResumo = {}) {
         query: { de: periodo.de, ate: periodo.ate },
         signal,
       }),
+    placeholderData: keepPreviousData,
   })
 }
 
-/** GET /v1/painel/resumo: totais por PAPEL (centavos) calculados no backend. */
+/**
+ * GET /v1/painel/resumo: totais por PAPEL (centavos) calculados no backend.
+ * `placeholderData: keepPreviousData` (item 14): troca de período mantém os totais
+ * antigos visíveis (`isFetching=true`) em vez de piscar os StatCards para o skeleton
+ * cheio; o Painel usa `isFetching` para acender um Skeleton só na linha do valor.
+ */
 export function usePainelResumo(periodo: PeriodoResumo) {
   return useQuery({
     queryKey: painelKeys.resumo(periodo),
@@ -56,6 +67,7 @@ export function usePainelResumo(periodo: PeriodoResumo) {
         query: { de: periodo.de, ate: periodo.ate },
         signal,
       }),
+    placeholderData: keepPreviousData,
   })
 }
 

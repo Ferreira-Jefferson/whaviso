@@ -27,6 +27,7 @@ import {
   Card,
   DateInput,
   EmptyState,
+  IconePendencia,
   Input,
   MoneyText,
   PageHeader,
@@ -47,7 +48,13 @@ import {
   type Pendencia,
   type StatusAviso,
 } from '@/shared/contracts'
-import { useAvisos, useCategorias, usePainelPendencias, usePainelResumo } from '../api'
+import {
+  useAvisos,
+  useCategorias,
+  usePainelMetricas,
+  usePainelPendencias,
+  usePainelResumo,
+} from '../api'
 
 const ROTULO_PENDENCIA: Record<Pendencia['tipo'], string> = {
   confirmar_pagamento: 'Aguardando sua confirmação',
@@ -72,6 +79,7 @@ const ESTADOS_ATIVOS: readonly StatusAviso[] = [
   'informado_pago',
   'pausado',
   'aguardando_aprovacao_aviso_editado',
+  'aguardando_aprovacao_dado_incorreto',
   'desregistrado',
 ]
 const ESTADOS_HISTORICO: readonly StatusAviso[] = ['pago', 'cancelado', 'recusado', 'expirado']
@@ -91,8 +99,9 @@ const ESTADOS_POR_FAIXA: Record<Grupo, readonly StatusAviso[]> = {
 const FILTRO_TODOS = 'todos'
 type FiltroEstado = typeof FILTRO_TODOS | StatusAviso
 
+// Item 5: fallback passa de 'ativos' para 'todos' (sem `grupo` na URL, mostra tudo).
 function lerGrupo(raw: string | null): Grupo {
-  return raw === 'agenda' || raw === 'historico' || raw === 'todos' ? raw : 'ativos'
+  return raw === 'agenda' || raw === 'historico' || raw === 'ativos' ? raw : 'todos'
 }
 function lerPapel(raw: string | null): PapelAviso | undefined {
   if (!raw) return undefined
@@ -119,12 +128,18 @@ export default function PainelPage() {
   // E16 H16.4: filtro por categoria. '' = todas; 'sem' = sem categoria; senão = id.
   const categoria = params.get('categoria') ?? ''
 
-  const { data, isLoading, isError } = usePainelResumo({
+  const { data, isLoading, isFetching, isError } = usePainelResumo({
     de: de || undefined,
     ate: ate || undefined,
   })
   const pendencias = usePainelPendencias()
   const categorias = useCategorias()
+  // Item 16: resumo compacto de resultado (papel cobrador), mesmo período do resto do
+  // Painel. Reaproveita usePainelMetricas (já existe, alimenta a aba Resultados de Gestão).
+  const metricas = usePainelMetricas({
+    de: de || undefined,
+    ate: ate || undefined,
+  })
 
   // Busca com debounce local antes de ir ao servidor (server-side por nome OU motivo).
   const [buscaInput, setBuscaInput] = useState(buscaUrl)
@@ -161,6 +176,12 @@ export default function PainelPage() {
   })
   const linhas = lista.data?.itens ?? []
 
+  // Item 8: mapa aviso_id -> tipo de pendência (a partir de usePainelPendencias, já usado
+  // pelo card "Precisa de você" acima). Alimenta o indicador de pendência na lista.
+  const pendenciaPorAviso = new Map<string, Pendencia['tipo']>(
+    (pendencias.data?.itens ?? []).map((p) => [p.aviso_id, p.tipo]),
+  )
+
   // Aplica um ou mais params numa ÚNICA navegação. O `setParams` do React Router entrega
   // o `prev` da render atual (não compõe chamadas sequenciais como o useState), então
   // mexer em 2 params exige um único patch, senão a 2ª chamada parte dos params antigos.
@@ -192,8 +213,15 @@ export default function PainelPage() {
         // aparece quando há telefone da outra ponta (agenda sem_aviso ainda não tem). O
         // stopPropagation evita disparar o clique da linha (que vai ao detalhe).
         const temTelefone = Boolean(a.telefone_devedor || a.telefone_cobrador)
+        // Item 8: indicador de pendência na lista (mesmo mapa do card "Precisa de você"),
+        // com o IconePendencia do grupo 1A. Nenhuma das duas pendências BLOQUEIA uma ação
+        // (só pedem atenção), então o tom é sempre 'aviso'.
+        const pendenciaTipo = pendenciaPorAviso.get(a.id)
         return (
           <span className="inline-flex items-center gap-2 font-medium">
+            {pendenciaTipo && (
+              <IconePendencia tipo="aviso" tooltip={ROTULO_PENDENCIA[pendenciaTipo]} />
+            )}
             {nome}
             {a.ocorrencias_total != null && a.ocorrencias_total > 1 && (
               <span
@@ -342,6 +370,10 @@ export default function PainelPage() {
           ))}
         </div>
       ) : (
+        // Item 14: o grid fica MONTADO durante refetches em segundo plano (troca de
+        // período); só o `isLoading` inicial (sem dado ainda) cai no skeleton acima. Cada
+        // StatCard recebe `carregando={isFetching}` para acender o Skeleton só na linha do
+        // valor, sem desmontar o card inteiro (evita o "piscar").
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             rotulo="A receber"
@@ -349,6 +381,7 @@ export default function PainelPage() {
             tom="ambar"
             icone={<Clock strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.a_receber_qtd} ${data.a_receber_qtd === 1 ? 'combinado' : 'combinados'}`}
+            carregando={isFetching}
           />
           <StatCard
             rotulo="Recebido"
@@ -356,6 +389,7 @@ export default function PainelPage() {
             tom="folha"
             icone={<ArrowDownLeft strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.recebido_qtd} ${data.recebido_qtd === 1 ? 'combinado' : 'combinados'}`}
+            carregando={isFetching}
           />
           <StatCard
             rotulo="A pagar"
@@ -363,6 +397,7 @@ export default function PainelPage() {
             tom="salvia"
             icone={<Wallet strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.a_pagar_qtd} ${data.a_pagar_qtd === 1 ? 'combinado' : 'combinados'}`}
+            carregando={isFetching}
           />
           <StatCard
             rotulo="Pago"
@@ -370,9 +405,50 @@ export default function PainelPage() {
             tom="neutro"
             icone={<ArrowUpRight strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.pago_qtd} ${data.pago_qtd === 1 ? 'combinado' : 'combinados'}`}
+            carregando={isFetching}
           />
         </div>
       )}
+
+      {/* Item 16: resumo compacto de resultado (papel cobrador), ao lado dos StatCards
+          acima. Mesmo período do resto do Painel; só aparece para quem tem algum
+          histórico como cobrador (evita seção vazia para quem só é devedor). Não mexe em
+          Gestão (H18.1 permanece como está); "Ver detalhes" leva à aba Resultados. */}
+      {!metricas.isLoading &&
+        metricas.data &&
+        metricas.data.recebido_qtd + metricas.data.a_receber_qtd > 0 && (
+          <section className="mt-6">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-tinta-2">Resultado do seu negócio</h2>
+              <Link to="/app/gestao" className="text-xs text-salvia hover:underline">
+                Ver detalhes
+              </Link>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <StatCard
+                rotulo="Recebido"
+                centavos={metricas.data.recebido_centavos}
+                tom="folha"
+                detalhe={`${metricas.data.recebido_qtd} ${metricas.data.recebido_qtd === 1 ? 'combinado' : 'combinados'}`}
+                carregando={metricas.isFetching}
+              />
+              <StatCard
+                rotulo="A receber"
+                centavos={metricas.data.a_receber_centavos}
+                tom="salvia"
+                detalhe={`${metricas.data.a_receber_qtd} ${metricas.data.a_receber_qtd === 1 ? 'combinado' : 'combinados'}`}
+                carregando={metricas.isFetching}
+              />
+              <StatCard
+                rotulo="Ticket médio"
+                centavos={metricas.data.ticket_medio_centavos}
+                tom="neutro"
+                detalhe="por combinado recebido"
+                carregando={metricas.isFetching}
+              />
+            </div>
+          </section>
+        )}
 
       {/* ---- Combinados: a lista por papel, com faixas/busca/situação (H9.1/H9.3) ---- */}
       <section className="mt-10">
@@ -396,8 +472,9 @@ export default function PainelPage() {
             value={grupo}
             onChange={(v) =>
               // Troca de faixa limpa o sub-filtro de situação (só vale em "Ativos"),
-              // num único patch para não perder a mudança de `grupo`.
-              setParam({ grupo: v === 'ativos' ? null : v, status: null })
+              // num único patch para não perder a mudança de `grupo`. Item 5: o fallback
+              // (sem `grupo` na URL) agora é "todos", então é essa opção que limpa o param.
+              setParam({ grupo: v === 'todos' ? null : v, status: null })
             }
             options={FAIXAS}
           />

@@ -2,8 +2,8 @@
 // venda); a linha abre o modal para ver/editar; o botão adiciona um novo. Produto é interno
 // do dono; nunca vai para a outra pessoa.
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { Button, Card, EmptyState, MoneyText, Spinner } from '@/shared/ui'
+import { Plus, Search } from 'lucide-react'
+import { Button, Card, EmptyState, Input, MoneyText, Spinner } from '@/shared/ui'
 import type { Produto } from '@/shared/contracts'
 import { useProdutos } from '../api'
 import { ProdutoModal } from '../components/ProdutoModal'
@@ -12,8 +12,14 @@ export default function ProdutosPage() {
   const lista = useProdutos()
   // null = fechado; 'novo' = criando; Produto = editando aquele.
   const [modal, setModal] = useState<'novo' | Produto | null>(null)
+  // Item 10: busca client-side simples (sem paginação/busca no servidor nesta leva; o
+  // catálogo hoje é pequeno). Casa pelo nome, sem diferenciar maiúsculas/minúsculas.
+  const [busca, setBusca] = useState('')
 
   const produtos = lista.data ?? []
+  const produtosFiltrados = produtos.filter((p) =>
+    p.nome.toLowerCase().includes(busca.trim().toLowerCase()),
+  )
 
   return (
     <div>
@@ -27,6 +33,23 @@ export default function ProdutosPage() {
         </Button>
       </div>
 
+      {produtos.length > 0 && (
+        <div className="relative mb-4 sm:w-72">
+          <Search
+            strokeWidth={1.75}
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-2"
+          />
+          <Input
+            type="search"
+            placeholder="Buscar por nome"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="pl-9"
+            aria-label="Buscar por nome"
+          />
+        </div>
+      )}
+
       {lista.isLoading ? (
         <div className="flex min-h-[20vh] items-center justify-center text-salvia">
           <Spinner className="size-6" />
@@ -36,9 +59,14 @@ export default function ProdutosPage() {
           titulo="Nenhum produto ainda"
           descricao="Adicione o primeiro (ex.: cada item que você revende) para escolher rápido no pedido."
         />
+      ) : produtosFiltrados.length === 0 ? (
+        <EmptyState
+          titulo="Nenhum resultado"
+          descricao="Nenhum produto corresponde à sua busca."
+        />
       ) : (
         <Card className="flex flex-col divide-y divide-linha p-0">
-          {produtos.map((p) => (
+          {produtosFiltrados.map((p) => (
             <button
               key={p.id}
               type="button"

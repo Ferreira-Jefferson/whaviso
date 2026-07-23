@@ -4,23 +4,55 @@
 // não há um nome único). A linha abre um modal com os totais e os combinados, onde dá para
 // renomear por grupo de nome. O número é dado do próprio dono (nunca vai em rota/log, H15.7).
 import { useState } from 'react'
-import { Card, EmptyState, MoneyText, Spinner } from '@/shared/ui'
+import { Search } from 'lucide-react'
+import { Card, EmptyState, Input, MoneyText, Spinner } from '@/shared/ui'
 import { telefone as fmtTelefone } from '@/shared/format'
 import type { Cliente } from '@/shared/contracts'
 import { usePessoas } from '../api'
 import { ClienteModal } from '../components/ClienteModal'
 
+// Item 10: busca client-side simples (sem paginação/busca no servidor nesta leva; a
+// lista de clientes hoje é pequena). Casa por qualquer nome registrado ou pelo telefone
+// (dígitos, ignora formatação), sem diferenciar maiúsculas/minúsculas.
+function casaBusca(cliente: Cliente, busca: string): boolean {
+  const alvo = busca.trim().toLowerCase()
+  if (!alvo) return true
+  const digitosBusca = alvo.replace(/\D/g, '')
+  const casaTelefone = digitosBusca.length > 0 && cliente.telefone.replace(/\D/g, '').includes(digitosBusca)
+  const casaNome = cliente.nomes.some((n) => n.toLowerCase().includes(alvo))
+  return casaNome || casaTelefone
+}
+
 export default function ClientesPage() {
   const lista = usePessoas()
   const [aberto, setAberto] = useState<Cliente | null>(null)
+  const [busca, setBusca] = useState('')
 
   const clientes = lista.data?.itens ?? []
+  const clientesFiltrados = clientes.filter((c) => casaBusca(c, busca))
 
   return (
     <div>
       <p className="mb-4 text-sm text-tinta-2">
         Todos os seus clientes num só lugar. Abra um para ver o histórico e renomear.
       </p>
+
+      {clientes.length > 0 && (
+        <div className="relative mb-4 sm:w-72">
+          <Search
+            strokeWidth={1.75}
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tinta-2"
+          />
+          <Input
+            type="search"
+            placeholder="Buscar por nome ou telefone"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="pl-9"
+            aria-label="Buscar por nome ou telefone"
+          />
+        </div>
+      )}
 
       {lista.isLoading ? (
         <div className="flex min-h-[20vh] items-center justify-center text-salvia">
@@ -31,9 +63,14 @@ export default function ClientesPage() {
           titulo="Nenhum cliente ainda"
           descricao="Assim que você criar combinados, os clientes aparecem aqui."
         />
+      ) : clientesFiltrados.length === 0 ? (
+        <EmptyState
+          titulo="Nenhum resultado"
+          descricao="Nenhum cliente corresponde à sua busca."
+        />
       ) : (
         <Card className="flex flex-col divide-y divide-linha p-0">
-          {clientes.map((c) => (
+          {clientesFiltrados.map((c) => (
             <button
               key={c.telefone}
               type="button"

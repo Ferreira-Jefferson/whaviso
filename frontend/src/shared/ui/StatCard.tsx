@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react'
 import { Card } from './Card'
 import { MoneyText } from './MoneyText'
+import { Skeleton } from './Skeleton'
 import { cn } from './cn'
 
 type Tom = 'salvia' | 'folha' | 'ambar' | 'neutro'
@@ -23,6 +24,13 @@ interface StatCardProps {
   icone?: ReactNode
   tom?: Tom
   className?: string
+  /**
+   * Item 14: true durante um refetch em segundo plano (ex.: troca de período com dado
+   * anterior ainda em tela via `placeholderData: keepPreviousData`). Mostra um Skeleton só
+   * na linha do valor, mantendo rótulo/ícone/detalhe visíveis, para o card não "piscar"
+   * (desmontar e remontar) a cada refetch. Prop opcional e aditiva; default false.
+   */
+  carregando?: boolean
 }
 
 export function StatCard({
@@ -32,6 +40,7 @@ export function StatCard({
   icone,
   tom = 'neutro',
   className,
+  carregando = false,
 }: StatCardProps) {
   return (
     <Card className={cn('flex flex-col gap-2', className)}>
@@ -39,7 +48,11 @@ export function StatCard({
         <span className="text-sm text-tinta-2">{rotulo}</span>
         {icone && <span className="text-tinta-2">{icone}</span>}
       </div>
-      <MoneyText centavos={centavos} className={cn('text-2xl', COR_VALOR[tom])} />
+      {carregando ? (
+        <Skeleton className="h-8 w-24" />
+      ) : (
+        <MoneyText centavos={centavos} className={cn('text-2xl', COR_VALOR[tom])} />
+      )}
       {detalhe && <span className="text-xs text-tinta-2">{detalhe}</span>}
     </Card>
   )

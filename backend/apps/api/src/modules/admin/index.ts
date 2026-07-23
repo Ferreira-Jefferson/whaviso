@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { comTransacao } from '@whaviso/shared/db'
+import { ATIVOS_NAO_PAGOS } from '../../shared/estados'
 import {
   adminAtualizarConfigPlataformaBody,
   type AdminAtualizarConfigPlataformaBody,
@@ -34,6 +35,11 @@ import { lerConfigPlataforma } from '../../shared/config_plataforma'
 import * as repo from './repo'
 
 const idParam = z.object({ id: z.uuid() })
+
+// Item 18: lista de estados "ativos não pagos" como literais SQL (mesma fonte única de
+// backend/apps/api/src/shared/estados.ts usada pelo painel do usuário, H9.2/H18.2), para
+// o resumo financeiro AGREGADO do sistema (owner) contar "a receber" com o mesmo critério.
+const ATIVOS_SQL = ATIVOS_NAO_PAGOS.map((s) => `'${s}'`).join(',')
 
 // Colunas retornadas do catálogo de créditos (GET e PATCH devolvem o catálogo inteiro).
 // O owner edita VALORES em runtime; nunca cria nem apaga (1 linha, id=1). envios_min/max
@@ -103,22 +109,42 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
           exists (select 1 from public.eventos_aviso e
                   where e.aviso_id = a.id and e.tipo = 'optout')`
 
-      const [avisos, envios, usuarios, optout] = await Promise.all([
+      // Item 18: resumo financeiro AGREGADO do sistema inteiro (recebido/a receber/ticket
+      // médio), mesmo critério de estado do painel do usuário (H9.2). Só números agregados
+      // (sem nome/telefone/combinado individual): mesma régua do owner-só-vê-config, não
+      // conteúdo de cliente.
+      const resumoSql = `
+        select
+          coalesce(sum(valor_centavos) filter (where status='pago'),0)::bigint as recebido_c,
+          count(*) filter (where status='pago')::int as recebido_q,
+          coalesce(sum(valor_centavos) filter (where status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
+          count(*) filter (where status in (${ATIVOS_SQL}))::int as a_receber_q
+        from public.avisos ${avisoWhere}`
+
+      const [avisos, envios, usuarios, optout, resumo] = await Promise.all([
         app.pool.query(`select status, count(*)::int as n from public.avisos ${avisoWhere} group by status`, avisoParams),
         app.pool.query(`select status, count(*)::int as n from public.envios ${envioWhere} group by status`, envioParams),
         app.pool.query(`select count(*)::int as n from public.profiles`),
         app.pool.query(optoutSql, avisoParams),
+        app.pool.query(resumoSql, avisoParams),
       ])
       const porStatus = (rows: { status: string; n: number }[]) =>
         Object.fromEntries(rows.map((r) => [r.status, r.n]))
       const totalAvisos = avisos.rows.reduce((s, r) => s + r.n, 0)
       const optoutTotal = optout.rows[0].n
+      const recebidoSistema = Number(resumo.rows[0].recebido_c)
+      const recebidoSistemaQ = resumo.rows[0].recebido_q as number
       return {
         avisos_por_status: porStatus(avisos.rows),
         envios_por_status: porStatus(envios.rows),
         total_usuarios: usuarios.rows[0].n,
         optout_total: optoutTotal,
         optout_taxa: totalAvisos > 0 ? optoutTotal / totalAvisos : 0,
+        recebido_centavos: recebidoSistema,
+        recebido_qtd: recebidoSistemaQ,
+        a_receber_centavos: Number(resumo.rows[0].a_receber_c),
+        a_receber_qtd: resumo.rows[0].a_receber_q,
+        ticket_medio_centavos: recebidoSistemaQ > 0 ? Math.round(recebidoSistema / recebidoSistemaQ) : 0,
       }
     },
   )

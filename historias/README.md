@@ -3,7 +3,7 @@
 > **Objetivo:** descrever o sistema do ponto de vista de quem usa, em histórias testáveis, para depois validar o que já está implementado e o que falta.
 > **Fonte de verdade:** estas histórias. Quando o código ou os docs (PROJETO.md / CLAUDE.md) divergirem do que está aqui, é o código/doc que deve mudar, não a história. Sempre que uma divergência aparecer, ela é sinalizada (ver legenda de validação) e explicada.
 > **Base de consulta:** [PROJETO.md](../PROJETO.md) (visão de produto) e [CLAUDE.md](../CLAUDE.md) (regras e arquitetura) servem de referência, não de autoridade sobre as histórias.
-> **Status:** 18 épicos escritos. Próxima fase: validar cada história contra o código (legenda de validação).
+> **Status:** 19 épicos escritos. Próxima fase: validar cada história contra o código (legenda de validação).
 > **Linguagem:** sem travessão (regra de ouro do produto). Sem "dívida/cobrança/atraso/devendo/inadimplência". Mensagens **neutras quanto a gênero** (ver convenções abaixo).
 
 ## Como ler
@@ -21,7 +21,7 @@ Os **critérios de aceite** são o que será conferido contra o código na fase 
 - **Devedor**: quem vai pagar e recebe os lembretes. Em geral sem conta, só interage por botões no WhatsApp.
 - **Criador-devedor**: no fluxo *pagar invertido*, cria o combinado e convida o cobrador.
 - **Convidado**: aceita ou recusa pelo WhatsApp, sem login.
-- **Owner/Admin**: gerencia templates de mensagem, o preço dos créditos de envio e credita contas (ativação manual pós-pagamento).
+- **Owner/Admin**: gerencia templates de mensagem, o preço dos créditos de envio, credita contas (ativação manual pós-pagamento) e acompanha métricas agregadas do sistema (Épico 19).
 - **Sistema (zap/scheduler)**: dispara lembretes e drena filas (histórias "de sistema").
 
 ### Legenda de escopo
@@ -71,6 +71,7 @@ Regras transversais para qualquer texto que chega ao usuário (WhatsApp, UI, e-m
 | 16 | Categorias (organização por marca/linha, multi) | [16-categorias.md](16-categorias.md) | escrito |
 | 17 | Produtos / Catálogo (mini-estoque) | [17-produtos.md](17-produtos.md) | escrito |
 | 18 | Gestão (área com abas) | [18-gestao.md](18-gestao.md) | escrito |
+| 19 | Métricas administrativas (visão do sistema, owner) | [19-metricas-admin.md](19-metricas-admin.md) | escrito |
 
 ## Dívidas técnicas levantadas durante a escrita
 
