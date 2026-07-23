@@ -19,7 +19,7 @@ import * as service from './service'
 
 const idParam = z.object({ id: z.uuid() })
 
-// Item 7 (migration 0092): resposta de aprovar/recusar um reporte de dado incorreto.
+// Item 7 (migrations 0092/0093): resposta de aprovar/recusar um reporte de dado incorreto.
 // Schema LOCAL (não em @whaviso/shared/contracts): o contrato geral do Aviso ainda não
 // carrega `codigo`/reporte nesta rodada (ver nota do grupo 1B no relatório); manter aqui
 // evita tocar em backend/packages/shared/src/contracts/entidades.ts ou payloads.ts, fora
@@ -39,7 +39,7 @@ const resolverReporteResposta = z.object({
   }),
 })
 
-// Item 21 (migration 0093): código do combinado, por rota dedicada (mesma razão acima:
+// Item 21 (migration 0094): código do combinado, por rota dedicada (mesma razão acima:
 // `codigo` ainda não entra no avisoSchema geral nesta rodada).
 const codigoAvisoResposta = z.object({ codigo: z.string() })
 
@@ -91,7 +91,7 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
     async (req) => service.desfazerEdicao(app.pool, req.userId, req.params.id),
   )
 
-  // Item 7 (migration 0092): o cobrador APROVA o dado reportado como incorreto pelo
+  // Item 7 (migrations 0092/0093): o cobrador APROVA o dado reportado como incorreto pelo
   // devedor. Devolve o aviso (já de volta a `programado`) + o reporte (campo + dados
   // corretos), para o painel reabrir a edição pré-preenchida/destacada.
   app.post(
@@ -120,7 +120,7 @@ export const avisosRoutes: FastifyPluginAsync = async (raiz) => {
     async (req) => ({ reporte: await service.obterReporteAprovadoPendente(app.pool, req.userId, req.params.id) }),
   )
 
-  // Item 21 (migration 0093): código curto do combinado, por rota dedicada (o avisoSchema
+  // Item 21 (migration 0094): código curto do combinado, por rota dedicada (o avisoSchema
   // geral ainda não carrega `codigo` nesta rodada). Mesma visibilidade do detalhe.
   app.get(
     '/avisos/:id/codigo',

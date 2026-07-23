@@ -821,7 +821,7 @@ export async function recusarEdicao(cli: PoolClient, id: string): Promise<void> 
   if (alvo) await enfileirarNotificacao(cli, alvo, 'edicao_recusada')
 }
 
-/** Resultado de resolver um reporte de dado incorreto (item 7, migration 0092). */
+/** Resultado de resolver um reporte de dado incorreto (item 7, migrations 0092/0093). */
 export interface ResolucaoReporte {
   aviso: Aviso
   reporte: { campo: repo.CampoReporte; dados: repo.DadosReporte }

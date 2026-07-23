@@ -1,19 +1,20 @@
 -- Item 7 (wave 2 / grupo 1E): fecha o lado ZAP da "aprovação de dado incorreto" que a
--- 0092 abriu (schema + decisão do cobrador via api/painel). Esta migration só ajusta o
--- que o zap precisa para: (a) o devedor REPORTAR um campo incorreto já no ciclo (pós
--- aceite, aviso `programado`); (b) o cobrador RESOLVER (aprovar/recusar) diretamente
--- pelo WhatsApp, por telefone (mesma disciplina de confirmar/rejeitar pagamento, H8.5).
+-- 0092/0093 abriu (schema + decisão do cobrador via api/painel). Esta migration só
+-- ajusta o que o zap precisa para: (a) o devedor REPORTAR um campo incorreto já no
+-- ciclo (pós aceite, aviso `programado`); (b) o cobrador RESOLVER (aprovar/recusar)
+-- diretamente pelo WhatsApp, por telefone (mesma disciplina de confirmar/rejeitar
+-- pagamento, H8.5).
 --
--- DECISÃO (grant column-level, não table-level): a 0092 deu ao zap só select+insert em
+-- DECISÃO (grant column-level, não table-level): a 0093 deu ao zap só select+insert em
 -- `avisos_reportes` ("zap só reporta, nunca resolve"). Resolver (aprovar/recusar) por
 -- WhatsApp exige setar `resolucao`/`resolvido_em`; sem isso, uma resolução via WhatsApp
 -- deixaria a linha 'pendente' presa para sempre (bloqueando um reporte futuro legítimo
 -- pelo índice único parcial). Concede só as 2 colunas da resolução (privilégio mínimo,
--- espelha 0070/0098), preservando "o zap só ESCREVE reporte" como regra geral: aqui ele
+-- espelha 0070/0099), preservando "o zap só ESCREVE reporte" como regra geral: aqui ele
 -- só fecha o MESMO reporte que o cobrador decidiu, nunca aplica a correção nos dados do
--- combinado (isso continua sendo só da api/painel, decisão da 0092).
+-- combinado (isso continua sendo só da api/painel, decisão da 0093).
 --
--- Numeração: última migration = 0098; esta é 0099.
+-- Numeração: última migration = 0099 (creditos_hold_privilegio_minimo); esta é 0100.
 
 grant update (resolucao, resolvido_em) on public.avisos_reportes to whaviso_zap;
 
@@ -29,10 +30,10 @@ grant update (resolucao, resolvido_em) on public.avisos_reportes to whaviso_zap;
 --
 -- Este template é `comoTemplate: true` (notificar_cobrador/index.ts): inicia conversa
 -- fora da janela de 24h, então é um template DE VERDADE da Meta. Mesma disciplina do
--- item 20 (0095): a correção nasce como NOVA VERSÃO pendente (meta_acao='criar'), nunca
+-- item 20 (0096): a correção nasce como NOVA VERSÃO pendente (meta_acao='criar'), nunca
 -- editando a versão aprovada/ativa em uso; precisa passar pelo fluxo de submissão +
 -- aprovação da Meta (H12.5) antes que o owner ative pelo painel. Guarda de ambiente
--- idêntica à 0095/0068: só roda onde já existe submissão real à Meta (meta_template_id
+-- idêntica à 0096/0068: só roda onde já existe submissão real à Meta (meta_template_id
 -- preenchido); em banco de DEV é NO-OP de propósito (o seed reativa toda linha da
 -- tabela incondicionalmente, e duas versões ativas na mesma chave/contexto violam o
 -- índice único).
@@ -102,7 +103,7 @@ where not exists (
 
 -- Resposta ao COBRADOR que digitou "aprovar" (fallback de texto por telefone, mesma
 -- disciplina dos botões de confirmar/rejeitar pagamento). Aprovar não aplica a correção
--- por si só (decisão da 0092): abre o combinado para edição pré-preenchida no painel.
+-- por si só (decisão da 0093): abre o combinado para edição pré-preenchida no painel.
 insert into public.templates (chave, nome_meta, conteudo, variaveis, status_meta, ativo)
 select 'resposta.correcao_aprovada', 'resposta_correcao_aprovada',
        '{"texto":"Correção aprovada. Abra o aplicativo para revisar e confirmar os novos dados deste combinado."}'::jsonb,

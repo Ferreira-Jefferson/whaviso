@@ -39,9 +39,9 @@
 -- violam o indice unico idx_templates_unif_ativo_por_chave. Precedente identico ao das
 -- 0087/0088 (tambem documentadas como NO-OP em DEV pelo mesmo motivo).
 --
--- Numeracao: ultima migration deste grupo = 0091 (combinado_linhas_custo_fix); os
--- numeros 0092 a 0094 e 0097/0098 sao de outros grupos aplicados em paralelo (nao
--- tocados aqui). Esta e a 0095, reservada para o grupo 1G (templates/mensagens admin).
+-- Numeracao: ultima migration = 0095 (billing_comprovantes, grupo 1D); os numeros
+-- 0092 a 0095 e 0098/0099 sao de outros grupos (nao tocados aqui). Esta e a 0096,
+-- reservada para o grupo 1G (templates/mensagens admin).
 
 insert into public.templates
   (chave, contexto, nome_meta, idioma, conteudo, variaveis, versao, status_meta, ativo, categoria, exemplos, meta_acao)

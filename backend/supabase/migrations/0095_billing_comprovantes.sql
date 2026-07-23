@@ -23,8 +23,7 @@
 -- ou do próprio usuário). `ia_motivo` é só uma frase curta de classificação (ex.: "valor não
 -- confere", "documento ilegível"), nunca dado extraído (conta/agência/CPF/chave Pix).
 --
--- Numeração: última migration = 0091 (combinado_linhas_custo_fix); esta leva usa 0092/0093
--- em outros grupos da mesma wave e 0094 aqui (reservado para o grupo 1D).
+-- Numeração: última migration = 0094 (aviso_codigo); esta é 0095 (grupo 1D).
 
 create table public.billing_comprovantes (
   id uuid primary key default gen_random_uuid(),

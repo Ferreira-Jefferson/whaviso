@@ -15,7 +15,7 @@ export const ATIVOS_NAO_PAGOS: readonly StatusAviso[] = [
   'informado_pago',
   'pausado',
   'aguardando_aprovacao_aviso_editado',
-  // Item 7 (migration 0092): mesma disciplina de suspensão de aguardando_aprovacao_aviso_editado;
+  // Item 7 (migrations 0092/0093): mesma disciplina de suspensão de aguardando_aprovacao_aviso_editado;
   // o valor ainda é devido, só pausado até o cobrador aprovar/recusar o reporte.
   'aguardando_aprovacao_dado_incorreto',
   'desregistrado',

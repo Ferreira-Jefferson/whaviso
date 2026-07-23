@@ -36,7 +36,7 @@ ENFILEIRA a recarga (não credita: o usuário nunca se credita, H11.11).
 ## Tabelas
 - lê de: creditos_carteira, creditos_catalogo, creditos_lancamentos, config_plataforma, whats_sessao
 - escreve em: notificacoes_billing (enfileira a recarga; o zap drena/envia), billing_comprovantes
-  (0094: comprovante + decisão da IA/owner)
+  (0095: comprovante + decisão da IA/owner)
 
 ## Especialistas consumidos (shared/, módulo nunca importa módulo)
 - `shared/planos` (lerCarteira/lerCatalogo/precoPorEnvioCentavos/creditarEnvios)

@@ -9,7 +9,7 @@ import {
   poolSuper,
 } from '../../../../test/harness'
 
-// Item 7 (wave 2, migration 0099): o devedor reporta um dado do combinado ATIVO
+// Item 7 (wave 2, migration 0100): o devedor reporta um dado do combinado ATIVO
 // (`programado`) como incorreto por texto ("<opção> <informação correta>"); o cobrador
 // aprova/recusa por texto ("aprovar"/"recusar"), roteado por telefone (H8.5/M4).
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }

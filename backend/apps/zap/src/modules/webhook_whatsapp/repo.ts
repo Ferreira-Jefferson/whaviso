@@ -36,7 +36,7 @@ export type AcaoBotao =
   // E14 H14.3: pedido do devedor (botão no lembrete invertido sem chave) que dispara a
   // oferta de cadastro de chave ao cobrador (Gatilho B).
   | 'solicitar_pix'
-  // Item 7 (wave 2, migration 0099): o COBRADOR aprova/recusa, por telefone, um dado
+  // Item 7 (wave 2, migration 0100): o COBRADOR aprova/recusa, por telefone, um dado
   // reportado como incorreto PÓS-aceite (não confundir com `dado_incorreto`, que é o
   // sinal simples do CONVITE, H5.4). Hoje chega ao service pelo fallback de texto
   // "aprovar"/"recusar" (mesmo pipeline de aplicarAcaoBotao); se um botão de verdade
@@ -45,14 +45,14 @@ export type AcaoBotao =
   | 'recusar_correcao'
 
 /** Campo do combinado que o devedor apontou como incorreto (espelha o CHECK de
- *  `avisos_reportes.campo`, migration 0092). Pix NÃO entra (sinal próprio, `pix_incorreto`,
+ *  `avisos_reportes.campo`, migration 0093). Pix NÃO entra (sinal próprio, `pix_incorreto`,
  *  0035). Mesmo enum do lado api (apps/api/src/modules/avisos/repo.ts): cada app é
  *  self-contained e mantém sua própria cópia, sem importar um do outro. */
 export type CampoReporte = 'valor' | 'data' | 'nome_motivo'
 
 /** Valores que o DEVEDOR informou como corretos ao reportar (formato depende de
  *  `campo`); o zap ESCREVE (nunca resolve), a api lê para reabrir a edição pré-preenchida
- *  no painel (0092). Espelha `DadosReporte` do lado api. */
+ *  no painel (0093). Espelha `DadosReporte` do lado api. */
 export interface DadosReporte {
   valor_centavos?: number
   data_combinada?: string
@@ -381,8 +381,8 @@ export async function aplicarAcaoBotao(
     // ----- Item 7 (wave 2): COBRADOR aprova/recusa um dado reportado como incorreto,
     // por telefone (mesmo roteamento/anti-vazamento de confirmar/rejeitar acima). Só
     // decide QUAL reporte pendente fecha (resolucao) e devolve o combinado a `programado`;
-    // a correção em si (aplicar os novos dados) segue exigindo o painel (decisão da 0092:
-    // "aprovar não aplica a edição sozinha"). Zap tem grant column-level pra isto (0099):
+    // a correção em si (aplicar os novos dados) segue exigindo o painel (decisão da 0093:
+    // "aprovar não aplica a edição sozinha"). Zap tem grant column-level pra isto (0100):
     // só `resolucao`/`resolvido_em`, nunca os campos do acordo.
     if (acao === 'aprovar_correcao' || acao === 'recusar_correcao') {
       const alvoCobrador = aviso.cobrador_id ? aviso.cobrador_profile_telefone : aviso.telefone_cobrador
@@ -827,7 +827,7 @@ export async function listarCombinadosParaMenu(
   return rows.map((r) => ({ id: r.id }))
 }
 
-// ---- Item 7 (wave 2, migration 0099): reporte de dado incorreto PÓS-aceite ------------
+// ---- Item 7 (wave 2, migration 0100): reporte de dado incorreto PÓS-aceite ------------
 
 /**
  * O DEVEDOR reporta, por texto, um campo do combinado ATIVO (`programado`) como
@@ -836,7 +836,7 @@ export async function listarCombinadosParaMenu(
  * estado (só a partir de `programado`; qualquer outro estado é idempotente/silencioso:
  * toque duplo, reporte já em análise, etc.), grava o reporte (`avisos_reportes`, só
  * INSERT: o zap nunca resolve), suspende o ciclo (`aguardando_aprovacao_dado_incorreto`,
- * o trigger da 0092 cancela os envios pendentes) e enfileira a notificação ao cobrador
+ * o trigger da 0093 cancela os envios pendentes) e enfileira a notificação ao cobrador
  * (mesmo TipoNotificacao do sinal simples do convite, `combinado_dado_incorreto`: não
  * exige valor novo em TipoNotificacao). Retorna true se o reporte foi de fato registrado
  * (para o service responder a confirmação); false = ignorado sem efeito (sem resposta).

@@ -21,7 +21,7 @@
 -- (nulls não colidem entre si em índice único do Postgres); `criarAviso` SEMPRE
 -- preenche o código para avisos novos criados pela api.
 --
--- Numeração: última migration = 0092; esta é 0093.
+-- Numeração: última migration = 0093 (dado_incorreto_schema); esta é 0094.
 
 alter table public.avisos add column if not exists codigo text;
 

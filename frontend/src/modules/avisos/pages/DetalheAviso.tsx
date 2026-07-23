@@ -201,7 +201,7 @@ function DetalheConteudo({ id, aviso }: { id: string; aviso: Aviso }) {
   const aprovarDadoIncorreto = useAprovarDadoIncorreto(id)
   const recusarDadoIncorreto = useRecusarDadoIncorreto(id)
   // Item 21: código curto do combinado (rota dedicada; degrada para null se ainda não
-  // existir no backend em execução, ex.: migration 0093 pendente de aplicar no cloud).
+  // existir no backend em execução, ex.: migration 0094 pendente de aplicar no cloud).
   const codigo = useAvisoCodigo(id)
   const [confirmarCancelar, setConfirmarCancelar] = useState(false)
   const [editando, setEditando] = useState(false)

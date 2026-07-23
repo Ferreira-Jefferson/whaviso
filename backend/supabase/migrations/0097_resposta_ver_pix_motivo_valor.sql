@@ -24,9 +24,8 @@
 -- conhecido da 0085 (pix_tipo, pix_chave); customizacao do owner via painel nao e
 -- sobrescrita.
 --
--- Numeracao: ultima migration deste grupo = 0091 (combinado_linhas_custo_fix); 0095 fecha
--- o item 20 deste mesmo grupo (0092-0094/0097/0098 sao de outros grupos, em paralelo).
--- Esta e a 0096.
+-- Numeracao: 0096 (deste mesmo grupo) fecha o item 20; 0092-0095/0098/0099 sao de
+-- outros grupos. Esta e a 0097.
 
 update public.templates
 set conteudo = jsonb_set(

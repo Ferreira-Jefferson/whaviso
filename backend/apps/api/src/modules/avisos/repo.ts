@@ -823,7 +823,7 @@ export async function atualizarItens(
   ])
 }
 
-// ---- Reporte de dado incorreto (item 7, migration 0092) --------------------------------
+// ---- Reporte de dado incorreto (item 7, migrations 0092/0093) --------------------------
 
 /** Campo do combinado que o devedor apontou como incorreto. Pix NÃO entra (sinal
  *  próprio, `pix_incorreto`, 0035). Espelha o CHECK de `avisos_reportes.campo`. */

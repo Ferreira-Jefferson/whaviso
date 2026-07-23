@@ -22,7 +22,7 @@ interface Log {
 
 // E14: além das ações de convite/ciclo, o webhook reconhece `solicitar_pix` (pedido do
 // devedor no lembrete) e as ações do wizard de chave (informar/pular/corrigir/confirmar).
-// Item 7 (wave 2, migration 0099): aprovar_correcao/recusar_correcao decidem um reporte
+// Item 7 (wave 2, migration 0100): aprovar_correcao/recusar_correcao decidem um reporte
 // de dado incorreto PÓS-aceite (não confundir com `dado_incorreto`, sinal simples do
 // CONVITE, H5.4). Hoje chegam pelo fallback de texto "aprovar"/"recusar" (mais abaixo);
 // entram em ACOES_BOTAO já agora para, se um botão de verdade existir num template
@@ -435,7 +435,7 @@ function parseNomeOuMotivo(texto: string): repo.DadosReporte | null {
   return motivo ? { motivo } : null
 }
 
-/** Monta `dados_corretos` (formato de `avisos_reportes`, migration 0092) a partir do
+/** Monta `dados_corretos` (formato de `avisos_reportes`, migration 0093) a partir do
  *  texto livre informado para o campo escolhido. null = formato não reconhecido. */
 function montarDadosCorretos(campo: repo.CampoReporte, bruto: string): repo.DadosReporte | null {
   if (campo === 'valor') {

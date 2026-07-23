@@ -162,7 +162,7 @@ export const ocorrenciaSchema = z.object({
 })
 export type Ocorrencia = z.infer<typeof ocorrenciaSchema>
 
-// ---- Item 7 (migration 0092, grupo 1B): reporte de dado incorreto ----------------------
+// ---- Item 7 (migrations 0092/0093, grupo 1B): reporte de dado incorreto ----------------
 // Campo do combinado que o DEVEDOR apontou como incorreto ao aceitar/interagir pelo
 // WhatsApp (valor, data ou nome/motivo agrupados; chave Pix NÃO entra, tem sinal
 // próprio). Espelha o CHECK de `avisos_reportes.campo` no backend. O schema de resposta
