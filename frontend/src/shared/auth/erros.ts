@@ -26,6 +26,14 @@ export function mensagemDeErroAuth(erro: AuthError | null | undefined): string {
   ) {
     return 'Muitas tentativas. Aguarde 1 minuto e peça o código de novo.'
   }
+  // Item 4a (leva 2026-07-22 1D): `phone_exists` é o Supabase recusando um número que já
+  // pertence a OUTRA conta (troca de telefone na Conta, ou onboarding). Precisa vir ANTES do
+  // fallback genérico de "phone/number" abaixo: aquele fallback casava com "phone_exists"
+  // também (a mensagem de erro contém "phone") e mostrava "DDD errado", que é enganoso quando
+  // o DDD está certo e o problema é o número já estar em uso por outra conta.
+  if (code === 'phone_exists' || msg.includes('phone_exists') || msg.includes('already been registered')) {
+    return 'Este número de WhatsApp já está em uso por outra conta.'
+  }
   if (msg.includes('phone') || msg.includes('number')) {
     return 'Número de WhatsApp inválido. Confira o DDD e tente de novo.'
   }

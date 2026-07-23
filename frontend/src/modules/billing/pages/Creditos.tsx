@@ -6,14 +6,15 @@
 // paga via Pix e manda o comprovante na conversa, e o owner credita depois. Abaixo, o
 // EXTRATO dos lançamentos. O limite é DECIDIDO PELO BACKEND: aqui só espelhamos o saldo.
 // Linguagem das Regras de Ouro: crédito, envio, saldo, recarga.
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Banner,
   Button,
   Card,
   ConfirmDialog,
   EmptyState,
+  InfoHint,
   MoneyText,
   PageHeader,
   Skeleton,
@@ -21,8 +22,31 @@ import {
 import { precoEnvioCentavos } from '@/shared/plano'
 import { ApiError } from '@/shared/api_client'
 import type { Lancamento } from '@/shared/contracts'
-import { useCarteira, useExtrato, useRecarga } from '../api'
+import { atualizarPerfil, OtpTelefoneDialog } from '@/shared/auth'
+import {
+  billingKeys,
+  MIME_COMPROVANTE_ACEITOS,
+  useCarteira,
+  useEnviarComprovante,
+  useExtrato,
+  useRecarga,
+  type MimeComprovante,
+} from '../api'
 import { linkConversaWhatsApp } from '../whatsapp'
+
+/** Lê um File como base64 puro (sem o prefixo `data:...;base64,`). */
+function lerArquivoBase64(arquivo: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader()
+    leitor.onerror = () => reject(new Error('Não foi possível ler o arquivo.'))
+    leitor.onload = () => {
+      const resultado = String(leitor.result ?? '')
+      const virgula = resultado.indexOf(',')
+      resolve(virgula >= 0 ? resultado.slice(virgula + 1) : resultado)
+    }
+    leitor.readAsDataURL(arquivo)
+  })
+}
 
 // Rótulo amigável de cada tipo de lançamento do extrato (sem termos proibidos).
 const ROTULO_LANCAMENTO: Record<Lancamento['tipo'], string> = {
@@ -40,9 +64,11 @@ const ROTULO_LANCAMENTO: Record<Lancamento['tipo'], string> = {
 const ENTRA: Lancamento['tipo'][] = ['cortesia', 'compra', 'credito_owner', 'devolucao']
 
 export default function CreditosPage() {
+  const queryClient = useQueryClient()
   const carteira = useCarteira()
   const extrato = useExtrato(1)
   const recarga = useRecarga()
+  const enviarComprovante = useEnviarComprovante()
 
   const catalogo = carteira.data?.catalogo
   const saldo = carteira.data?.carteira
@@ -52,6 +78,16 @@ export default function CreditosPage() {
   const [aConfirmar, setAConfirmar] = useState(false)
   // Vira true quando a recarga foi confirmada e a mensagem foi enfileirada ao WhatsApp.
   const [enviado, setEnviado] = useState(false)
+  // Item 3: popup de cadastro/verificação de WhatsApp quando a recarga recusa por
+  // telefone_ausente, sem sair da tela. Ao confirmar o código, salva o telefone e refaz a
+  // recarga automaticamente (mesma quantidade que a pessoa já tinha confirmado).
+  const [cadastrarWhats, setCadastrarWhats] = useState(false)
+  // Item 19: anexar comprovante da recarga em andamento (JSON base64; ver MODULE.md do billing
+  // no backend sobre a escolha de não usar multipart). Guarda o resultado para a mensagem.
+  const [comprovanteResultado, setComprovanteResultado] = useState<
+    'aprovado' | 'aguardando_revisao_manual' | null
+  >(null)
+  const inputComprovanteRef = useRef<HTMLInputElement>(null)
 
   const min = catalogo?.envios_min ?? 10
   const max = catalogo?.envios_max ?? 250
@@ -67,7 +103,36 @@ export default function CreditosPage() {
   function aoMudarQuantidade(n: number) {
     setQtd(n)
     setEnviado(false)
+    setComprovanteResultado(null)
     recarga.reset()
+  }
+
+  async function aoVerificarWhatsApp(telefoneE164: string) {
+    await atualizarPerfil({ telefone: telefoneE164 })
+    setCadastrarWhats(false)
+    // Refaz a recarga automaticamente com a mesma quantidade (item 3: sem a pessoa ter que
+    // clicar em Recarregar de novo depois de cadastrar o WhatsApp).
+    recarga.mutate(
+      { quantidade },
+      { onSuccess: () => setEnviado(true) },
+    )
+  }
+
+  async function aoEscolherComprovante(arquivo: File) {
+    const recargaId = recarga.data?.id
+    if (!recargaId) return
+    const mime = arquivo.type as MimeComprovante
+    if (!MIME_COMPROVANTE_ACEITOS.includes(mime)) return
+    const arquivoBase64 = await lerArquivoBase64(arquivo)
+    enviarComprovante.mutate(
+      { recargaId, arquivoBase64, arquivoMime: mime },
+      {
+        onSuccess: (r) => {
+          setComprovanteResultado(r.status)
+          if (r.status === 'aprovado') void queryClient.invalidateQueries({ queryKey: billingKeys.carteira })
+        },
+      },
+    )
   }
 
   return (
@@ -93,7 +158,11 @@ export default function CreditosPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <CartaoSaldo titulo="Saldo livre" valor={saldo.saldo_livre} destaque />
-          <CartaoSaldo titulo="Reservado" valor={saldo.reservado} />
+          <CartaoSaldo
+            titulo="Reservado"
+            valor={saldo.reservado}
+            dica="Créditos já separados para combinados ativos que ainda não dispararam. Eles saem do reservado só quando o lembrete é enviado (viram 'envios feitos') ou quando voltam ao saldo livre, se o combinado não for aceito ou for encerrado."
+          />
           <CartaoSaldo titulo="Em espera (24h)" valor={saldo.em_hold} />
           <CartaoSaldo titulo="Envios feitos" valor={saldo.consumido} />
         </div>
@@ -178,15 +247,61 @@ export default function CreditosPage() {
           )}
         </Banner>
       )}
+
+      {/* Item 19 (H11.14): anexar o comprovante direto na tela, sem depender só do WhatsApp. */}
+      {enviado && recarga.data?.id && (
+        <Card className="mt-4 flex flex-col gap-3">
+          <h3 className="text-sm font-medium text-tinta">Já pagou? Anexe o comprovante aqui</h3>
+          <p className="text-xs text-tinta-2">
+            Envie a foto ou o PDF do Pix. Se tudo bater, o saldo entra automaticamente; senão,
+            fica em análise e liberamos assim que confirmarmos.
+          </p>
+          <input
+            ref={inputComprovanteRef}
+            type="file"
+            accept={MIME_COMPROVANTE_ACEITOS.join(',')}
+            className="hidden"
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0]
+              e.target.value = ''
+              if (arquivo) void aoEscolherComprovante(arquivo)
+            }}
+          />
+          <Button
+            variante="secondary"
+            className="self-start"
+            loading={enviarComprovante.isPending}
+            onClick={() => inputComprovanteRef.current?.click()}
+          >
+            Anexar comprovante
+          </Button>
+          {comprovanteResultado === 'aprovado' && (
+            <Banner tom="sucesso">Comprovante confirmado! O saldo já entrou na sua conta.</Banner>
+          )}
+          {comprovanteResultado === 'aguardando_revisao_manual' && (
+            <Banner tom="info">Recebemos seu comprovante e ele está em análise.</Banner>
+          )}
+          {enviarComprovante.isError && (
+            <Banner tom="erro">
+              {(enviarComprovante.error instanceof ApiError && enviarComprovante.error.message) ||
+                'Não foi possível enviar o comprovante. Tente de novo.'}
+            </Banner>
+          )}
+        </Card>
+      )}
+
       {recarga.isError && !enviado && (
         <Banner tom="erro" className="mt-4">
           {recarga.error instanceof ApiError && recarga.error.code === 'telefone_ausente' ? (
             <>
-              Cadastre seu WhatsApp na{' '}
-              <Link to="/app/conta" className="font-medium underline">
-                tela Conta
-              </Link>{' '}
-              para receber as instruções de pagamento.
+              Cadastre seu WhatsApp para receber as instruções de pagamento.{' '}
+              <button
+                type="button"
+                className="font-medium underline"
+                onClick={() => setCadastrarWhats(true)}
+              >
+                Cadastrar WhatsApp
+              </button>
             </>
           ) : (
             (recarga.error instanceof ApiError && recarga.error.message) ||
@@ -253,16 +368,39 @@ export default function CreditosPage() {
           comprovante na conversa.
         </span>
       </ConfirmDialog>
+
+      {/* Item 3: popup de cadastro/verificação de WhatsApp (componente compartilhado, também
+          usável por Conta/Onboarding numa leva futura). Ao confirmar, refaz a recarga. */}
+      <OtpTelefoneDialog
+        aberto={cadastrarWhats}
+        onFechar={() => setCadastrarWhats(false)}
+        onVerificado={aoVerificarWhatsApp}
+        titulo="Cadastrar WhatsApp"
+        descricao="Vamos enviar as instruções de pagamento da sua recarga para este número."
+      />
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
 
-function CartaoSaldo({ titulo, valor, destaque = false }: { titulo: string; valor: number; destaque?: boolean }) {
+function CartaoSaldo({
+  titulo,
+  valor,
+  destaque = false,
+  dica,
+}: {
+  titulo: string
+  valor: number
+  destaque?: boolean
+  dica?: string
+}) {
   return (
     <Card className={`flex flex-col gap-1 ${destaque ? 'border-salvia ring-1 ring-salvia/30' : ''}`}>
-      <span className="text-sm text-tinta-2">{titulo}</span>
+      <span className="flex items-center gap-1 text-sm text-tinta-2">
+        {titulo}
+        {dica && <InfoHint texto={dica} rotulo={`Sobre ${titulo.toLowerCase()}`} />}
+      </span>
       <span className="font-display text-2xl text-salvia">{valor}</span>
     </Card>
   )

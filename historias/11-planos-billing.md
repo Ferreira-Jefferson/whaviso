@@ -156,6 +156,20 @@ Como **owner**, quero, no futuro, recorrência sem parecer pegadinha, para ter r
 
 ---
 
+### H11.14: Comprovante de recarga validado por IA 🟢
+Como **pessoa usuária**, quero anexar o comprovante do Pix direto na tela de Créditos, para não depender só de mandar a foto na conversa e esperar o owner ver manualmente.
+*Critérios de aceite:*
+- [ ] Depois de confirmar a recarga (H11.10), a tela de Créditos mostra uma opção de **anexar o comprovante** (foto ou PDF) enquanto a recarga está em aberto.
+- [ ] O servidor guarda o arquivo num **Storage privado** e chama uma **IA com visão** para conferir duas coisas: (a) se o documento **parece** um comprovante de pagamento e (b) se o **valor pago bate** com o valor da recarga.
+- [ ] **Confiança alta e valor batendo:** credita os envios **automaticamente** (mesmo mecanismo de H11.11, "crédito"), sem esperar o owner.
+- [ ] **Qualquer outro caso** (confiança baixa, valor não confirmado, ou a IA fora do ar) **não credita e não rejeita sozinho**: o comprovante fica **aguardando revisão manual** até o owner decidir. O falso positivo é mitigado por exigir confiança alta *e* valor batendo, nunca só "parece um comprovante".
+- [ ] O owner tem uma forma de ver os comprovantes **aguardando revisão manual** (lista simples, sem exigir dashboard sofisticado nesta fase) e de **aprovar** (credita, mesma trilha de H11.11) ou **rejeitar** cada um.
+- [ ] O **arquivo** do comprovante é retido por **30 dias** e depois **apagado** do Storage; a **decisão** (aprovado/rejeitado, confiança, se o valor bateu) fica guardada para sempre no livro-razão/auditoria, só o documento em si some.
+- [ ] **Nunca loga** o conteúdo do documento nem a resposta bruta da IA (podem carregar dado bancário do próprio usuário ou de terceiro); o motivo guardado no banco é só uma frase curta de classificação, nunca dado extraído (conta/agência/CPF/chave Pix).
+- [ ] Reenviar um comprovante de uma recarga **já aprovada ou rejeitada** é recusado (não reabre uma decisão já tomada).
+
+---
+
 ### Divergências com a definição anterior (revogadas)
 
 > O modelo antigo deste épico (4 planos Free/Start/Profissional/Plus com alavancas por plano, versionamento e congelamento por assinatura) está **revogado**. Como **não há cliente em produção**, não há migração: o schema é refeito do zero para a carteira de créditos.
@@ -179,10 +193,12 @@ Como **owner**, quero, no futuro, recorrência sem parecer pegadinha, para ter r
 - **Owner credita (com confirmação) e edita a curva;** usuário nunca se credita (H11.11).
 - **Sem cliente em produção:** schema do zero, sem compatibilidade com o modelo de 4 planos (revogado).
 - **MVP manual:** compra via WhatsApp + crédito do owner; gateway/recarga/assinatura são 🟡 (H11.13).
+- **Comprovante com IA (H11.14):** anexar na tela credita automático se a IA tiver confiança alta e o valor bater; qualquer dúvida vira revisão manual do owner (nunca credita nem rejeita sozinho); arquivo retido 30 dias e depois apagado (a decisão fica).
 
 ### Decisões em aberto
 - **Valores iniciais a calibrar:** saldo de cortesia do Free; teto de agenda do Free e da conta com crédito; os marcos da curva de preço (tabela `envios` -> `R$/envio`, que também define o mínimo/máximo do slider).
 - **Confirmar a regra de agenda** (2 estados como proposto, ou agenda generosa para todos desde o Free).
+- **H11.14 (infra pendente):** o bucket do Storage e a chave da IA (OpenRouter) ainda não estão provisionados em produção; até lá, todo comprovante enviado cai em revisão manual (nunca credita sozinho, só o caminho automático fica pausado).
 
 ### Fora de escopo deste épico
 - ❌ Gateway de pagamento, recarga automática, assinatura mensal, dunning (🟡, H11.13).

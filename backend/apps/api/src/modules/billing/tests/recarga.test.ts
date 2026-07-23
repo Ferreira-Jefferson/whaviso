@@ -100,7 +100,12 @@ describe('billing recarga (integração)', () => {
     await app.close()
     expect(r.statusCode).toBe(200)
     // Curva em 50 envios = 90 centavos/envio (migration 0058) -> 50 * 90 = 4500.
-    expect(r.json()).toEqual({ enfileirado: true, quantidade: 50, valor_centavos: 4500, telefone_vendas: null })
+    // Item 19: a resposta ganhou o `id` (linha de notificacoes_billing), usado depois para
+    // anexar o comprovante.
+    const corpo = r.json()
+    expect(corpo).toMatchObject({ enfileirado: true, quantidade: 50, valor_centavos: 4500, telefone_vendas: null })
+    expect(typeof corpo.id).toBe('string')
+    expect(corpo.id).toHaveLength(36)
 
     const linhas = await linhasBilling(u)
     expect(linhas).toHaveLength(1)
