@@ -35,6 +35,13 @@ export async function processarEnviosDevidos(deps: DepsEnviarLembretes): Promise
       //   empurrãozinho de D+1 (etapa d_mais_1, template variante revisao). Qualquer outra
       //   etapa remanescente é cancelada (não polui o painel com texto normal nesse estado).
       // - terminais e suspensos: nunca enviam.
+      //
+      // Item 20: o par ('ciclo.d_mais_1', 'revisao') é o ÚNICO par etapa/contexto
+      // autorizado a mencionar encerramento de ciclo (o texto "ainda não confirmou" do
+      // empurrãozinho). Nenhuma outra etapa, nem a variante 'padrao' de d_mais_1, pode
+      // sair enquanto o aviso está em informado_pago; ver repo.carregarDados (a busca do
+      // template já restringe a variante 'revisao' a esse estado) e o teste de regressão
+      // em tests/enviar_lembretes.test.ts que varre todas as etapas.
       if (dados.aviso_status === 'informado_pago') {
         if (envio.etapa !== 'd_mais_1') {
           await repo.marcarCancelado(pool, envio.id, 'informado_pago')

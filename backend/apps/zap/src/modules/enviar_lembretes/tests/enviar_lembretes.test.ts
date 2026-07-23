@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import type { EtapaEnvio } from '@whaviso/shared/contracts'
 import { ErroEnvio } from '../../../shared/whats'
 import { processarEnviosDevidos } from '../index'
 import {
@@ -118,6 +119,34 @@ describe('enviar_lembretes (integração)', () => {
     expect(whats.enviadas[0]!.botoes).toHaveLength(3)
     await limpar(cobradorId)
   })
+
+  // Item 20 (regressão): ('ciclo.d_mais_1', 'revisao') é o ÚNICO par etapa/variante
+  // autorizado a mencionar encerramento de ciclo em informado_pago. Varre TODAS as
+  // demais etapas do enum (EtapaEnvio menos d_mais_1) e garante que nenhuma delas sai;
+  // toda outra etapa remanescente é cancelada com motivo 'informado_pago', sem chamar o
+  // transporte. Complementa o teste acima (que cobre só a etapa 'd').
+  const etapasQueNaoSaemEmInformadoPago: EtapaEnvio[] = ['d_menos_2', 'd_menos_1', 'd']
+  for (const etapa of etapasQueNaoSaemEmInformadoPago) {
+    it(`informado_pago (H6.5) regressão: etapa ${etapa} NUNCA sai (só d_mais_1 sai)`, async () => {
+      const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: futuro })
+      const envioId = await criarEnvioAgendado(avisoId, etapa)
+      const { poolSuper } = await import('../../../../test/harness')
+      await poolSuper.query(`update public.avisos set status='informado_pago' where id=$1`, [avisoId])
+      let chamou = false
+      const whats = clienteWhatsFake(() => {
+        chamou = true
+        return { wamid: 'nao_deveria' }
+      })
+
+      const n = await processarEnviosDevidos({ pool: poolZap, logger, whats })
+      expect(n).toBe(0)
+      const e = await lerEnvio(envioId)
+      expect(e.status).toBe('cancelado')
+      expect(e.erro).toBe('informado_pago')
+      expect(chamou).toBe(false)
+      await limpar(cobradorId)
+    })
+  }
 
   it('aviso já pago: trigger cancela o envio antes do envio acontecer', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: futuro })

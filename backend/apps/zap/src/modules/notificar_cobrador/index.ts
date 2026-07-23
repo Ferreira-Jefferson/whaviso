@@ -61,6 +61,9 @@ const CONFIG: Record<string, ConfigTipo> = {
     aindaValida: (d) => d.aviso_status === 'aguardando_aceite',
   },
   // "Já paguei": só vale enquanto o aviso segue em revisão (cobrador ainda não agiu).
+  // Item 6 (central de notificações): "pagamento reportado" é sinônimo deste mesmo
+  // evento no vocabulário de produto, não uma categoria à parte; o enfileiramento de
+  // pagamento_informado (acoes_devedor, api) já cobre os dois nomes.
   pagamento_informado: {
     chave: 'cobrador.pagamento_informado',
     contexto: PADRAO,

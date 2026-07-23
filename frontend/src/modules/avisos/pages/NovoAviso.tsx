@@ -17,6 +17,8 @@ import {
   PhoneInput,
   SegmentedControl,
   Spinner,
+  ToastProvider,
+  useToast,
   WhatsAppPreview,
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
@@ -50,11 +52,23 @@ const OPCOES_DIRECAO: ReadonlyArray<{ value: DirecaoAviso; label: string }> = [
   { value: 'pagar', label: 'Vou pagar' },
 ]
 
+// ToastProvider isolado aqui (não há Provider global de toast ainda): esta é a única
+// tela desta wave que consome `useToast`. Ao escopo local, o provider não reseta ao
+// trocar para a tela de sucesso (AvisoCriado), porque ele envolve as duas por fora.
 export default function NovoAvisoPage() {
+  return (
+    <ToastProvider>
+      <NovoAvisoConteudo />
+    </ToastProvider>
+  )
+}
+
+function NovoAvisoConteudo() {
   const navigate = useNavigate()
   const location = useLocation()
   const criar = useCriarAviso()
   const perfil = usePerfil()
+  const { mostrarToast } = useToast()
   // E16 (multi): categorias do usuário, só para exibir os NOMES na revisão. A seleção/criação
   // vive dentro do SeletorCategorias (componente controlado).
   const categorias = useCategorias()
@@ -124,6 +138,9 @@ export default function NovoAvisoPage() {
   // em MAX_MOTIVO_CARACTERES; o schema valida por garantia (paste etc.).
   const motivoLen = (watch('motivo') ?? '').length
   const ehReceber = direcao === 'receber'
+  // Item 12: os lembretes pelo WhatsApp exigem Pix; sem chave (opcional em agenda/pagar) o
+  // seletor de cadência mostra o gate visual.
+  const pixPresente = Boolean(watch('pix_chave')?.trim())
 
   // Cada botão escolhe o modo e dispara o submit. O schema valida conforme o modo
   // (telefone/Pix só obrigatórios ao enviar o combinado), então setamos antes de validar.
@@ -175,6 +192,7 @@ export default function NovoAvisoPage() {
         cadencia_etapas: cadenciaEtapas ?? null,
       })
       setResultado(r)
+      mostrarToast(dados.modo === 'enviar' ? 'Combinado enviado' : 'Combinado salvo na agenda')
     } catch (e) {
       if (e instanceof ApiError && e.isLimiteDeSaldo) {
         setLimiteAtingido(e.message)
@@ -448,8 +466,9 @@ export default function NovoAvisoPage() {
           </div>
 
           {/* E6 H6.10: quais lembretes saem é do PRÓPRIO combinado (vale repetindo ou
-              não), por isso fora do "Repetir". Universal (E11 H11.2): liberado para todos. */}
-          <CadenciaLembretes onChange={aoMudarCadencia} />
+              não), por isso fora do "Repetir". Universal (E11 H11.2): liberado para todos.
+              Item 12: sem chave Pix (opcional em agenda/pagar) o seletor fica indisponível. */}
+          <CadenciaLembretes onChange={aoMudarCadencia} pixPresente={pixPresente} />
 
           <div className="flex flex-col gap-2 pt-1">
             {/* E11 H11.9: sem saldo, antecipa a CTA de comprar créditos (a api ainda
@@ -510,6 +529,13 @@ export default function NovoAvisoPage() {
           salvando={isSubmitting}
           onSalvar={salvar}
           onFechar={() => setRevisando(false)}
+          // Item 13: oferece a chave Pix dentro da revisão quando falta (o watch('pix_chave')
+          // no form principal faz o form re-renderizar e `valores` refletir a escolha).
+          onMudarPixChave={(v) => setValue('pix_chave', v)}
+          onMudarPixDetalhes={(titular, banco) => {
+            setValue('pix_titular', titular)
+            setValue('pix_banco', banco)
+          }}
         />
       )}
     </div>
@@ -527,6 +553,8 @@ function RevisarModal({
   salvando,
   onSalvar,
   onFechar,
+  onMudarPixChave,
+  onMudarPixDetalhes,
 }: {
   valores: NovoAvisoForm
   categoriaNomes: string[]
@@ -534,12 +562,17 @@ function RevisarModal({
   salvando: boolean
   onSalvar: (modo: 'enviar' | 'agenda') => void
   onFechar: () => void
+  // Item 13: reportam a escolha da chave Pix embutida para o form principal (react-hook-form),
+  // que é a fonte real submetida (o `valores` aqui é só uma leitura pontual via getValues()).
+  onMudarPixChave: (chave: string) => void
+  onMudarPixDetalhes: (titular: string, banco: string) => void
 }) {
   const [enviarAceite, setEnviarAceite] = useState(false)
   const totalCentavos = somaItensCentavos(valores.itens)
+  const semPix = !valores.pix_chave?.trim()
 
-  // Payload do preview: só faz sentido montar quando há o mínimo (nome/valor); a query só
-  // dispara quando `enviarAceite` está ligado.
+  // Item 9: sempre true (não só quando `enviarAceite`). O preview fica cacheado
+  // (staleTime: 30s), então quando o usuário marca "Enviar aceite" ele já está pronto.
   const payload: CombinadoPreviewBody | null =
     valores.nome_devedor.trim().length > 0 && totalCentavos > 0
       ? {
@@ -553,7 +586,7 @@ function RevisarModal({
           pix_banco: valores.pix_banco || null,
         }
       : null
-  const preview = useCombinadoPreview(payload, enviarAceite)
+  const preview = useCombinadoPreview(payload, true)
 
   // Guarda de envio: o WhatsApp já é exigido para chegar até aqui (Concluir bloqueia sem
   // ele), então só falta validar, no receber, o trio Pix (chave+titular+banco).
@@ -650,6 +683,21 @@ function RevisarModal({
           Enviar o combinado para {valores.nome_devedor || 'a outra pessoa'} confirmar no WhatsApp
         </label>
 
+        {/* Item 13: sem chave Pix ao marcar "Enviar aceite", oferece o cadastro/escolha aqui
+            mesmo. No receber é bloqueante (enviarPossivel abaixo); no pagar é só uma oferta,
+            não impede o envio. */}
+        {enviarAceite && semPix && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-tinta">Chave Pix</span>
+            <SeletorChavePix
+              modo={ehReceber ? 'proprias' : 'externa'}
+              value={valores.pix_chave ?? ''}
+              onChange={onMudarPixChave}
+              onDetalhes={onMudarPixDetalhes}
+            />
+          </div>
+        )}
+
         {/* Preview da mensagem: cinza/desabilitado até marcar "Enviar aceite". */}
         {!enviarAceite ? (
           <div className="rounded-card border border-linha bg-areia/30 p-4 text-sm text-tinta-2 opacity-70">
@@ -690,7 +738,7 @@ function RevisarModal({
 
         {enviarAceite && !enviarPossivel && (
           <p className="text-xs text-barro">
-            Falta a chave Pix para enviar. Toque em Revisar para completar.
+            Escolha ou cadastre uma chave Pix acima para enviar o combinado.
           </p>
         )}
       </Card>
