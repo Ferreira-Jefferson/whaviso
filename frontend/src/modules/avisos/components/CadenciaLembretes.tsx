@@ -22,9 +22,16 @@ const ETAPAS: ReadonlyArray<{ value: EtapaEnvio; rotulo: string; quando: string 
 interface CadenciaLembretesProps {
   /** Emite o subconjunto escolhido (undefined = ciclo completo) sempre que muda. */
   onChange: (etapas: EtapaEnvio[] | undefined) => void
+  /**
+   * Se o combinado já tem uma chave Pix definida. Os lembretes pelo WhatsApp exigem
+   * Pix; em fluxos onde a chave é opcional (agenda, pagar), sem ela o seletor fica
+   * visualmente indisponível (opacidade + texto explicativo), sem bloquear o resto
+   * do formulário.
+   */
+  pixPresente: boolean
 }
 
-export function CadenciaLembretes({ onChange }: CadenciaLembretesProps) {
+export function CadenciaLembretes({ onChange, pixPresente }: CadenciaLembretesProps) {
   // Subconjunto das etapas. Vazio = todas marcadas (ciclo completo).
   const [etapasSelecionadas, setEtapasSelecionadas] = useState<EtapaEnvio[]>([])
 
@@ -70,13 +77,17 @@ export function CadenciaLembretes({ onChange }: CadenciaLembretesProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={cn('flex flex-col gap-2', !pixPresente && 'opacity-50')}>
       <span className="flex items-center gap-1.5 text-sm font-medium text-tinta">
         <CalendarRange strokeWidth={1.75} className="size-4 text-salvia" />
         Quais lembretes enviar
       </span>
-      <p className="text-xs text-tinta-2">{resumo}</p>
-      <div className="flex flex-wrap gap-2 pt-1">
+      <p className="text-xs text-tinta-2">
+        {pixPresente
+          ? resumo
+          : 'Só é possível enviar lembretes pelo WhatsApp em combinados com chave Pix cadastrada.'}
+      </p>
+      <div className={cn('flex flex-wrap gap-2 pt-1', !pixPresente && 'pointer-events-none')}>
         {ETAPAS.map((etapa) => {
           const ativo =
             etapasSelecionadas.length === 0 || etapasSelecionadas.includes(etapa.value)
@@ -86,6 +97,8 @@ export function CadenciaLembretes({ onChange }: CadenciaLembretesProps) {
               type="button"
               role="checkbox"
               aria-checked={ativo}
+              aria-disabled={!pixPresente}
+              tabIndex={pixPresente ? 0 : -1}
               onClick={() => alternarEtapa(etapa.value)}
               className={cn(
                 'flex flex-col items-center rounded-input border px-3 py-2 text-center transition-colors',
