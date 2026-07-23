@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import type { Pool } from '@whaviso/shared/db'
-import { detectarTipoChavePix, ROTULO_TIPO_CHAVE, type TipoChavePix } from '@whaviso/shared/contracts'
+import {
+  detectarTipoChavePix,
+  gerarPayloadPixCopiaCola,
+  ROTULO_TIPO_CHAVE,
+  type TipoChavePix,
+} from '@whaviso/shared/contracts'
+import { formatarValorBr } from '@whaviso/shared/datas'
 import type { ClienteWhats, EventoBotao, EventoStatus, EventoTexto } from '../../shared/whats'
 import type { AdminSupabase } from '../../shared/supabase_admin'
 import { carregarTemplateAtivo, renderMensagem } from '../../shared/templates'
@@ -205,6 +211,16 @@ function intervaloPixMs(): number {
  * e banco, após até 3s). Marca `entrega_chave_status='entregue'` SOMENTE depois que as
  * DUAS saíram com sucesso. Se a 2a falhar (mesmo após os 3 retrys do transporte), NÃO
  * marca: fica reentregável no próximo toque. A chave/titular/banco nunca são logados.
+ *
+ * Item 22 (2026-07-22): a 1a mensagem também popula `motivo`/`valor` (combinado/valor
+ * do aviso), para o texto do template poder usá-los; hoje o template ainda não usa
+ * essas variáveis (mudança coordenada à parte, grupo 1G), mas populá-las agora é
+ * seguro (render ignora variável que o texto não referencia).
+ *
+ * Item 23 (2026-07-22): a 1a mensagem também leva o Pix Copia e Cola (BR Code) como
+ * texto adicional, gerado por função pura (sem gateway/integração paga), reutilizando
+ * a chave/titular/valor já carregados aqui. Se a geração falhar por algum motivo
+ * inesperado, a chave/titular/banco (o essencial) ainda saem normalmente.
  */
 async function entregarChaveDePagamento(
   deps: DepsInbound,
@@ -220,17 +236,25 @@ async function entregarChaveDePagamento(
     deps.logger.warn({ chave: 'resposta.ver_pix' }, 'template ausente; chave não enviada')
     return
   }
-  const para = await telefoneDoAviso(deps, avisoId)
-  if (!para) return
+  const dados = await dadosEntregaChave(deps, avisoId)
+  if (!dados?.telefoneDevedor) return
+  const para = dados.telefoneDevedor
   // Tipo p/ o corpo (ex.: "Chave Pix (CPF):"): prefere o snapshot do aviso; senão infere do
   // formato (o zap não acessa chaves_pix). Ambíguo (11 díg. CPF x celular) -> '' (o corpo
   // é texto livre, então vazio só renderiza sem o rótulo, sem quebrar o envio).
   const tipoResolvido = tipo ?? detectarTipoChavePix(chave)
   const pixTipoRotulo = tipoResolvido ? ROTULO_TIPO_CHAVE[tipoResolvido] : ''
   try {
-    await deps.whats.enviarMensagem(
-      renderMensagem(t1, para, { valores: { pix_tipo: pixTipoRotulo, pix_chave: chave } }),
-    )
+    const mensagem1 = renderMensagem(t1, para, {
+      valores: {
+        pix_tipo: pixTipoRotulo,
+        pix_chave: chave,
+        motivo: dados.motivo,
+        valor: formatarValorBr(dados.valorCentavos),
+      },
+    })
+    mensagem1.texto = anexarCopiaCola(mensagem1.texto, chave, titular, dados.valorCentavos)
+    await deps.whats.enviarMensagem(mensagem1)
     // 2a mensagem só faz sentido com titular/banco e template; sem eles, entrega só a 1a.
     if (t2 && (titular || banco)) {
       await esperar(intervaloPixMs())
@@ -244,13 +268,47 @@ async function entregarChaveDePagamento(
   }
 }
 
-/** Telefone-alvo (devedor) de um aviso, sem logar. Usado pela entrega da chave. */
-async function telefoneDoAviso(deps: DepsInbound, avisoId: string): Promise<string | null> {
-  const { rows } = await deps.pool.query<{ telefone_devedor: string | null }>(
-    `select telefone_devedor from public.avisos where id=$1`,
+/**
+ * Item 23: acrescenta o Pix Copia e Cola (BR Code) ao final do texto da 1a mensagem.
+ * Função pura por baixo (`gerarPayloadPixCopiaCola`); qualquer erro na geração (chave
+ * num formato inesperado, etc.) não pode derrubar a entrega da chave em texto, então
+ * cai em silêncio e devolve o texto original sem o BR Code.
+ */
+function anexarCopiaCola(texto: string, chave: string, titular: string, valorCentavos: number): string {
+  try {
+    const payload = gerarPayloadPixCopiaCola({
+      chave,
+      nomeTitular: titular,
+      valorCentavos,
+    })
+    return `${texto}\n\n${payload}`
+  } catch {
+    return texto
+  }
+}
+
+/** Dados do aviso usados na entrega da chave (telefone do devedor, motivo, valor do
+ *  combinado). Nunca loga (a query não é logada em nenhum ponto de chamada). */
+async function dadosEntregaChave(
+  deps: DepsInbound,
+  avisoId: string,
+): Promise<{ telefoneDevedor: string | null; motivo: string; valorCentavos: number } | null> {
+  const { rows } = await deps.pool.query<{
+    telefone_devedor: string | null
+    motivo: string
+    valor_centavos: string
+  }>(
+    `select telefone_devedor, motivo, valor_centavos::bigint as valor_centavos
+       from public.avisos where id=$1`,
     [avisoId],
   )
-  return rows[0]?.telefone_devedor ?? null
+  const linha = rows[0]
+  if (!linha) return null
+  return {
+    telefoneDevedor: linha.telefone_devedor,
+    motivo: linha.motivo,
+    valorCentavos: Number(linha.valor_centavos),
+  }
 }
 
 function esperar(ms: number): Promise<void> {
