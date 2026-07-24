@@ -89,7 +89,7 @@ export function SinoNotificacoes() {
         <div
           role="dialog"
           aria-label="Notificações"
-          className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-card border border-linha bg-cartao shadow-[0_12px_40px_rgba(32,50,42,0.18)]"
+          className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-card border border-linha bg-cartao shadow-[0_12px_40px_rgba(32,50,42,0.18)] lg:right-auto lg:left-0"
         >
           <div className="border-b border-linha px-4 py-3">
             <span className="font-display text-sm font-semibold text-salvia">Notificações</span>
