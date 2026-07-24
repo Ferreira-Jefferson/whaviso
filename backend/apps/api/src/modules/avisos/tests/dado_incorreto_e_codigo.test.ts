@@ -103,7 +103,7 @@ describe('item 7: aprovar/recusar dado reportado como incorreto', () => {
   // aviso para aguardando_aprovacao_dado_incorreto (trigger já permite a transição).
   async function reportarDadoIncorreto(
     avisoId: string,
-    campo: 'valor' | 'data' | 'nome_motivo',
+    campo: 'valor' | 'data' | 'nome' | 'motivo',
     dados: Record<string, unknown>,
   ): Promise<void> {
     await poolSuper.query(
@@ -211,7 +211,7 @@ describe('item 7: aprovar/recusar dado reportado como incorreto', () => {
 
   it('GET reporte-aprovado-pendente: devolve o reporte quando a aprovação veio direto do banco (simula o zap/WhatsApp)', async () => {
     const avisoId = await criarAceito()
-    await reportarDadoIncorreto(avisoId, 'nome_motivo', { motivo: 'aluguel de setembro' })
+    await reportarDadoIncorreto(avisoId, 'motivo', { motivo: 'aluguel de setembro' })
     // Mesma sequência que o zap faz ao aprovar por WhatsApp (grupo 1E, wave 2): resolve o
     // reporte e registra o evento direto no banco, sem passar pelo POST síncrono acima.
     const rep = await poolSuper.query<{ id: string }>(
@@ -225,14 +225,14 @@ describe('item 7: aprovar/recusar dado reportado como incorreto', () => {
     await poolSuper.query(`update public.avisos set status = 'programado' where id = $1`, [avisoId])
     await poolSuper.query(
       `insert into public.eventos_aviso (aviso_id, tipo, ator, detalhes)
-       values ($1, 'dado_incorreto_aprovado', 'cobrador', jsonb_build_object('reporte_id', $2::text, 'campo', 'nome_motivo'))`,
+       values ($1, 'dado_incorreto_aprovado', 'cobrador', jsonb_build_object('reporte_id', $2::text, 'campo', 'motivo'))`,
       [avisoId, rep.rows[0]!.id],
     )
 
     const app = await criarAppTeste(cobrador)
     const r = await app.inject({ method: 'GET', url: `/v1/avisos/${avisoId}/reporte-aprovado-pendente`, headers: AUTH })
     await app.close()
-    expect(r.json().reporte).toEqual({ campo: 'nome_motivo', dados: { motivo: 'aluguel de setembro' } })
+    expect(r.json().reporte).toEqual({ campo: 'motivo', dados: { motivo: 'aluguel de setembro' } })
   })
 
   it('GET reporte-aprovado-pendente: some depois que o cobrador edita (a correção já foi tratada)', async () => {
@@ -256,7 +256,7 @@ describe('item 7: aprovar/recusar dado reportado como incorreto', () => {
 
   it('editar direto enquanto há reporte pendente -> 409 reporte_em_aprovacao', async () => {
     const avisoId = await criarAceito()
-    await reportarDadoIncorreto(avisoId, 'nome_motivo', { motivo: 'aluguel' })
+    await reportarDadoIncorreto(avisoId, 'motivo', { motivo: 'aluguel' })
     const app = await criarAppTeste(cobrador)
     const r = await app.inject({
       method: 'PATCH',

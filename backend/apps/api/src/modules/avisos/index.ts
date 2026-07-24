@@ -24,7 +24,7 @@ const idParam = z.object({ id: z.uuid() })
 // carrega `codigo`/reporte nesta rodada (ver nota do grupo 1B no relatório); manter aqui
 // evita tocar em backend/packages/shared/src/contracts/entidades.ts ou payloads.ts, fora
 // do escopo desta tarefa.
-const campoReporteSchema = z.enum(['valor', 'data', 'nome_motivo'])
+const campoReporteSchema = z.enum(['valor', 'data', 'nome', 'motivo'])
 const dadosReporteSchema = z.object({
   valor_centavos: z.number().int().positive().nullish(),
   data_combinada: z.string().nullish(),

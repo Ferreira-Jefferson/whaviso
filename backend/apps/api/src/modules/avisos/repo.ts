@@ -826,8 +826,9 @@ export async function atualizarItens(
 // ---- Reporte de dado incorreto (item 7, migrations 0092/0093) --------------------------
 
 /** Campo do combinado que o devedor apontou como incorreto. Pix NÃO entra (sinal
- *  próprio, `pix_incorreto`, 0035). Espelha o CHECK de `avisos_reportes.campo`. */
-export type CampoReporte = 'valor' | 'data' | 'nome_motivo'
+ *  próprio, `pix_incorreto`, 0035). Espelha o CHECK de `avisos_reportes.campo` (migration
+ *  0102: nome e motivo são campos diferentes, não mais agrupados em 'nome_motivo'). */
+export type CampoReporte = 'valor' | 'data' | 'nome' | 'motivo'
 
 /** Valores que o DEVEDOR informou como CORRETOS ao reportar (formato depende de
  *  `campo`): o zap (grupo 1E) escreve; a api só lê para reabrir a edição pré-preenchida. */

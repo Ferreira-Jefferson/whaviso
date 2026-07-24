@@ -888,11 +888,11 @@ function valoresDoReporte(
   if (reporte.campo === 'data' && d.data_combinada) {
     return { data_combinada: d.data_combinada }
   }
-  if (reporte.campo === 'nome_motivo') {
-    const v: Partial<{ nome_devedor: string; motivo: string }> = {}
-    if (d.nome_devedor) v.nome_devedor = d.nome_devedor
-    if (d.motivo) v.motivo = d.motivo
-    return v
+  if (reporte.campo === 'nome' && d.nome_devedor) {
+    return { nome_devedor: d.nome_devedor }
+  }
+  if (reporte.campo === 'motivo' && d.motivo) {
+    return { motivo: d.motivo }
   }
   return {}
 }
@@ -901,7 +901,8 @@ function valoresDoReporte(
 function destaquesDoReporte(campo: AvisoReporte['campo']): ReadonlySet<CampoDestacavel> {
   if (campo === 'valor') return new Set(['itens'])
   if (campo === 'data') return new Set(['data_combinada'])
-  return new Set(['nome_devedor', 'motivo'])
+  if (campo === 'nome') return new Set(['nome_devedor'])
+  return new Set(['motivo'])
 }
 
 // Item 7: campos do EditarModal que podem ser destacados por virem de uma aprovação de

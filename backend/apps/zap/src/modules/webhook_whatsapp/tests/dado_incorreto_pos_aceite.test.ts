@@ -46,10 +46,10 @@ async function contarEvento(id: string, tipo: string): Promise<number> {
 }
 
 describe('Item 7 (wave 2): reporte de dado incorreto pós-aceite', () => {
-  it('"1 250,00" (valor): registra reporte, suspende (aguardando_aprovacao_dado_incorreto), notifica cobrador', async () => {
+  it('"2 250,00" (valor): registra reporte, suspende (aguardando_aprovacao_dado_incorreto), notifica cobrador', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '1 250,00'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 250,00'))
     expect(await statusDe(avisoId)).toBe('aguardando_aprovacao_dado_incorreto')
     const rep = await reportePendente(avisoId)
     expect(rep?.campo).toBe('valor')
@@ -64,58 +64,59 @@ describe('Item 7 (wave 2): reporte de dado incorreto pós-aceite', () => {
     await limpar(cobradorId)
   })
 
-  it('"1 250.00" (valor, ponto decimal): interpreta como 250,00, não como 25000 (regressão)', async () => {
+  it('"2 250.00" (valor, ponto decimal): interpreta como 250,00, não como 25000 (regressão)', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '1 250.00'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 250.00'))
     const rep = await reportePendente(avisoId)
     expect(rep?.dados_corretos).toEqual({ valor_centavos: 25000 })
     await limpar(cobradorId)
   })
 
-  it('"2 20/08/2026" (data): dados_corretos com data_combinada ISO', async () => {
+  it('"3 20/08/2026" (data): dados_corretos com data_combinada ISO', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 20/08/2026'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '3 20/08/2026'))
     const rep = await reportePendente(avisoId)
     expect(rep?.campo).toBe('data')
     expect(rep?.dados_corretos).toEqual({ data_combinada: '2026-08-20' })
     await limpar(cobradorId)
   })
 
-  it('"3 Aluguel de agosto" (nome ou motivo, texto simples): vai para `motivo`', async () => {
+  it('"1 Maria" (nome): dados_corretos com nome_devedor', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '3 Aluguel de agosto'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '1 Maria'))
     const rep = await reportePendente(avisoId)
-    expect(rep?.campo).toBe('nome_motivo')
+    expect(rep?.campo).toBe('nome')
+    expect(rep?.dados_corretos).toEqual({ nome_devedor: 'Maria' })
+    await limpar(cobradorId)
+  })
+
+  it('"4 Aluguel de agosto" (motivo): dados_corretos com motivo, campo diferente de nome', async () => {
+    const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
+    const whats = clienteWhatsFake()
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '4 Aluguel de agosto'))
+    const rep = await reportePendente(avisoId)
+    expect(rep?.campo).toBe('motivo')
     expect(rep?.dados_corretos).toEqual({ motivo: 'Aluguel de agosto' })
     await limpar(cobradorId)
   })
 
-  it('"3 Maria | Aluguel de agosto" (nome ou motivo, formato com pipe): nome + motivo', async () => {
+  it('formato inválido ("2 abc"): não registra reporte, não muda status, pede para tentar de novo', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '3 Maria | Aluguel de agosto'))
-    const rep = await reportePendente(avisoId)
-    expect(rep?.dados_corretos).toEqual({ nome_devedor: 'Maria', motivo: 'Aluguel de agosto' })
-    await limpar(cobradorId)
-  })
-
-  it('formato inválido ("1 abc"): não registra reporte, não muda status, pede para tentar de novo', async () => {
-    const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
-    const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '1 abc'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 abc'))
     expect(await statusDe(avisoId)).toBe('programado')
     expect(await reportePendente(avisoId)).toBeNull()
     expect(whats.enviadas.some((t) => t.para === TEL_DEVEDOR)).toBe(true)
     await limpar(cobradorId)
   })
 
-  it('data inválida ("2 31/02/2026"): formato reconhecido no regex mas calendário inválido -> rejeita', async () => {
+  it('data inválida ("3 31/02/2026"): formato reconhecido no regex mas calendário inválido -> rejeita', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 31/02/2026'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '3 31/02/2026'))
     expect(await reportePendente(avisoId)).toBeNull()
     await limpar(cobradorId)
   })
@@ -123,9 +124,9 @@ describe('Item 7 (wave 2): reporte de dado incorreto pós-aceite', () => {
   it('idempotente: um 2º reporte enquanto o 1º está pendente não duplica (silêncio)', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '1 250,00'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 250,00'))
     expect(await statusDe(avisoId)).toBe('aguardando_aprovacao_dado_incorreto')
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '1 300,00'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 300,00'))
     const { rows } = await poolSuper.query(
       `select count(*)::int as n from public.avisos_reportes where aviso_id=$1`,
       [avisoId],
@@ -137,7 +138,7 @@ describe('Item 7 (wave 2): reporte de dado incorreto pós-aceite', () => {
   it('telefone divergente: sem combinado ativo para esse número, texto ignorado (silêncio)', async () => {
     const { cobradorId, avisoId } = await criarAvisoPendente({ dataCombinada: '2026-12-15' })
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto('+5511000000000', '1 250,00'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto('+5511000000000', '2 250,00'))
     expect(await statusDe(avisoId)).toBe('programado')
     expect(await reportePendente(avisoId)).toBeNull()
     expect(whats.enviadas).toHaveLength(0)
@@ -148,7 +149,7 @@ describe('Item 7 (wave 2): reporte de dado incorreto pós-aceite', () => {
 describe('Item 7 (wave 2): cobrador aprova/recusa por texto ("aprovar"/"recusar")', () => {
   async function reportar(): Promise<void> {
     const whats = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '1 250,00'))
+    await processarTexto({ pool: poolSuper, logger, whats }, texto(TEL_DEVEDOR, '2 250,00'))
   }
 
   it('"aprovar" (cobrador com conta): resolucao=aprovado, volta a programado, evento auditado', async () => {
@@ -187,7 +188,7 @@ describe('Item 7 (wave 2): cobrador aprova/recusa por texto ("aprovar"/"recusar"
   it('"aprovar" (cobrador SEM conta, invertido): roteia por telefone_cobrador', async () => {
     const { devedorId, avisoId } = await criarAvisoInvertido({ dataCombinada: '2026-12-15' })
     const whats0 = clienteWhatsFake()
-    await processarTexto({ pool: poolSuper, logger, whats: whats0 }, texto('+5511970001111', '1 250,00'))
+    await processarTexto({ pool: poolSuper, logger, whats: whats0 }, texto('+5511970001111', '2 250,00'))
     expect(await statusDe(avisoId)).toBe('aguardando_aprovacao_dado_incorreto')
     const whats = clienteWhatsFake()
     await processarTexto({ pool: poolSuper, logger, whats }, texto('+5511960002222', 'aprovar'))

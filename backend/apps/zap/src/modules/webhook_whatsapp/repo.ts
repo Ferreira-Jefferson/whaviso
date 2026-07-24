@@ -45,10 +45,11 @@ export type AcaoBotao =
   | 'recusar_correcao'
 
 /** Campo do combinado que o devedor apontou como incorreto (espelha o CHECK de
- *  `avisos_reportes.campo`, migration 0093). Pix NÃO entra (sinal próprio, `pix_incorreto`,
- *  0035). Mesmo enum do lado api (apps/api/src/modules/avisos/repo.ts): cada app é
- *  self-contained e mantém sua própria cópia, sem importar um do outro. */
-export type CampoReporte = 'valor' | 'data' | 'nome_motivo'
+ *  `avisos_reportes.campo`, migration 0102: nome e motivo são coisas diferentes, cada
+ *  um seu próprio campo, não mais agrupados). Pix NÃO entra (sinal próprio,
+ *  `pix_incorreto`, 0035). Mesmo enum do lado api (apps/api/src/modules/avisos/repo.ts):
+ *  cada app é self-contained e mantém sua própria cópia, sem importar um do outro. */
+export type CampoReporte = 'valor' | 'data' | 'nome' | 'motivo'
 
 /** Valores que o DEVEDOR informou como corretos ao reportar (formato depende de
  *  `campo`); o zap ESCREVE (nunca resolve), a api lê para reabrir a edição pré-preenchida

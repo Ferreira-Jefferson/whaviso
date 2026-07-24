@@ -352,15 +352,18 @@ const DECISAO_CORRECAO_POR_TEXTO: Record<string, 'aprovar_correcao' | 'recusar_c
 }
 
 // Item 7 (wave 2): opção numerada de qual campo está incorreto, no MESMO texto que já
-// traz a informação correta (formato "<opção> <valor>", ex.: "1 250,00"). Sem sessão
+// traz a informação correta (formato "<opção> <valor>", ex.: "2 250,00"). Sem sessão
 // multi-etapa (decisão de UX): um wizard de 2 mensagens exigiria uma tabela de sessão
 // nova (fora do escopo desta rodada, que só toca service/repo/index do módulo); uma
 // única mensagem cobre o mesmo resultado com bem menos risco. Pix NÃO entra (sinal
-// próprio `pix_incorreto`, 0035): só os 3 campos decididos (valor/data/nome ou motivo).
+// próprio `pix_incorreto`, 0035). Nome e motivo são campos DIFERENTES (nome de quem
+// paga não é o mesmo dado que o motivo do combinado), cada um sua própria opção
+// (migration 0102, antes agrupados em 'nome_motivo').
 const CAMPO_REPORTE_POR_NUMERO: Record<string, repo.CampoReporte> = {
-  '1': 'valor',
-  '2': 'data',
-  '3': 'nome_motivo',
+  '1': 'nome',
+  '2': 'valor',
+  '3': 'data',
+  '4': 'motivo',
 }
 
 interface RelatoDadoIncorreto {
@@ -368,11 +371,11 @@ interface RelatoDadoIncorreto {
   bruto: string
 }
 
-/** Reconhece "<1|2|3> <texto>" (a opção do campo + a informação correta). Não colide com
- *  o fallback "1"/"2"/"3" isolados (aceite/dado_incorreto/recusa do convite): esse exige
- *  match EXATO do dígito, sem nada depois. */
+/** Reconhece "<1|2|3|4> <texto>" (a opção do campo + a informação correta). Não colide
+ *  com o fallback "1"/"2"/"3" isolados (aceite/dado_incorreto/recusa do convite): esse
+ *  exige match EXATO do dígito, sem nada depois. */
 function parsearRelatoDadoIncorreto(textoBruto: string): RelatoDadoIncorreto | null {
-  const m = textoBruto.trim().match(/^([123])\s+([\s\S]+)$/)
+  const m = textoBruto.trim().match(/^([1234])\s+([\s\S]+)$/)
   if (!m) return null
   const campo = CAMPO_REPORTE_POR_NUMERO[m[1]!]
   if (!campo) return null
@@ -416,24 +419,6 @@ function parseDataBr(texto: string): string | null {
   return `${String(ano).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
 
-/**
- * Nome/motivo corrigido: aceita "nome | motivo" (pipe separa os dois; um lado pode ficar
- * vazio quando só o outro está errado) ou texto livre simples, que vai só para `motivo`
- * (a correção mais comum: descrição do que é o combinado). Vazio -> null.
- */
-function parseNomeOuMotivo(texto: string): repo.DadosReporte | null {
-  if (texto.includes('|')) {
-    const [nomeBruto, ...resto] = texto.split('|')
-    const nome = nomeBruto!.trim()
-    const motivo = resto.join('|').trim()
-    const dados: repo.DadosReporte = {}
-    if (nome) dados.nome_devedor = nome
-    if (motivo) dados.motivo = motivo
-    return dados.nome_devedor || dados.motivo ? dados : null
-  }
-  const motivo = texto.trim()
-  return motivo ? { motivo } : null
-}
 
 /** Monta `dados_corretos` (formato de `avisos_reportes`, migration 0093) a partir do
  *  texto livre informado para o campo escolhido. null = formato não reconhecido. */
@@ -446,7 +431,12 @@ function montarDadosCorretos(campo: repo.CampoReporte, bruto: string): repo.Dado
     const iso = parseDataBr(bruto)
     return iso ? { data_combinada: iso } : null
   }
-  return parseNomeOuMotivo(bruto)
+  if (campo === 'nome') {
+    const nome = bruto.trim()
+    return nome ? { nome_devedor: nome } : null
+  }
+  const motivo = bruto.trim()
+  return motivo ? { motivo } : null
 }
 
 /**

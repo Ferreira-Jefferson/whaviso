@@ -162,15 +162,15 @@ export const ocorrenciaSchema = z.object({
 })
 export type Ocorrencia = z.infer<typeof ocorrenciaSchema>
 
-// ---- Item 7 (migrations 0092/0093, grupo 1B): reporte de dado incorreto ----------------
+// ---- Item 7 (migrations 0092/0093/0102, grupo 1B): reporte de dado incorreto ----------
 // Campo do combinado que o DEVEDOR apontou como incorreto ao aceitar/interagir pelo
-// WhatsApp (valor, data ou nome/motivo agrupados; chave Pix NÃO entra, tem sinal
-// próprio). Espelha o CHECK de `avisos_reportes.campo` no backend. O schema de resposta
-// das rotas POST /avisos/:id/aprovar-dado-incorreto e /recusar-dado-incorreto vive LOCAL
-// em backend/apps/api/src/modules/avisos/index.ts nesta rodada (o contrato geral do
-// Aviso ainda não carrega reporte/código, ver nota abaixo); este tipo aqui é o espelho
-// para o front consumir a mesma forma.
-export const campoReporteAviso = z.enum(['valor', 'data', 'nome_motivo'])
+// WhatsApp (valor, data, nome ou motivo, cada um seu próprio campo; chave Pix NÃO entra,
+// tem sinal próprio). Espelha o CHECK de `avisos_reportes.campo` no backend. O schema de
+// resposta das rotas POST /avisos/:id/aprovar-dado-incorreto e /recusar-dado-incorreto
+// vive LOCAL em backend/apps/api/src/modules/avisos/index.ts nesta rodada (o contrato
+// geral do Aviso ainda não carrega reporte/código, ver nota abaixo); este tipo aqui é o
+// espelho para o front consumir a mesma forma.
+export const campoReporteAviso = z.enum(['valor', 'data', 'nome', 'motivo'])
 export type CampoReporteAviso = z.infer<typeof campoReporteAviso>
 
 export const avisoReporteSchema = z.object({
