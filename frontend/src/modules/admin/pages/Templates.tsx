@@ -7,14 +7,12 @@
 // mexe em templates (risco nº 8). Linguagem das Regras de Ouro em toda string.
 import { Card, EmptyState, PageHeader, Skeleton } from '@/shared/ui'
 import { SECOES_MENSAGENS, construirSecoesExtra, type SecaoMensagens } from '../catalogo_mensagens'
-import { useMensagens, type Template } from '../api'
+import { useMensagens } from '../api'
 import { CicloTemplates } from '../components/CicloTemplates'
-import { ListaMensagens, type SituacaoChave } from '../components/ListaMensagens'
-import { situacaoTemplate } from '../situacao_template'
+import { ListaMensagens } from '../components/ListaMensagens'
 
 export default function TemplatesPage() {
   const mensagens = useMensagens()
-  const resumoPorChave = construirResumo(mensagens.data)
   // Seções curadas + todo TEMPLATE fora do catálogo (nenhum template oculto): o owner
   // vê e gerencia qualquer template, e um novo aparece sozinho na próxima carga. Escopo
   // é só a tabela `templates` (configuração), não conteúdo de cliente.
@@ -35,51 +33,19 @@ export default function TemplatesPage() {
 
       <div className="flex flex-col gap-10">
         {[...SECOES_MENSAGENS, ...secoesExtra].map((secao) => (
-          <Secao key={secao.id} secao={secao} mensagens={mensagens} resumoPorChave={resumoPorChave} />
+          <Secao key={secao.id} secao={secao} mensagens={mensagens} />
         ))}
       </div>
     </div>
   )
 }
 
-// Situação viva de cada chave a partir dos templates unificados: 'ativo' (tem
-// versão ativa E aprovada na Meta, de fato no ar) ou 'vazio' (sem versão). Sem
-// versão no ar, resume as versões pela que MAIS pede atenção do owner: aprovado
-// (falta só ativar, um clique) > rejeitado (corrigir e reenviar) > em_analise (só
-// esperar) > rascunho (enviar). Retorna undefined enquanto carrega, para a lista
-// não piscar um estado errado.
-function construirResumo(
-  mensagens: Template[] | undefined,
-): ((chave: string) => SituacaoChave | undefined) | undefined {
-  if (!mensagens) return undefined
-  const porChave = new Map<string, Template[]>()
-  for (const t of mensagens) {
-    const arr = porChave.get(t.chave) ?? []
-    arr.push(t)
-    porChave.set(t.chave, arr)
-  }
-  return (chave) => {
-    const arr = porChave.get(chave)
-    if (!arr || arr.length === 0) return 'vazio'
-    // "No ar" (verde) exige a versão ativa E aprovada na Meta; enquanto a Meta não
-    // aprova, o envio fica gated (E12), então a chave mostra o estado da proposta.
-    if (arr.some((t) => t.ativo && t.status_meta === 'aprovado')) return 'ativo'
-    const situacoes = new Set(arr.map(situacaoTemplate))
-    if (situacoes.has('aprovado')) return 'aprovado'
-    if (situacoes.has('rejeitado')) return 'rejeitado'
-    if (situacoes.has('em_analise')) return 'em_analise'
-    return 'rascunho'
-  }
-}
-
 function Secao({
   secao,
   mensagens,
-  resumoPorChave,
 }: {
   secao: SecaoMensagens
   mensagens: ReturnType<typeof useMensagens>
-  resumoPorChave?: (chave: string) => SituacaoChave | undefined
 }) {
   const headingId = `secao-${secao.id}`
   return (
@@ -89,7 +55,7 @@ function Secao({
         <CicloEditavel mensagens={mensagens} />
       ) : (
         <Card>
-          <ListaMensagens mensagens={secao.mensagens} resumoPorChave={resumoPorChave} />
+          <ListaMensagens mensagens={secao.mensagens} templates={mensagens.data} />
         </Card>
       )}
     </section>
