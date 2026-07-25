@@ -1,18 +1,19 @@
 // Painel de controle (E9): home ÚNICA de quem tem conta (/app), POR PAPEL.
 // Consolida, numa página só, o que antes eram duas telas (Painel + Lista de avisos):
-// - "Precisa de você": o que aguarda ação (informado_pago como cobrador, edição a aprovar).
 // - Totais POR PAPEL (a receber/recebido como cobrador; a pagar/pago como devedor),
 //   calculados no BACKEND (centavos); o front só exibe (H9.2/H9.8).
 // - A LISTA de combinados POR PAPEL, com faixas (Ativos/Sem aviso/Encerrados), busca e
 //   filtro de situação (H9.1/H9.3). A lista vive AQUI (não no módulo avisos): este módulo
 //   NUNCA importa o módulo avisos (fronteira do lint), por isso o hook useAvisos mora em ../api.
+// "Precisa de você" (H9.2, o que aguarda ação) saiu daqui: vive agora na página
+// /app/notificacoes (H10.10, módulo `notificacoes`), junto do histórico da central. O
+// indicador de pendência POR LINHA na lista abaixo (item 8) continua aqui.
 // Linguagem das Regras de Ouro: a receber/a pagar/recebido/combinado (ver linguagem.ts).
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Bell,
   Clock,
   Inbox,
   Plus,
@@ -24,7 +25,6 @@ import {
 import {
   AlternarVisaoOwner,
   Button,
-  Card,
   DateInput,
   EmptyState,
   IconePendencia,
@@ -39,7 +39,7 @@ import {
   TableResponsive,
   type ColunaTabela,
 } from '@/shared/ui'
-import { ROTULO_PAPEL, ROTULO_STATUS_AVISO, brl, dataPtBR } from '@/shared/format'
+import { ROTULO_PAPEL, ROTULO_STATUS_AVISO, dataPtBR } from '@/shared/format'
 import {
   papelAviso,
   statusAviso,
@@ -289,38 +289,6 @@ export default function PainelPage() {
           </Link>
         }
       />
-
-      {/* "Precisa de você": o que aguarda ação do usuário (H9.2). Só aparece com itens. */}
-      {!pendencias.isLoading && (pendencias.data?.total ?? 0) > 0 && (
-        <Card className="mb-6 border-revisao/30 bg-revisao-claro">
-          <h2 className="mb-3 flex items-center gap-2 text-lg text-revisao">
-            <Bell strokeWidth={1.75} className="size-5" />
-            Precisa de você
-          </h2>
-          <ul className="flex flex-col divide-y divide-revisao/15">
-            {pendencias.data!.itens.map((p) => (
-              <li key={`${p.tipo}:${p.aviso_id}`}>
-                <Link
-                  to={`/app/avisos/${p.aviso_id}`}
-                  className="flex items-center justify-between gap-3 py-3 transition-colors hover:text-revisao"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-tinta">
-                      {p.nome_outra_ponta} · {p.motivo}
-                    </p>
-                    <p className="text-xs text-tinta-2">
-                      {ROTULO_PENDENCIA[p.tipo]} · data combinada {dataPtBR(p.data_combinada)}
-                    </p>
-                  </div>
-                  <span className="shrink-0 font-medium tabular-nums text-revisao">
-                    {brl(p.valor_centavos)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
 
       {/* Filtro de período (opcional, na URL). Rege os totais E a lista: com período, o
           recorrente aparece uma linha por ocorrência daquele intervalo (H9.6). */}

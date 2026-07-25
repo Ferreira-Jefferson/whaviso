@@ -5,6 +5,7 @@ import {
   UserCircle,
   History,
   BarChart3,
+  Bell,
   Send,
   FileText,
   Palette,
@@ -57,6 +58,8 @@ export const NAV_POR_SECAO: Record<Secao, NavItem[]> = {
     // E18: "Resultado" virou a área "Gestão" (abas Resultados/Clientes/Produtos/Categorias).
     // Sem `end`: acende também nas sub-rotas (/app/gestao/clientes etc.).
     { to: '/app/gestao', label: 'Gestão', icon: BarChart3 },
+    // H10.10: "precisa de você" (H9.2) + histórico da central, numa página própria.
+    { to: '/app/notificacoes', label: 'Notificações', icon: Bell },
     { to: '/app/creditos', label: 'Créditos', icon: CreditCard },
     { to: '/app/conta', label: 'Conta', icon: UserCircle },
   ],

@@ -1012,11 +1012,14 @@ export type PreviewMensagemResposta = z.infer<typeof previewMensagemResposta>
 // Item 6 (feedback 2026-07-22): feed cronológico das notificações do PRÓPRIO usuário,
 // unindo `notificacoes_cobrador` (pagamento_informado, combinado_dado_incorreto; o
 // enfileiramento já roteia para o alvo certo em qualquer papel/fluxo, ver
-// apps/api/src/shared/notificacoes) e `notificacoes_billing` (recarga). Não é o "precisa
-// de você" do painel (H9.2, pendências ABERTAS por combinado); é o histórico do que já
-// aconteceu. Sem texto pronto: o front monta o rótulo a partir de `tipo` (como ROTULO_EVENTO).
+// apps/api/src/shared/notificacoes) e `notificacoes_billing` (recarga). Vive numa página
+// própria (/app/notificacoes) junto com o "precisa de você" do painel (H9.2, pendências
+// ABERTAS por combinado); esta central é o histórico do que já aconteceu. Sem texto
+// pronto: o front monta o rótulo a partir de `tipo` (como ROTULO_EVENTO). Paginada (não
+// um `limit` fixo): cobre ver todas as notificações já acontecidas, não só as últimas.
 export const notificacoesCentralQuery = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  per_page: z.coerce.number().int().min(1).max(100).default(20),
 })
 export type NotificacoesCentralQuery = z.infer<typeof notificacoesCentralQuery>
 
@@ -1034,18 +1037,24 @@ export type NotificacaoCentral = z.infer<typeof notificacaoCentralSchema>
 
 export const notificacoesCentralResposta = z.object({
   itens: z.array(notificacaoCentralSchema),
-  // Contagem de não lidas TOTAL (não limitada por `limit`): é o número do badge do sino.
+  // Total de linhas do feed (governa a paginação, não confundir com `nao_lidas`).
+  total: z.number().int(),
+  page: z.number().int(),
+  per_page: z.number().int(),
+  // Contagem de não lidas TOTAL (não limitada pela página atual): é o número do
+  // atalho do sino. Só cai quando uma notificação específica é marcada (nunca em massa).
   nao_lidas: z.number().int(),
 })
 export type NotificacoesCentralResposta = z.infer<typeof notificacoesCentralResposta>
 
-// POST /v1/notificacoes/marcar-lidas: marca TODAS as não lidas do usuário como lidas de
-// uma vez (decisão de mecanismo mais simples que cobre o caso de uso real: abrir o sino e
-// a lista para de contar como pendente). Idempotente (nada para marcar = marcadas 0).
-export const marcarNotificacoesLidasResposta = z.object({
-  marcadas: z.number().int(),
+// POST /v1/notificacoes/:id/marcar-lida: marca UMA notificação como lida
+// (decisão de produto: o contador só cai quando o usuário abre aquele item específico,
+// nunca em massa ao só visitar a página/sino). Idempotente: marcar uma já lida devolve
+// `lida: true` sem falhar nem duplicar carimbo.
+export const marcarNotificacaoLidaResposta = z.object({
+  lida: z.boolean(),
 })
-export type MarcarNotificacoesLidasResposta = z.infer<typeof marcarNotificacoesLidasResposta>
+export type MarcarNotificacaoLidaResposta = z.infer<typeof marcarNotificacaoLidaResposta>
 
 // ---- Envelope de erro padrão ----
 export const erroResposta = z.object({

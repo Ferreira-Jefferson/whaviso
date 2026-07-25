@@ -24,7 +24,7 @@ Como **usuário com conta**, quero um resumo do total em cada situação, para e
 *Critérios de aceite:*
 - [ ] Em **"A receber"**, vejo totais (quantidade e soma em R$) de pelo menos: **a receber** (combinados ativos ainda não pagos) e **recebido** (combinados `pago`).
 - [ ] Em **"A pagar"**, vejo totais de: **a pagar** (ativos ainda não pagos) e **pago**.
-- [ ] Há um destaque de **"precisa de você"** reunindo os combinados que aguardam minha ação: como cobrador, os em **`informado_pago`** ("aguardando sua confirmação") e sinalizações de **dado incorreto** (Épico 5); como qualquer papel, edições a aprovar quando aplicável.
+- [ ] Há um destaque de **"precisa de você"** reunindo os combinados que aguardam minha ação: como cobrador, os em **`informado_pago`** ("aguardando sua confirmação") e sinalizações de **dado incorreto** (Épico 5); como qualquer papel, edições a aprovar quando aplicável. Este destaque vive na página **Notificações** (Épico 10 H10.10), não na Visão geral: as duas seções (o que precisa de ação agora e o histórico do que já aconteceu) ficam juntas ali, um item de navegação próprio leva até elas.
 - [ ] Os totais são calculados no **backend** a partir do estado e do valor (centavos), nunca somados/decididos no front.
 - [ ] Os rótulos dos totais **não** usam termos proibidos (ex.: "a receber"/"a pagar"/"pendente", nunca "dívida/atraso/cobrança").
 - [ ] Combinados em estado **terminal não-pago** (`cancelado`, `recusado`, `expirado`) **não** entram nos totais de "a receber/a pagar" (entram só num histórico, H9.3).

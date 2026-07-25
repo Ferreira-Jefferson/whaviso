@@ -1,37 +1,48 @@
 # Módulo: notificacoes
 
-Sino de notificações (H10.10, item 6 do feedback 2026-07-22): feed cronológico das
-notificações do usuário logado (pagamento informado, dado incorreto reportado,
-solicitação de créditos), com contador de não lidas no header comum (AppShell).
-NÃO é o "precisa de você" do painel (pendências abertas por combinado, módulo
-`painel`); é o histórico do que já aconteceu.
+Central de notificações (H10.10, item 6 do feedback 2026-07-22): página própria
+(`/app/notificacoes`) que reúne o "precisa de você" (H9.2, pendências ABERTAS por
+combinado que aguardam ação, movida da Visão geral do Painel) e o feed cronológico
+paginado das notificações do usuário logado (pagamento informado, dado incorreto
+reportado, solicitação de créditos). O sino no header comum (AppShell) é só um atalho
+(ícone + contador de não lidas) para essa página, sem dropdown próprio.
 
-**Papel:** user/owner (qualquer área logada; o AppShell é o layout comum de /app, /meus
-e /admin)
-**Onde aparece:** `AppShell` (sidebar lg+ e topbar mobile)
+**Papel:** user/owner (o sino aparece em qualquer área logada, `/app`, `/meus`, `/admin`;
+a página fica sob `/app`, mesma seção do Painel que ela substitui parcialmente)
+**Onde aparece:** sino em `AppShell` (sidebar lg+ e topbar mobile); página em
+`/app/notificacoes`, com item de navegação próprio
 
-> Fronteira: este módulo NUNCA importa de outro módulo. Coordene via `@/shared/*`
-> (ui, format, api_client) ou contratos. Diferente dos demais módulos (que só exportam
-> páginas lazy), `index.ts` exporta o componente `SinoNotificacoes` direto (sem lazy):
-> não é uma rota, é montado sempre no header.
+> Fronteira: este módulo NUNCA importa de outro módulo (nem `painel`, mesmo servindo o
+> "precisa de você" dele). Coordene via `@/shared/*` (ui, format, api_client, contracts)
+> ou contratos: `usePendencias()` em `api.ts` espelha `painelPendenciasResposta` de
+> `@/shared/contracts` (kernel compartilhado, não um módulo) e chama `/painel/pendencias`
+> direto, do mesmo jeito que o módulo `painel` chama `/avisos` sem importar o módulo
+> `avisos`.
 
 ## Estado
 
 - `api.ts`:
-  - `useNotificacoesCentral(limit?)` → `GET /v1/notificacoes`. Contrato Zod PRÓPRIO
-    (espelha manualmente `notificacaoCentralSchema`/`notificacoesCentralResposta` do
-    backend, não importa o pacote). `refetchInterval` de 60s mantém o badge perto do
-    estado real (sem websocket).
-  - `useMarcarNotificacoesLidas()` → `POST /v1/notificacoes/marcar-lidas`, invalida a
-    central ao concluir.
-- `components/SinoNotificacoes.tsx`: ícone + contador + painel dropdown. Ao abrir, marca
-  TUDO como lido (mecanismo escolhido no backend). Clique num item fecha o painel e
-  navega: origem `cobrador` → `/app/avisos/:id`; origem `billing` → `/app/creditos`.
-  Rótulos próprios por `tipo` (NÃO reutiliza `ROTULO_EVENTO` de `shared/format`: aquele
-  é de `TipoEvento`, a linha do tempo dentro de um combinado; aqui é
-  `TipoNotificacaoCentral`, a outbox).
+  - `useNotificacoesCentral(page?, perPage?)` → `GET /v1/notificacoes`. Contrato Zod
+    PRÓPRIO (espelha manualmente `notificacaoCentralSchema`/`notificacoesCentralResposta`
+    do backend, não importa o pacote). Paginado (`page`/`per_page`, resposta traz
+    `total`); `nao_lidas` é o total pendente, independente da página. `refetchInterval`
+    de 60s mantém o contador do atalho do sino perto do estado real (sem websocket).
+  - `useMarcarNotificacaoLida()` → `POST /v1/notificacoes/:id/marcar-lida`, marca UMA
+    notificação (nunca em massa), invalida a central ao concluir.
+  - `usePendencias()` → `GET /v1/painel/pendencias` ("precisa de você", H9.2), contrato
+    mirado de `@/shared/contracts`.
+- `components/SinoNotificacoes.tsx`: ícone + contador, SEM painel dropdown. Ao clicar,
+  navega direto para `/app/notificacoes`; não marca nada como lido.
+- `pages/Notificacoes.tsx`: a página em si. Seção "Precisa de você" no topo (só aparece
+  com itens); seção "Histórico" embaixo, com a lista paginada. Clique num item do
+  histórico marca aquele item como lido (se ainda não estava) e navega ao contexto:
+  origem `cobrador` → `/app/avisos/:id`; origem `billing` → `/app/creditos`. Rótulos
+  próprios por `tipo` (NÃO reutiliza `ROTULO_EVENTO` de `shared/format`: aquele é de
+  `TipoEvento`, a linha do tempo dentro de um combinado; aqui é `TipoNotificacaoCentral`,
+  a outbox).
 
 ## Escopo (mesma decisão do backend, H10.10)
-Só 3 categorias aparecem: `pagamento_informado`, `combinado_dado_incorreto` e `recarga`.
-Os demais eventos do produto (optout, reativação, encerramento, edição, reengajamento...)
-continuam só WhatsApp, fora da central por decisão deliberada nesta leva.
+Só 3 categorias aparecem no histórico: `pagamento_informado`, `combinado_dado_incorreto`
+e `recarga`. Os demais eventos do produto (optout, reativação, encerramento, edição,
+reengajamento...) continuam só WhatsApp, fora da central por decisão deliberada nesta
+leva.

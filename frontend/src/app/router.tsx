@@ -27,6 +27,7 @@ import { PoliticaPrivacidadePage, TermosUsoPage } from '@/modules/legal'
 import { LoginPage, OnboardingPage } from '@/modules/auth'
 import { AcaoAvisoPage, SairLembretesPage } from '@/modules/aceite'
 import { PainelPage, MetricasNegocioPage } from '@/modules/painel'
+import { NotificacoesPage } from '@/modules/notificacoes'
 import { PessoaPage, ClientesPage } from '@/modules/pessoas'
 import { NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
 import { CreditosPage } from '@/modules/billing'
@@ -158,6 +159,8 @@ const router = createBrowserRouter([
           { path: 'avisos', element: <RedirectAvisos /> },
           { path: 'avisos/novo', element: <NovoAvisoPage /> },
           { path: 'avisos/:id', element: <DetalheAvisoPage /> },
+          // H10.10: "precisa de você" (H9.2) + histórico da central de notificações.
+          { path: 'notificacoes', element: <NotificacoesPage /> },
           // E15: visão por pessoa/contato. `:avisoId` = um combinado do usuário; a api
           // resolve o telefone da outra ponta no servidor (telefone nunca em rota, H15.7).
           { path: 'pessoa/:avisoId', element: <PessoaPage /> },

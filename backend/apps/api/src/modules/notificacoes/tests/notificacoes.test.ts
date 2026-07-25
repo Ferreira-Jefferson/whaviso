@@ -1,7 +1,7 @@
 // H10.10: central de notificações. Cobre isolamento por profile, filtro de categoria
 // (só pagamento_informado/combinado_dado_incorreto da outbox de cobrador + recarga da
-// outbox de billing entram; outros TipoNotificacao, ex. optout, NUNCA vazam) e a
-// marcação como lida (idempotente).
+// outbox de billing entram; outros TipoNotificacao, ex. optout, NUNCA vazam), paginação
+// e a marcação de lida POR ITEM (idempotente, sem marcar em massa).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   criarAppTeste,
@@ -102,6 +102,7 @@ describe('notificacoes: central (H10.10)', () => {
     expect(r.statusCode).toBe(200)
     const b = r.json()
     expect(b.itens).toHaveLength(3)
+    expect(b.total).toBe(3)
     const tipos = b.itens.map((i: { tipo: string }) => i.tipo).sort()
     expect(tipos).toEqual(['combinado_dado_incorreto', 'pagamento_informado', 'recarga'])
     expect(b.itens.every((i: { tipo: string }) => i.tipo !== 'optout')).toBe(true)
@@ -133,34 +134,7 @@ describe('notificacoes: central (H10.10)', () => {
     expect(b.nao_lidas).toBe(1)
   })
 
-  it('marcar-lidas marca tudo de uma vez e é idempotente', async () => {
-    const avisoId = await criarAviso(userA, '+5511900001004')
-    await inserirNotifCobrador({ avisoId, cobradorId: userA, tipo: 'pagamento_informado', criadoEm: '2026-07-20T10:00:00Z' })
-    await inserirNotifCobrador({ avisoId, cobradorId: userA, tipo: 'combinado_dado_incorreto', criadoEm: '2026-07-20T11:00:00Z' })
-    await inserirNotifBilling({ profileId: userA, telefone: '+5511900001004', criadoEm: '2026-07-20T12:00:00Z' })
-
-    const app1 = await appA()
-    const marcar1 = await app1.inject({ method: 'POST', url: '/v1/notificacoes/marcar-lidas', headers: AUTH })
-    await app1.close()
-    expect(marcar1.statusCode).toBe(200)
-    expect(marcar1.json()).toEqual({ marcadas: 3 })
-
-    const app2 = await appA()
-    const depois = await app2.inject({ method: 'GET', url: '/v1/notificacoes', headers: AUTH })
-    await app2.close()
-    const b = depois.json()
-    expect(b.nao_lidas).toBe(0)
-    expect(b.itens.every((i: { lida: boolean }) => i.lida)).toBe(true)
-
-    // Idempotente: reprocessar sem pendentes novas não marca nada de novo, nem quebra.
-    const app3 = await appA()
-    const marcar2 = await app3.inject({ method: 'POST', url: '/v1/notificacoes/marcar-lidas', headers: AUTH })
-    await app3.close()
-    expect(marcar2.statusCode).toBe(200)
-    expect(marcar2.json()).toEqual({ marcadas: 0 })
-  })
-
-  it('respeita o limit da querystring', async () => {
+  it('pagina o feed (page/per_page) sem afastar a contagem de não lidas', async () => {
     const avisoId = await criarAviso(userA, '+5511900001005')
     for (let i = 0; i < 5; i++) {
       await inserirNotifCobrador({
@@ -171,11 +145,70 @@ describe('notificacoes: central (H10.10)', () => {
       })
     }
     const app = await appA()
-    const r = await app.inject({ method: 'GET', url: '/v1/notificacoes?limit=2', headers: AUTH })
+    const r = await app.inject({ method: 'GET', url: '/v1/notificacoes?page=1&per_page=2', headers: AUTH })
     await app.close()
     const b = r.json()
     expect(b.itens).toHaveLength(2)
-    // nao_lidas segue contando TODAS as pendentes, não só as retornadas pelo limit.
+    expect(b.total).toBe(5)
+    expect(b.page).toBe(1)
+    expect(b.per_page).toBe(2)
+    // nao_lidas segue contando TODAS as pendentes, não só as da página atual.
     expect(b.nao_lidas).toBe(5)
+
+    const app2 = await appA()
+    const r2 = await app2.inject({ method: 'GET', url: '/v1/notificacoes?page=3&per_page=2', headers: AUTH })
+    await app2.close()
+    expect(r2.json().itens).toHaveLength(1)
+  })
+
+  it('marcar-lida marca só o item clicado, é idempotente e não vaza notificação de outro dono', async () => {
+    const avisoId = await criarAviso(userA, '+5511900001004')
+    const idPagamento = await inserirNotifCobrador({ avisoId, cobradorId: userA, tipo: 'pagamento_informado', criadoEm: '2026-07-20T10:00:00Z' })
+    await inserirNotifCobrador({ avisoId, cobradorId: userA, tipo: 'combinado_dado_incorreto', criadoEm: '2026-07-20T11:00:00Z' })
+    const idRecarga = await inserirNotifBilling({ profileId: userA, telefone: '+5511900001004', criadoEm: '2026-07-20T12:00:00Z' })
+
+    const app1 = await appA()
+    const marcar1 = await app1.inject({ method: 'POST', url: `/v1/notificacoes/${idPagamento}/marcar-lida`, headers: AUTH })
+    await app1.close()
+    expect(marcar1.statusCode).toBe(200)
+    expect(marcar1.json()).toEqual({ lida: true })
+
+    const app2 = await appA()
+    const depois = await app2.inject({ method: 'GET', url: '/v1/notificacoes', headers: AUTH })
+    await app2.close()
+    const b = depois.json()
+    // Só o item marcado caiu do contador; os outros dois continuam pendentes.
+    expect(b.nao_lidas).toBe(2)
+    const marcado = b.itens.find((i: { id: string }) => i.id === idPagamento)
+    expect(marcado.lida).toBe(true)
+    const dadoIncorreto = b.itens.find((i: { tipo: string }) => i.tipo === 'combinado_dado_incorreto')
+    expect(dadoIncorreto.lida).toBe(false)
+
+    // Idempotente: marcar de novo o mesmo item não falha nem quebra a contagem.
+    const app3 = await appA()
+    const marcar2 = await app3.inject({ method: 'POST', url: `/v1/notificacoes/${idPagamento}/marcar-lida`, headers: AUTH })
+    await app3.close()
+    expect(marcar2.statusCode).toBe(200)
+    expect(marcar2.json()).toEqual({ lida: true })
+
+    // Marca a de billing também, isolado da de cobrador (tabelas diferentes).
+    const app4 = await appA()
+    const marcarBilling = await app4.inject({ method: 'POST', url: `/v1/notificacoes/${idRecarga}/marcar-lida`, headers: AUTH })
+    await app4.close()
+    expect(marcarBilling.json()).toEqual({ lida: true })
+
+    // B tentando marcar um id de A: não falha, mas não marca (isolamento, sem vazar
+    // se o id existe em outra conta).
+    const appB = await criarAppTeste(userB)
+    const tentativaB = await appB.inject({ method: 'POST', url: `/v1/notificacoes/${idPagamento}/marcar-lida`, headers: AUTH })
+    await appB.close()
+    expect(tentativaB.statusCode).toBe(200)
+
+    const app5 = await appA()
+    const depoisB = await app5.inject({ method: 'GET', url: '/v1/notificacoes', headers: AUTH })
+    await app5.close()
+    // A notificação de A segue lida por A, intocada pela tentativa de B.
+    const aindaMarcado = depoisB.json().itens.find((i: { id: string }) => i.id === idPagamento)
+    expect(aindaMarcado.lida).toBe(true)
   })
 })

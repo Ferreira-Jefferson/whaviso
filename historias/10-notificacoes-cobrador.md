@@ -98,16 +98,22 @@ Como **sistema (zap)**, quero uma fila simples (sem Redis) que espace os envios 
 
 ---
 
-### H10.10: Central de notificações no painel (leitura + marcar como lida) 🟢
+### H10.10: Central de notificações numa página própria (leitura + marcar como lida) 🟢
 Como **cobrador** (ou devedor-criador no invertido), quero ver num só lugar o que já
-aconteceu (pagamento informado, dado incorreto reportado, solicitação de créditos), para
-acompanhar sem depender só do WhatsApp.
+aconteceu (pagamento informado, dado incorreto reportado, solicitação de créditos) E o
+que ainda aguarda minha ação, para acompanhar sem depender só do WhatsApp e sem perder
+notificação por não ter aberto a tela na hora.
 *Critérios de aceite:*
-- [ ] A central é um **feed cronológico** (mais recentes primeiro) do que já foi
-  enfileirado, acessível pelo sino do cabeçalho comum do painel (`AppShell`). Não é o
-  "precisa de você" da H9.2 (pendências ABERTAS por combinado): é o **histórico** do que
-  já aconteceu, os dois são complementares.
-- [ ] Só **estas categorias** entram na central nesta leva (decisão deliberada de
+- [ ] A central vive numa **página própria** (`/app/notificacoes`), com item de
+  navegação dedicado ("Notificações") no menu comum do painel (`AppShell`). O sino do
+  cabeçalho deixa de abrir um painel dropdown: vira só um **atalho** (ícone + contador de
+  não lidas) que leva direto a essa página ao ser clicado.
+- [ ] A página reúne, na mesma tela, duas seções complementares: no topo, o **"precisa de
+  você"** da H9.2 (pendências ABERTAS por combinado que aguardam ação: `informado_pago`,
+  dado incorreto, edição a aprovar), que sai da Visão geral do Painel e passa a viver só
+  aqui; embaixo, o **feed cronológico** (mais recentes primeiro, paginado) do que já
+  aconteceu, cobrindo o histórico completo, não só os últimos itens.
+- [ ] Só **estas categorias** entram no feed histórico nesta leva (decisão deliberada de
   escopo, extensível depois): "já paguei" (`pagamento_informado`, sinônimo de "pagamento
   reportado" no vocabulário do dono do produto), "dado incorreto reportado"
   (`combinado_dado_incorreto`) e "solicitação de créditos" (recarga enfileirada em
@@ -116,14 +122,19 @@ acompanhar sem depender só do WhatsApp.
   reengajamento, edição a aprovar/recusada) **não entram**: continuam só WhatsApp/
   auditoria, sem mudança de comportamento.
 - [ ] **Mecanismo de "lida":** coluna `lida_em` (nullable; NULL = não lida) em
-  `notificacoes_cobrador` e em `notificacoes_billing`. Abrir a central marca **todas** as
-  não lidas do usuário como lidas de uma vez (mais simples que cobre o caso de uso real);
-  idempotente (reabrir sem pendências novas não falha nem duplica nada).
-- [ ] O contador de não lidas do sino conta o **total pendente**, não só os itens
-  trazidos pelo feed (que tem um limite de exibição).
+  `notificacoes_cobrador` e em `notificacoes_billing`. Cada notificação marca como lida
+  **individualmente**, só quando o usuário clica nela (o clique também navega ao
+  contexto, como já fazia). Abrir a página ou clicar no atalho do sino **não** marca nada
+  como lido sozinho: o contador só cai item a item, à medida que cada um é aberto;
+  idempotente (clicar numa já lida não falha nem duplica nada).
+- [ ] O contador de não lidas do sino conta o **total pendente** (independente de
+  paginação): só diminui quando a notificação específica é clicada, nunca em massa.
+- [ ] O feed histórico é **paginado** (página + itens por página, não um `limit` fixo
+  sem navegação): cobre ver todas as notificações que já aconteceram, não só as mais
+  recentes.
 - [ ] **Isolamento:** cada usuário só vê as próprias notificações (nunca vaza dado de
   outra conta), pelo mesmo id de perfil autenticado.
-- [ ] Clique num item da central navega ao contexto: para as de `notificacoes_cobrador`,
+- [ ] Clique num item do feed navega ao contexto: para as de `notificacoes_cobrador`,
   ao combinado (`/app/avisos/:id`); para a de crédito, à tela de Créditos
   (`/app/creditos`).
 - [ ] Sem texto pronto vindo do banco: o rótulo exibido é montado no front a partir da
@@ -156,13 +167,16 @@ acompanhar sem depender só do WhatsApp.
 - **Idempotência e antiduplicação** por evento/combinado.
 - **Canal principal é o WhatsApp:** avisos sempre por WhatsApp; o painel/site é segunda opção, não substitui o canal. Não há preferência que desligue o WhatsApp.
 - **Fila de saída simples (H10.9):** só banco (sem Redis), espaçamento de 10 min por destinatário e **cancelamento conservador** de itens superados, nas duas filas (cobrador e devedor); ponto crítico com testes dedicados.
-- **Central de notificações (H10.10):** feed cronológico no painel (sino no `AppShell`),
-  unindo `notificacoes_cobrador` (só `pagamento_informado`/`combinado_dado_incorreto`) e
-  `notificacoes_billing` (recarga). Mecanismo de "lida" é a coluna `lida_em` (NULL = não
-  lida); abrir a central marca TODAS as não lidas de uma vez (mais simples, idempotente).
-  Isolamento por perfil autenticado; sem texto pronto no banco (o front monta o rótulo a
-  partir da categoria). Escopo deliberadamente restrito às 3 categorias do item 6 do
-  feedback: os demais tipos de notificação seguem só WhatsApp/auditoria nesta leva.
+- **Central de notificações (H10.10):** página própria (`/app/notificacoes`), reunindo o
+  "precisa de você" (H9.2, movido da Visão geral do Painel) e o feed cronológico
+  histórico, unindo `notificacoes_cobrador` (só `pagamento_informado`/
+  `combinado_dado_incorreto`) e `notificacoes_billing` (recarga). O sino no `AppShell`
+  vira só um atalho (contador + link) para essa página, sem dropdown próprio. Mecanismo
+  de "lida" é a coluna `lida_em` (NULL = não lida), marcada **por item** ao clicar nele
+  (nunca em massa); feed paginado. Isolamento por perfil autenticado; sem texto pronto no
+  banco (o front monta o rótulo a partir da categoria). Escopo do feed histórico
+  deliberadamente restrito às 3 categorias do item 6 do feedback: os demais tipos de
+  notificação seguem só WhatsApp/auditoria nesta leva.
 
 ### Decisões em aberto
 - Nenhuma pendente neste épico.
