@@ -40,7 +40,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
  * mostra a página pública normalmente, sem bloquear visitantes anônimos.
  */
 export function RedirectSeLogado({ children }: { children: ReactNode }) {
-  const { status, role, precisaOnboarding } = useAuth()
+  const { status, role, precisaOnboarding, jaEsteveLogado } = useAuth()
   const [params] = useSearchParams()
 
   if (status === 'logado') {
@@ -48,8 +48,13 @@ export function RedirectSeLogado({ children }: { children: ReactNode }) {
     const next = nextSeguro(params.get('next'))
     return <Navigate to={next || homeDoPapel(role)} replace />
   }
-  // 'carregando' ou 'deslogado': renderiza a página pública (sem splash, para
-  // não penalizar visitantes anônimos com um spinner na landing/login).
+  // 'carregando' com sessão desta aba já ativa antes (ex.: token expirou de
+  // idle longo e está revalidando): mostra o Splash, não a landing. Sem isso, a
+  // landing pisca por um instante até o redirect resolver.
+  if (status === 'carregando' && jaEsteveLogado) return <Splash />
+  // 'carregando' (1ª resolução, sem sessão anterior nesta aba) ou 'deslogado':
+  // renderiza a página pública (sem splash, para não penalizar visitantes
+  // anônimos com um spinner na landing/login).
   return <>{children}</>
 }
 

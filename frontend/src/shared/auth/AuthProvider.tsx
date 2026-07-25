@@ -15,10 +15,33 @@ import { ApiError } from '../api_client'
 import { AuthContext, type AuthState, type AuthStatus } from './context'
 import { buscarPerfil, perfilIncompleto } from './perfil'
 
+const CHAVE_SESSAO_ATIVA = 'whaviso:sessao-ativa'
+
+function lerSessaoAtivaAnterior(): boolean {
+  try {
+    return sessionStorage.getItem(CHAVE_SESSAO_ATIVA) === '1'
+  } catch {
+    return false
+  }
+}
+
+function gravarSessaoAtiva(ativa: boolean) {
+  try {
+    if (ativa) sessionStorage.setItem(CHAVE_SESSAO_ATIVA, '1')
+    else sessionStorage.removeItem(CHAVE_SESSAO_ATIVA)
+  } catch {
+    // sessionStorage indisponível (ex.: modo privado): sem persistência, sem problema.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Perfil | null>(null)
   const [status, setStatus] = useState<AuthStatus>('carregando')
+  // Espelha o último status conhecido em sessionStorage: sobrevive a idle longo e
+  // a reload da aba. Só usado pela RedirectSeLogado pra decidir entre Splash e a
+  // landing crua enquanto uma sessão expirada é revalidada (evita o "flash").
+  const [jaEsteveLogado, setJaEsteveLogado] = useState(lerSessaoAtivaAnterior)
   // Evita resolver perfil de uma sessão já trocada (corridas de async).
   const sessaoAtual = useRef<string | null>(null)
   // UID do usuário já resolvido. O Supabase reemite SIGNED_IN/TOKEN_REFRESHED ao
@@ -50,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       usuarioResolvido.current = null
       setProfile(null)
       setStatus('deslogado')
+      setJaEsteveLogado(false)
+      gravarSessaoAtiva(false)
       return
     }
 
@@ -60,6 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       usuarioResolvido.current = uid
       setProfile(perfil)
       setStatus('logado')
+      setJaEsteveLogado(true)
+      gravarSessaoAtiva(true)
     } catch (err) {
       if (sessaoAtual.current !== marca) return
       // 401 = sessão inválida/expirada apesar do token local → trate como deslogado.
@@ -67,12 +94,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         usuarioResolvido.current = null
         setProfile(null)
         setStatus('deslogado')
+        setJaEsteveLogado(false)
+        gravarSessaoAtiva(false)
         return
       }
       // Outras falhas (rede/api fora): mantém logado sem perfil → onboarding/retry.
       // Não marca usuarioResolvido (o perfil não veio), para reprocessar na próxima.
       setProfile(null)
       setStatus('logado')
+      setJaEsteveLogado(true)
+      gravarSessaoAtiva(true)
     }
   }, [])
 
@@ -103,13 +134,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       role,
       status,
+      jaEsteveLogado,
       precisaOnboarding,
       recarregarPerfil,
       signOut: async () => {
         await supabaseSignOut()
       },
     }
-  }, [session, profile, status, recarregarPerfil])
+  }, [session, profile, status, jaEsteveLogado, recarregarPerfil])
 
   return <AuthContext value={value}>{children}</AuthContext>
 }

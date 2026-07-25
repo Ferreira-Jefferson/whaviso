@@ -13,6 +13,12 @@ export interface AuthState {
   /** Papel do usuário, sempre do perfil; null enquanto carrega ou sem perfil. */
   role: RoleUsuario | null
   status: AuthStatus
+  /**
+   * True se esta aba já teve uma sessão válida antes (persiste em sessionStorage).
+   * Usado só para não piscar a landing enquanto uma sessão expirada por idle longo
+   * está sendo revalidada (ver RedirectSeLogado em app/guards.tsx).
+   */
+  jaEsteveLogado: boolean
   /** True quando há sessão mas o perfil está incompleto (precisa onboarding). */
   precisaOnboarding: boolean
   /** Refaz o fetch do perfil (após onboarding/edição de conta). */
