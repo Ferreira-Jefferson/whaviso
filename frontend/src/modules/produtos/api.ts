@@ -6,10 +6,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ApiError } from '@/shared/api_client'
 import {
   listaProdutosResposta,
+  produtoCombinadosResposta,
   produtoSchema,
   type AtualizarProdutoBody,
   type CriarProdutoBody,
   type Produto,
+  type ProdutoCombinadosResposta,
 } from '@/shared/contracts'
 
 const KEY = ['produtos'] as const
@@ -56,5 +58,21 @@ export function useAtualizarProduto() {
       void qc.invalidateQueries({ queryKey: KEY })
       void qc.invalidateQueries({ queryKey: ['avisos'] })
     },
+  })
+}
+
+/**
+ * GET /v1/produtos/:id/combinados (E18): combinados que usam o produto, com e sem aviso.
+ * `id` ausente (produto ainda não criado) desliga a query.
+ */
+export function useProdutoCombinados(id: string | undefined) {
+  return useQuery({
+    queryKey: [...KEY, 'combinados', id],
+    enabled: id !== undefined,
+    queryFn: ({ signal }) =>
+      apiClient.get<ProdutoCombinadosResposta>(`/produtos/${id}/combinados`, {
+        schema: produtoCombinadosResposta,
+        signal,
+      }),
   })
 }

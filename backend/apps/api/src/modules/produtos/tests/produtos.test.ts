@@ -4,7 +4,8 @@
 //  - renomear PROPAGA para a descrição dos itens que referenciam o produto, SEM tocar no
 //    valor_unit_centavos (snapshot congelado, H17.3);
 //  - PATCH só de preço NÃO propaga (decisão E17);
-//  - a propagação não vaza entre donos.
+//  - a propagação não vaza entre donos;
+//  - GET /combinados: combinados vinculados ao produto, com e sem aviso (E18 H17.6).
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { criarAppTeste, criarUsuario, encerrarPools, limparUsuario } from '../../../../test/harness'
 
@@ -203,5 +204,38 @@ describe('produtos (integração)', () => {
     await appOutro.close()
     await limparUsuario(outro)
     expect(doOutro.itens[0].descricao).toBe('Item X')
+  })
+
+  it('lista os combinados vinculados ao produto, com e sem aviso, nenhum estado filtrado (E18 H17.6)', async () => {
+    const app = await criarAppTeste(uid)
+    const prod = (await criarProduto(app, 'Batom', 2990)).json()
+    // Agenda (sem_aviso): nada foi enviado, mas ainda assim precisa aparecer aqui.
+    const criado = await app.inject({
+      method: 'POST',
+      url: '/v1/avisos',
+      headers: AUTH,
+      payload: bodyAvisoComProduto('Ana', prod.id, 'Batom', 2990),
+    })
+    await criarProduto(app, 'Sem uso', 500) // produto sem combinado nenhum: não deve aparecer
+
+    const lista = await app.inject({ method: 'GET', url: `/v1/produtos/${prod.id}/combinados`, headers: AUTH })
+    await app.close()
+    expect(lista.statusCode).toBe(200)
+    expect(lista.json().total).toBe(1)
+    expect(lista.json().itens[0].id).toBe(criado.json().aviso.id)
+    expect(lista.json().itens[0].status).toBe('sem_aviso')
+  })
+
+  it('combinados de produto de outra conta não vazam; produto inexistente -> 404', async () => {
+    const outro = await criarUsuario('Outra')
+    const appOutro = await criarAppTeste(outro)
+    const prodOutro = (await criarProduto(appOutro, 'Item X', 1000)).json()
+    await appOutro.close()
+
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({ method: 'GET', url: `/v1/produtos/${prodOutro.id}/combinados`, headers: AUTH })
+    await app.close()
+    await limparUsuario(outro)
+    expect(r.statusCode).toBe(404)
   })
 })

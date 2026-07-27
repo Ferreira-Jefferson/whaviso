@@ -49,6 +49,14 @@ Como **usuário com conta**, quero filtrar meus combinados por categoria, para v
 
 ---
 
+### H16.5: Ver os combinados vinculados a uma categoria 🟢 `[+]`
+Como **usuário com conta**, quero abrir uma categoria e ver todos os combinados que a usam, para saber o que está de fato associado a ela, não só o cadastro (nome/cor) em si.
+*Critérios de aceite:*
+- [ ] A partir da lista de categorias (aba Categorias de Gestão, Épico 18), abrir uma categoria mostra os combinados vinculados a ela via a junção `aviso_categorias`.
+- [ ] A lista traz **todos os estados**, com aviso (enviados) ou sem aviso (agenda, `sem_aviso`, Épico 4): nenhum estado é filtrado aqui (diferente dos totais "a receber"/"a pagar", que por design deixam a agenda de fora).
+- [ ] Abrir um item da lista leva ao detalhe do combinado (mesma navegação da visão por pessoa, H15.3).
+- [ ] Isolado por conta: só os combinados que **eu** criei usando aquela categoria (a categoria é sempre do próprio dono, H16.3).
+
 ### Decisões tomadas
 - **Categoria = rótulo livre do usuário**, isolado por conta, com nome (1 a 40) e cor opcional (`#RRGGBB`). Sem catálogo fixo imposto pelo produto.
 - **Múltiplas categorias por combinado** (atualizado 2026-07-16): a relação virou uma **junção** `aviso_categorias` (antes era a coluna única `avisos.categoria_id`). Motivo: a prática de venda direta faz pedidos mistos (mais de uma marca no mesmo combinado). O filtro do painel passa a ter semântica "contém".

@@ -1,6 +1,11 @@
 import type { Pool } from '@whaviso/shared/db'
 import { comTransacao } from '@whaviso/shared/db'
-import type { AtualizarProdutoBody, CriarProdutoBody, Produto } from '@whaviso/shared/contracts'
+import type {
+  AtualizarProdutoBody,
+  CriarProdutoBody,
+  Produto,
+  ProdutoCombinadosResposta,
+} from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado } from '../../shared/http_errors'
 import * as repo from './repo'
 
@@ -54,4 +59,16 @@ export async function atualizar(
       throw e
     }
   })
+}
+
+/** E18: combinados que usam o produto (todos os estados, com e sem aviso). */
+export async function combinados(
+  pool: Pool,
+  uid: string,
+  id: string,
+): Promise<ProdutoCombinadosResposta> {
+  const produto = await repo.buscar(pool, uid, id)
+  if (!produto) throw naoEncontrado('Produto não encontrado')
+  const itens = await repo.combinadosPorProduto(pool, uid, id)
+  return { itens, total: itens.length }
 }

@@ -466,6 +466,14 @@ export type AtualizarCategoriaBody = z.infer<typeof atualizarCategoriaBody>
 
 export const listaCategoriasResposta = z.array(categoriaSchema)
 
+// GET /v1/categorias/:id/combinados (E18): combinados vinculados à categoria, TODOS os
+// estados (com e sem aviso, inclusive `sem_aviso`/agenda; nenhum é filtrado aqui).
+export const categoriaCombinadosResposta = z.object({
+  itens: z.array(avisoSchema),
+  total: z.number().int(),
+})
+export type CategoriaCombinadosResposta = z.infer<typeof categoriaCombinadosResposta>
+
 // ---- Produtos (E17) ---- espelho do backend.
 export const criarProdutoBody = z.object({
   nome: z.string().trim().min(1).max(80),
@@ -487,6 +495,14 @@ export type AtualizarProdutoBody = z.infer<typeof atualizarProdutoBody>
 
 export const listaProdutosResposta = z.array(produtoSchema)
 export type ListaProdutosResposta = z.infer<typeof listaProdutosResposta>
+
+// GET /v1/produtos/:id/combinados (E18): combinados que usam o produto (`itens[].produto_id`),
+// TODOS os estados (com e sem aviso, inclusive `sem_aviso`/agenda; nenhum é filtrado aqui).
+export const produtoCombinadosResposta = z.object({
+  itens: z.array(avisoSchema),
+  total: z.number().int(),
+})
+export type ProdutoCombinadosResposta = z.infer<typeof produtoCombinadosResposta>
 export type ListaChavesPixResposta = z.infer<typeof listaChavesPixResposta>
 
 export const criarChavePixBody = z.object({

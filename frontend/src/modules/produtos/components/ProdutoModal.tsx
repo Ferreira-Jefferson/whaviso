@@ -1,12 +1,13 @@
 // E17: modal de criar/ver/editar um produto do catálogo (nome + preço de venda). Via portal
 // para o body (ModalPortal), robusto contra o containing block do `.animate-rise`. Editar o
 // NOME propaga o rótulo aos combinados que usam o produto; editar o PREÇO não (só vale para
-// combinados novos): a copy avisa isso.
+// combinados novos): a copy avisa isso. E18: ao editar, mostra os combinados vinculados ao
+// produto (todos os estados, com e sem aviso; não só o que o catálogo "tem" em si).
 import { useState } from 'react'
-import { Banner, Button, Field, Input, MoneyInput, ModalPortal } from '@/shared/ui'
+import { Banner, Button, Field, Input, ListaCombinados, MoneyInput, ModalPortal } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
 import type { Produto } from '@/shared/contracts'
-import { useAtualizarProduto, useCriarProduto } from '../api'
+import { useAtualizarProduto, useCriarProduto, useProdutoCombinados } from '../api'
 
 export function ProdutoModal({
   produto,
@@ -19,6 +20,7 @@ export function ProdutoModal({
   const editando = produto !== null
   const criar = useCriarProduto()
   const atualizar = useAtualizarProduto()
+  const combinados = useProdutoCombinados(produto?.id)
 
   const [nome, setNome] = useState(produto?.nome ?? '')
   const [preco, setPreco] = useState<number>(produto?.preco_venda_centavos ?? 0)
@@ -58,7 +60,11 @@ export function ProdutoModal({
   }
 
   return (
-    <ModalPortal ariaLabel={editando ? 'Editar produto' : 'Novo produto'} onFechar={onFechar} className="max-w-md">
+    <ModalPortal
+      ariaLabel={editando ? 'Editar produto' : 'Novo produto'}
+      onFechar={onFechar}
+      className={editando ? 'max-w-lg' : 'max-w-md'}
+    >
       <h2 className="text-lg text-salvia">{editando ? 'Editar produto' : 'Novo produto'}</h2>
 
       {erro && <Banner tom="erro">{erro}</Banner>}
@@ -92,6 +98,19 @@ export function ProdutoModal({
           Renomear atualiza o rótulo deste produto nos combinados que já o usam. O preço não muda
           nos combinados antigos.
         </p>
+      )}
+
+      {editando && (
+        <div>
+          <h3 className="mb-2 text-sm font-medium text-tinta">Combinados</h3>
+          <ListaCombinados
+            itens={combinados.data?.itens}
+            isLoading={combinados.isLoading}
+            vazioTitulo="Nenhum combinado"
+            vazioDescricao="Nenhum combinado usa este produto ainda."
+            onFechar={onFechar}
+          />
+        </div>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">

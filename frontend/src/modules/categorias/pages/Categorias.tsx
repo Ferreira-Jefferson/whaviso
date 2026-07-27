@@ -1,7 +1,9 @@
 // E16: gerência de categorias (/app/categorias). Criar, renomear, trocar cor e arquivar
 // (soft-delete). Categoria é organização interna do dono; nunca vai para o devedor.
+// E18: cada linha tem "ver combinados" (CategoriaModal), com os combinados vinculados àquela
+// categoria em TODOS os estados (com e sem aviso; não só o que a categoria "tem" em si).
 import { useState } from 'react'
-import { Archive, Check, Pencil, X } from 'lucide-react'
+import { Archive, Check, Eye, Pencil, X } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -14,6 +16,7 @@ import {
 import { ApiError } from '@/shared/api_client'
 import type { Categoria } from '@/shared/contracts'
 import { useAtualizarCategoria, useCategorias, useCriarCategoria } from '../api'
+import { CategoriaModal } from '../components/CategoriaModal'
 
 const COR_PADRAO = '#1e4d3b'
 
@@ -29,6 +32,8 @@ export default function CategoriasPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editNome, setEditNome] = useState('')
   const [editCor, setEditCor] = useState(COR_PADRAO)
+  // E18: categoria aberta no modal de "ver combinados vinculados" (todos os estados).
+  const [verCombinados, setVerCombinados] = useState<Categoria | null>(null)
 
   async function criarCategoria() {
     const n = nome.trim()
@@ -181,6 +186,14 @@ export default function CategoriasPage() {
                   <Button
                     type="button"
                     variante="ghost"
+                    aria-label={`Ver combinados de ${c.nome}`}
+                    onClick={() => setVerCombinados(c)}
+                  >
+                    <Eye strokeWidth={1.75} className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variante="ghost"
                     aria-label={`Editar ${c.nome}`}
                     onClick={() => {
                       setEditId(c.id)
@@ -209,6 +222,10 @@ export default function CategoriasPage() {
         Arquivar tira a categoria da lista e dos filtros. Os combinados que já a usavam
         continuam no histórico, sem perder nada.
       </p>
+
+      {verCombinados && (
+        <CategoriaModal categoria={verCombinados} onFechar={() => setVerCombinados(null)} />
+      )}
     </div>
   )
 }

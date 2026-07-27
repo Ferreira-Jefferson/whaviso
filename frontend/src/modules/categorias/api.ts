@@ -5,10 +5,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api_client'
 import {
+  categoriaCombinadosResposta,
   categoriaSchema,
   listaCategoriasResposta,
   type AtualizarCategoriaBody,
   type Categoria,
+  type CategoriaCombinadosResposta,
   type CriarCategoriaBody,
 } from '@/shared/contracts'
 
@@ -45,5 +47,17 @@ export function useAtualizarCategoria() {
       // Arquivar/renomear muda o que o painel e o form mostram: revalida a lista de avisos.
       void qc.invalidateQueries({ queryKey: ['avisos'] })
     },
+  })
+}
+
+/** GET /v1/categorias/:id/combinados (E18): combinados vinculados à categoria, com e sem aviso. */
+export function useCategoriaCombinados(id: string) {
+  return useQuery({
+    queryKey: [...KEY, 'combinados', id],
+    queryFn: ({ signal }) =>
+      apiClient.get<CategoriaCombinadosResposta>(`/categorias/${id}/combinados`, {
+        schema: categoriaCombinadosResposta,
+        signal,
+      }),
   })
 }

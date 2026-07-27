@@ -4,6 +4,7 @@ import {
   atualizarProdutoBody,
   criarProdutoBody,
   listaProdutosResposta,
+  produtoCombinadosResposta,
   produtoSchema,
 } from '@whaviso/shared/contracts'
 import { z } from 'zod'
@@ -42,5 +43,15 @@ export const produtosRoutes: FastifyPluginAsync = async (raiz) => {
       schema: { params: idParam, body: atualizarProdutoBody, response: { 200: produtoSchema } },
     },
     (req) => service.atualizar(app.pool, req.userId, req.params.id, req.body),
+  )
+
+  // E18: combinados que usam o produto (todos os estados, com e sem aviso).
+  app.get(
+    '/produtos/:id/combinados',
+    {
+      preHandler: app.autenticar,
+      schema: { params: idParam, response: { 200: produtoCombinadosResposta } },
+    },
+    (req) => service.combinados(app.pool, req.userId, req.params.id),
   )
 }

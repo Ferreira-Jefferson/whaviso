@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
   atualizarCategoriaBody,
+  categoriaCombinadosResposta,
   categoriaSchema,
   criarCategoriaBody,
   listaCategoriasResposta,
@@ -42,5 +43,15 @@ export const categoriasRoutes: FastifyPluginAsync = async (raiz) => {
       schema: { params: idParam, body: atualizarCategoriaBody, response: { 200: categoriaSchema } },
     },
     (req) => service.atualizar(app.pool, req.userId, req.params.id, req.body),
+  )
+
+  // E18: combinados vinculados à categoria (todos os estados, com e sem aviso).
+  app.get(
+    '/categorias/:id/combinados',
+    {
+      preHandler: app.autenticar,
+      schema: { params: idParam, response: { 200: categoriaCombinadosResposta } },
+    },
+    (req) => service.combinados(app.pool, req.userId, req.params.id),
   )
 }

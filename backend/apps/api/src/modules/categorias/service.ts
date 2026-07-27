@@ -1,5 +1,10 @@
 import type { Pool } from '@whaviso/shared/db'
-import type { AtualizarCategoriaBody, Categoria, CriarCategoriaBody } from '@whaviso/shared/contracts'
+import type {
+  AtualizarCategoriaBody,
+  Categoria,
+  CategoriaCombinadosResposta,
+  CriarCategoriaBody,
+} from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado } from '../../shared/http_errors'
 import * as repo from './repo'
 
@@ -42,4 +47,16 @@ export async function atualizar(
     if (ehNomeDuplicado(e)) throw conflito('categoria_duplicada', DUPLICADA)
     throw e
   }
+}
+
+/** E18: combinados vinculados à categoria (todos os estados, com e sem aviso). */
+export async function combinados(
+  pool: Pool,
+  uid: string,
+  id: string,
+): Promise<CategoriaCombinadosResposta> {
+  const categoria = await repo.buscar(pool, uid, id)
+  if (!categoria) throw naoEncontrado('Categoria não encontrada')
+  const itens = await repo.combinadosPorCategoria(pool, uid, id)
+  return { itens, total: itens.length }
 }

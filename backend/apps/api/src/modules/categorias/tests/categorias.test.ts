@@ -3,7 +3,8 @@
 //  - nome único por conta (case-insensitive) -> 409 categoria_duplicada;
 //  - vincular categoria ao criar combinado e filtrar o painel por categoria (H16.3/H16.4);
 //  - editar a categoria de um combinado é LIVRE (não abre reaprovação);
-//  - categoria de OUTRA conta é recusada ao criar combinado (categoria_invalida).
+//  - categoria de OUTRA conta é recusada ao criar combinado (categoria_invalida);
+//  - GET /combinados: combinados vinculados à categoria, com e sem aviso (E18 H16.5).
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { criarAppTeste, criarUsuario, encerrarPools, limparUsuario } from '../../../../test/harness'
 
@@ -160,5 +161,35 @@ describe('categorias (integração)', () => {
     const aindaPresentes = await app.inject({ method: 'GET', url: `/v1/avisos?papel=cobrador&categoria_id=${presentes}`, headers: AUTH })
     await app.close()
     expect(aindaPresentes.json().total).toBe(0)
+  })
+
+  it('lista os combinados vinculados à categoria, com e sem aviso, nenhum estado filtrado (E18 H16.5)', async () => {
+    const app = await criarAppTeste(uid)
+    const catId = (await criarCategoria(app, 'Natura')).json().id
+
+    // Agenda (sem_aviso): nada foi enviado, mas ainda assim precisa aparecer aqui.
+    const comCat = await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: bodyAgenda('Ana', [catId]) })
+    await app.inject({ method: 'POST', url: '/v1/avisos', headers: AUTH, payload: bodyAgenda('Bruno') })
+
+    const lista = await app.inject({ method: 'GET', url: `/v1/categorias/${catId}/combinados`, headers: AUTH })
+    await app.close()
+    expect(lista.statusCode).toBe(200)
+    expect(lista.json().total).toBe(1)
+    expect(lista.json().itens[0].id).toBe(comCat.json().aviso.id)
+    expect(lista.json().itens[0].nome_devedor).toBe('Ana')
+    expect(lista.json().itens[0].status).toBe('sem_aviso')
+  })
+
+  it('combinados de categoria de outra conta não vazam; categoria inexistente -> 404', async () => {
+    const outro = await criarUsuario('Outra')
+    const appOutro = await criarAppTeste(outro)
+    const catAlheia = (await criarCategoria(appOutro, 'Alheia')).json().id
+    await appOutro.close()
+
+    const app = await criarAppTeste(uid)
+    const r = await app.inject({ method: 'GET', url: `/v1/categorias/${catAlheia}/combinados`, headers: AUTH })
+    await app.close()
+    await limparUsuario(outro)
+    expect(r.statusCode).toBe(404)
   })
 })

@@ -53,9 +53,10 @@ Como **usuário com conta**, quero uma lista de todos os meus clientes e poder v
 ### H18.5: Abas Produtos e Categorias 🟢 `[+]`
 Como **usuário com conta**, quero gerenciar produtos e categorias dentro da mesma área de Gestão, para não caçar cada coisa num canto diferente do app.
 *Critérios de aceite:*
-- [ ] A aba **Produtos** é o catálogo do Épico 17 (listar/criar/editar/arquivar em modal).
-- [ ] A aba **Categorias** é a gestão do Épico 16 (listar/criar/renomear/arquivar), agora dentro de Gestão em vez de tela própria.
+- [ ] A aba **Produtos** é o catálogo do Épico 17 (listar/criar/editar/arquivar em modal), incluindo ver os combinados vinculados a cada produto (Épico 17 H17.6).
+- [ ] A aba **Categorias** é a gestão do Épico 16 (listar/criar/renomear/arquivar), agora dentro de Gestão em vez de tela própria, incluindo ver os combinados vinculados a cada categoria (Épico 16 H16.5).
 - [ ] O link "Gerenciar categorias" do Novo combinado passa a apontar para a aba Categorias de Gestão.
+- [ ] **Simetria com Clientes (H18.4):** as três abas (Clientes, Produtos, Categorias) mostram o que está **associado** a cada item (os combinados vinculados, todos os estados, com e sem aviso), não só o cadastro em si.
 
 ---
 

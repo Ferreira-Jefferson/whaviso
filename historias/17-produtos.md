@@ -57,6 +57,14 @@ Como **criador (cobrador ou devedor)**, quero escolher um produto do catálogo a
 
 ---
 
+### H17.6: Ver os combinados vinculados a um produto 🟢 `[+]`
+Como **usuário com conta**, quero abrir um produto e ver todos os combinados que o usam, para saber o que está de fato associado a ele, não só o cadastro (nome/preço) em si.
+*Critérios de aceite:*
+- [ ] Ao abrir um produto (modal, H17.2), vejo os combinados que têm algum item com o `produto_id` daquele produto.
+- [ ] A lista traz **todos os estados**, com aviso (enviados) ou sem aviso (agenda, `sem_aviso`, Épico 4): nenhum estado é filtrado aqui.
+- [ ] Abrir um item da lista leva ao detalhe do combinado (mesma navegação da visão por pessoa, H15.3).
+- [ ] Isolado por conta: só os combinados que **eu** criei usando aquele produto do meu catálogo (H17.5).
+
 ### Decisões tomadas
 - **Produto = só nome (1..80) + preço de venda (centavos, >= 0)**, isolado por conta. Sem custo, sem categoria, sem quantidade em estoque (decisão do dono: manter o mínimo útil).
 - **Nome único por conta** entre os ativos (case-insensitive), como `categorias`.
