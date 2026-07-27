@@ -13,6 +13,7 @@ import { produtosRoutes } from './modules/produtos'
 import { adminRoutes } from './modules/admin'
 import { billingRoutes } from './modules/billing'
 import { notificacoesRoutes } from './modules/notificacoes'
+import { syncRoutes } from './modules/sync'
 
 export const registrarModulos: FastifyPluginAsync = async (app) => {
   await app.register(perfilRoutes)
@@ -28,4 +29,5 @@ export const registrarModulos: FastifyPluginAsync = async (app) => {
   await app.register(adminRoutes)
   await app.register(billingRoutes)
   await app.register(notificacoesRoutes)
+  await app.register(syncRoutes)
 }

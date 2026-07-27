@@ -36,8 +36,9 @@ export const painelKeys = {
 /**
  * GET /v1/painel/metricas: saúde do negócio (papel cobrador), calculada no backend.
  * `placeholderData: keepPreviousData` (item 14): ao trocar o período, mantém os números
- * antigos visíveis (com `isFetching=true`) em vez de cair para `isLoading` e desmontar a
- * tela; quem consome usa `isFetching` para acender um Skeleton pontual, não a tela toda.
+ * antigos visíveis em vez de cair para `isLoading` e desmontar a tela; quem consome usa
+ * `isLoading` (não `isFetching`) para acender o Skeleton, então um refetch de fundo
+ * (poller de versão, invalidação por mutação) nunca pisca o valor já em tela.
  */
 export function usePainelMetricas(periodo: PeriodoResumo = {}) {
   return useQuery({
@@ -55,8 +56,8 @@ export function usePainelMetricas(periodo: PeriodoResumo = {}) {
 /**
  * GET /v1/painel/resumo: totais por PAPEL (centavos) calculados no backend.
  * `placeholderData: keepPreviousData` (item 14): troca de período mantém os totais
- * antigos visíveis (`isFetching=true`) em vez de piscar os StatCards para o skeleton
- * cheio; o Painel usa `isFetching` para acender um Skeleton só na linha do valor.
+ * antigos visíveis em vez de piscar os StatCards para o skeleton cheio; o Painel usa
+ * `isLoading` (não `isFetching`) para acender o Skeleton só na linha do valor.
  */
 export function usePainelResumo(periodo: PeriodoResumo) {
   return useQuery({

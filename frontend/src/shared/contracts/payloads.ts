@@ -299,6 +299,14 @@ export const painelResumoResposta = z.object({
 })
 export type PainelResumoResposta = z.infer<typeof painelResumoResposta>
 
+// ---- GET /v1/sync/versao ----
+// Carimbo barato de versão do estado do usuário (detecção de mudança por versão): o
+// poller compara este valor entre polls e só invalida painel/avisos quando ele avança.
+export const syncVersaoResposta = z.object({
+  versao: z.coerce.date(),
+})
+export type SyncVersaoResposta = z.infer<typeof syncVersaoResposta>
+
 // ---- GET /v1/painel/pendencias ("precisa de você", H9.2) ----
 export const tipoPendencia = z.enum(['confirmar_pagamento', 'aprovar_edicao'])
 export type TipoPendencia = z.infer<typeof tipoPendencia>

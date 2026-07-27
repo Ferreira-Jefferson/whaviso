@@ -128,7 +128,7 @@ export default function PainelPage() {
   // E16 H16.4: filtro por categoria. '' = todas; 'sem' = sem categoria; senão = id.
   const categoria = params.get('categoria') ?? ''
 
-  const { data, isLoading, isFetching, isError } = usePainelResumo({
+  const { data, isLoading, isError } = usePainelResumo({
     de: de || undefined,
     ate: ate || undefined,
   })
@@ -340,8 +340,9 @@ export default function PainelPage() {
       ) : (
         // Item 14: o grid fica MONTADO durante refetches em segundo plano (troca de
         // período); só o `isLoading` inicial (sem dado ainda) cai no skeleton acima. Cada
-        // StatCard recebe `carregando={isFetching}` para acender o Skeleton só na linha do
-        // valor, sem desmontar o card inteiro (evita o "piscar").
+        // StatCard recebe `carregando={isLoading}` (nunca `isFetching`): um refetch de
+        // fundo (poller de versão, invalidação por mutação) não deve piscar o valor já em
+        // tela (stale-while-revalidate); `isLoading` só é true quando ainda não há cache.
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             rotulo="A receber"
@@ -349,7 +350,7 @@ export default function PainelPage() {
             tom="ambar"
             icone={<Clock strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.a_receber_qtd} ${data.a_receber_qtd === 1 ? 'combinado' : 'combinados'}`}
-            carregando={isFetching}
+            carregando={isLoading}
           />
           <StatCard
             rotulo="Recebido"
@@ -357,7 +358,7 @@ export default function PainelPage() {
             tom="folha"
             icone={<ArrowDownLeft strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.recebido_qtd} ${data.recebido_qtd === 1 ? 'combinado' : 'combinados'}`}
-            carregando={isFetching}
+            carregando={isLoading}
           />
           <StatCard
             rotulo="A pagar"
@@ -365,7 +366,7 @@ export default function PainelPage() {
             tom="salvia"
             icone={<Wallet strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.a_pagar_qtd} ${data.a_pagar_qtd === 1 ? 'combinado' : 'combinados'}`}
-            carregando={isFetching}
+            carregando={isLoading}
           />
           <StatCard
             rotulo="Pago"
@@ -373,7 +374,7 @@ export default function PainelPage() {
             tom="neutro"
             icone={<ArrowUpRight strokeWidth={1.75} className="size-4" />}
             detalhe={`${data.pago_qtd} ${data.pago_qtd === 1 ? 'combinado' : 'combinados'}`}
-            carregando={isFetching}
+            carregando={isLoading}
           />
         </div>
       )}
@@ -398,21 +399,21 @@ export default function PainelPage() {
                 centavos={metricas.data.recebido_centavos}
                 tom="folha"
                 detalhe={`${metricas.data.recebido_qtd} ${metricas.data.recebido_qtd === 1 ? 'combinado' : 'combinados'}`}
-                carregando={metricas.isFetching}
+                carregando={metricas.isLoading}
               />
               <StatCard
                 rotulo="A receber"
                 centavos={metricas.data.a_receber_centavos}
                 tom="salvia"
                 detalhe={`${metricas.data.a_receber_qtd} ${metricas.data.a_receber_qtd === 1 ? 'combinado' : 'combinados'}`}
-                carregando={metricas.isFetching}
+                carregando={metricas.isLoading}
               />
               <StatCard
                 rotulo="Ticket médio"
                 centavos={metricas.data.ticket_medio_centavos}
                 tom="neutro"
                 detalhe="por combinado recebido"
-                carregando={metricas.isFetching}
+                carregando={metricas.isLoading}
               />
             </div>
           </section>

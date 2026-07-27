@@ -25,10 +25,11 @@ interface StatCardProps {
   tom?: Tom
   className?: string
   /**
-   * Item 14: true durante um refetch em segundo plano (ex.: troca de período com dado
-   * anterior ainda em tela via `placeholderData: keepPreviousData`). Mostra um Skeleton só
-   * na linha do valor, mantendo rótulo/ícone/detalhe visíveis, para o card não "piscar"
-   * (desmontar e remontar) a cada refetch. Prop opcional e aditiva; default false.
+   * True só quando ainda não há dado em cache (equivalente a `isLoading`, nunca
+   * `isFetching`): mostra um Skeleton na linha do valor sem desmontar o card inteiro. Um
+   * refetch em segundo plano (troca de período com `placeholderData: keepPreviousData`,
+   * poller de versão) mantém o valor anterior em tela, sem "piscar". Prop opcional e
+   * aditiva; default false.
    */
   carregando?: boolean
 }

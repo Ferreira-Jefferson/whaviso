@@ -343,6 +343,16 @@ export const painelResumoResposta = z.object({
 })
 export type PainelResumoResposta = z.infer<typeof painelResumoResposta>
 
+// ---- GET /v1/sync/versao ----
+// Carimbo barato do "estado" do usuário logado (detecção de mudança por versão, ver
+// plano de cache do front): o front compara este valor entre polls e só invalida as
+// queries pesadas (painel/avisos) quando ele avança. Sempre cresce (maior atualizado_em
+// entre avisos e aviso_ocorrencias do escopo do usuário); nunca some/some parcial.
+export const syncVersaoResposta = z.object({
+  versao: z.coerce.date(),
+})
+export type SyncVersaoResposta = z.infer<typeof syncVersaoResposta>
+
 // ---- GET /v1/painel/pendencias ("precisa de você", H9.2) ----
 // Reúne os combinados que aguardam ação do usuário, por aviso_id e tipo de pendência,
 // SEM dado sensível (nada de telefone/Pix/conteúdo; só ids, nome da outra ponta, motivo,

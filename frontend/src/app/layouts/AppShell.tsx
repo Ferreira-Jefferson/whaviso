@@ -7,6 +7,7 @@ import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router'
 import { LogOut, Inbox, LayoutDashboard, MoreHorizontal, X } from 'lucide-react'
 import { useAuth, useRole, useTemVinculoDevedor } from '@/shared/auth'
 import { cn, BellLogo } from '@/shared/ui'
+import { SyncVersaoWatcher } from '@/shared/sync'
 import { SinoNotificacoes } from '@/modules/notificacoes'
 import { NAV_POR_SECAO, NAV_OWNER, secaoDaRota, rotaAtiva, type NavItem } from './nav'
 import { AssinaturaBanner } from '../AssinaturaBanner'
@@ -71,6 +72,10 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr]">
+      {/* Detecção de mudança por versão: componente headless, montado uma vez para toda
+          a área autenticada (não renderiza nada). */}
+      <SyncVersaoWatcher />
+
       {/* Sidebar (lg+) */}
       <aside className="hidden border-r border-linha bg-papel-2 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
         <div className="flex items-center justify-between px-6 py-6">
