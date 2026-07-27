@@ -6,6 +6,7 @@ import {
   JANELA_INICIO_SEG,
   JANELA_FIM_SEG,
   DISTANCIA_MIN_SEG,
+  ORDEM_ETAPAS,
 } from '@whaviso/shared/datas'
 import { processarBotao } from '../service'
 import { aplicarAcaoBotao } from '../repo'
@@ -58,8 +59,11 @@ async function envios(avisoId: string): Promise<Array<{ etapa: string; status: s
 
 describe('G1: ciclo COMPLETO no fluxo INVERTIDO (cobrador_id null)', () => {
   it('aceitar invertido cria 4 envios e o drainer ENVIA (não descarta por falta de cobrador)', async () => {
+    // Cadência explícita = ciclo completo (o padrão do servidor, sem configurar nada,
+    // passou a ser só D; este teste cobre especificamente o ciclo COMPLETO no invertido).
     const { devedorId, avisoId } = await criarConviteInvertido({
       dataCombinada: futuro,
+      cadenciaEtapas: [...ORDEM_ETAPAS],
     })
     usados.push(devedorId)
     const whats = clienteWhatsFake()

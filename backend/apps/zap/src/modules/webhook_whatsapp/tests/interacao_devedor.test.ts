@@ -213,9 +213,9 @@ describe('E7 interação do devedor', () => {
     expect(aviso.rows[0].status).toBe('programado')
     const h = await lerHorario(avisoId)
     expect(h.seg).not.toBeNull() // pegou um horário de novo
-    // Catch-up: data futura (2026-12-15) recria os 4 envios.
+    // Catch-up: data futura (2026-12-15) recria o(s) envio(s) da cadência (padrão = só D).
     const envios = await poolSuper.query(`select count(*)::int as n from public.envios where aviso_id=$1 and status='agendado'`, [avisoId])
-    expect(envios.rows[0].n).toBe(4)
+    expect(envios.rows[0].n).toBe(1)
     // Mensagem de confirmação SEM botão (H7.5).
     expect(whats.enviadas).toHaveLength(1)
     expect(whats.enviadas[0]!.botoes ?? []).toHaveLength(0)

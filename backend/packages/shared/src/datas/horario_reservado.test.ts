@@ -7,7 +7,7 @@ import {
   segundoDoDiaSp,
   segundoDePartida,
 } from './horario_reservado'
-import { calcularAgendamentos } from './index'
+import { calcularAgendamentos, ORDEM_ETAPAS } from './index'
 
 describe('segundoDoDiaSp / segundoDePartida', () => {
   it('converte o instante para o segundo do dia em SP (UTC-3)', () => {
@@ -110,7 +110,7 @@ describe('DST não desloca o dia civil (robustez)', () => {
     // Datas em torno de uma virada de horário de verão genérica (Brasil não usa hoje, mas
     // o cálculo é por dia civil em SP, então o offset não muda o dia).
     const seg = 10 * 3600 // 10:00 SP
-    const ags = calcularAgendamentos('2026-02-15', seg, new Date('2026-01-01T00:00:00Z'))
+    const ags = calcularAgendamentos('2026-02-15', seg, new Date('2026-01-01T00:00:00Z'), ORDEM_ETAPAS)
     // D-2 = 13/02, D+1 = 16/02 (dias civis), independente de qualquer DST.
     expect(ags[0]!.etapa).toBe('d_menos_2')
     expect(ags[0]!.agendado_para.toISOString().slice(0, 10)).toBe('2026-02-13')

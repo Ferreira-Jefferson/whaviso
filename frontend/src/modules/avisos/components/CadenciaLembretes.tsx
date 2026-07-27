@@ -4,8 +4,9 @@
 // (não dentro) do "Repetir este combinado".
 //
 // E11 H11.2: cadência é UNIVERSAL (liberada para todos, sem gating por plano). Sem
-// configurar nada = ciclo completo D-2..D+1 (H6.2). O servidor é a autoridade: filtra as
-// etapas no cálculo dos agendamentos.
+// configurar nada = só o lembrete D (no dia); o ciclo completo D-2..D+1 (H6.2) fica
+// disponível como opção, não como padrão. O servidor é a autoridade: filtra as etapas
+// no cálculo dos agendamentos.
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarRange } from 'lucide-react'
 import { cn } from '@/shared/ui'
@@ -19,8 +20,11 @@ const ETAPAS: ReadonlyArray<{ value: EtapaEnvio; rotulo: string; quando: string 
   { value: 'd_mais_1', rotulo: 'D+1', quando: '1 dia depois' },
 ]
 
+// Cadência padrão (E6 H6.10) de quem não configura nada: só o lembrete D.
+const CADENCIA_PADRAO: readonly EtapaEnvio[] = ['d']
+
 interface CadenciaLembretesProps {
-  /** Emite o subconjunto escolhido (undefined = ciclo completo) sempre que muda. */
+  /** Emite o subconjunto escolhido (undefined = padrão, só D) sempre que muda. */
   onChange: (etapas: EtapaEnvio[] | undefined) => void
   /**
    * Se o combinado já tem uma chave Pix definida. Os lembretes pelo WhatsApp exigem
@@ -32,13 +36,17 @@ interface CadenciaLembretesProps {
 }
 
 export function CadenciaLembretes({ onChange, pixPresente }: CadenciaLembretesProps) {
-  // Subconjunto das etapas. Vazio = todas marcadas (ciclo completo).
-  const [etapasSelecionadas, setEtapasSelecionadas] = useState<EtapaEnvio[]>([])
+  // Subconjunto das etapas; começa no padrão (só D).
+  const [etapasSelecionadas, setEtapasSelecionadas] = useState<EtapaEnvio[]>([...CADENCIA_PADRAO])
 
-  // Só conta como configurada quando há subconjunto válido (1..3 etapas; 4 = ciclo
-  // completo, equivalente a não configurar).
+  // Equivalente ao padrão (ou vazio, se o usuário desmarcar tudo) não precisa persistir
+  // nada: o servidor já cai no mesmo padrão sozinho.
   const cadenciaEtapas = useMemo<EtapaEnvio[] | undefined>(() => {
-    if (etapasSelecionadas.length === 0 || etapasSelecionadas.length === ETAPAS.length) {
+    if (
+      etapasSelecionadas.length === 0 ||
+      (etapasSelecionadas.length === CADENCIA_PADRAO.length &&
+        CADENCIA_PADRAO.every((v) => etapasSelecionadas.includes(v)))
+    ) {
       return undefined
     }
     // Mantém na ordem canônica do ciclo.
@@ -52,12 +60,11 @@ export function CadenciaLembretes({ onChange, pixPresente }: CadenciaLembretesPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cadenciaEtapas])
 
-  // Texto-resumo reflete a seleção atual, em vez de afirmar sempre os 4 (evita
-  // induzir ao erro quando o usuário desmarca chips). Vazio = ciclo completo.
+  // Texto-resumo reflete a seleção atual. Vazio (usuário desmarcou tudo) cai no padrão.
   const resumo = useMemo(() => {
     const ativas =
       etapasSelecionadas.length === 0
-        ? ETAPAS
+        ? ETAPAS.filter((e) => CADENCIA_PADRAO.includes(e.value))
         : ETAPAS.filter((e) => etapasSelecionadas.includes(e.value))
     if (ativas.length === ETAPAS.length) {
       return 'Saem os 4 lembretes (D-2 a D+1).'
@@ -90,7 +97,9 @@ export function CadenciaLembretes({ onChange, pixPresente }: CadenciaLembretesPr
       <div className={cn('flex flex-wrap gap-2 pt-1', !pixPresente && 'pointer-events-none')}>
         {ETAPAS.map((etapa) => {
           const ativo =
-            etapasSelecionadas.length === 0 || etapasSelecionadas.includes(etapa.value)
+            etapasSelecionadas.length === 0
+              ? CADENCIA_PADRAO.includes(etapa.value)
+              : etapasSelecionadas.includes(etapa.value)
           return (
             <button
               key={etapa.value}

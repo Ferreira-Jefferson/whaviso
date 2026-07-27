@@ -118,6 +118,8 @@ export async function criarConviteInvertido(opts: {
   dataCombinada: string
   telefoneCobrador?: string
   telefoneDevedor?: string
+  /** Cadência custom (E6 H6.10); ausente = padrão do servidor (só D). */
+  cadenciaEtapas?: EtapaEnvio[]
 }): Promise<{ devedorId: string; avisoId: string }> {
   const devedorId = randomUUID()
   await poolSuper.query(`insert into auth.users (id) values ($1)`, [devedorId])
@@ -126,16 +128,17 @@ export async function criarConviteInvertido(opts: {
     `insert into public.avisos
        (cobrador_id, devedor_profile_id, direcao, criador_papel, status,
         nome_devedor, telefone_devedor, nome_cobrador, telefone_cobrador,
-        motivo, valor_centavos, data_combinada, pix_chave, convite_expira_em)
+        motivo, valor_centavos, data_combinada, pix_chave, convite_expira_em, cadencia_etapas)
      values (null, $1, 'pagar', 'devedor', 'aguardando_aceite',
              'Devedor', $2, 'Cobrador Convidado', $3,
-             'aluguel', 5000, $4, 'cobrador@pix.com', now() + interval '7 days')
+             'aluguel', 5000, $4, 'cobrador@pix.com', now() + interval '7 days', $5)
      returning id`,
     [
       devedorId,
       opts.telefoneDevedor ?? '+5511970001111',
       opts.telefoneCobrador ?? '+5511960002222',
       opts.dataCombinada,
+      opts.cadenciaEtapas ?? null,
     ],
   )
   return { devedorId, avisoId: rows[0]!.id }

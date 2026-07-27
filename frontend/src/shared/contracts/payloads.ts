@@ -73,7 +73,7 @@ export const criarAvisoBody = z
     // H11.5); cada ocorrência reserva 1 vaga, validado no servidor. O servidor expande em
     // ocorrências; o cliente nunca calcula data de ocorrência.
     recorrencia: recorrenciaInput.nullish(),
-    // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = ciclo completo.
+    // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = padrão (só D).
     // Gated por plano (cadencia_configuravel) no servidor.
     cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
     // E16 (multi) / Fase A: categorias (0..N, minhas e não arquivadas) e custo interno (>=0).

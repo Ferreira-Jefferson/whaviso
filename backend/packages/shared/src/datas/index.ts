@@ -12,6 +12,9 @@ export const ORDEM_ETAPAS: readonly EtapaEnvio[] = [
   'd_mais_1',
 ] as const
 
+/** Cadência padrão (E6 H6.10) de quem não configura nada: só o lembrete D (no dia). */
+export const CADENCIA_PADRAO: readonly EtapaEnvio[] = ['d'] as const
+
 const OFFSET_DIAS: Record<EtapaEnvio, number> = {
   d_menos_2: -2,
   d_menos_1: -1,
@@ -95,9 +98,9 @@ export function calcularAgendamentos(
   dataCombinada: string,
   horarioSeg: number,
   agora: Date = new Date(),
-  // Cadência configurável (E6 H6.10): subconjunto de etapas a enviar. Default = ciclo
-  // completo. A ordem de envio segue ORDEM_ETAPAS, não a ordem do array recebido.
-  etapas: readonly EtapaEnvio[] = ORDEM_ETAPAS,
+  // Cadência configurável (E6 H6.10): subconjunto de etapas a enviar. Default = só D
+  // (no dia). A ordem de envio segue ORDEM_ETAPAS, não a ordem do array recebido.
+  etapas: readonly EtapaEnvio[] = CADENCIA_PADRAO,
 ): Agendamento[] {
   const resultado: Agendamento[] = []
   const hoje = hojeSp(agora)

@@ -13,6 +13,7 @@
 // No volume do produto (<100 clientes) serializar toda alocação é barato e correto.
 
 import type { PoolClient } from '../db'
+import type { EtapaEnvio } from '../contracts/enums'
 import { calcularAgendamentos } from './index'
 import { alocarSegundo, segundoDePartida, type ResultadoAlocacao } from './horario_reservado'
 
@@ -115,8 +116,13 @@ export async function garantirHorarioReservado(cli: PoolClient, opts: OpcoesRese
  */
 export async function reprogramarCiclo(cli: PoolClient, opts: OpcoesReserva): Promise<void> {
   const agora = opts.agora ?? new Date()
-  const { rows } = await cli.query<{ data_combinada: string; status: string }>(
-    `select to_char(data_combinada,'YYYY-MM-DD') as data_combinada, status
+  const { rows } = await cli.query<{
+    data_combinada: string
+    status: string
+    cadencia_etapas: string[] | null
+  }>(
+    `select to_char(data_combinada,'YYYY-MM-DD') as data_combinada, status,
+            cadencia_etapas::text[] as cadencia_etapas
        from public.avisos where id = $1 for update`,
     [opts.avisoId],
   )
@@ -124,7 +130,8 @@ export async function reprogramarCiclo(cli: PoolClient, opts: OpcoesReserva): Pr
   if (!aviso || aviso.status !== 'programado') return
 
   const seg = await garantirHorarioReservado(cli, opts)
-  for (const a of calcularAgendamentos(aviso.data_combinada, seg, agora)) {
+  const etapas = (aviso.cadencia_etapas ?? undefined) as EtapaEnvio[] | undefined
+  for (const a of calcularAgendamentos(aviso.data_combinada, seg, agora, etapas)) {
     // E6 H6.10: o unique (aviso_id, etapa) virou dois índices PARCIAIS (0052). Esta função
     // (re)programa o ciclo do combinado SIMPLES (ocorrencia_id null), então o ON CONFLICT
     // mira o índice parcial `where ocorrencia_id is null`. O ciclo POR OCORRÊNCIA do

@@ -107,7 +107,7 @@ describe('E8 recorrência: confirmação por ocorrência', () => {
       `select id from public.aviso_ocorrencias where aviso_id=$1 and indice=2`, [id])
     const envios2 = await poolSuper.query<{ n: string }>(
       `select count(*) as n from public.envios where ocorrencia_id=$1 and status='agendado'`, [oc2.rows[0]!.id])
-    expect(Number(envios2.rows[0]!.n)).toBe(4)
+    expect(Number(envios2.rows[0]!.n)).toBe(1) // sem cadência configurada, o padrão é só D
     // Mensagem ao devedor é a variante recorrente, não o encerramento terminal.
     expect(await contarNotif(id, 'encerramento_recorrente')).toBe(1)
     expect(await contarNotif(id, 'encerramento')).toBe(0)

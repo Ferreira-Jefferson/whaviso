@@ -77,14 +77,14 @@ describe('E5 H5.3/H5.4/H5.5: aceite/dado_incorreto/recusa pelo fallback numerado
     expect(notif.rows.map((r: { tipo: string }) => r.tipo)).toContain('combinado_dado_incorreto')
   })
 
-  it('fallback "1" (aceitar) → programado + 4 envios + notifica criador', async () => {
+  it('fallback "1" (aceitar) → programado + 1 envio (padrão, só D) + notifica criador', async () => {
     const { avisoId } = await criarConvite({ telefoneDevedor: '+5511933331111' })
     const whats = clienteWhatsFake()
     await processarTexto({ pool: poolSuper, logger, whats }, texto('5511933331111', '1'))
     const aviso = await poolSuper.query(`select status from public.avisos where id=$1`, [avisoId])
     expect(aviso.rows[0].status).toBe('programado')
     const envios = await poolSuper.query(`select count(*)::int as n from public.envios where aviso_id=$1`, [avisoId])
-    expect(envios.rows[0].n).toBe(4)
+    expect(envios.rows[0].n).toBe(1)
   })
 
   it('fallback "3" (recusar) → recusado + notifica criador', async () => {
@@ -112,7 +112,7 @@ describe('E5 H5.3/H5.4/H5.5: aceite/dado_incorreto/recusa pelo fallback numerado
     await processarBotao(deps, ev)
     await processarBotao(deps, ev)
     const envios = await poolSuper.query(`select count(*)::int as n from public.envios where aviso_id=$1`, [avisoId])
-    expect(envios.rows[0].n).toBe(4) // não duplicou
+    expect(envios.rows[0].n).toBe(1) // não duplicou
     expect(whats.enviadas).toHaveLength(1) // só a 1ª confirmação
   })
 })

@@ -122,7 +122,7 @@ Como **sistema (zap/scheduler)**, quero dar a cada combinado um horário própri
 Como **criador**, quero definir se o combinado se repete (e em quais datas) e quais lembretes saem em cada ocorrência, para adaptar o aviso a cada combinado.
 *Critérios de aceite:*
 
-> Duas coisas distintas: **recorrência** (quantas vezes o combinado se repete) e **cadência configurável** (quais D-avisos saem dentro de cada ocorrência) são **ambas disponíveis para todos** (não há recurso por plano: o modelo é carteira de créditos, Épico 11). O padrão (sem configurar nada) é **um combinado único** com o ciclo **D-2 a D+1** completo.
+> Duas coisas distintas: **recorrência** (quantas vezes o combinado se repete) e **cadência configurável** (quais D-avisos saem dentro de cada ocorrência) são **ambas disponíveis para todos** (não há recurso por plano: o modelo é carteira de créditos, Épico 11). O padrão (sem configurar nada) é **um combinado único** com **só o lembrete D** (no dia).
 
 **Recorrência (datas das ocorrências):**
 - [ ] O **padrão** é não repetir (combinado único, comportamento atual). Repetir é **opt-in**, atrás de um controle recolhido por padrão; **disponível para todas as contas** (não é gated). É só um atalho para registrar vários avisos do mesmo cliente.
@@ -131,8 +131,8 @@ Como **criador**, quero definir se o combinado se repete (e em quais datas) e qu
 - [ ] A **tela mostra ao vivo** quantos avisos a regra gera e quanto isso consome de **créditos de envio** (cada ocorrência reserva 1 envio, Épico 11 H11.4); a **palavra final é do servidor** (recusa com envelope `{ error: { code, message } }`; sem saldo, ativar/enviar cai na CTA de comprar créditos, mas registrar na agenda é permitido).
 
 **Cadência (quais D-avisos):**
-- [ ] O **padrão** é o ciclo D-2, D-1, D, D+1 completo (H6.2); quem não configurar nada usa esse padrão.
-- [ ] O criador **escolhe quais etapas** do ciclo saem (um subconjunto de D-2..D+1); o **devedor do fluxo invertido** também pode ajustar como recebe. Sem configurar, usa o padrão. Disponível para todos (não é recurso de plano).
+- [ ] O **padrão** é **só o lembrete D** (no dia); quem não configurar nada usa esse padrão (menos intrusivo; o ciclo completo D-2..D+1, H6.2, fica disponível como opção, não como padrão).
+- [ ] O criador **escolhe quais etapas** do ciclo saem (um subconjunto de D-2..D+1); o **devedor do fluxo invertido** também pode ajustar como recebe. Sem configurar, usa o padrão (só D). Disponível para todos (não é recurso de plano).
 
 **Sempre:**
 - [ ] A quantidade de envios resultante respeita o **saldo de créditos de envio** da conta (Épico 11).

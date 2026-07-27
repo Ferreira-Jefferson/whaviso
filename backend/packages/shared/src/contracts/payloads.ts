@@ -43,7 +43,7 @@ const MAX_ITENS_PEDIDO = 50
 //    própria data_combinada.
 // O servidor expande em aviso_ocorrencias (datas em America/Sao_Paulo); o cliente NUNCA
 // calcula ocorrência. `cadencia_etapas` (separado) escolhe quais etapas do ciclo enviar
-// (null = ciclo completo).
+// (null = padrão, só D).
 export const recorrenciaInput = z.discriminatedUnion('tipo', [
   z.object({
     tipo: z.literal('periodo'),
@@ -87,7 +87,7 @@ export const criarAvisoBody = z
     // Recorrência (E6 H6.10): ausente = combinado simples. Gated por plano (permite_recorrente)
     // no servidor. O servidor expande em ocorrências; o cliente nunca calcula data de ocorrência.
     recorrencia: recorrenciaInput.nullish(),
-    // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = ciclo completo.
+    // Cadência configurável (E6 H6.10): subconjunto das 4 etapas; null = padrão (só D).
     // Gated por plano (cadencia_configuravel) no servidor.
     cadencia_etapas: z.array(etapaEnvio).min(1).max(4).nullish(),
     // E16 H16.3 (multi): categorias (0..N) do combinado. Cada uma precisa ser minha e não

@@ -162,7 +162,7 @@ describe('inbound de botões (integração)', () => {
     const aviso = await poolSuper.query(`select status from public.avisos where id=$1`, [conviteId])
     expect(aviso.rows[0].status).toBe('programado')
     const envios = await poolSuper.query(`select count(*)::int as n from public.envios where aviso_id=$1`, [conviteId])
-    expect(envios.rows[0].n).toBe(4)
+    expect(envios.rows[0].n).toBe(1) // padrão (sem cadência configurada) é só D
     const ev = await poolSuper.query(
       `select count(*)::int as n from public.eventos_aviso where aviso_id=$1 and tipo='aceite'`,
       [conviteId],

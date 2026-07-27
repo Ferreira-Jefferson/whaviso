@@ -7,6 +7,7 @@ import {
   formatarValorBr,
   hojeSp,
   janelaPerdida,
+  ORDEM_ETAPAS,
 } from './index'
 
 // São Paulo é UTC-3 o ano inteiro (sem horário de verão desde 2019):
@@ -32,7 +33,7 @@ describe('calcularAgendamentos', () => {
 
   it('aceite cedo: 4 envios no horário reservado (09:00 SP = 12:00 UTC)', () => {
     const agora = new Date('2026-07-10T15:00:00Z')
-    const ags = calcularAgendamentos(D, SEG_9H, agora)
+    const ags = calcularAgendamentos(D, SEG_9H, agora, ORDEM_ETAPAS)
     expect(ags.map((a) => a.etapa)).toEqual(['d_menos_2', 'd_menos_1', 'd', 'd_mais_1'])
     expect(ags[0]!.agendado_para.toISOString()).toBe('2026-07-13T12:00:00.000Z')
     expect(ags[3]!.agendado_para.toISOString()).toBe('2026-07-16T12:00:00.000Z')
@@ -40,7 +41,7 @@ describe('calcularAgendamentos', () => {
 
   it('todas as etapas saem no MESMO segundo reservado, cada uma na sua data (H6.9)', () => {
     const seg = 10 * 3600 + 30 * 60 + 7 // 10:30:07 SP = 13:30:07 UTC
-    const ags = calcularAgendamentos(D, seg, new Date('2026-07-10T00:00:00Z'))
+    const ags = calcularAgendamentos(D, seg, new Date('2026-07-10T00:00:00Z'), ORDEM_ETAPAS)
     expect(ags.map((a) => a.agendado_para.toISOString())).toEqual([
       '2026-07-13T13:30:07.000Z',
       '2026-07-14T13:30:07.000Z',
@@ -51,7 +52,7 @@ describe('calcularAgendamentos', () => {
 
   it('aceite tardio no dia de D-1 após o horário: D-2 cai fora, D-1 ainda sai hoje', () => {
     const agora = new Date('2026-07-14T17:00:00Z') // 14:00 SP do dia D-1, depois das 09:00
-    const ags = calcularAgendamentos(D, SEG_9H, agora)
+    const ags = calcularAgendamentos(D, SEG_9H, agora, ORDEM_ETAPAS)
     expect(ags.map((a) => a.etapa)).toEqual(['d_menos_1', 'd', 'd_mais_1'])
     // D-1 é hoje e o segundo reservado (09:00) já passou: agenda no instante reservado de
     // hoje (claim imediato pelo scheduler), não em lote atrasado.
@@ -61,14 +62,14 @@ describe('calcularAgendamentos', () => {
 
   it('aceite no dia D antes do horário: todas a partir de D no horário reservado', () => {
     const agora = new Date('2026-07-15T10:00:00Z') // 07:00 SP do dia D
-    const ags = calcularAgendamentos(D, SEG_9H, agora)
+    const ags = calcularAgendamentos(D, SEG_9H, agora, ORDEM_ETAPAS)
     expect(ags.map((a) => a.etapa)).toEqual(['d', 'd_mais_1'])
     expect(ags[0]!.agendado_para.toISOString()).toBe('2026-07-15T12:00:00.000Z')
   })
 
   it('aceite depois do fim de D+1: nenhum envio', () => {
     const agora = new Date('2026-07-17T15:00:00Z')
-    expect(calcularAgendamentos(D, SEG_9H, agora)).toEqual([])
+    expect(calcularAgendamentos(D, SEG_9H, agora, ORDEM_ETAPAS)).toEqual([])
   })
 
   it('E6 H6.10 cadência: o 4º arg filtra as etapas (subconjunto), na ORDEM do ciclo', () => {
@@ -84,6 +85,12 @@ describe('calcularAgendamentos', () => {
     const ags = calcularAgendamentos(D, SEG_9H, agora, ['d'])
     expect(ags.map((a) => a.etapa)).toEqual(['d'])
     expect(ags[0]!.agendado_para.toISOString()).toBe('2026-07-15T12:00:00.000Z')
+  })
+
+  it('E6 H6.10 cadência: sem 4º arg (não configurado), o padrão é só D', () => {
+    const agora = new Date('2026-07-10T15:00:00Z')
+    const ags = calcularAgendamentos(D, SEG_9H, agora)
+    expect(ags.map((a) => a.etapa)).toEqual(['d'])
   })
 })
 

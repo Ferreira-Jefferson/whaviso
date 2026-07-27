@@ -480,7 +480,7 @@ export async function aplicarAcaoBotao(
       // H6.9: aloca o segundo reservado (janela 08-18, único global, 10min/devedor) NESTA
       // transação (lock dos ativos serializa aceites concorrentes). Todas as etapas saem
       // nesse mesmo segundo, cada uma na sua data. A cadência (E6 H6.10) filtra as etapas
-      // (null = ciclo completo); vale para simples e recorrente.
+      // (null = padrão, só D); vale para simples e recorrente.
       const { seg } = await reservarHorario(cli, { avisoId, telefoneDevedor: aviso.telefone_devedor })
       const cadencia = aviso.cadencia_etapas ?? undefined
       if (aviso.recorrencia_tipo != null) {
