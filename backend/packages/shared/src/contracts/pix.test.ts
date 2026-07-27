@@ -124,4 +124,63 @@ describe('gerarPayloadPixCopiaCola (item 23, BR Code estático)', () => {
     const payload = gerarPayloadPixCopiaCola({ chave: 'x@x.com', nomeTitular: '   ' })
     expect(camposDeNivel1(payload)['59']).toBe('RECEBEDOR')
   })
+
+  it('cpf/cnpj digitados com pontuação viram só dígitos no BR Code (formato do DICT)', () => {
+    const payload = gerarPayloadPixCopiaCola({
+      chave: '123.456.789-01',
+      tipo: 'cpf',
+      nomeTitular: 'X',
+    })
+    expect(camposDeNivel1(payload)['26']).toContain('12345678901')
+    expect(camposDeNivel1(payload)['26']).not.toContain('123.456.789-01')
+  })
+
+  it('telefone digitado só com DDD+número (sem "55" nem "+") ganha os dois no E.164', () => {
+    const payload = gerarPayloadPixCopiaCola({
+      chave: '(11) 99999-8888',
+      tipo: 'telefone',
+      nomeTitular: 'X',
+    })
+    expect(camposDeNivel1(payload)['26']).toContain('+5511999998888')
+  })
+
+  it('DDD 55 (RS) sozinho não é confundido com código de país já embutido', () => {
+    // 11 dígitos começando em "55" (DDD do RS), sem código de país: precisa do prefixo,
+    // não só do "+" (esse é exatamente o caso que um startsWith("55") ingênuo erraria).
+    const payload = gerarPayloadPixCopiaCola({
+      chave: '55991234567',
+      tipo: 'telefone',
+      nomeTitular: 'X',
+    })
+    expect(camposDeNivel1(payload)['26']).toContain('+5555991234567')
+  })
+
+  it('telefone com "55" e código de país já embutido (12-13 dígitos, sem "+") só ganha o "+"', () => {
+    const payload = gerarPayloadPixCopiaCola({
+      chave: '5511999998888',
+      tipo: 'telefone',
+      nomeTitular: 'X',
+    })
+    expect(camposDeNivel1(payload)['26']).toContain('+5511999998888')
+  })
+
+  it('telefone já em E.164 (com "+") segue intacto, só remove pontuação incidental', () => {
+    const payload = gerarPayloadPixCopiaCola({
+      chave: '+55 11 99999-8888',
+      tipo: 'telefone',
+      nomeTitular: 'X',
+    })
+    expect(camposDeNivel1(payload)['26']).toContain('+5511999998888')
+  })
+
+  it('sem tipo conhecido, a chave vai como veio (melhor esforço, caso ambíguo)', () => {
+    const payload = gerarPayloadPixCopiaCola({ chave: '123.456.789-01', nomeTitular: 'X' })
+    expect(camposDeNivel1(payload)['26']).toContain('123.456.789-01')
+  })
+
+  it('email e chave aleatória (uuid) não são tocados pela normalização', () => {
+    const uuid = '123e4567-e12b-12d1-a456-426655440000'
+    const payload = gerarPayloadPixCopiaCola({ chave: uuid, tipo: 'aleatoria', nomeTitular: 'X' })
+    expect(camposDeNivel1(payload)['26']).toContain(uuid)
+  })
 })

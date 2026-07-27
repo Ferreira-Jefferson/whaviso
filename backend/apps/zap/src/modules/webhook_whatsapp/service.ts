@@ -259,7 +259,7 @@ async function entregarChaveDePagamento(
         valor: formatarValorBr(dados.valorCentavos),
       },
     })
-    mensagem1.texto = anexarCopiaCola(mensagem1.texto, chave, titular, dados.valorCentavos)
+    mensagem1.texto = anexarCopiaCola(mensagem1.texto, chave, titular, dados.valorCentavos, tipoResolvido)
     await deps.whats.enviarMensagem(mensagem1)
     // 2a mensagem só faz sentido com titular/banco e template; sem eles, entrega só a 1a.
     if (t2 && (titular || banco)) {
@@ -278,12 +278,22 @@ async function entregarChaveDePagamento(
  * Item 23: acrescenta o Pix Copia e Cola (BR Code) ao final do texto da 1a mensagem.
  * Função pura por baixo (`gerarPayloadPixCopiaCola`); qualquer erro na geração (chave
  * num formato inesperado, etc.) não pode derrubar a entrega da chave em texto, então
- * cai em silêncio e devolve o texto original sem o BR Code.
+ * cai em silêncio e devolve o texto original sem o BR Code. Passa o tipo resolvido para
+ * a chave sair no formato exato do DICT no BR Code (cpf/cnpj só dígitos, telefone com
+ * "+"), mesmo que o cobrador tenha digitado com pontuação; sem isso o código escaneava
+ * mas o banco recusava a chave por não bater com o DICT.
  */
-function anexarCopiaCola(texto: string, chave: string, titular: string, valorCentavos: number): string {
+function anexarCopiaCola(
+  texto: string,
+  chave: string,
+  titular: string,
+  valorCentavos: number,
+  tipo: TipoChavePix | null,
+): string {
   try {
     const payload = gerarPayloadPixCopiaCola({
       chave,
+      tipo,
       nomeTitular: titular,
       valorCentavos,
     })

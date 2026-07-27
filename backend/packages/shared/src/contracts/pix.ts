@@ -127,6 +127,10 @@ function crc16(payload: string): string {
 export interface DadosPixCopiaCola {
   /** Chave pix (qualquer tipo aceito pelo DICT: cpf/cnpj/email/telefone/aleatória). */
   chave: string
+  /** Tipo da chave, quando conhecido: normaliza para o formato exato do DICT antes de
+   *  embutir no campo 26 (ver `normalizarChaveDict`). Sem tipo, a chave vai como veio
+   *  (melhor esforço; hoje só acontece em caso ambíguo, que já é raro). */
+  tipo?: TipoChavePix | null
   /** Nome de quem recebe (Merchant Name do EMV, campo 59); truncado a 25 caracteres. */
   nomeTitular: string
   /** Valor combinado, em CENTAVOS. Ausente/nulo/<=0: BR Code sem valor fixo (quem paga digita). */
@@ -134,6 +138,31 @@ export interface DadosPixCopiaCola {
   /** Identificador da transação (Reference Label, subcampo 05 do campo 62); sem valor
    *  vira "***" (marcador padrão do spec para "sem identificador"). */
   identificador?: string | null
+}
+
+// O cadastro da chave (wizard/painel) guarda texto livre de propósito (UX, não
+// validação: ver o topo do arquivo). Mas o campo 26 do EMV exige a chave no formato
+// EXATO do DICT, e um cobrador digita/cola CPF, CNPJ e telefone com pontuação (ex.:
+// "123.456.789-01", "(11) 99999-8888") com total naturalidade. Sem normalizar aqui, o
+// BR Code sai com CRC e estrutura válidos (escaneia normal) mas com uma chave que o
+// DICT não reconhece: o banco do devedor recusa por "chave não encontrada", o que
+// aparenta (e é relatado como) "o Pix gerado é inválido". aleatoria (UUID) e email já
+// chegam no formato do DICT, então seguem intocados.
+function normalizarChaveDict(chave: string, tipo?: TipoChavePix | null): string {
+  const valor = chave.trim()
+  if (tipo === 'cpf' || tipo === 'cnpj') return valor.replace(/\D/g, '')
+  if (tipo === 'telefone') {
+    const digitos = valor.replace(/\D/g, '')
+    // Mesma convenção de `detectarTipoChavePix` (topo do arquivo): sem "+", só se conta
+    // com código de país já embutido quando vêm 12-13 dígitos começando em 55. Qualquer
+    // outro tamanho é DDD+número BR sem o "55" (ex.: DDD 55 do RS sozinho já começa com
+    // "55" em 11 dígitos, o que confundiria um "startsWith" sem o comprimento junto) e
+    // precisa ganhar o prefixo para virar E.164.
+    const jaTemCodigoPais =
+      valor.startsWith('+') || (digitos.length >= 12 && digitos.length <= 13 && digitos.startsWith('55'))
+    return jaTemCodigoPais ? `+${digitos}` : `+55${digitos}`
+  }
+  return valor
 }
 
 /**
@@ -144,7 +173,7 @@ export interface DadosPixCopiaCola {
  * o resultado, mas esta função em si não loga).
  */
 export function gerarPayloadPixCopiaCola(dados: DadosPixCopiaCola): string {
-  const chave = dados.chave.trim()
+  const chave = normalizarChaveDict(dados.chave, dados.tipo)
   const nome = truncar(normalizarAscii(dados.nomeTitular).toUpperCase() || 'RECEBEDOR', 25)
   const identificadorBruto = normalizarAscii(dados.identificador ?? '').toUpperCase()
   const identificador = truncar(identificadorBruto, 25) || '***'
