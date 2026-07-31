@@ -147,7 +147,7 @@ export function ItensPedido({
                 </ul>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 aria-label={`Quantidade do item ${i + 1}`}
                 type="number"
@@ -156,9 +156,9 @@ export function ItensPedido({
                 max={9999}
                 value={item.qtd}
                 onChange={(e) => atualizar(i, { qtd: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
-                className="w-16 rounded-input border border-linha bg-cartao px-2 py-2.5 text-center text-sm text-tinta tabular focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                className="w-16 shrink-0 rounded-input border border-linha bg-cartao px-2 py-2.5 text-center text-sm text-tinta tabular focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
               />
-              <div className="w-32">
+              <div className="w-32 shrink-0">
                 <MoneyInput
                   aria-label={`Preço unitário do item ${i + 1}`}
                   value={item.valor_unit_centavos}
@@ -171,6 +171,7 @@ export function ItensPedido({
                 aria-label={`Remover item ${i + 1}`}
                 disabled={!podeRemover}
                 onClick={() => remover(i)}
+                className="shrink-0"
               >
                 <Trash2 strokeWidth={1.75} className="size-4" />
               </Button>
