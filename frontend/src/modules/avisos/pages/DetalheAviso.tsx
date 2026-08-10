@@ -34,7 +34,9 @@ import {
   EmptyState,
   Field,
   IconePendencia,
+  InfoHint,
   Input,
+  MoneyInput,
   MoneyText,
   PageHeader,
   PhoneInput,
@@ -947,6 +949,8 @@ function EditarModal({
   const [pix, setPix] = useState(aviso.pix_chave ?? '')
   const [titular, setTitular] = useState(aviso.pix_titular ?? '')
   const [banco, setBanco] = useState(aviso.pix_banco ?? '')
+  // Fase A: custo interno (opcional, livre). null = "sem custo informado".
+  const [custo, setCusto] = useState<number | null>(aviso.valor_custo_centavos ?? null)
   const [confirmando, setConfirmando] = useState(false)
   // O valor do combinado vem dos itens. Avisos antigos sem itens ganham uma linha semente
   // (descrição = motivo, preço = valor atual), preservando o total até o dono ajustar.
@@ -985,6 +989,8 @@ function EditarModal({
     if (titular.trim() && titular.trim() !== (aviso.pix_titular ?? '')) body.pix_titular = titular.trim()
     if (banco.trim() && banco.trim() !== (aviso.pix_banco ?? '')) body.pix_banco = banco.trim()
     if (itensMudou && !itensInvalido) body.itens = itens
+    // Fase A: custo é interno e LIVRE (não abre reaprovação, ver comentário do contrato).
+    if (custo !== (aviso.valor_custo_centavos ?? null)) body.valor_custo_centavos = custo
     return body
   }
 
@@ -1060,6 +1066,22 @@ function EditarModal({
             <Field label="Banco da chave">
               <Input value={banco} onChange={(e) => setBanco(e.target.value)} />
             </Field>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="campo-custo-editar" className="flex items-center gap-1.5 text-sm font-medium text-tinta">
+              Quanto isso te custou (opcional)
+              <InfoHint
+                texto="Não aparece para a outra pessoa. Serve só para você ver o quanto sobrou em Gestão > Resultados."
+                rotulo="Sobre: custo"
+              />
+            </label>
+            <MoneyInput
+              id="campo-custo-editar"
+              value={custo}
+              onChange={setCusto}
+              placeholder="R$ 0,00"
+              className="max-w-[10rem]"
+            />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variante="secondary" onClick={onFechar}>

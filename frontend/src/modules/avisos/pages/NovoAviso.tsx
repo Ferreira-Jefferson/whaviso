@@ -12,6 +12,7 @@ import {
   Field,
   InfoHint,
   Input,
+  MoneyInput,
   MoneyText,
   PageHeader,
   PhoneInput,
@@ -128,6 +129,7 @@ function NovoAvisoConteudo() {
       categoria_ids: [],
       // Itens obrigatórios: começa com uma linha vazia (o valor do combinado vem da soma).
       itens: [{ descricao: '', qtd: 1, valor_unit_centavos: 0, produto_id: null }],
+      valor_custo_centavos: null,
     },
   })
 
@@ -190,6 +192,8 @@ function NovoAvisoConteudo() {
         // autoridade: expande as ocorrências e valida vagas/cadência.
         recorrencia: recorrencia ?? null,
         cadencia_etapas: cadenciaEtapas ?? null,
+        // Fase A: custo interno, opcional. Nunca vai ao devedor; alimenta "Resultado".
+        valor_custo_centavos: dados.valor_custo_centavos ?? null,
       })
       setResultado(r)
       mostrarToast(dados.modo === 'enviar' ? 'Combinado enviado' : 'Combinado salvo na agenda')
@@ -379,6 +383,31 @@ function NovoAvisoConteudo() {
               <ItensPedido value={field.value} onChange={field.onChange} erro={errors.itens?.message} />
             )}
           />
+
+          {/* Fase A: custo interno (opcional). Nunca vai à outra pessoa; alimenta "Resultado"
+              em Gestão > Resultados (quanto sobrou = valor do combinado menos este custo). */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="campo-custo" className="flex items-center gap-1.5 text-sm font-medium text-tinta">
+              Quanto isso te custou (opcional)
+              <InfoHint
+                texto="Não aparece para a outra pessoa. Serve só para você ver o quanto sobrou em Gestão > Resultados."
+                rotulo="Sobre: custo"
+              />
+            </label>
+            <Controller
+              control={control}
+              name="valor_custo_centavos"
+              render={({ field }) => (
+                <MoneyInput
+                  id="campo-custo"
+                  value={field.value ?? null}
+                  onChange={field.onChange}
+                  placeholder="R$ 0,00"
+                  className="max-w-[10rem]"
+                />
+              )}
+            />
+          </div>
 
           {/* E16 (multi): categorias (internas, nunca vão para a outra pessoa) ao lado da data
               combinada (do acordo). A data desceu para cá porque o valor avulso deixou de existir. */}
@@ -671,6 +700,12 @@ function RevisarModal({
             <span className="text-tinta-2">Total</span>
             <MoneyText centavos={totalCentavos} className="font-medium tabular" />
           </div>
+          {valores.valor_custo_centavos != null && (
+            <div className="mt-1 flex items-center justify-between text-sm">
+              <span className="text-tinta-2">Custo (só você vê)</span>
+              <MoneyText centavos={valores.valor_custo_centavos} className="tabular text-tinta-2" />
+            </div>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-tinta">

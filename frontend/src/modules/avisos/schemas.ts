@@ -57,6 +57,9 @@ export const novoAvisoSchema = z
     pix_banco: z.string().trim().max(80, 'Nome muito longo.').optional(),
     // E16 (multi): categorias (0..N). Nunca vão ao devedor; ajudam a organizar.
     categoria_ids: z.array(z.uuid()).optional(),
+    // Fase A: custo interno (opcional). Nunca vai ao devedor; alimenta "Resultado" em
+    // Gestão > Resultados (quanto sobrou = valor do combinado menos este custo).
+    valor_custo_centavos: z.number().int().min(0).nullable().optional(),
   })
   // Itens obrigatórios: >=1 item, todos com descrição, e total > 0 (uma mensagem por vez, em
   // ordem de prioridade). Vale nos dois modos (enviar e agenda): sem itens não há valor.

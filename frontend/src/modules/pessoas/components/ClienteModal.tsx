@@ -117,6 +117,25 @@ export function ClienteModal({ cliente, onFechar }: { cliente: Cliente; onFechar
         </div>
       )}
 
+      {/* Fase A (A4): última venda para a pessoa + sinal de inatividade (para reativar quem
+          está parado). Só quando já vendi para ela (ultima_compra vem do servidor). Este é o
+          caminho novo/recomendado (H18.4); a mesma informação também vive em Pessoa.tsx. */}
+      {resumo.data?.ultima_compra && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="inline-flex items-center gap-1.5 text-tinta-2">
+            <Clock strokeWidth={1.75} className="size-4" />
+            Última compra em {dataPtBR(resumo.data.ultima_compra)}
+            {resumo.data.dias_desde_ultima_compra !== null &&
+              ` · há ${resumo.data.dias_desde_ultima_compra} ${resumo.data.dias_desde_ultima_compra === 1 ? 'dia' : 'dias'}`}
+          </span>
+          {resumo.data.inativo && (
+            <span className="inline-flex items-center gap-1.5 rounded-pill bg-ambar-claro px-3 py-1 text-xs font-medium text-ambar">
+              Cliente parado há um tempo, que tal um novo contato?
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Combinados, agrupados por nome (H15.3). */}
       <div>
         <h3 className="mb-2 text-sm font-medium text-tinta">Combinados</h3>

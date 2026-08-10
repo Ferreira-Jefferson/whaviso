@@ -1,9 +1,13 @@
 // Fase A: "Resultado" (/app/metricas). Saúde do negócio de quem vende: recebido, a
-// receber, lucro (só onde o custo foi informado), ticket médio, melhores clientes e
-// quebra por categoria. Só leitura: consome GET /v1/painel/metricas
+// receber, lucro (só onde o custo foi informado), ticket médio, melhores clientes,
+// quebra por categoria e clientes inativos. Só leitura: consome GET /v1/painel/metricas
 // (tudo calculado no servidor). Linguagem sem termos proibidos, neutra quanto a gênero.
-import { Activity, PiggyBank, Users, Tags } from 'lucide-react'
-import { Card, EmptyState, MoneyText, Spinner, StatCard } from '@/shared/ui'
+// H18.2: "no período escolhido", mesmo padrão De/Até do Painel (../pages/Painel.tsx),
+// na URL própria desta rota (/app/gestao); sem período, mostra o histórico inteiro.
+import { useSearchParams } from 'react-router'
+import { Activity, PiggyBank, UserX, Users, Tags } from 'lucide-react'
+import { Button, Card, DateInput, EmptyState, MoneyText, Spinner, StatCard } from '@/shared/ui'
+import { dataPtBR } from '@/shared/format'
 import { usePainelMetricas } from '../api'
 
 // Mascara o número (mantém só os 4 últimos), para não expor telefone inteiro na tela.
@@ -13,7 +17,29 @@ function mascararTelefone(tel: string | null): string {
 }
 
 export default function MetricasPage() {
-  const { data, isLoading, isError } = usePainelMetricas()
+  const [params, setParams] = useSearchParams()
+  const de = params.get('de') ?? ''
+  const ate = params.get('ate') ?? ''
+  const emPeriodo = Boolean(de || ate)
+
+  function setParam(patch: Record<string, string | null>) {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        for (const [chave, valor] of Object.entries(patch)) {
+          if (valor) next.set(chave, valor)
+          else next.delete(chave)
+        }
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  const { data, isLoading, isError } = usePainelMetricas({
+    de: de || undefined,
+    ate: ate || undefined,
+  })
 
   if (isLoading) {
     return (
@@ -39,6 +65,39 @@ export default function MetricasPage() {
       <p className="text-sm text-tinta-2">
         Como vai o seu negócio: o que recebeu, o que ainda tem a receber e quanto rendeu.
       </p>
+
+      {/* H18.2: filtro de período. Mesmo padrão do Painel; sem período, mostra o
+          histórico inteiro (comportamento anterior). */}
+      <div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-xs text-tinta-2">
+            De
+            <DateInput
+              value={de}
+              onChange={(e) => setParam({ de: e.target.value || null })}
+              className="w-44"
+              aria-label="Período: data inicial"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-tinta-2">
+            Até
+            <DateInput
+              value={ate}
+              onChange={(e) => setParam({ ate: e.target.value || null })}
+              className="w-44"
+              aria-label="Período: data final"
+            />
+          </label>
+          {emPeriodo && (
+            <Button variante="ghost" onClick={() => setParam({ de: null, ate: null })}>
+              Limpar período
+            </Button>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-tinta-2">
+          {emPeriodo ? 'Números do período escolhido.' : 'Sem período, mostra o histórico inteiro.'}
+        </p>
+      </div>
 
       {/* Números principais */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -182,6 +241,37 @@ export default function MetricasPage() {
                 <span className="text-sm text-tinta-2">
                   <MoneyText centavos={m.recebido_centavos} className="text-folha" /> em {m.qtd}{' '}
                   {m.qtd === 1 ? 'combinado' : 'combinados'}
+                </span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      {/* H18.2: clientes inativos (sem combinado ativo e sem comprar há um tempo). Calculado
+          no servidor (painel/repo.ts); antes só existia no backend, nunca renderizado. */}
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 font-display text-xl text-salvia">
+          <UserX strokeWidth={1.75} className="size-5" />
+          Clientes parados
+        </h2>
+        {data.inativos.length === 0 ? (
+          <Card className="text-sm text-tinta-2">
+            Ninguém parado por aqui: todo mundo tem algo ativo ou comprou recentemente.
+          </Card>
+        ) : (
+          <Card className="flex flex-col divide-y divide-linha p-0">
+            {data.inativos.map((c, i) => (
+              <div
+                key={`${c.telefone ?? c.nome}-${i}`}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+              >
+                <span className="text-tinta">
+                  {c.nome}
+                  <span className="ml-2 text-xs text-tinta-2">{mascararTelefone(c.telefone)}</span>
+                </span>
+                <span className="text-sm text-tinta-2">
+                  última compra {dataPtBR(c.ultima_data)} · faz {c.dias} dias
                 </span>
               </div>
             ))}
