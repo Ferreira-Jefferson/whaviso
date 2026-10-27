@@ -79,6 +79,19 @@ export default tseslint.config(
   },
   ...tseslint.configs.recommended,
   {
+    // Convencao de nome: `_`-prefixado e descartavel; omitir chave via rest (`{ x: _x, ...resto }`)
+    // nao conta como variavel nao usada (ignoreRestSiblings).
+    files: ['**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      }],
+    },
+  },
+  {
     // Linguagem do produto (H13.10): so codigo/copy de PRODUCAO. Exclui:
     // (1) os proprios arquivos de definicao de linguagem (eles LISTAM as
     //     palavras e os travessoes de proposito);
