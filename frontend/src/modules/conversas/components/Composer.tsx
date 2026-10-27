@@ -59,7 +59,7 @@ export function Composer({ aoEnviar, enviando, bloqueio }: Props) {
           placeholder="Escreva uma mensagem"
           aria-label="Mensagem para o cliente"
           className={cn(
-            'max-h-32 min-h-11 w-full flex-1 resize-none rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta',
+            'max-h-32 min-h-11 w-full flex-1 resize-none rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta [field-sizing:content]',
             'placeholder:text-tinta-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia',
           )}
         />

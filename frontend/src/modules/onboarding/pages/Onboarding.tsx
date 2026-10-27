@@ -26,31 +26,33 @@ export default function Onboarding() {
       )}
       {consulta.isError && <ErrorState aoTentarDeNovo={() => void consulta.refetch()} />}
       {consulta.isSuccess && (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="grid animate-rise items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <ChecklistOnboarding dados={consulta.data} />
-          <Card className="flex flex-col gap-2">
+          <Card className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-tinta-2">Tempo até o primeiro pedido</span>
-              <Timer strokeWidth={1.75} className="size-4 text-tinta-2" aria-hidden />
+              <span className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-salvia/10 text-salvia">
+                <Timer strokeWidth={1.75} className="size-4" aria-hidden />
+              </span>
             </div>
             {consulta.data.tempo_ate_primeiro_pedido_min !== null ? (
-              <>
-                <span className="tabular text-2xl text-salvia">
+              <div>
+                <p className="tabular text-2xl tracking-tight text-salvia">
                   {formatarDuracao(consulta.data.tempo_ate_primeiro_pedido_min)}
-                </span>
+                </p>
                 {consulta.data.primeiro_pedido_em && (
-                  <span className="text-xs text-tinta-2">
+                  <p className="mt-1 text-xs text-tinta-2">
                     Primeiro pedido em {formatarDataHora(consulta.data.primeiro_pedido_em)}
-                  </span>
+                  </p>
                 )}
-              </>
+              </div>
             ) : (
-              <>
-                <span className="text-lg text-tinta-2">Ainda sem pedidos</span>
-                <span className="text-xs text-tinta-2">
+              <div>
+                <p className="text-base font-medium text-tinta">Ainda sem pedidos</p>
+                <p className="mt-1 text-xs text-tinta-2">
                   A contagem começou em {formatarDataHora(consulta.data.iniciado_em)}, quando a loja foi criada.
-                </span>
-              </>
+                </p>
+              </div>
             )}
           </Card>
         </div>

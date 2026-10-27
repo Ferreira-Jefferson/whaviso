@@ -3,7 +3,7 @@
 // salvar substitui (PUT). Horas locais (America/Sao_Paulo); o backend decide, a tela so edita.
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Banner, Button, Field, cn, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Field, Input, cn, useToast } from '@/shared/ui'
 import { useDefinirJanela, type Janela } from '../api'
 import { DIAS_CURTOS, DIAS_SEMANA, ORDEM_DIAS } from '../estados'
 
@@ -113,19 +113,19 @@ export function EditorJanela({ janela }: { janela: Janela | null }) {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <Field label="Começa às">
-          <input
+          <Input
             type="time"
             value={inicio}
             onChange={(e) => setInicio(e.target.value)}
-            className="min-h-11 w-full rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+            className="min-h-11 px-2.5 tabular-nums [color-scheme:light]"
           />
         </Field>
         <Field label="Termina às">
-          <input
+          <Input
             type="time"
             value={fim}
             onChange={(e) => setFim(e.target.value)}
-            className="min-h-11 w-full rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+            className="min-h-11 px-2.5 tabular-nums [color-scheme:light]"
           />
         </Field>
       </div>

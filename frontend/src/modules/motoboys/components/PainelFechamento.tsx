@@ -2,13 +2,14 @@
 // lancamentos expandiveis, ajuste manual e "marcar como pago". O total vem DERIVADO do
 // servidor; ao pagar enviamos o total que o dono viu e o servidor recusa (409) se mudou.
 import { useState } from 'react'
-import { CalendarCheck, Plus } from 'lucide-react'
+import { CalendarCheck, CheckCircle2, ChevronDown, Clock, Plus } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { formatarCentavos, formatarDataHora, formatarHora } from '@/shared/format'
 import {
   Badge,
   Button,
   Card,
+  cn,
   ConfirmDialog,
   DateInput,
   EmptyState,
@@ -86,12 +87,10 @@ export function PainelFechamento() {
 
       {fechamento.isSuccess && linhas.length > 0 && (
         <>
-          <StatCard
-            rotulo={`Total do dia ${dataBr(fechamento.data.data)}`}
-            centavos={fechamento.data.total_centavos}
-            detalhe={`${linhas.length} ${linhas.length === 1 ? 'motoboy' : 'motoboys'}`}
-            tom="salvia"
-            className="sm:max-w-xs"
+          <Resumo
+            data={dataBr(fechamento.data.data)}
+            totalCentavos={fechamento.data.total_centavos}
+            linhas={linhas}
           />
           <ul className="flex flex-col gap-3">
             {linhas.map((l) => (
@@ -138,6 +137,51 @@ export function PainelFechamento() {
   )
 }
 
+/**
+ * Resumo do dia: o total vem DERIVADO do servidor (headline); a divisão "a pagar" vs "pago" é
+ * só apresentação, somada a partir das linhas que já estão em tela. Nenhuma regra de negócio.
+ */
+function Resumo({
+  data,
+  totalCentavos,
+  linhas,
+}: {
+  data: string
+  totalCentavos: number
+  linhas: ReadonlyArray<FechamentoLinha>
+}) {
+  const pendentes = linhas.filter((l) => l.status !== 'pago')
+  const aPagarCentavos = pendentes.reduce((s, l) => s + l.total_centavos, 0)
+  const pagoCentavos = totalCentavos - aPagarCentavos
+  const pagos = linhas.length - pendentes.length
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <StatCard
+        rotulo={`Total do dia ${data}`}
+        centavos={totalCentavos}
+        detalhe={`${linhas.length} ${linhas.length === 1 ? 'motoboy' : 'motoboys'}`}
+        icone={<CalendarCheck className="size-4" aria-hidden />}
+        tom="salvia"
+      />
+      <StatCard
+        rotulo="A pagar"
+        centavos={aPagarCentavos}
+        detalhe={`${pendentes.length} ${pendentes.length === 1 ? 'motoboy' : 'motoboys'}`}
+        icone={<Clock className="size-4" aria-hidden />}
+        tom="ambar"
+      />
+      <StatCard
+        rotulo="Já pago"
+        centavos={pagoCentavos}
+        detalhe={`${pagos} ${pagos === 1 ? 'motoboy' : 'motoboys'}`}
+        icone={<CheckCircle2 className="size-4" aria-hidden />}
+        tom="folha"
+      />
+    </div>
+  )
+}
+
 function LinhaFechamento({
   linha,
   aoAjustar,
@@ -149,7 +193,7 @@ function LinhaFechamento({
 }) {
   const pago = linha.status === 'pago'
   return (
-    <Card className="flex flex-col gap-4">
+    <Card className={cn('flex flex-col gap-4', pago && 'bg-papel-2')}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <span className="flex flex-wrap items-center gap-2 text-base font-medium text-tinta">
@@ -158,18 +202,23 @@ function LinhaFechamento({
           </span>
           {pago && linha.pago_em && <span className="text-xs text-tinta-2">Pago em {formatarDataHora(linha.pago_em)}</span>}
         </div>
-        <span className="tabular text-2xl text-salvia">{formatarCentavos(linha.total_centavos)}</span>
+        <span className={cn('tabular text-2xl', pago ? 'text-tinta-2' : 'text-salvia')}>{formatarCentavos(linha.total_centavos)}</span>
       </div>
 
       <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
         <Dado rotulo="Entregas" valor={`${linha.qtd_entregas}`} />
         <Dado rotulo="Valor das entregas" valor={formatarCentavos(linha.entregas_centavos)} />
-        <Dado rotulo="Ajustes" valor={formatarCentavos(linha.ajustes_centavos)} />
+        <Dado
+          rotulo="Ajustes"
+          valor={formatarCentavos(linha.ajustes_centavos)}
+          negativo={linha.ajustes_centavos < 0}
+        />
       </dl>
 
       {linha.lancamentos.length > 0 && (
         <details className="group text-sm">
-          <summary className="cursor-pointer text-salvia">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-salvia [&::-webkit-details-marker]:hidden">
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden />
             Ver lançamentos ({linha.lancamentos.length})
           </summary>
           <ul className="mt-2 flex flex-col divide-y divide-linha rounded-input border border-linha">
@@ -202,11 +251,11 @@ function LinhaFechamento({
   )
 }
 
-function Dado({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Dado({ rotulo, valor, negativo }: { rotulo: string; valor: string; negativo?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-2 sm:flex-col sm:items-start sm:justify-start">
       <dt className="text-tinta-2">{rotulo}</dt>
-      <dd className="tabular font-medium text-tinta">{valor}</dd>
+      <dd className={cn('tabular font-medium', negativo ? 'text-barro' : 'text-tinta')}>{valor}</dd>
     </div>
   )
 }

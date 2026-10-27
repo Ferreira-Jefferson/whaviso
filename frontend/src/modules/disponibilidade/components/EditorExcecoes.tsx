@@ -96,19 +96,19 @@ export function EditorExcecoes({ itens }: { itens: Excecao[] }) {
           {!fechado && (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <Field label="Abre às">
-                <input
+                <Input
                   type="time"
                   value={abre}
                   onChange={(e) => setAbre(e.target.value)}
-                  className="min-h-11 w-full rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                  className="min-h-11 px-2.5 tabular-nums [color-scheme:light]"
                 />
               </Field>
               <Field label="Fecha às">
-                <input
+                <Input
                   type="time"
                   value={fecha}
                   onChange={(e) => setFecha(e.target.value)}
-                  className="min-h-11 w-full rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                  className="min-h-11 px-2.5 tabular-nums [color-scheme:light]"
                 />
               </Field>
             </div>
@@ -151,7 +151,7 @@ export function EditorExcecoes({ itens }: { itens: Excecao[] }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-tinta">{dataPtBR(ex.data)}</p>
-                <p className="truncate text-sm text-tinta-2">
+                <p className="truncate text-sm text-tinta-2 tabular-nums">
                   {ex.fechado ? 'Fechado o dia todo' : `Aberto ${rotuloFaixa(ex.abre ?? '', ex.fecha ?? '')}`}
                   {ex.motivo ? ` · ${ex.motivo}` : ''}
                 </p>

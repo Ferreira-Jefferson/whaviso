@@ -21,6 +21,7 @@ export function ItemConversa({ item, selecionada, aoSelecionar }: Props) {
   const ultima = item.ultima_mensagem
   const previa = ultima ? previaLista(ultima.previa, ultima.tipo) : 'Sem mensagens ainda'
   const saida = ultima?.direcao === 'saida'
+  const temNaoLidas = item.nao_lidas > 0
 
   return (
     <button
@@ -28,29 +29,39 @@ export function ItemConversa({ item, selecionada, aoSelecionar }: Props) {
       aria-current={selecionada ? 'true' : undefined}
       onClick={() => aoSelecionar(item.id)}
       className={cn(
-        'flex w-full items-start gap-3 border-b border-linha px-4 py-3 text-left',
+        'flex w-full items-start gap-3 border-b border-linha px-4 py-3 text-left transition-colors',
         'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-salvia',
-        selecionada ? 'bg-salvia-claro' : 'hover:bg-papel-2',
+        selecionada
+          ? 'bg-salvia-claro shadow-[inset_3px_0_0_0_var(--cor-primaria)]'
+          : 'hover:bg-papel-2',
       )}
     >
-      <span className="mt-1 flex size-9 flex-none items-center justify-center rounded-full bg-papel-2 text-sm font-bold text-tinta-2">
+      <span
+        className={cn(
+          'mt-0.5 flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold',
+          selecionada ? 'bg-cartao text-salvia' : 'bg-salvia-claro text-salvia',
+        )}
+      >
         {inicial(nome)}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
           <span className="min-w-0 flex-1 truncate font-bold text-tinta">{nome}</span>
-          <span className="flex-none text-xs tabular-nums text-tinta-2">
+          <span className={cn('flex-none text-xs tabular-nums', temNaoLidas ? 'text-salvia' : 'text-tinta-2')}>
             {ultima ? formatarHora(ultima.criado_em) : ''}
           </span>
         </span>
         <span className="mt-0.5 flex items-center gap-1.5">
-          <span className="min-w-0 flex-1 truncate text-[13px] text-tinta-2">
-            {saida && <span className="text-tinta-2/70">Você: </span>}
+          <span className={cn('min-w-0 flex-1 truncate text-[13px]', temNaoLidas ? 'font-medium text-tinta' : 'text-tinta-2')}>
+            {saida && <span className="font-normal text-tinta-2/70">Você: </span>}
             {previa}
           </span>
-          {item.nao_lidas > 0 && (
-            <span className="flex-none rounded-pill bg-salvia px-1.5 text-xs font-bold tabular-nums text-papel">
-              {item.nao_lidas}
+          {temNaoLidas && (
+            <span
+              className="inline-flex min-w-5 flex-none items-center justify-center rounded-pill bg-salvia px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums text-papel"
+              aria-label={`${item.nao_lidas} ${item.nao_lidas === 1 ? 'mensagem não lida' : 'mensagens não lidas'}`}
+            >
+              {item.nao_lidas > 99 ? '99+' : item.nao_lidas}
             </span>
           )}
         </span>

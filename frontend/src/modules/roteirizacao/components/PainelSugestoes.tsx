@@ -2,7 +2,7 @@
 // (tempo de preparo + proximidade), confere/ajusta e aceita cada uma. A sugestao NAO e
 // persistida: vive neste estado e some ao sair da tela; so o aceite grava a corrida.
 import { useState } from 'react'
-import { MapPinOff, Sparkles } from 'lucide-react'
+import { MapPinOff, Route, Sparkles } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { formatarHora } from '@/shared/format'
 import { Banner, Button, Card, EmptyState, Field, Input, useToast } from '@/shared/ui'
@@ -127,17 +127,28 @@ export function PainelSugestoes() {
           )}
 
           {corridas.length > 0 && (
-            <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              {corridas.map((c) => (
-                <li key={c.ordem_saida}>
-                  <CorridaSugeridaCard
-                    sugestao={c}
-                    motoboys={motoboys.data ?? []}
-                    aoAceitar={() => setAceitas((atual) => new Set(atual).add(c.ordem_saida))}
-                  />
-                </li>
-              ))}
-            </ul>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-lg text-salvia">
+                  <Route className="size-5" aria-hidden />
+                  Corridas sugeridas
+                </h2>
+                <span className="text-sm text-tinta-2">
+                  {corridas.length} {corridas.length === 1 ? 'corrida' : 'corridas'}
+                </span>
+              </div>
+              <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                {corridas.map((c) => (
+                  <li key={c.ordem_saida}>
+                    <CorridaSugeridaCard
+                      sugestao={c}
+                      motoboys={motoboys.data ?? []}
+                      aoAceitar={() => setAceitas((atual) => new Set(atual).add(c.ordem_saida))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {semLocalizacao.length > 0 && (

@@ -75,19 +75,22 @@ function Formulario({ aoFechar }: { aoFechar: () => void }) {
           ? 'Nenhum bairro informado.'
           : `${bairros.length} ${bairros.length === 1 ? 'bairro' : 'bairros'} para criar.`}
       </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Taxa cobrada do cliente">
-          <MoneyInput value={taxa} onChange={setTaxa} />
-        </Field>
-        <Field label="Valor pago ao motoboy">
-          <MoneyInput value={valorMotoboy} onChange={setValorMotoboy} />
-        </Field>
-        <Field label="Pedido mínimo (opcional)">
-          <MoneyInput value={minimo} onChange={setMinimo} />
-        </Field>
-        <Field label="Frete grátis acima de (opcional)">
-          <MoneyInput value={freteGratis} onChange={setFreteGratis} />
-        </Field>
+      <div className="flex flex-col gap-4 border-t border-linha pt-4">
+        <p className="text-sm font-medium text-tinta">Valores aplicados a cada bairro</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Taxa cobrada do cliente">
+            <MoneyInput value={taxa} onChange={setTaxa} />
+          </Field>
+          <Field label="Valor pago ao motoboy">
+            <MoneyInput value={valorMotoboy} onChange={setValorMotoboy} />
+          </Field>
+          <Field label="Pedido mínimo (opcional)">
+            <MoneyInput value={minimo} onChange={setMinimo} />
+          </Field>
+          <Field label="Frete grátis acima de (opcional)">
+            <MoneyInput value={freteGratis} onChange={setFreteGratis} />
+          </Field>
+        </div>
       </div>
       {erro && <Banner tom="erro">{erro}</Banner>}
       <div className="flex flex-wrap gap-2">

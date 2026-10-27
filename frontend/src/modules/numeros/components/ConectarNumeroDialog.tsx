@@ -5,6 +5,7 @@
 // Segredo: o `codigo` e sensivel (SEC-020) -> autoComplete off, nunca persistido nem exibido
 // de volta; o token nunca aparece nesta tela.
 import { useEffect, useState } from 'react'
+import { Info, ShieldCheck } from 'lucide-react'
 import { Banner, Button, Dialog, Field, Input } from '@/shared/ui'
 
 export type ModoConexao = 'conectar' | 'reconectar'
@@ -72,11 +73,14 @@ export function ConectarNumeroDialog({
           enviar()
         }}
       >
-        <p className="text-sm text-tinta-2">
-          {reconectar
-            ? 'Cole o novo código do cadastro da Meta para renovar a conexão deste número. O número e os identificadores continuam os mesmos.'
-            : 'A conexão é pela Meta (WhatsApp Cloud API), por credenciais e sem QR. Conclua o cadastro no painel da Meta e cole aqui o código e os identificadores.'}
-        </p>
+        <div className="flex items-start gap-2.5 rounded-input border border-linha bg-papel-2 px-3.5 py-3 text-sm text-tinta-2">
+          <Info strokeWidth={1.75} className="mt-0.5 size-4 flex-none text-salvia" aria-hidden />
+          <p>
+            {reconectar
+              ? 'Cole o novo código do cadastro da Meta para renovar a conexão deste número. O número e os identificadores continuam os mesmos.'
+              : 'A conexão é pela Meta (WhatsApp Cloud API), por credenciais e sem QR. Conclua o cadastro no painel da Meta e cole aqui o código e os identificadores.'}
+          </p>
+        </div>
 
         <Field label="Código da Meta" dica="Código gerado ao concluir o cadastro no painel da Meta. É usado uma vez e nunca fica guardado.">
           <Input
@@ -121,6 +125,11 @@ export function ConectarNumeroDialog({
         )}
 
         {erro && <Banner tom="erro">{erro}</Banner>}
+
+        <p className="flex items-start gap-2 text-xs text-tinta-2">
+          <ShieldCheck strokeWidth={1.75} className="mt-0.5 size-3.5 flex-none" aria-hidden />
+          O código é usado uma vez para fazer a conexão e nunca fica guardado.
+        </p>
 
         {/* Submit implicito pelo Enter dentro do form; o botao visivel fica no rodape do Dialog. */}
         <button type="submit" className="hidden" aria-hidden tabIndex={-1} />

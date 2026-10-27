@@ -124,9 +124,15 @@ export default function Numeros() {
       {lista.isPending && (
         <div className="grid gap-4 md:grid-cols-2" aria-busy="true" aria-label="Carregando números">
           {[0, 1].map((i) => (
-            <div key={i} className="grid gap-3 rounded-card border border-linha bg-cartao p-5">
-              <Skeleton className="h-10 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
+            <div key={i} className="flex flex-col gap-4 rounded-card border border-linha bg-cartao p-5">
+              <div className="flex items-start gap-3">
+                <Skeleton className="size-10 flex-none rounded-full" />
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+              </div>
+              <Skeleton className="h-px w-full" />
               <Skeleton className="h-9 w-full" />
             </div>
           ))}

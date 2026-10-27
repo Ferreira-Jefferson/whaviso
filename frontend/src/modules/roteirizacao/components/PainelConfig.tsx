@@ -94,9 +94,10 @@ function Formulario({ config }: { config: Config }) {
           enviar()
         }}
       >
-        <fieldset className="flex flex-col gap-4">
-          <legend className="mb-1 text-lg text-salvia">Preparo</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <fieldset>
+          <legend className="font-display text-lg text-salvia">Preparo</legend>
+          <p className="mt-1 text-sm text-tinta-2">Quanto tempo cada pedido leva para ficar pronto.</p>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Preparo base (min)" dica="Tempo mínimo para qualquer pedido ficar pronto, contado a partir da criação.">
               <Input value={preparoBase} onChange={(e) => setPreparoBase(e.target.value)} {...numerico} />
             </Field>
@@ -106,9 +107,10 @@ function Formulario({ config }: { config: Config }) {
           </div>
         </fieldset>
 
-        <fieldset className="flex flex-col gap-4">
-          <legend className="mb-1 text-lg text-salvia">Corridas</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <fieldset>
+          <legend className="font-display text-lg text-salvia">Corridas</legend>
+          <p className="mt-1 text-sm text-tinta-2">Como os pedidos prontos são agrupados numa mesma saída.</p>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label="Máximo de pedidos" dica="Quantos pedidos cabem numa mesma corrida (1 a 10).">
               <Input value={maxPedidos} onChange={(e) => setMaxPedidos(e.target.value)} {...numerico} />
             </Field>
@@ -119,7 +121,7 @@ function Formulario({ config }: { config: Config }) {
               <Input value={desvio} onChange={(e) => setDesvio(e.target.value)} {...numerico} />
             </Field>
           </div>
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-tinta">
+          <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-sm text-tinta">
             <input
               type="checkbox"
               checked={volta}
@@ -130,9 +132,10 @@ function Formulario({ config }: { config: Config }) {
           </label>
         </fieldset>
 
-        <fieldset className="flex flex-col gap-4">
-          <legend className="mb-1 text-lg text-salvia">Origem e mapa</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <fieldset>
+          <legend className="font-display text-lg text-salvia">Origem e mapa</legend>
+          <p className="mt-1 text-sm text-tinta-2">De onde as corridas saem e como estimar a rota sem o provedor de mapas.</p>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label="Latitude da loja" dica="Ponto de saída das corridas. Sem origem, usamos o centro das paradas.">
               <Input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="-23.5505" {...numerico} />
             </Field>

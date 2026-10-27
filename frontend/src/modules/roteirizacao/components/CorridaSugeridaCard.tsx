@@ -3,10 +3,10 @@
 // ("Otimizar ordem") e aceitar com um motoboy opcional. Nada e gravado ate o aceite.
 // Depois de ajuste manual os tempos por parada deixam de valer: a tela avisa e esconde.
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Clock, Route } from 'lucide-react'
+import { ArrowDown, ArrowUp, Clock, Info, Route, Store } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { formatarHora } from '@/shared/format'
-import { Badge, Banner, Button, Card, Select, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, Select, cn, useToast } from '@/shared/ui'
 import { useAceitarSugestao, useOtimizarOrdem, type CorridaSugerida, type MotoboyOpcao } from '../api'
 import { formatarDistancia, formatarMinutos } from '../estados'
 
@@ -75,76 +75,94 @@ export function CorridaSugeridaCard({ sugestao, motoboys, aoAceitar }: Props) {
   return (
     <Card className="flex flex-col gap-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <span className="flex flex-wrap items-center gap-2 text-base font-medium text-tinta">
-            Corrida {sugestao.ordem_saida}
-            {sugestao.sem_motoboy && <Badge tom="atencao">Sem motoboy livre</Badge>}
-            {totais.estimado && <Badge tom="neutro">Tempo estimado</Badge>}
-          </span>
-          <span className="flex items-center gap-1 text-xs text-tinta-2">
-            <Clock className="size-3.5" aria-hidden />
-            Saída sugerida às {formatarHora(sugestao.saida_prevista_em)}
-          </span>
-        </div>
-        <span className="tabular flex items-center gap-1.5 text-sm text-tinta-2">
-          <Route className="size-4 text-salvia" aria-hidden />
-          {formatarMinutos(totais.minutos)} · {formatarDistancia(totais.metros)}
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-display text-lg text-tinta">Corrida {sugestao.ordem_saida}</span>
+          {sugestao.sem_motoboy && <Badge tom="atencao">Sem motoboy livre</Badge>}
+          {totais.estimado && <Badge tom="neutro">Tempo estimado</Badge>}
         </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <MetricaChip icone={<Clock className="size-4" aria-hidden />} rotulo="Tempo" valor={formatarMinutos(totais.minutos)} />
+          <MetricaChip icone={<Route className="size-4" aria-hidden />} rotulo="Distância" valor={formatarDistancia(totais.metros)} />
+        </div>
       </div>
 
-      <ol className="flex flex-col divide-y divide-linha rounded-input border border-linha">
+      <ol className="flex flex-col">
+        <li className="flex gap-3">
+          <div className="flex flex-col items-center">
+            <span className="flex size-7 flex-none items-center justify-center rounded-pill bg-salvia text-papel">
+              <Store className="size-3.5" aria-hidden />
+            </span>
+            <span className="w-px flex-1 bg-linha" />
+          </div>
+          <div className="flex-1 pb-5">
+            <span className="block text-sm font-medium text-tinta">Saída da loja</span>
+            <span className="tabular block text-xs text-tinta-2">às {formatarHora(sugestao.saida_prevista_em)}</span>
+          </div>
+        </li>
         {ordem.map((id, i) => {
           const p = porId.get(id)
           if (!p) return null
+          const ultimo = i === ordem.length - 1
           return (
-            <li key={id} className="flex items-center gap-3 px-3 py-2">
-              <span className="tabular flex size-7 flex-none items-center justify-center rounded-pill bg-salvia-claro text-xs font-bold text-salvia">
-                {i + 1}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-medium text-tinta">Pedido {p.codigo}</span>
-                <span className="truncate text-xs text-tinta-2">
-                  {[p.endereco_resumo, p.bairro].filter(Boolean).join(' · ') || 'Endereço não informado'}
+            <li key={id} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <span className="tabular flex size-7 flex-none items-center justify-center rounded-pill bg-salvia-claro text-xs font-bold text-salvia">
+                  {i + 1}
                 </span>
-                <span className="tabular text-xs text-tinta-2">
-                  Pronto às {formatarHora(p.pronto_previsto_em)}
-                  {!alterada && ` · chega em ${formatarMinutos(p.chegada_min)}`}
+                {!ultimo && <span className="w-px flex-1 bg-linha" />}
+              </div>
+              <div className={cn('flex min-w-0 flex-1 items-start gap-3', ultimo ? 'pb-0' : 'pb-5')}>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm font-medium text-tinta">Pedido {p.codigo}</span>
+                  <span className="truncate text-xs text-tinta-2">
+                    {[p.endereco_resumo, p.bairro].filter(Boolean).join(' · ') || 'Endereço não informado'}
+                  </span>
+                  <span className="tabular text-xs text-tinta-2">
+                    Pronto às {formatarHora(p.pronto_previsto_em)}
+                    {!alterada && ` · chega em ${formatarMinutos(p.chegada_min)}`}
+                  </span>
                 </span>
-              </span>
-              <span className="flex flex-none items-center">
-                <BotaoIcone rotulo={`Subir pedido ${p.codigo}`} desabilitado={ocupado || i === 0} aoClicar={() => mover(i, -1)}>
-                  <ArrowUp className="size-4" aria-hidden />
-                </BotaoIcone>
-                <BotaoIcone
-                  rotulo={`Descer pedido ${p.codigo}`}
-                  desabilitado={ocupado || i === ordem.length - 1}
-                  aoClicar={() => mover(i, 1)}
-                >
-                  <ArrowDown className="size-4" aria-hidden />
-                </BotaoIcone>
-              </span>
+                <span className="flex flex-none items-center">
+                  <BotaoIcone rotulo={`Subir pedido ${p.codigo}`} desabilitado={ocupado || i === 0} aoClicar={() => mover(i, -1)}>
+                    <ArrowUp className="size-4" aria-hidden />
+                  </BotaoIcone>
+                  <BotaoIcone
+                    rotulo={`Descer pedido ${p.codigo}`}
+                    desabilitado={ocupado || i === ordem.length - 1}
+                    aoClicar={() => mover(i, 1)}
+                  >
+                    <ArrowDown className="size-4" aria-hidden />
+                  </BotaoIcone>
+                </span>
+              </div>
             </li>
           )
         })}
       </ol>
 
       {alterada && (
-        <p className="text-xs text-tinta-2">
-          A ordem foi ajustada. Os horários de chegada por parada deixam de valer; use Otimizar ordem para
-          recalcular o tempo e a distância totais.
-        </p>
+        <div className="flex items-start gap-2 rounded-input bg-ambar-claro px-3 py-2 text-xs text-ambar">
+          <Info className="mt-0.5 size-4 flex-none" aria-hidden />
+          <span>
+            A ordem foi ajustada, os horários de chegada por parada deixam de valer. Use Otimizar ordem para
+            recalcular o tempo e a distância totais.
+          </span>
+        </div>
       )}
 
-      <Select
-        ariaLabel={`Motoboy da corrida ${sugestao.ordem_saida}`}
-        value={motoboyId}
-        onChange={setMotoboyId}
-        disabled={ocupado}
-        options={[
-          { value: '', label: 'Escolher o motoboy depois' },
-          ...motoboys.map((m) => ({ value: m.id, label: m.nome })),
-        ]}
-      />
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-tinta-2">Motoboy da corrida</span>
+        <Select
+          ariaLabel={`Motoboy da corrida ${sugestao.ordem_saida}`}
+          value={motoboyId}
+          onChange={setMotoboyId}
+          disabled={ocupado}
+          options={[
+            { value: '', label: 'Escolher o motoboy depois' },
+            ...motoboys.map((m) => ({ value: m.id, label: m.nome })),
+          ]}
+        />
+      </div>
 
       {erro && <Banner tom="erro">{erro}</Banner>}
 
@@ -159,6 +177,18 @@ export function CorridaSugeridaCard({ sugestao, motoboys, aoAceitar }: Props) {
         )}
       </div>
     </Card>
+  )
+}
+
+function MetricaChip({ icone, rotulo, valor }: { icone: React.ReactNode; rotulo: string; valor: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-input bg-papel-2 px-3 py-1.5">
+      <span className="text-salvia">{icone}</span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-[11px] uppercase tracking-wide text-tinta-2">{rotulo}</span>
+        <span className="tabular text-sm font-semibold text-tinta">{valor}</span>
+      </span>
+    </span>
   )
 }
 

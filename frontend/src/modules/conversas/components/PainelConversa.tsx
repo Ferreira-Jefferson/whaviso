@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Clock, MoreHorizontal, PackageCheck } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Clock, PackageCheck } from 'lucide-react'
 import type { ConversaDetalheSaida } from '@/shared/contracts/_generated/conversas'
 import { ApiError } from '@/shared/api_client'
 import { cn, ConfirmDialog, ErrorState, Spinner, useToast } from '@/shared/ui'
@@ -108,9 +108,10 @@ export function PainelConversa({ conversaId, aoVoltar, className }: Props) {
               <p className="py-10 text-center text-sm text-tinta-2">Nenhuma mensagem nesta conversa ainda.</p>
             ) : (
               <div className="space-y-1.5">
-                {lista.map((m) => (
-                  <Mensagem key={m.id} mensagem={m} />
-                ))}
+                {lista.map((m, i) => {
+                  const anterior = i > 0 ? lista[i - 1] : undefined
+                  return <Mensagem key={m.id} mensagem={m} mostrarAutor={!anterior || anterior.autor !== m.autor} />
+                })}
               </div>
             )}
           </>
@@ -169,6 +170,15 @@ function Cabecalho({ d, carregando, aoVoltar, aoEncerrar, encerrando }: CabProps
         <ArrowLeft className="size-5" aria-hidden />
       </button>
 
+      {d && (
+        <span
+          aria-hidden
+          className="flex size-9 flex-none items-center justify-center rounded-full bg-salvia-claro text-sm font-bold text-salvia"
+        >
+          {inicial(nome)}
+        </span>
+      )}
+
       <div className="min-w-0 flex-1">
         <p className="truncate font-bold text-tinta">{nome}</p>
         {d && (
@@ -199,7 +209,7 @@ function Cabecalho({ d, carregando, aoVoltar, aoEncerrar, encerrando }: CabProps
           disabled={encerrando}
           className="inline-flex min-h-10 flex-none items-center gap-1.5 rounded-pill border border-linha bg-cartao px-3 text-[13px] font-bold text-tinta-2 hover:bg-papel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia disabled:opacity-60"
         >
-          {encerrando ? <Spinner /> : <MoreHorizontal className="size-4" aria-hidden />}
+          {encerrando ? <Spinner /> : <CircleCheck className="size-4" aria-hidden />}
           Encerrar
         </button>
       )}
@@ -209,4 +219,9 @@ function Cabecalho({ d, carregando, aoVoltar, aoEncerrar, encerrando }: CabProps
       )}
     </header>
   )
+}
+
+function inicial(nome: string): string {
+  const letra = nome.trim().charAt(0)
+  return letra ? letra.toUpperCase() : '?'
 }

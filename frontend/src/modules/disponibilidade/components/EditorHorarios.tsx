@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { Plus, RotateCcw, X } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Button, cn, useToast } from '@/shared/ui'
+import { Badge, Button, Input, cn, useToast } from '@/shared/ui'
 import { useAtualizarHorario, useCriarHorario, useDesativarHorario, type Horario } from '../api'
 import { DIAS_SEMANA, ORDEM_DIAS, rotuloFaixa } from '../estados'
 
@@ -110,51 +110,52 @@ export function EditorHorarios({ itens }: { itens: Horario[] }) {
                   {ativas.map((h) => {
                     const v = valorFaixa(h)
                     const ocupada = idOcupado === h.id
+                    const cruzaMeiaNoite = v.fecha <= v.abre
                     return (
-                      <div key={h.id} className="flex items-center gap-2">
-                        <input
-                          type="time"
-                          value={v.abre}
-                          disabled={ocupada}
-                          onChange={(e) => editarCampo(h, 'abre', e.target.value)}
-                          onBlur={() => salvarFaixa(h)}
-                          aria-label={`${rotulo}: abre`}
-                          className="min-h-11 rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia disabled:opacity-60"
-                        />
-                        <span className="text-sm text-tinta-2" aria-hidden>
-                          às
-                        </span>
-                        <input
-                          type="time"
-                          value={v.fecha}
-                          disabled={ocupada}
-                          onChange={(e) => editarCampo(h, 'fecha', e.target.value)}
-                          onBlur={() => salvarFaixa(h)}
-                          aria-label={`${rotulo}: fecha`}
-                          className="min-h-11 rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia disabled:opacity-60"
-                        />
-                        {v.fecha <= v.abre && (
-                          <span className="text-xs text-tinta-2" title="A faixa termina no dia seguinte">
-                            dia seguinte
+                      <div key={h.id} className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="time"
+                            value={v.abre}
+                            disabled={ocupada}
+                            onChange={(e) => editarCampo(h, 'abre', e.target.value)}
+                            onBlur={() => salvarFaixa(h)}
+                            aria-label={`${rotulo}: abre`}
+                            className="min-h-11 min-w-0 flex-1 px-2.5 tabular-nums [color-scheme:light] sm:w-32 sm:flex-none"
+                          />
+                          <span className="shrink-0 text-sm text-tinta-2" aria-hidden>
+                            às
                           </span>
+                          <Input
+                            type="time"
+                            value={v.fecha}
+                            disabled={ocupada}
+                            onChange={(e) => editarCampo(h, 'fecha', e.target.value)}
+                            onBlur={() => salvarFaixa(h)}
+                            aria-label={`${rotulo}: fecha`}
+                            className="min-h-11 min-w-0 flex-1 px-2.5 tabular-nums [color-scheme:light] sm:w-32 sm:flex-none"
+                          />
+                          <Button
+                            type="button"
+                            variante="ghost"
+                            loading={ocupada && desativar.isPending}
+                            aria-label={`Remover período ${rotuloFaixa(h.abre, h.fecha)} de ${rotulo}`}
+                            onClick={() => remover(h)}
+                            className="min-h-11 shrink-0 px-2"
+                          >
+                            <X strokeWidth={1.75} className="size-4" />
+                          </Button>
+                        </div>
+                        {cruzaMeiaNoite && (
+                          <p className="text-xs text-tinta-2">Termina no dia seguinte.</p>
                         )}
-                        <Button
-                          type="button"
-                          variante="ghost"
-                          loading={ocupada && desativar.isPending}
-                          aria-label={`Remover período ${rotuloFaixa(h.abre, h.fecha)} de ${rotulo}`}
-                          onClick={() => remover(h)}
-                          className="ml-auto min-h-11 px-2"
-                        >
-                          <X strokeWidth={1.75} className="size-4" />
-                        </Button>
                       </div>
                     )
                   })}
 
                   {inativas.map((h) => (
                     <div key={h.id} className="flex items-center gap-2 text-sm text-tinta-2">
-                      <span className="line-through">{rotuloFaixa(h.abre, h.fecha)}</span>
+                      <span className="line-through tabular-nums">{rotuloFaixa(h.abre, h.fecha)}</span>
                       <Button
                         type="button"
                         variante="ghost"

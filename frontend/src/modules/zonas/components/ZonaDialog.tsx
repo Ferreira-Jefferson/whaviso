@@ -205,19 +205,28 @@ function Formulario({ zona, aoFechar }: { zona: Zona | null; aoFechar: () => voi
           </Field>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Taxa cobrada do cliente" dica="Quanto o cliente paga de entrega nesta zona.">
-            <MoneyInput value={taxa} onChange={setTaxa} />
-          </Field>
-          <Field label="Valor pago ao motoboy" dica="Quanto o motoboy recebe por entrega nesta zona.">
-            <MoneyInput value={valorMotoboy} onChange={setValorMotoboy} />
-          </Field>
-          <Field label="Pedido mínimo (opcional)" dica="Deixe vazio para não ter pedido mínimo.">
-            <MoneyInput value={minimo} onChange={setMinimo} />
-          </Field>
-          <Field label="Frete grátis acima de (opcional)" dica="Pedidos a partir deste valor não pagam a taxa. Deixe vazio para não ter frete grátis.">
-            <MoneyInput value={freteGratis} onChange={setFreteGratis} />
-          </Field>
+        <div className="flex flex-col gap-4 border-t border-linha pt-4">
+          <p className="text-sm font-medium text-tinta">Valores desta zona</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Taxa cobrada do cliente" dica="Quanto o cliente paga de entrega nesta zona.">
+              <MoneyInput value={taxa} onChange={setTaxa} />
+            </Field>
+            <Field label="Valor pago ao motoboy" dica="Quanto o motoboy recebe por entrega nesta zona.">
+              <MoneyInput value={valorMotoboy} onChange={setValorMotoboy} />
+            </Field>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 border-t border-linha pt-4">
+          <p className="text-sm font-medium text-tinta">Regras opcionais</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Pedido mínimo (opcional)" dica="Deixe vazio para não ter pedido mínimo.">
+              <MoneyInput value={minimo} onChange={setMinimo} />
+            </Field>
+            <Field label="Frete grátis acima de (opcional)" dica="Pedidos a partir deste valor não pagam a taxa. Deixe vazio para não ter frete grátis.">
+              <MoneyInput value={freteGratis} onChange={setFreteGratis} />
+            </Field>
+          </div>
         </div>
 
         {ehEdicao && zona.pedidos_em_aberto > 0 && (

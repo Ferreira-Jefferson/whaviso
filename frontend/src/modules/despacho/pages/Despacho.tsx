@@ -5,12 +5,12 @@ import { useMemo, useState } from 'react'
 import { Bike, PackageCheck, Route } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import {
+  Badge,
   Banner,
   Button,
   Card,
   EmptyState,
   ErrorState,
-  PageHeader,
   Select,
   Skeleton,
   useToast,
@@ -100,10 +100,23 @@ export default function Despacho() {
 
   return (
     <div>
-      <PageHeader
-        titulo="Despacho"
-        descricao="Pedidos prontos para sair, corridas em montagem e em rota."
-      />
+      <header className="mb-6 border-b border-linha pb-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl text-salvia sm:text-3xl">Despacho</h1>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-tinta-2">
+              <span className="inline-flex items-center gap-1.5 rounded-pill bg-folha/10 px-2 py-0.5 text-xs font-bold text-folha">
+                <span className="relative flex size-1.5" aria-hidden>
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-folha opacity-60" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-folha" />
+                </span>
+                Ao vivo
+              </span>
+              <span>Pedidos prontos para sair, corridas em montagem e em rota. Atualiza sozinho.</span>
+            </p>
+          </div>
+        </div>
+      </header>
 
       {painel.isPending && (
         <div aria-busy="true" aria-label="Carregando despacho" className="flex flex-col gap-3">
@@ -116,17 +129,21 @@ export default function Despacho() {
 
       {painel.isSuccess && (
         <div className="flex flex-col gap-8">
-          <dl className="grid grid-cols-3 gap-3">
+          <dl
+            className="flex items-stretch divide-x divide-linha overflow-hidden rounded-card border border-linha bg-cartao"
+            aria-label="Situação do despacho agora"
+          >
             <Contador icone={<PackageCheck className="size-4" aria-hidden />} rotulo="Prontos" valor={prontos.length} />
-            <Contador icone={<Route className="size-4" aria-hidden />} rotulo="Corridas abertas" valor={corridas.length} />
-            <Contador icone={<Bike className="size-4" aria-hidden />} rotulo="Motoboys ativos" valor={motoboys.length} />
+            <Contador icone={<Route className="size-4" aria-hidden />} rotulo="Corridas" valor={corridas.length} />
+            <Contador icone={<Bike className="size-4" aria-hidden />} rotulo="Motoboys" valor={motoboys.length} />
           </dl>
 
           {erro && <Banner tom="erro">{erro}</Banner>}
 
           <section aria-labelledby="titulo-prontos" className="flex flex-col gap-3">
-            <h2 id="titulo-prontos" className="text-xl text-salvia">
+            <h2 id="titulo-prontos" className="flex items-baseline gap-2 text-xl text-salvia">
               Prontos para sair
+              {prontos.length > 0 && <span className="text-sm font-normal tabular-nums text-tinta-2">{prontos.length}</span>}
             </h2>
 
             {idsSelecionados.length > 0 && (
@@ -200,8 +217,9 @@ export default function Despacho() {
           </section>
 
           <section aria-labelledby="titulo-corridas" className="flex flex-col gap-3">
-            <h2 id="titulo-corridas" className="text-xl text-salvia">
+            <h2 id="titulo-corridas" className="flex items-baseline gap-2 text-xl text-salvia">
               Corridas
+              {corridas.length > 0 && <span className="text-sm font-normal tabular-nums text-tinta-2">{corridas.length}</span>}
             </h2>
             {corridas.length === 0 ? (
               <EmptyState
@@ -221,8 +239,9 @@ export default function Despacho() {
           </section>
 
           <section aria-labelledby="titulo-motoboys" className="flex flex-col gap-3">
-            <h2 id="titulo-motoboys" className="text-xl text-salvia">
+            <h2 id="titulo-motoboys" className="flex items-baseline gap-2 text-xl text-salvia">
               Motoboys
+              {motoboys.length > 0 && <span className="text-sm font-normal tabular-nums text-tinta-2">{motoboys.length}</span>}
             </h2>
             {motoboys.length === 0 ? (
               <EmptyState
@@ -232,24 +251,37 @@ export default function Despacho() {
               />
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {motoboys.map((m) => (
-                  <li key={m.id}>
-                    <Card className="flex items-center justify-between gap-3 p-4">
-                      <span className="flex flex-col">
-                        <span className="text-sm font-medium text-tinta">{m.nome}</span>
-                        <span className="text-xs text-tinta-2">{ROTULO_VEICULO[m.veiculo]}</span>
-                      </span>
-                      <span className="text-right text-xs text-tinta-2">
-                        <span className="tabular block">
-                          {m.corridas_abertas} {m.corridas_abertas === 1 ? 'corrida' : 'corridas'}
+                {motoboys.map((m) => {
+                  const livre = m.corridas_abertas === 0 && m.pedidos_em_aberto === 0
+                  return (
+                    <li key={m.id}>
+                      <Card className="flex items-center gap-3 p-4">
+                        <span
+                          aria-hidden
+                          className="flex size-10 flex-none items-center justify-center rounded-full bg-papel-2 text-sm font-bold text-tinta-2"
+                        >
+                          {inicialMotoboy(m.nome)}
                         </span>
-                        <span className="tabular block">
-                          {m.pedidos_em_aberto} {m.pedidos_em_aberto === 1 ? 'pedido' : 'pedidos'}
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate text-sm font-medium text-tinta">{m.nome}</span>
+                          <span className="text-xs text-tinta-2">{ROTULO_VEICULO[m.veiculo]}</span>
                         </span>
-                      </span>
-                    </Card>
-                  </li>
-                ))}
+                        {livre ? (
+                          <Badge tom="sucesso">Livre</Badge>
+                        ) : (
+                          <span className="flex-none text-right text-xs text-tinta-2">
+                            <span className="tabular block text-tinta">
+                              {m.corridas_abertas} {m.corridas_abertas === 1 ? 'corrida' : 'corridas'}
+                            </span>
+                            <span className="tabular block">
+                              {m.pedidos_em_aberto} {m.pedidos_em_aberto === 1 ? 'pedido' : 'pedidos'}
+                            </span>
+                          </span>
+                        )}
+                      </Card>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
@@ -259,14 +291,20 @@ export default function Despacho() {
   )
 }
 
+/** Primeira letra do nome do motoboy (avatar decorativo); `?` quando vazio. */
+function inicialMotoboy(nome: string): string {
+  const letra = nome.trim().charAt(0)
+  return letra ? letra.toUpperCase() : '?'
+}
+
 function Contador({ icone, rotulo, valor }: { icone: React.ReactNode; rotulo: string; valor: number }) {
   return (
-    <Card className="flex flex-col gap-1 p-4">
-      <dt className="flex items-center gap-1.5 text-xs text-tinta-2 sm:text-sm">
+    <div className="flex flex-1 flex-col gap-1.5 px-4 py-3 sm:px-5">
+      <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-tinta-2">
         <span className="text-salvia">{icone}</span>
         {rotulo}
       </dt>
-      <dd className="tabular text-2xl text-salvia">{valor}</dd>
-    </Card>
+      <dd className="font-display text-[26px] font-semibold leading-none tabular-nums text-tinta">{valor}</dd>
+    </div>
   )
 }

@@ -17,7 +17,7 @@ function formatar(texto: string): ReactNode {
 }
 
 /** Uma bolha de mensagem. O autor define o lado e a cor; sistema fica centralizado e discreto. */
-export function Mensagem({ mensagem }: { mensagem: MensagemSaida }) {
+export function Mensagem({ mensagem, mostrarAutor = true }: { mensagem: MensagemSaida; mostrarAutor?: boolean }) {
   const { texto, placeholder } = conteudoExibido(mensagem)
   const lado = ladoDaBolha(mensagem.autor)
   const hora = formatarHora(mensagem.criado_em)
@@ -47,7 +47,7 @@ export function Mensagem({ mensagem }: { mensagem: MensagemSaida }) {
             : 'rounded-tl-sm border border-linha bg-cartao text-tinta',
         )}
       >
-        {direita && (
+        {direita && mostrarAutor && (
           <p className={cn('mb-0.5 text-[11px] font-bold', humano ? 'text-papel/80' : 'text-salvia')}>
             {ROTULO_AUTOR[mensagem.autor]}
           </p>
