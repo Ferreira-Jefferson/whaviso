@@ -27,9 +27,9 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | F2  | clientes-externos | Interfaces `ClienteWhats`/`ClienteLLM`/`ClienteMapas` (contratos + stubs) | F1 | Sonnet | 00-fundacao/clientes-externos.md | CONCLUIDO |
 | F3  | tenant-auth | JWT/JWKS local, escopo de loja (membros) e de operador | F0, F1 | Opus | 00-fundacao/tenant-auth.md | CONCLUIDO (revisao Opus ok) |
 | F4  | api-core | server/app/routes registry, http_errors, config, logger, fronteira `shared/db` | F0, F1, F3 | Sonnet | 00-fundacao/api-core.md | CONCLUIDO |
-| F5  | realtime-sse | SSE na api sobre `LISTEN/NOTIFY` do Postgres | F4 | Sonnet | 00-fundacao/realtime-sse.md | EM ANDAMENTO (agente) |
+| F5  | realtime-sse | SSE na api sobre `LISTEN/NOTIFY` do Postgres | F4 | Sonnet | 00-fundacao/realtime-sse.md | CONCLUIDO |
 | F6  | front-shell | SPA shell, api_client, auth (login), `_generated`, ui kit, tenant/branding, realtime client | F1, F4 | Sonnet | 00-fundacao/front-shell.md | EM ANDAMENTO (agente) |
-| F7  | seguranca-harness | Suíte `security/`, helpers `SET ROLE`, redaction, cobertura RLS no CI | F0, F4 | Opus | seguranca/harness.md | A FAZER (após F5, para não disputar whaviso_dev em paralelo) |
+| F7  | seguranca-harness | Suíte `security/`, helpers `SET ROLE`, redaction, cobertura RLS no CI | F0, F4 | Opus | seguranca/harness.md | EM ANDAMENTO (agente) |
 
 ## Onda 1: Núcleo do pedido (loop ponta a ponta, fluxo hardcoded, sem LLM)
 
