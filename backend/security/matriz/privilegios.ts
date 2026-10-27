@@ -31,9 +31,12 @@ export interface LinhaMatriz {
 // ---------------------------------------------------------------------------------------------
 export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }>> = {
   assinaturas: { apiDelete: 'negado' },
+  avaliacoes: { apiDelete: 'negado' },
   base_conhecimento: { apiDelete: 'negado' },
   cache_semantico: { apiDelete: 'negado' },
   caixas: { apiDelete: 'negado' },
+  campanha_envios: { apiDelete: 'negado' },
+  campanhas: { apiDelete: 'negado' },
   cargos: { apiDelete: 'negado' },
   categoria_grupos: { apiDelete: 'negado' },
   categorias: { apiDelete: 'negado' },

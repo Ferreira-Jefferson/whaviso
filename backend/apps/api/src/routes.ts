@@ -26,6 +26,10 @@ import { configuracoesLlmRoutes } from './modules/configuracoes_llm'
 import { plataformaClientesRoutes } from './modules/plataforma_clientes'
 import { cobrancaRoutes } from './modules/plataforma_cobranca'
 import { plataformaFunilRoutes } from './modules/plataforma_funil'
+import { plataformaPainelRoutes } from './modules/plataforma_painel'
+import { despachoRoutes } from './modules/despacho'
+import { avaliacoesRoutes } from './modules/avaliacoes'
+import { campanhasRoutes } from './modules/campanhas'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -60,6 +64,10 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'plataforma-clientes', plugin: plataformaClientesRoutes },
   { prefixo: 'plataforma-cobranca', plugin: cobrancaRoutes },
   { prefixo: 'plataforma-funil', plugin: plataformaFunilRoutes },
+  { prefixo: 'plataforma-painel', plugin: plataformaPainelRoutes },
+  { prefixo: 'despacho', plugin: despachoRoutes },
+  { prefixo: 'avaliacoes', plugin: avaliacoesRoutes },
+  { prefixo: 'campanhas', plugin: campanhasRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/

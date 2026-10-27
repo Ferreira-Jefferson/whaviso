@@ -1,7 +1,9 @@
 {
   "gerado_de": "backend/packages/shared/src/contracts",
   "arquivos": [
+    "avaliacoes.ts",
     "caixa.ts",
+    "campanhas.ts",
     "cardapio.ts",
     "clientes.ts",
     "configuracoes_llm.ts",
@@ -9,6 +11,7 @@
     "conversas.ts",
     "crm.ts",
     "dashboard.ts",
+    "despacho.ts",
     "disponibilidade.ts",
     "enums.ts",
     "estoque_insumos.ts",
@@ -27,10 +30,11 @@
     "plataforma_clientes.ts",
     "plataforma_cobranca.ts",
     "plataforma_funil.ts",
+    "plataforma_painel.ts",
     "primitivos.ts",
     "salao.ts",
     "sessao.ts",
     "zonas_entrega.ts"
   ],
-  "hash": "56efa135624209677ece88c90e39c100c7c88cc549d19b919910ec204d62ace5"
+  "hash": "41bb1c45118e50336d5f3aefcc8a9d5aecb388a88e422621fa8cbf88f6ba79fa"
 }
