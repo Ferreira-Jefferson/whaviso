@@ -33,9 +33,13 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   assinaturas: { apiDelete: 'negado' },
   base_conhecimento: { apiDelete: 'negado' },
   cache_semantico: { apiDelete: 'negado' },
+  caixas: { apiDelete: 'negado' },
+  cargos: { apiDelete: 'negado' },
   categoria_grupos: { apiDelete: 'negado' },
   categorias: { apiDelete: 'negado' },
   clientes: { apiDelete: 'negado' },
+  comanda_itens: { apiDelete: 'negado' },
+  comandas: { apiDelete: 'negado' },
   contas: { apiDelete: 'negado' },
   conversas: { apiDelete: 'negado' },
   convites: { apiDelete: 'negado' },
@@ -43,26 +47,37 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   credenciais_llm: { apiDelete: 'negado' },
   enderecos: { apiDelete: 'negado' },
   envios: { apiDelete: 'negado' },
+  escalas: { apiDelete: 'negado' },
   eventos: { apiDelete: 'negado' },
   eventos_auth: { apiDelete: 'negado' },
+  excecoes_disponibilidade: { apiDelete: 'negado' },
   faturas: { apiDelete: 'negado' },
   fechamentos: { apiDelete: 'negado' },
+  fichas_tecnicas: { apiDelete: 'negado' },
   grupos_opcoes: { apiDelete: 'negado' },
+  horarios_funcionamento: { apiDelete: 'negado' },
+  insumos: { apiDelete: 'negado' },
   item_grupos: { apiDelete: 'negado' },
   itens: { apiDelete: 'negado' },
   itens_pedido: { apiDelete: 'negado' },
   itens_pedido_opcoes: { apiDelete: 'negado' },
+  janela_atendente: { apiDelete: 'negado' },
   loja_pix: { apiDelete: 'negado' },
   lojas: { apiDelete: 'negado' },
   membros: { apiDelete: 'negado' },
   mensagens: { apiDelete: 'negado' },
+  mesas: { apiDelete: 'negado' },
   motoboy_lancamentos: { apiDelete: 'negado' },
   motoboys: { apiDelete: 'negado' },
+  movimentos_caixa: { apiDelete: 'negado' },
+  movimentos_insumo: { apiDelete: 'negado' },
+  movimentos_item_estoque: { apiDelete: 'negado' },
   numeros_whatsapp: { apiDelete: 'negado' },
   opcoes: { apiDelete: 'negado' },
   operadores: { apiDelete: 'negado' },
   pagamentos: { apiDelete: 'negado' },
   pedidos: { apiDelete: 'negado' },
+  pessoas: { apiDelete: 'negado' },
   prospecto_atividades: { apiDelete: 'negado' },
   prospectos: { apiDelete: 'negado' },
   // Unica excecao documentada (SEC-030): templates e configuracao, nao auditoria.
@@ -167,6 +182,70 @@ export const CASOS_ESPECIFICOS: readonly LinhaMatriz[] = [
   { role: 'whaviso_atendente', tabela: 'mensagens', coluna: 'processada_em', operacao: 'update', esperado: 'permitido', sec: 'SEC-033', nota: 'claim do inbound (0015)' },
   { role: 'whaviso_atendente', tabela: 'mensagens', coluna: 'conteudo', operacao: 'update', esperado: 'negado', sec: 'SEC-033', nota: 'conteudo imutavel' },
   { role: 'whaviso_atendente', tabela: 'mensagens', operacao: 'delete', esperado: 'negado', sec: 'SEC-030' },
+
+  // estoque_itens (0023): api e dona do painel; atendente decrementa na venda (UPDATE so de
+  // quantidade_disponivel em itens + append no diario). Diario append-only (trigger).
+  { role: 'whaviso_api', tabela: 'movimentos_item_estoque', operacao: 'insert', esperado: 'permitido', sec: 'SEC-033' },
+  { role: 'whaviso_api', tabela: 'movimentos_item_estoque', operacao: 'select', esperado: 'permitido', sec: 'SEC-033' },
+  { role: 'whaviso_api', tabela: 'movimentos_item_estoque', coluna: 'motivo', operacao: 'update', esperado: 'negado', sec: 'SEC-033', nota: 'diario append-only' },
+  { role: 'whaviso_atendente', tabela: 'movimentos_item_estoque', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'decremento da venda' },
+  { role: 'whaviso_atendente', tabela: 'movimentos_item_estoque', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'idempotencia da venda' },
+  { role: 'whaviso_atendente', tabela: 'movimentos_item_estoque', operacao: 'delete', esperado: 'negado', sec: 'SEC-030' },
+  { role: 'whaviso_atendente', tabela: 'itens', coluna: 'quantidade_disponivel', operacao: 'update', esperado: 'permitido', sec: 'SEC-032', nota: 'venda decrementa a contagem' },
+  { role: 'whaviso_atendente', tabela: 'itens', coluna: 'nome', operacao: 'update', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so escreve quantidade_disponivel em itens' },
+
+  // disponibilidade (0024): api e dona do cadastro; atendente LE as tres para decidir atendimento; zap nao toca.
+  { role: 'whaviso_api', tabela: 'horarios_funcionamento', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'api dona do cadastro' },
+  { role: 'whaviso_api', tabela: 'janela_atendente', operacao: 'update', esperado: 'permitido', sec: 'SEC-032', nota: 'api dona do cadastro' },
+  { role: 'whaviso_api', tabela: 'excecoes_disponibilidade', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'api dona do cadastro' },
+  { role: 'whaviso_atendente', tabela: 'horarios_funcionamento', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le horario para decidir atendimento' },
+  { role: 'whaviso_atendente', tabela: 'janela_atendente', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le a janela de resposta' },
+  { role: 'whaviso_atendente', tabela: 'excecoes_disponibilidade', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le feriados/excecoes' },
+  { role: 'whaviso_atendente', tabela: 'horarios_funcionamento', operacao: 'insert', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so le' },
+  { role: 'whaviso_atendente', tabela: 'janela_atendente', operacao: 'update', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so le' },
+  { role: 'whaviso_zap', tabela: 'horarios_funcionamento', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'zap nao toca disponibilidade' },
+  { role: 'whaviso_zap', tabela: 'excecoes_disponibilidade', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'zap nao toca disponibilidade' },
+
+  // estoque_insumos (0026): api dona do cadastro; atendente consome na venda (le insumo, UPDATE so
+  // quantidade_atual, append no movimento). movimentos_insumo append-only (trigger).
+  { role: 'whaviso_api', tabela: 'insumos', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'cadastro de insumo' },
+  { role: 'whaviso_api', tabela: 'insumos', coluna: 'quantidade_atual', operacao: 'update', esperado: 'permitido', sec: 'SEC-032' },
+  { role: 'whaviso_api', tabela: 'movimentos_insumo', operacao: 'insert', esperado: 'permitido', sec: 'SEC-033', nota: 'append do movimento' },
+  { role: 'whaviso_api', tabela: 'movimentos_insumo', coluna: 'quantidade', operacao: 'update', esperado: 'negado', sec: 'SEC-033', nota: 'movimento imutavel' },
+  { role: 'whaviso_atendente', tabela: 'insumos', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le saldo p/ consumir' },
+  { role: 'whaviso_atendente', tabela: 'insumos', coluna: 'quantidade_atual', operacao: 'update', esperado: 'permitido', sec: 'SEC-032', nota: 'baixa de insumo por venda' },
+  { role: 'whaviso_atendente', tabela: 'insumos', coluna: 'nome', operacao: 'update', esperado: 'negado', sec: 'SEC-032', nota: 'atendente nao edita cadastro' },
+  { role: 'whaviso_atendente', tabela: 'insumos', operacao: 'insert', esperado: 'negado', sec: 'SEC-032', nota: 'atendente nao cria insumo' },
+  { role: 'whaviso_atendente', tabela: 'movimentos_insumo', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'enfileira o consumo' },
+  { role: 'whaviso_atendente', tabela: 'movimentos_insumo', operacao: 'delete', esperado: 'negado', sec: 'SEC-030' },
+  { role: 'whaviso_zap', tabela: 'insumos', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'zap nao toca estoque' },
+
+  // ficha_tecnica (0027): api e dona da ficha; atendente so le para dar baixa na venda.
+  { role: 'whaviso_api', tabela: 'fichas_tecnicas', operacao: 'insert', esperado: 'permitido', sec: 'SEC-030', nota: 'api e dona da ficha' },
+  { role: 'whaviso_atendente', tabela: 'fichas_tecnicas', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le a ficha p/ baixa na venda' },
+  { role: 'whaviso_atendente', tabela: 'fichas_tecnicas', operacao: 'insert', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so le' },
+  { role: 'whaviso_atendente', tabela: 'fichas_tecnicas', operacao: 'update', esperado: 'negado', sec: 'SEC-032' },
+
+  // caixa (0028): api abre/fecha a sessao (UPDATE em caixas) e so faz append em movimentos_caixa
+  // (append-only via ausencia de grant de UPDATE, igual a pagamentos; sem trigger).
+  { role: 'whaviso_api', tabela: 'caixas', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'abre a sessao' },
+  { role: 'whaviso_api', tabela: 'caixas', coluna: 'status', operacao: 'update', esperado: 'permitido', sec: 'SEC-032', nota: 'fecha a sessao' },
+  { role: 'whaviso_api', tabela: 'movimentos_caixa', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'lancamento do caixa' },
+  { role: 'whaviso_api', tabela: 'movimentos_caixa', coluna: 'valor_centavos', operacao: 'update', esperado: 'negado', sec: 'SEC-033', nota: 'movimento e append-only' },
+
+  // salao (0029): api e dona das mesas e comandas (SELECT/INSERT/UPDATE, sem DELETE).
+  { role: 'whaviso_api', tabela: 'mesas', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'salao' },
+  { role: 'whaviso_api', tabela: 'mesas', operacao: 'update', esperado: 'permitido', sec: 'SEC-032' },
+  { role: 'whaviso_api', tabela: 'comandas', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032' },
+  { role: 'whaviso_api', tabela: 'comandas', operacao: 'update', esperado: 'permitido', sec: 'SEC-032' },
+  { role: 'whaviso_api', tabela: 'comanda_itens', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032' },
+
+  // pessoas (0025): cadastro de quem trabalha a favor da loja (nao so CLT); cargo = funcao, motoboy
+  // fixo. api e dona; atendente nao gere equipe.
+  { role: 'whaviso_api', tabela: 'cargos', operacao: 'insert', esperado: 'permitido', sec: 'SEC-030' },
+  { role: 'whaviso_api', tabela: 'pessoas', operacao: 'insert', esperado: 'permitido', sec: 'SEC-030' },
+  { role: 'whaviso_api', tabela: 'escalas', operacao: 'insert', esperado: 'permitido', sec: 'SEC-030' },
+  { role: 'whaviso_atendente', tabela: 'pessoas', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'atendente nao gere equipe' },
 ] as const
 
 /** Tabelas (append-only) cujo UPDATE deve ser barrado pelo TRIGGER mesmo para o dono da tabela. */
@@ -174,6 +253,8 @@ export const TABELAS_APPEND_ONLY: readonly string[] = [
   'eventos',
   'eventos_auth',
   'motoboy_lancamentos',
+  'movimentos_insumo',
+  'movimentos_item_estoque',
   'uso_llm',
 ]
 

@@ -10,6 +10,13 @@ import { cardapioRoutes } from './modules/cardapio'
 import { clientesRoutes } from './modules/clientes'
 import { conversasRoutes } from './modules/conversas'
 import { pedidosRoutes } from './modules/pedidos'
+import { estoqueItensRoutes } from './modules/estoque_itens'
+import { disponibilidadeRoutes } from './modules/disponibilidade'
+import { pessoasRoutes } from './modules/pessoas'
+import { estoqueInsumosRoutes } from './modules/estoque_insumos'
+import { fichaTecnicaRoutes } from './modules/ficha_tecnica'
+import { caixaRoutes } from './modules/caixa'
+import { salaoRoutes } from './modules/salao'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -26,6 +33,14 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'clientes', plugin: clientesRoutes },
   { prefixo: 'conversas', plugin: conversasRoutes },
   { prefixo: 'pedidos', plugin: pedidosRoutes },
+  // Onda 2 (gestao do restaurante). Um prefixo por modulo.
+  { prefixo: 'estoque-itens', plugin: estoqueItensRoutes },
+  { prefixo: 'disponibilidade', plugin: disponibilidadeRoutes },
+  { prefixo: 'pessoas', plugin: pessoasRoutes },
+  { prefixo: 'estoque-insumos', plugin: estoqueInsumosRoutes },
+  { prefixo: 'ficha-tecnica', plugin: fichaTecnicaRoutes },
+  { prefixo: 'caixa', plugin: caixaRoutes },
+  { prefixo: 'salao', plugin: salaoRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/
