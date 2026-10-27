@@ -31,6 +31,17 @@ import { despachoRoutes } from './modules/despacho'
 import { avaliacoesRoutes } from './modules/avaliacoes'
 import { campanhasRoutes } from './modules/campanhas'
 import { cardapioImportacaoRoutes } from './modules/cardapio_importacao'
+import { conhecimentoRoutes } from './modules/conhecimento'
+import { onboardingRoutes } from './modules/onboarding'
+import { agendamentoRoutes } from './modules/agendamento'
+import { promocoesRoutes } from './modules/promocoes'
+import { fidelidadeRoutes } from './modules/fidelidade'
+import { relatoriosRoutes } from './modules/relatorios'
+import { custosRoutes } from './modules/custos'
+import { roteirizacaoRoutes } from './modules/roteirizacao'
+import { fluxoRoutes } from './modules/fluxo'
+import { canaisRoutes } from './modules/canais'
+import { fiscalRoutes } from './modules/fiscal'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -70,6 +81,18 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'avaliacoes', plugin: avaliacoesRoutes },
   { prefixo: 'campanhas', plugin: campanhasRoutes },
   { prefixo: 'cardapio-importacao', plugin: cardapioImportacaoRoutes },
+  { prefixo: 'conhecimento', plugin: conhecimentoRoutes },
+  // Onda 3/4/5: entrega avancada, retencao, plataforma e builder.
+  { prefixo: 'onboarding', plugin: onboardingRoutes },
+  { prefixo: 'agendamento', plugin: agendamentoRoutes },
+  { prefixo: 'promocoes', plugin: promocoesRoutes },
+  { prefixo: 'fidelidade', plugin: fidelidadeRoutes },
+  { prefixo: 'relatorios', plugin: relatoriosRoutes },
+  { prefixo: 'custos', plugin: custosRoutes },
+  { prefixo: 'roteirizacao', plugin: roteirizacaoRoutes },
+  { prefixo: 'fluxo', plugin: fluxoRoutes },
+  { prefixo: 'canais', plugin: canaisRoutes },
+  { prefixo: 'fiscal', plugin: fiscalRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/

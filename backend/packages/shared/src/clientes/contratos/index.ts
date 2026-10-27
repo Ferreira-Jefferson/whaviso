@@ -2,3 +2,5 @@
 export * from './whats'
 export * from './llm'
 export * from './mapas'
+export * from './canais'
+export * from './fiscal'
