@@ -49,10 +49,24 @@ O plano aqui **executa** aquilo. Se o plano divergir do produto, aquilo vence (o
 
 ## Front-end: design primeiro, código depois
 
-Para qualquer tela, **primeiro criar um artifact visual** (bonito, organizado, com desktop e mobile
-claros), guiar-se por ele, e **só então** transpor para o código React. Buscar inspiração em referências
-de design de produto. O artifact é o espelho da qualidade que o código precisa ter: a mesma tela que
-ficou bonita no artifact é a que vai para o código, sem degradar.
+Para qualquer tela, **primeiro produzir um mock visual em HTML standalone**, guiar-se por ele, e **só
+então** transpor para o código React. O objetivo do mock é elevar a qualidade da UI antes de codar; ele
+é o espelho da qualidade que o código precisa ter: a mesma tela que ficou bonita no mock é a que vai
+para o código, sem degradar.
+
+**Não usar a ferramenta de Artifact** (abre um pop-up para o dono, que não vai abrir; o mock é
+ferramenta do agente para si mesmo, não interação com o usuário). Em vez disso:
+
+1. Escrever o mock como um `.html` autocontido (Tailwind via CDN ou CSS inline) em
+   `docs/pivot/mocks/<tela>/` (desktop e mobile claros; estados vazios e de erro).
+2. **Autoverificar renderizando de verdade:** abrir o HTML no Chrome headless (Chrome DevTools MCP /
+   Playwright) e tirar **screenshot em desktop (1280) e mobile (390)**; opcionalmente gerar um PDF da
+   tela. Olhar o resultado, iterar no HTML até ficar bonito, organizado e responsivo. Guardar os PNGs
+   junto do mock como referência.
+3. Buscar inspiração em referências de design de produto antes de começar.
+4. Só depois transpor para React, mantendo o mesmo resultado visual.
+
+O `.html` e os PNGs do mock entram no commit (referência viva da tela), não o pop-up de nenhum artifact.
 
 ## Qual agente para qual tarefa
 

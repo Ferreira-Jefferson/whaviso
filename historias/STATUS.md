@@ -46,7 +46,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | ZAP-webhook | webhook_whatsapp | Inbound -> enfileira; recibos; idempotência `wamid` | F4, API-conversas, API-clientes, ZAP-meta | Opus | backend-zap/webhook_whatsapp.md | A FAZER |
 | ZAP-enviar | enviar | Drena outbox `envios` -> Meta, claim SKIP LOCKED | ZAP-meta | Sonnet | backend-zap/enviar.md | A FAZER |
 | AT-motor-min | motor_fluxo (hardcoded) | Grafo fixo do pedido por botões/regras, sem LLM | API-pedidos, API-cardapio, API-conversas, ZAP-enviar | Opus | backend-atendente/motor_fluxo.md | A FAZER |
-| FR-nucleo | telas do núcleo | Lojas, números, cardápio, pedidos (kanban), clientes, conversas | F6 + cada API-* da tela; **artifact primeiro** | Sonnet | frontend/nucleo.md | A FAZER |
+| FR-nucleo | telas do núcleo | Lojas, números, cardápio, pedidos (kanban), clientes, conversas | F6 + cada API-* da tela; **mock HTML + autoverificação visual** | Sonnet | frontend/nucleo.md | A FAZER |
 
 ## Onda 2: IA no atendimento
 
@@ -71,7 +71,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | API-motoboys | motoboys + fechamento | Cadastro completo, acerto do dia (auto + manual) | F4, F6 | Sonnet | backend-api/motoboys.md | A FAZER |
 | API-pagamentos | pagamentos | Pix na conversa (BR Code/txid) | F4, API-conversas, API-pedidos | Opus | backend-api/pagamentos.md | A FAZER |
 | API-despacho | despacho (básico) | Atribuir motoboy ao pedido, montar corrida manual | API-pedidos, API-motoboys, API-zonas | Sonnet | backend-api/despacho.md | A FAZER |
-| FR-entrega | telas de entrega | Zonas, motoboys, fechamento, despacho manual | F6 + API-* da área; **artifact primeiro** | Sonnet | frontend/entrega.md | A FAZER |
+| FR-entrega | telas de entrega | Zonas, motoboys, fechamento, despacho manual | F6 + API-* da área; **mock HTML + autoverificação visual** | Sonnet | frontend/entrega.md | A FAZER |
 
 ## Onda 4: Negócio da loja e da plataforma
 
@@ -83,7 +83,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | P-cobranca | plataforma_cobranca | Assinatura/faturas restaurante -> Whaviso | F4, F3 | Opus | plataforma/cobranca.md | A FAZER |
 | P-funil | plataforma_funil | CRM de aquisição (prospectos, atividades) | F4, F3 | Sonnet | plataforma/funil.md | A FAZER |
 | P-painel | plataforma_painel | Crescimento da base (MRR, churn, lojas ativas) | P-cobranca, P-clientes | Sonnet | plataforma/painel.md | A FAZER |
-| FR-negocio | telas de negócio | Dashboard da loja + console da plataforma | F6 + API/P-*; **artifact primeiro** | Sonnet | frontend/negocio.md | A FAZER |
+| FR-negocio | telas de negócio | Dashboard da loja + console da plataforma | F6 + API/P-*; **mock HTML + autoverificação visual** | Sonnet | frontend/negocio.md | A FAZER |
 
 ## Onda 5: Roteirização e builder
 
@@ -91,7 +91,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 |---|---|---|---|---|---|---|
 | API-roteiriza | despacho (roteirização) | Agrupar pedidos por preparo + proximidade, `ClienteMapas` | API-despacho, F2 (ClienteMapas) | Opus | backend-api/roteirizacao.md | A FAZER |
 | API-fluxo | fluxo (builder) | Editor visual do grafo (NodeContract reservado) | AT-motor-min, F1 | Opus | backend-api/fluxo.md | A FAZER |
-| FR-avancado | telas avançadas | Mapa de despacho + editor de fluxo | F6 + API-*; **artifact primeiro** | Sonnet | frontend/avancado.md | A FAZER |
+| FR-avancado | telas avançadas | Mapa de despacho + editor de fluxo | F6 + API-*; **mock HTML + autoverificação visual** | Sonnet | frontend/avancado.md | A FAZER |
 
 ## Transversal: Segurança (acompanha cada superfície)
 
@@ -103,8 +103,10 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 
 ## Notas de coordenação
 
-- **Front sempre com artifact primeiro:** nenhuma tarefa `FR-*` começa pelo código; começa por um
-  artifact visual (desktop + mobile), que vira o espelho do código. Ver [README.md](README.md).
+- **Front sempre com mock HTML primeiro (sem Artifact):** nenhuma tarefa `FR-*` começa pelo código;
+  começa por um mock `.html` standalone em `docs/pivot/mocks/<tela>/`, autoverificado por screenshot
+  real no Chrome headless (desktop 1280 + mobile 390), que vira o espelho do código. Nada de ferramenta
+  de Artifact (abre pop-up para o dono). Ver [README.md](README.md).
 - **RAG e fine-tuning:** o design mora em `docs/pivot/RAG.md` (em produção por um especialista). `AT-rag`
   e `AT-realimentar` só começam quando ele estiver escrito.
 - **Segurança é revisão Opus:** todo módulo que toca segredo (numeros, config-llm, pagamentos, rag,
@@ -185,7 +187,7 @@ remoção do resto é um commit coordenado à parte, nunca no meio de uma onda.
 |---|---|---|---|
 | API-crm | CRM do restaurante sobre o consumidor final: histórico por cliente, RFM, o que compra | 3 | maior diferencial; dep API-pedidos/clientes |
 | API-campanhas | disparo de campanha por WhatsApp (opt-out, template, janela 24h) pela outbox | 4 | dep API-crm, ZAP-enviar |
-| FR-crm | telas de CRM + campanhas (artifact primeiro) | 3 | dep F6, API-crm |
+| FR-crm | telas de CRM + campanhas (mock HTML primeiro) | 3 | dep F6, API-crm |
 | API-onboarding | onboarding guiado, métrica tempo-até-1º-pedido | 1 | 1ª classe |
 | API-zonas (+) | pedido mínimo e frete grátis por zona | 3 | amplia o módulo |
 | API-pedidos/AT (+) | troco, forma de pagamento carimbada, repetir pedido inteiro | 1 | erro operacional real |
