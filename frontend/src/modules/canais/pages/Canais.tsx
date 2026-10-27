@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { Inbox } from 'lucide-react'
 import {
+  Badge,
   Banner,
   EmptyState,
   ErrorState,
@@ -34,18 +35,34 @@ export default function Canais() {
   const pedidos = usePedidosDosCanais()
 
   return (
-    <div>
+    <div className="animate-rise">
       <PageHeader
         titulo="Canais de pedidos"
         descricao="Traga os pedidos do iFood e de outros canais para o mesmo painel."
       />
 
-      <Banner tom="info" className="mb-4">
+      <Banner tom="info" className="mb-5">
         A integração com cada canal está sendo liberada aos poucos. Você já pode guardar a credencial; quando o canal estiver
         disponível, a sincronização passa a funcionar sem novo cadastro.
       </Banner>
 
-      {canais.isPending && <Skeleton className="h-48 w-full" />}
+      {canais.isPending && (
+        <div className="grid gap-4 md:grid-cols-2" aria-busy="true" aria-label="Carregando canais">
+          {[0, 1].map((i) => (
+            <div key={i} className="flex flex-col gap-4 rounded-card border border-linha bg-cartao p-5">
+              <div className="flex items-start gap-3">
+                <Skeleton className="size-10 flex-none rounded-full" />
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-44" />
+                </div>
+              </div>
+              <Skeleton className="h-px w-full" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          ))}
+        </div>
+      )}
       {canais.isError && <ErrorState aoTentarDeNovo={() => void canais.refetch()} />}
       {canais.isSuccess && (
         <div className="grid gap-4 md:grid-cols-2">
@@ -60,19 +77,29 @@ export default function Canais() {
         </div>
       )}
 
-      <h2 className="mb-3 mt-8 text-lg text-salvia">Pedidos importados</h2>
-      {pedidos.isPending && <Skeleton className="h-24 w-full" />}
-      {pedidos.isError && <ErrorState aoTentarDeNovo={() => void pedidos.refetch()} />}
-      {pedidos.isSuccess && pedidos.data.length === 0 && (
-        <EmptyState
-          icone={<Inbox className="size-7" aria-hidden />}
-          titulo="Nenhum pedido importado"
-          descricao="Os pedidos dos canais conectados aparecem aqui depois da sincronização."
-        />
-      )}
-      {pedidos.isSuccess && pedidos.data.length > 0 && (
-        <TableResponsive legenda="Pedidos importados dos canais" colunas={COLUNAS} linhas={pedidos.data} chaveLinha={(p) => `${p.id_externo}`} />
-      )}
+      <section className="mt-10">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-linha pb-2">
+          <h2 className="text-lg text-salvia">Pedidos importados</h2>
+          {pedidos.isSuccess && pedidos.data.length > 0 && <Badge tom="neutro">{pedidos.data.length}</Badge>}
+        </div>
+        {pedidos.isPending && <Skeleton className="h-24 w-full" />}
+        {pedidos.isError && <ErrorState aoTentarDeNovo={() => void pedidos.refetch()} />}
+        {pedidos.isSuccess && pedidos.data.length === 0 && (
+          <EmptyState
+            icone={<Inbox className="size-7" aria-hidden />}
+            titulo="Nenhum pedido importado"
+            descricao="Os pedidos dos canais conectados aparecem aqui depois da sincronização."
+          />
+        )}
+        {pedidos.isSuccess && pedidos.data.length > 0 && (
+          <TableResponsive
+            legenda="Pedidos importados dos canais"
+            colunas={COLUNAS}
+            linhas={pedidos.data}
+            chaveLinha={(p) => `${p.id_externo}`}
+          />
+        )}
+      </section>
 
       <ConectarCanalDialog
         canal={conectando}

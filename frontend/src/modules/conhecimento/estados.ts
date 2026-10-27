@@ -1,4 +1,6 @@
 // Rotulos e tons do modulo conhecimento (so apresentacao).
+import type { LucideIcon } from 'lucide-react'
+import { BookText, HelpCircle, ScrollText, ShieldCheck } from 'lucide-react'
 import type {
   DocumentoOrigem,
   DocumentoStatus,
@@ -13,6 +15,14 @@ export const ROTULO_TIPO: Record<DocumentoTipo, string> = {
   regra: 'Regra',
   faq: 'Pergunta frequente',
   politica: 'Política',
+}
+
+/** Icone por tipo de documento (so apresentacao, ajuda a varrer a lista). */
+export const ICONE_TIPO: Record<DocumentoTipo, LucideIcon> = {
+  descricao: BookText,
+  regra: ScrollText,
+  faq: HelpCircle,
+  politica: ShieldCheck,
 }
 
 export const OPCOES_TIPO = (Object.keys(ROTULO_TIPO) as DocumentoTipo[]).map((value) => ({

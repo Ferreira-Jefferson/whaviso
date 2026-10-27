@@ -6,6 +6,7 @@ import {
   Badge,
   Banner,
   Button,
+  cn,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -22,7 +23,15 @@ import {
   useMudarStatusDocumento,
   type Documento,
 } from '../api'
-import { OPCOES_TIPO, ROTULO_ORIGEM, ROTULO_STATUS, ROTULO_TIPO, TOM_STATUS, mensagemErro } from '../estados'
+import {
+  ICONE_TIPO,
+  OPCOES_TIPO,
+  ROTULO_ORIGEM,
+  ROTULO_STATUS,
+  ROTULO_TIPO,
+  TOM_STATUS,
+  mensagemErro,
+} from '../estados'
 import { DialogDocumento, type ValoresDocumento } from './DialogDocumento'
 import { DialogVersoes } from './DialogVersoes'
 
@@ -144,19 +153,44 @@ export function TabDocumentos() {
         />
       )}
       {lista.isSuccess && lista.data.length > 0 && (
+        <>
+        <p className="text-sm text-tinta-2" aria-live="polite">
+          {lista.data.length} {lista.data.length === 1 ? 'documento' : 'documentos'}
+        </p>
         <ul className="flex flex-col gap-2">
-          {lista.data.map((d) => (
-            <li key={d.id} className="flex flex-col gap-3 rounded-card border border-linha bg-cartao p-4">
+          {lista.data.map((d) => {
+            const Icone = ICONE_TIPO[d.tipo]
+            return (
+            <li
+              key={d.id}
+              className="flex flex-col gap-3 rounded-card border border-linha bg-cartao p-4 shadow-[0_1px_2px_rgba(32,50,42,0.05)] transition-shadow hover:shadow-[0_6px_16px_-8px_rgba(32,50,42,0.18)]"
+            >
               <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="flex size-9 shrink-0 items-center justify-center rounded-input bg-salvia-claro text-salvia"
+                  aria-hidden
+                >
+                  <Icone className="size-[18px]" strokeWidth={1.75} />
+                </span>
                 <h3 className="min-w-0 flex-1 truncate font-display text-base font-semibold text-tinta">{d.titulo}</h3>
                 <Badge tom={TOM_STATUS[d.status]}>{ROTULO_STATUS[d.status]}</Badge>
                 <Badge>{ROTULO_TIPO[d.tipo]}</Badge>
               </div>
               <p className="line-clamp-2 whitespace-pre-line text-sm text-tinta-2">{d.conteudo}</p>
-              <p className="text-xs text-tinta-2">
-                Versão {d.versao} · {ROTULO_ORIGEM[d.origem]} · atualizado em {formatarDataHora(d.atualizado_em)}
-                {d.status === 'aprovado' && (d.chunks_indexados > 0 ? ' · já usado pelo atendente' : ' · aguardando o atendente ler')}
-              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-tinta-2">
+                <span>
+                  Versão {d.versao} · {ROTULO_ORIGEM[d.origem]} · atualizado em {formatarDataHora(d.atualizado_em)}
+                </span>
+                {d.status === 'aprovado' && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className={cn('size-1.5 rounded-full', d.chunks_indexados > 0 ? 'bg-folha' : 'bg-ambar')}
+                      aria-hidden
+                    />
+                    {d.chunks_indexados > 0 ? 'Já usado pelo atendente' : 'Aguardando o atendente ler'}
+                  </span>
+                )}
+              </div>
               {d.duplicado_de && (
                 <Banner tom="info">Outro documento ativo tem o mesmo conteúdo. Considere manter só um.</Banner>
               )}
@@ -179,8 +213,10 @@ export function TabDocumentos() {
                 </Button>
               </div>
             </li>
-          ))}
+            )
+          })}
         </ul>
+        </>
       )}
 
       <DialogDocumento

@@ -1,5 +1,5 @@
 // Resultado da validacao do rascunho: erros bloqueiam a publicacao; avisos nao.
-import { CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Banner } from '@/shared/ui'
 import type { FluxoProblema, FluxoValidacao } from '@/shared/contracts/_generated/fluxo'
 import { ROTULO_PROBLEMA } from '../estados'
@@ -40,9 +40,14 @@ export function PainelValidacao({ resultado }: { resultado: FluxoValidacao }) {
           Fluxo válido. Pode publicar.
         </div>
       ) : (
-        <h3 className="font-display text-base font-semibold text-barro">
-          {resultado.erros.length === 1 ? '1 problema impede a publicação' : `${resultado.erros.length} problemas impedem a publicação`}
-        </h3>
+        <div className="flex items-center gap-2 rounded-input border border-barro/20 bg-barro/10 px-3 py-2.5 text-barro">
+          <AlertTriangle className="size-5 flex-none" aria-hidden />
+          <h3 className="font-display text-base font-semibold">
+            {resultado.erros.length === 1
+              ? '1 problema impede a publicação'
+              : `${resultado.erros.length} problemas impedem a publicação`}
+          </h3>
+        </div>
       )}
       {resultado.erros.length > 0 && <Lista itens={resultado.erros} tom="erro" />}
       {resultado.avisos.length > 0 && (

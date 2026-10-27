@@ -2,9 +2,10 @@
 // Os numeros da regra sao do backend; o "exemplo" abaixo so ilustra a formula documentada
 // (floor, subtotal pago) e nao e fonte de verdade.
 import { useEffect, useState } from 'react'
+import { ArrowRight, Gift } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { brl, formatarDataHora } from '@/shared/format'
-import { Banner, Button, Card, Field, Input, MoneyInput, SegmentedControl, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, Field, Input, MoneyInput, SegmentedControl, cn, useToast } from '@/shared/ui'
 import { ProgramaEntrada } from '@/shared/contracts/_generated/fidelidade'
 import { useSalvarPrograma, type ModoFidelidadeTipo, type Programa, type ProgramaForm as Valores } from '../api'
 import { Alternador } from './Alternador'
@@ -92,10 +93,22 @@ export function ProgramaForm({ programa }: { programa: Programa }) {
         </Banner>
       )}
 
-      <Card className="flex items-center justify-between gap-4">
-        <div>
-          <p className="font-medium text-tinta">Programa ligado</p>
-          <p className="text-sm text-tinta-2">
+      <Card className="flex items-center gap-4">
+        <span
+          aria-hidden
+          className={cn(
+            'flex size-10 flex-none items-center justify-center rounded-pill transition-colors',
+            v.ativo ? 'bg-salvia-claro text-salvia' : 'bg-papel-2 text-tinta-2',
+          )}
+        >
+          <Gift strokeWidth={1.75} className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-tinta">Programa de fidelidade</p>
+            <Badge tom={v.ativo ? 'sucesso' : 'neutro'}>{v.ativo ? 'Ligado' : 'Desligado'}</Badge>
+          </div>
+          <p className="mt-0.5 text-sm text-tinta-2">
             {v.ativo ? 'Clientes acumulam e podem resgatar.' : 'Ninguém acumula nem resgata enquanto estiver desligado.'}
           </p>
         </div>
@@ -109,10 +122,11 @@ export function ProgramaForm({ programa }: { programa: Programa }) {
           </span>
           <SegmentedControl<ModoFidelidadeTipo>
             ariaLabel="Modo do programa"
+            preencher
             value={v.modo}
             onChange={(m) => set('modo', m)}
             options={[
-              { value: 'cashback', label: 'Cashback (crédito em reais)' },
+              { value: 'cashback', label: 'Cashback' },
               { value: 'pontos', label: 'Pontos' },
             ]}
           />
@@ -165,15 +179,21 @@ export function ProgramaForm({ programa }: { programa: Programa }) {
           <PercentInput bps={v.max_resgate_bps} onChange={(b) => set('max_resgate_bps', b)} />
         </Field>
 
-        <p className="rounded-input bg-papel-2 px-3 py-2 text-sm text-tinta-2">
-          Exemplo: um pedido de {brl(exemploBase)} gera{' '}
-          <strong className="text-tinta">
-            {cashback
-              ? `${brl(ganho)} de crédito`
-              : `${ganho} ${ganho === 1 ? 'ponto' : 'pontos'} (valem ${brl(ganho * v.valor_ponto_centavos)})`}
-          </strong>
-          .
-        </p>
+        <div className="rounded-input border border-linha bg-papel-2 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-tinta-2">Prévia do ganho</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-sm text-tinta-2">
+              Pedido de <strong className="tabular text-tinta">{brl(exemploBase)}</strong>
+            </span>
+            <ArrowRight strokeWidth={1.75} className="size-4 flex-none text-tinta-2" aria-hidden />
+            <span className="font-display text-xl font-semibold text-salvia">
+              {cashback ? `${brl(ganho)} de crédito` : `${ganho} ${ganho === 1 ? 'ponto' : 'pontos'}`}
+            </span>
+          </div>
+          {!cashback && (
+            <p className="mt-1 text-xs text-tinta-2">Valem {brl(ganho * v.valor_ponto_centavos)} no resgate.</p>
+          )}
+        </div>
       </Card>
 
       {erroGeral && (

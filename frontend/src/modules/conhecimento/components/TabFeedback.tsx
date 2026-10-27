@@ -78,7 +78,10 @@ export function TabFeedback() {
       {lista.isSuccess && lista.data.length > 0 && (
         <ul className="flex flex-col gap-2">
           {lista.data.map((f) => (
-            <li key={f.id} className="flex flex-col gap-3 rounded-card border border-linha bg-cartao p-4">
+            <li
+              key={f.id}
+              className="flex flex-col gap-3 rounded-card border border-linha bg-cartao p-4 shadow-[0_1px_2px_rgba(32,50,42,0.05)] transition-shadow hover:shadow-[0_6px_16px_-8px_rgba(32,50,42,0.18)]"
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tom="marca">{ROTULO_FEEDBACK_TIPO[f.tipo]}</Badge>
                 <Badge tom={TOM_FEEDBACK[f.status]}>{ROTULO_FEEDBACK_STATUS[f.status]}</Badge>

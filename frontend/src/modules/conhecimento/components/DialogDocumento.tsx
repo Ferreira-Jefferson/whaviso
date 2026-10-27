@@ -2,7 +2,7 @@
 // com o dialog aberto, entao o formulario sempre nasce com o estado inicial certo.
 // Validacao de borda com o contrato Zod; a trava de conteudo estavel e do servidor (422).
 import { useState, type FormEvent } from 'react'
-import { Banner, Button, Dialog, Field, Input, Select } from '@/shared/ui'
+import { Banner, Button, cn, Dialog, Field, Input, Select } from '@/shared/ui'
 import { DocumentoCriar, type DocumentoTipo } from '@/shared/contracts/_generated/conhecimento'
 import { OPCOES_TIPO } from '../estados'
 import { Textarea } from './Textarea'
@@ -72,7 +72,9 @@ function Corpo({ textoSalvar, aviso, inicial, salvando, erro, onSalvar, onFechar
       >
         <Textarea rows={8} value={conteudo} maxLength={4000} onChange={(e) => setConteudo(e.target.value)} />
       </Field>
-      <p className="-mt-2 text-right text-xs text-tinta-2 tabular">{conteudo.length}/4000</p>
+      <p className={cn('-mt-2 text-right text-xs tabular', conteudo.length > 3600 ? 'text-barro' : 'text-tinta-2')}>
+        {conteudo.length}/4000
+      </p>
       {(local ?? erro) && <Banner tom="erro">{local ?? erro}</Banner>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variante="secondary" onClick={onFechar} disabled={salvando}>

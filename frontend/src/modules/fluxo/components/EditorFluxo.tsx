@@ -237,7 +237,7 @@ function Corpo({
               {ativo ? 'Desativar' : 'Ativar'}
             </Button>
           )}
-          <Button variante="ghost" onClick={() => setVersoesAberto(true)}>
+          <Button variante="ghost" className="sm:ml-auto" onClick={() => setVersoesAberto(true)}>
             <History className="size-4" aria-hidden /> Versões
           </Button>
         </div>
@@ -245,8 +245,9 @@ function Corpo({
         {erro && <Banner tom="erro">{erro}</Banner>}
         {validacao && <PainelValidacao resultado={validacao} />}
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 rounded-card border border-linha bg-cartao p-4">
           <span className="text-sm font-medium text-tinta">Etapa inicial</span>
+          <p className="text-xs text-tinta-2">Por onde a conversa começa quando chega uma mensagem nova.</p>
           <Select
             value={grafo.inicial}
             onChange={(v) => editar((g) => ({ ...g, inicial: v }))}
@@ -255,18 +256,26 @@ function Corpo({
               label: `${rotuloNode(n.tipo, catalogo.find((c) => c.tipo === n.tipo)?.rotulo)} (${n.id})`,
             }))}
             ariaLabel="Etapa inicial"
-            className="sm:max-w-sm"
+            className="mt-1 sm:max-w-sm"
           />
         </div>
 
-        <ol className="flex flex-col gap-2">
-          {grafo.nodes.map((n) => (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-base font-semibold text-tinta">Etapas</h2>
+            <span className="text-xs text-tinta-2">
+              {grafo.nodes.length === 1 ? '1 etapa' : `${grafo.nodes.length} etapas`}
+            </span>
+          </div>
+          <ol className="flex flex-col gap-2">
+          {grafo.nodes.map((n, i) => (
             <CartaoNode
               key={n.id}
               node={n}
               grafo={grafo}
               catalogo={catalogo}
               problemas={(validacao?.erros ?? []).concat(validacao?.avisos ?? []).filter((p) => p.node_id === n.id)}
+              indice={i + 1}
               podeEditar
               onTrocarTipo={(tipo) =>
                 editar((g) =>
@@ -291,6 +300,7 @@ function Corpo({
             <Plus className="size-4" aria-hidden /> Adicionar etapa
           </Button>
           {noLimite && <span className="text-xs text-tinta-2">Limite de {FLUXO_LIMITES.nodes} etapas atingido.</span>}
+        </div>
         </div>
       </div>
 

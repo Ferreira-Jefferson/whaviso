@@ -16,8 +16,8 @@ export default function CardapioImportacao() {
         descricao="Transforme a foto ou o PDF do seu cardápio em itens, com revisão antes de publicar."
       />
       <div className="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
-        <div className="flex flex-col gap-4">
-          <h2 className="text-sm font-medium text-tinta-2">Importações</h2>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-tinta-2">Importações</h2>
           <ListaImportacoes selecionada={aberta} aoAbrir={setAberta} />
         </div>
         <div className="flex flex-col gap-6">

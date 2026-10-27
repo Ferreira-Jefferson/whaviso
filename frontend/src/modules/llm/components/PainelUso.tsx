@@ -40,11 +40,7 @@ export function PainelUso({ uso }: { uso: Uso }) {
             {uso.por_dia.map((d) => (
               <li key={d.dia} className="grid grid-cols-[3rem_1fr_5rem] items-center gap-3 text-sm">
                 <span className="tabular text-tinta-2">{diaCurto(d.dia)}</span>
-                <span
-                  role="img"
-                  aria-label={`${diaCurto(d.dia)}: ${nf.format(d.tokens_entrada + d.tokens_saida)} tokens`}
-                  className="h-2.5 rounded-pill bg-papel-2"
-                >
+                <span aria-hidden className="h-2.5 rounded-pill bg-papel-2">
                   <span
                     className="block h-full rounded-pill bg-salvia"
                     style={{ width: `${Math.max(2, (d.custo_estimado_centavos / maximo) * 100)}%` }}

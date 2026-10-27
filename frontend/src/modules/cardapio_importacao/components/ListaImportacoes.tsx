@@ -44,9 +44,11 @@ export function ListaImportacoes({ selecionada, aoAbrir }: Props) {
               onClick={() => aoAbrir(i.id)}
               aria-current={selecionada === i.id || undefined}
               className={cn(
-                'flex w-full items-center gap-3 rounded-card border bg-cartao p-3 text-left transition-colors hover:bg-papel-2',
+                'flex w-full items-center gap-3 rounded-card border p-3 text-left transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia',
-                selecionada === i.id ? 'border-salvia' : 'border-linha',
+                selecionada === i.id
+                  ? 'border-salvia bg-salvia-claro/50'
+                  : 'border-linha bg-cartao hover:bg-papel-2',
               )}
             >
               <Icone strokeWidth={1.75} className="size-5 flex-none text-tinta-2" aria-hidden />

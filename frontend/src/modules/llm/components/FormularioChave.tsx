@@ -79,8 +79,8 @@ export function FormularioChave({
       autoComplete="off"
       className="flex flex-col gap-4 rounded-card border border-linha bg-cartao p-4 sm:p-5"
     >
-      <div className="flex items-start gap-2 text-sm text-tinta-2">
-        <ShieldCheck className="mt-0.5 size-4 flex-none text-salvia" strokeWidth={1.75} aria-hidden />
+      <div className="flex items-start gap-2.5 rounded-input border border-salvia/20 bg-salvia-claro px-3 py-2.5 text-sm text-salvia">
+        <ShieldCheck className="mt-0.5 size-4 flex-none" strokeWidth={1.75} aria-hidden />
         <p>
           A chave é guardada cifrada e nunca é mostrada de novo, nem para você. Ao salvar, ela é conferida no
           provedor antes de ser gravada.

@@ -1,6 +1,7 @@
 // Simulador de cupom: chama POST /promocoes/validar com um codigo e um subtotal e mostra o resultado
 // (desconto e total, ou o motivo da recusa). Nao registra uso nem altera nada.
 import { useState } from 'react'
+import { CheckCircle2, XCircle } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { Banner, Button, Dialog, Field, Input, MoneyInput, MoneyText } from '@/shared/ui'
 import { useValidarCupom, type ResultadoValidacao } from '../api'
@@ -66,13 +67,21 @@ function Formulario({ aoFechar }: { aoFechar: () => void }) {
       {resultado &&
         (resultado.valido ? (
           <Banner tom="sucesso">
-            <span>
-              Cupom válido. Desconto de <MoneyText centavos={resultado.desconto_centavos} />, total de{' '}
-              <MoneyText centavos={resultado.total_centavos} /> (sem entrega).
+            <span className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 size-4 flex-none" aria-hidden />
+              <span>
+                Cupom válido. Desconto de <MoneyText centavos={resultado.desconto_centavos} />, total de{' '}
+                <MoneyText centavos={resultado.total_centavos} /> (sem entrega).
+              </span>
             </span>
           </Banner>
         ) : (
-          <Banner tom="erro">{resultado.motivo ? ROTULO_MOTIVO[resultado.motivo] : 'Cupom não aplicável.'}</Banner>
+          <Banner tom="erro">
+            <span className="flex items-start gap-2">
+              <XCircle className="mt-0.5 size-4 flex-none" aria-hidden />
+              <span>{resultado.motivo ? ROTULO_MOTIVO[resultado.motivo] : 'Cupom não aplicável.'}</span>
+            </span>
+          </Banner>
         ))}
 
       <div className="flex flex-col gap-2 sm:flex-row">

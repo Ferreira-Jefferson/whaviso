@@ -1,7 +1,7 @@
 // Saldo por cliente: busca o cliente (nome ou telefone, mostrado mascarado), mostra o saldo do livro
 // e o extrato (acumulos e resgates). Somente leitura: acumular e resgatar sao do fluxo de pedidos.
 import { useEffect, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Wallet } from 'lucide-react'
 import { formatarDataHora, brl } from '@/shared/format'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Skeleton } from '@/shared/ui'
 import { useBuscaCliente, useMovimentos, useSaldo, type ClienteBusca, type Movimento, type Saldo } from '../api'
@@ -88,9 +88,17 @@ function PainelSaldo({ cliente, aoTrocar }: { cliente: ClienteBusca; aoTrocar: (
   return (
     <div className="flex flex-col gap-4">
       <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-display text-lg font-semibold text-tinta">{cliente.nome ?? 'Cliente sem nome'}</p>
-          <p className="tabular text-sm text-tinta-2">{cliente.telefone_mascarado ?? 'Sem telefone'}</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-10 flex-none items-center justify-center rounded-pill bg-salvia-claro text-sm font-semibold text-salvia"
+          >
+            {(cliente.nome?.trim()?.[0] ?? '?').toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg font-semibold text-tinta">{cliente.nome ?? 'Cliente sem nome'}</p>
+            <p className="tabular text-sm text-tinta-2">{cliente.telefone_mascarado ?? 'Sem telefone'}</p>
+          </div>
         </div>
         <Button variante="secondary" onClick={aoTrocar}>
           Trocar cliente
@@ -100,12 +108,22 @@ function PainelSaldo({ cliente, aoTrocar }: { cliente: ClienteBusca; aoTrocar: (
       {saldo.isPending && <Skeleton className="h-24 w-full" />}
       {saldo.isError && <ErrorState aoTentarDeNovo={() => void saldo.refetch()} />}
       {saldo.isSuccess && (
-        <Card>
-          <p className="text-sm text-tinta-2">Saldo atual</p>
-          <p className="text-3xl font-semibold tabular-nums text-salvia">{unidade(saldo.data.modo, saldo.data.saldo)}</p>
-          {saldo.data.modo === 'pontos' && (
-            <p className="text-xs text-tinta-2">Vale {brl(saldo.data.saldo_centavos)} no resgate.</p>
-          )}
+        <Card className="flex items-center gap-4">
+          <span
+            aria-hidden
+            className="flex size-11 flex-none items-center justify-center rounded-pill bg-salvia-claro text-salvia"
+          >
+            <Wallet strokeWidth={1.75} className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm text-tinta-2">Saldo atual</p>
+            <p className="font-display text-3xl font-semibold tabular-nums text-salvia">
+              {unidade(saldo.data.modo, saldo.data.saldo)}
+            </p>
+            {saldo.data.modo === 'pontos' && (
+              <p className="text-xs text-tinta-2">Vale {brl(saldo.data.saldo_centavos)} no resgate.</p>
+            )}
+          </div>
         </Card>
       )}
 
@@ -138,7 +156,7 @@ function PainelSaldo({ cliente, aoTrocar }: { cliente: ClienteBusca; aoTrocar: (
 function LinhaMovimento({ m, modo }: { m: Movimento; modo: Saldo['modo'] }) {
   const ganho = m.tipo === 'acumulo'
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-input border border-linha px-3 py-2 text-sm">
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-input border border-linha bg-cartao px-3 py-2 text-sm">
       <div className="flex min-w-0 items-center gap-2">
         <Badge tom={ganho ? 'sucesso' : 'atencao'}>{ganho ? 'Acúmulo' : 'Resgate'}</Badge>
         <span className="text-tinta">Pedido #{m.pedido_codigo}</span>

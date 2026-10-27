@@ -110,7 +110,7 @@ export function ListaDocumentos() {
   ]
 
   return (
-    <div>
+    <div className="animate-rise">
       <div className="mb-4">
         <SegmentedControl ariaLabel="Status do documento" value={filtro} onChange={setFiltro} options={OPCOES} />
       </div>

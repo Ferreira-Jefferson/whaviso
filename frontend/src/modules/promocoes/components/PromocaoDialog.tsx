@@ -265,7 +265,9 @@ function Formulario({ promocao, aoFechar }: Pick<Props, 'promocao' | 'aoFechar'>
         </fieldset>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-3 border-t border-linha pt-4">
+        <span className="text-xs font-medium uppercase tracking-wide text-tinta-2">Agendamento e limites</span>
+        <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Começa em" erro={erros.inicio_em} dica="Horário de Brasília. Vazio vale desde já.">
           <Input type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} />
         </Field>
@@ -284,10 +286,16 @@ function Formulario({ promocao, aoFechar }: Pick<Props, 'promocao' | 'aoFechar'>
         <Field label="Teto de desconto" erro={erros.desconto_maximo_centavos} dica="Limita o desconto em reais. Vazio = sem teto.">
           <MoneyInput value={teto} onChange={setTeto} />
         </Field>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 rounded-input border border-linha px-3">
-        <span className="text-sm text-tinta">{ativo ? 'Ligada' : 'Desligada'}</span>
+      <div className="flex items-center justify-between gap-3 rounded-input border border-linha bg-papel-2 px-3 py-2.5">
+        <span className="flex flex-col">
+          <span className="text-sm font-medium text-tinta">{ativo ? 'Promoção ligada' : 'Promoção desligada'}</span>
+          <span className="text-xs text-tinta-2">
+            {ativo ? 'Vale para novos pedidos.' : 'Não vale enquanto estiver desligada.'}
+          </span>
+        </span>
         <Alternador ligado={ativo} onMudar={setAtivo} rotulo="Promoção ligada" />
       </div>
 

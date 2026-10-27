@@ -33,7 +33,7 @@ export default function ConfiguracoesLlm() {
         <section className="flex flex-col gap-4">
           <SecaoTitulo
             icone={<KeyRound className="size-5" strokeWidth={1.75} aria-hidden />}
-            titulo="Chave do atendente"
+            titulo="A chave do provedor"
             descricao="O atendente usa a chave do seu provedor para responder os clientes. O custo vai direto para a sua conta nele."
           />
           {credencial.isPending && <Esqueleto />}

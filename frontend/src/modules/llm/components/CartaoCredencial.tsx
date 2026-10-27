@@ -1,7 +1,7 @@
 // Estado da credencial do atendente: so metadado ("configurada, termina em 1234, validada em ...").
 // A chave nunca e exibida. Aqui tambem ficam ligar/desligar e o modelo preferido (PATCH, sem chave).
 import { useEffect, useState } from 'react'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, Lock, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { Badge, Banner, Button, Field, Input, cn, useToast } from '@/shared/ui'
 import { formatarDataHora } from '@/shared/format'
@@ -35,14 +35,14 @@ export function CartaoCredencial({ estado }: { estado: Estado }) {
   // Sem registro nenhum: nada a mostrar alem do convite a cadastrar.
   if (!estado.criado_em) {
     return (
-      <div className="flex items-start gap-3 rounded-card border border-dashed border-linha bg-cartao p-5">
-        <span className="flex size-9 flex-none items-center justify-center rounded-full bg-papel-2 text-tinta-2">
+      <div className="flex items-start gap-3 rounded-card border border-dashed border-linha bg-cartao p-5 sm:p-6">
+        <span className="flex size-10 flex-none items-center justify-center rounded-full bg-papel-2 text-tinta-2">
           <KeyRound className="size-5" strokeWidth={1.75} aria-hidden />
         </span>
-        <div>
+        <div className="min-w-0">
           <h3 className="font-display text-lg font-semibold text-tinta">Nenhuma chave cadastrada</h3>
-          <p className="mt-0.5 text-sm text-tinta-2">
-            Sem a chave do provedor, o atendente não responde. Cadastre abaixo.
+          <p className="mt-1 text-sm text-tinta-2">
+            Sem a chave do provedor, o atendente não responde. Cadastre a chave no formulário abaixo.
           </p>
         </div>
       </div>
@@ -52,10 +52,12 @@ export function CartaoCredencial({ estado }: { estado: Estado }) {
   const modeloAlterado = modelo.trim() !== (estado.modelo_preferido ?? '')
 
   return (
-    <div className="flex flex-col gap-4 rounded-card border border-linha bg-cartao p-4 sm:p-5">
+    <div className="flex flex-col gap-5 rounded-card border border-linha bg-cartao p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <KeyRound className="size-5 text-salvia" strokeWidth={1.75} aria-hidden />
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-9 flex-none items-center justify-center rounded-full bg-salvia-claro text-salvia">
+            <KeyRound className="size-5" strokeWidth={1.75} aria-hidden />
+          </span>
           <span className="font-display text-lg font-semibold text-tinta">
             {estado.provedor ? ROTULO_PROVEDOR[estado.provedor] : 'Provedor'}
           </span>
@@ -65,22 +67,28 @@ export function CartaoCredencial({ estado }: { estado: Estado }) {
         </Badge>
       </div>
 
-      <dl className="grid gap-3 text-sm sm:grid-cols-3">
-        <div>
-          <dt className="text-tinta-2">Chave</dt>
-          <dd className="tabular font-medium text-tinta">
-            {estado.ultimos4 ? `termina em ${estado.ultimos4}` : 'configurada'}
-          </dd>
-        </div>
+      {/* Chave: dado protegido, write-only. Nunca é exibida, só o final mascarado. */}
+      <div className="flex items-center gap-2.5 rounded-input border border-linha bg-papel-2 px-3 py-2.5">
+        <Lock className="size-4 flex-none text-salvia" strokeWidth={1.75} aria-hidden />
+        <span
+          className="tabular font-medium text-tinta"
+          aria-label={estado.ultimos4 ? `Chave terminada em ${estado.ultimos4}` : 'Chave cadastrada'}
+        >
+          {estado.ultimos4 ? `•••• ${estado.ultimos4}` : 'Cadastrada'}
+        </span>
+        <span className="ml-auto text-xs font-medium text-tinta-2">Protegida</span>
+      </div>
+
+      <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-tinta-2">Validada em</dt>
-          <dd className="font-medium text-tinta">
+          <dd className="mt-0.5 font-medium text-tinta">
             {estado.validada_em ? formatarDataHora(estado.validada_em) : 'ainda não validada'}
           </dd>
         </div>
         <div>
           <dt className="text-tinta-2">Última troca</dt>
-          <dd className="font-medium text-tinta">
+          <dd className="mt-0.5 font-medium text-tinta">
             {estado.atualizado_em ? formatarDataHora(estado.atualizado_em) : 'sem registro'}
           </dd>
         </div>
@@ -94,9 +102,9 @@ export function CartaoCredencial({ estado }: { estado: Estado }) {
         onClick={() =>
           void aplicar({ ativo: !estado.ativo }, estado.ativo ? 'Atendente pausado.' : 'Atendente ligado.')
         }
-        className="flex min-h-11 items-center justify-between gap-3 rounded-input text-left focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia disabled:opacity-60"
+        className="flex min-h-11 items-center justify-between gap-3 rounded-input border border-linha bg-papel-2 px-3 py-2.5 text-left transition-colors hover:border-salvia/40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia disabled:opacity-60"
       >
-        <span>
+        <span className="min-w-0">
           <span className="block font-medium text-tinta">Atendente ligado</span>
           <span className="block text-sm text-tinta-2">
             {estado.ativo ? 'Usa a chave para responder.' : 'Pausado: a chave fica guardada, mas não é usada.'}
@@ -105,14 +113,14 @@ export function CartaoCredencial({ estado }: { estado: Estado }) {
         <span
           className={cn(
             'inline-flex h-6 w-11 flex-none items-center rounded-pill p-0.5 transition-colors',
-            estado.ativo ? 'bg-salvia' : 'bg-papel-2',
+            estado.ativo ? 'bg-salvia' : 'bg-linha',
           )}
         >
           <span className={cn('size-5 rounded-full bg-cartao shadow-sm transition-transform', estado.ativo && 'translate-x-5')} />
         </span>
       </button>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div className="flex flex-col gap-3 border-t border-linha pt-5 sm:flex-row sm:items-end">
         <div className="flex-1">
           <Field label="Modelo preferido" dica="Opcional. Deixe vazio para usar o padrão do provedor.">
             <Input value={modelo} maxLength={120} onChange={(e) => setModelo(e.target.value)} />
@@ -130,6 +138,11 @@ export function CartaoCredencial({ estado }: { estado: Estado }) {
       </div>
 
       {erro && <Banner tom="erro">{erro}</Banner>}
+
+      <p className="flex items-start gap-2 border-t border-linha pt-4 text-xs text-tinta-2">
+        <ShieldCheck className="mt-0.5 size-4 flex-none text-salvia" strokeWidth={1.75} aria-hidden />
+        Por segurança, a chave guardada nunca é exibida de novo, nem para você. Para alterar, cadastre uma nova.
+      </p>
     </div>
   )
 }

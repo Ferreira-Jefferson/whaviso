@@ -1,5 +1,5 @@
 // Historico de versoes de um documento (somente leitura).
-import { Badge, Dialog, ErrorState, Skeleton } from '@/shared/ui'
+import { Badge, Button, Dialog, ErrorState, Skeleton } from '@/shared/ui'
 import { formatarDataHora } from '@/shared/format'
 import { useVersoes, type Documento } from '../api'
 import { ROTULO_STATUS, TOM_STATUS } from '../estados'
@@ -29,13 +29,9 @@ export function DialogVersoes({ documento, onFechar }: { documento: Documento | 
           ))}
         </ol>
       )}
-      <button
-        type="button"
-        onClick={onFechar}
-        className="mt-4 min-h-11 w-full rounded-pill border border-linha bg-cartao text-sm font-medium text-tinta hover:bg-papel-2"
-      >
+      <Button type="button" variante="secondary" onClick={onFechar} className="mt-4 w-full">
         Fechar
-      </button>
+      </Button>
     </Dialog>
   )
 }

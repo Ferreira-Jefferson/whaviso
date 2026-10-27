@@ -3,9 +3,9 @@
 // Sem credencial preenchida e com config existente, salva so os ajustes (PATCH); com credencial,
 // reenvia tudo (PUT, so o dono). A api valida e o cliente mostra a mensagem dela.
 import { useEffect, useState } from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { ReceiptText, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Banner, Button, Card, ErrorState, Field, Input, Select, Skeleton, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, cn, ErrorState, Field, Input, Select, Skeleton, useToast } from '@/shared/ui'
 import { formatarDataHora } from '@/shared/format'
 import {
   CredencialFiscal,
@@ -40,6 +40,12 @@ export function FiscalConfig() {
 
   const estado = config.data
   const configurada = Boolean(estado?.configurada)
+  // Tom do avatar pelo estado: reforça a situação de relance (sem depender só do selo).
+  const avatarTom = !estado?.configurada
+    ? 'bg-papel-2 text-tinta-2'
+    : estado.ativo
+      ? 'bg-salvia-claro text-salvia'
+      : 'bg-ambar-claro text-ambar'
 
   // Carrega o formulario com o que ja esta salvo (so campos nao secretos).
   useEffect(() => {
@@ -112,36 +118,56 @@ export function FiscalConfig() {
 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-2">
-      <Card className="flex flex-col gap-3">
-        <h2 className="text-lg text-salvia">Situação do emissor</h2>
+      <Card className="flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <span
+            aria-hidden
+            className={cn('flex size-10 flex-none items-center justify-center rounded-full', avatarTom)}
+          >
+            <ReceiptText strokeWidth={1.75} className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg text-salvia">Situação do emissor</h2>
+            <p className="mt-0.5 text-xs text-tinta-2">Emissão de NFC-e e NFS-e dos pedidos.</p>
+          </div>
+          {config.isSuccess && estado?.configurada && (
+            <Badge tom={estado.ativo ? 'sucesso' : 'atencao'} className="ml-auto">
+              {estado.ativo ? 'Emissão ativa' : 'Emissão desativada'}
+            </Badge>
+          )}
+        </div>
         {config.isPending && <Skeleton className="h-24 w-full" />}
         {config.isError && <ErrorState aoTentarDeNovo={() => void config.refetch()} />}
         {config.isSuccess && !estado?.configurada && (
-          <p className="text-sm text-tinta-2">
+          <p className="border-t border-linha pt-4 text-sm text-tinta-2">
             Nenhum emissor configurado. Cadastre os dados ao lado para poder emitir notas fiscais dos pedidos.
           </p>
         )}
         {config.isSuccess && estado?.configurada && (
           <>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <dt className="text-tinta-2">Emissão</dt>
-              <dd className="text-tinta">{estado.ativo ? 'Ativa' : 'Desativada'}</dd>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 border-t border-linha pt-4 text-sm">
               <dt className="text-tinta-2">CNPJ</dt>
-              <dd className="tabular text-tinta">{estado.cnpj ? formatarCnpj(estado.cnpj) : '-'}</dd>
+              <dd className="tabular text-right text-tinta">{estado.cnpj ? formatarCnpj(estado.cnpj) : '-'}</dd>
               <dt className="text-tinta-2">Regime</dt>
-              <dd className="text-tinta">{estado.regime ? ROTULO_REGIME[estado.regime] : '-'}</dd>
+              <dd className="text-right text-tinta">{estado.regime ? ROTULO_REGIME[estado.regime] : '-'}</dd>
               <dt className="text-tinta-2">Séries</dt>
-              <dd className="tabular text-tinta">
+              <dd className="tabular text-right text-tinta">
                 NFC-e {estado.serie_nfce ?? '-'} · NFS-e {estado.serie_nfse ?? '-'}
               </dd>
               <dt className="text-tinta-2">Ambiente</dt>
-              <dd className="text-tinta">{estado.ambiente ? ROTULO_AMBIENTE[estado.ambiente] : '-'}</dd>
+              <dd className="text-right">
+                {estado.ambiente === 'producao' ? (
+                  <Badge tom="atencao">Produção</Badge>
+                ) : (
+                  <span className="text-tinta">{estado.ambiente ? ROTULO_AMBIENTE[estado.ambiente] : '-'}</span>
+                )}
+              </dd>
               <dt className="text-tinta-2">Credencial</dt>
-              <dd className="tabular text-tinta">{estado.ultimos4 ? `•••• ${estado.ultimos4}` : 'Cadastrada'}</dd>
+              <dd className="tabular text-right text-tinta">{estado.ultimos4 ? `•••• ${estado.ultimos4}` : 'Cadastrada'}</dd>
               {estado.atualizado_em && (
                 <>
                   <dt className="text-tinta-2">Atualizada em</dt>
-                  <dd className="text-tinta">{formatarDataHora(estado.atualizado_em)}</dd>
+                  <dd className="text-right text-tinta">{formatarDataHora(estado.atualizado_em)}</dd>
                 </>
               )}
             </dl>

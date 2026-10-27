@@ -1,12 +1,13 @@
 // Promocoes da loja: cupons (percentual e fixo) e combos, com validade, limites e liga/desliga.
 // Rota /promocoes. Dados pela api REST (raiz ['promocoes']); nao ha exclusao: desligar e o caminho.
 import { useMemo, useState } from 'react'
-import { FlaskConical, Plus, TicketPercent } from 'lucide-react'
+import { FlaskConical, Package, Plus, Tag, TicketPercent } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { brl, formatarDataHora } from '@/shared/format'
 import {
   Badge,
   Button,
+  cn,
   EmptyState,
   ErrorState,
   PageHeader,
@@ -24,6 +25,28 @@ import { TestarCupomDialog } from '../components/TestarCupomDialog'
 import { ROTULO_SITUACAO, ROTULO_TIPO, situacaoDe, TIPOS, TOM_SITUACAO } from '../estados'
 
 type Estado = 'todas' | 'ativas' | 'desligadas'
+
+const ICONE_TIPO: Record<PromocaoTipo, typeof TicketPercent> = {
+  cupom_percentual: TicketPercent,
+  cupom_fixo: Tag,
+  combo: Package,
+}
+
+/** Selo quadrado com o ícone do tipo: dá rosto e ritmo à lista sem depender só de texto. */
+function TipoTile({ tipo, inativo }: { tipo: PromocaoTipo; inativo?: boolean }) {
+  const Icone = ICONE_TIPO[tipo]
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex size-9 flex-none items-center justify-center rounded-input bg-salvia-claro text-salvia',
+        inativo && 'opacity-50',
+      )}
+    >
+      <Icone className="size-4" />
+    </span>
+  )
+}
 
 function descontoTexto(p: Promocao): string {
   if (p.tipo === 'cupom_percentual') return `${p.valor}%`
@@ -56,11 +79,14 @@ export default function Promocoes() {
       titulo: 'Promoção',
       principal: true,
       render: (p) => (
-        <span className="flex flex-col">
-          <span className="font-medium">{p.nome}</span>
-          <span className="text-xs text-tinta-2">
-            {ROTULO_TIPO[p.tipo]}
-            {p.codigo ? ` · ${p.codigo}` : ''}
+        <span className="flex items-center gap-3">
+          <TipoTile tipo={p.tipo} inativo={!p.ativo} />
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate font-medium">{p.nome}</span>
+            <span className="text-xs text-tinta-2">
+              {ROTULO_TIPO[p.tipo]}
+              {p.codigo ? ` · ${p.codigo}` : ''}
+            </span>
           </span>
         </span>
       ),
@@ -71,12 +97,26 @@ export default function Promocoes() {
       chave: 'usos',
       titulo: 'Usos',
       alinhar: 'direita',
-      render: (p) => (
-        <span className="tabular-nums">
-          {p.usos_total}
-          {p.limite_total != null ? ` / ${p.limite_total}` : ''}
-        </span>
-      ),
+      render: (p) => {
+        if (p.limite_total == null || p.limite_total <= 0) {
+          return <span className="tabular-nums text-tinta-2">{p.usos_total}</span>
+        }
+        const pct = Math.min(100, Math.round((p.usos_total / p.limite_total) * 100))
+        const cheio = p.usos_total >= p.limite_total
+        return (
+          <span className="inline-flex flex-col items-end gap-1">
+            <span className="tabular-nums">
+              {p.usos_total} / {p.limite_total}
+            </span>
+            <span className="h-1 w-16 overflow-hidden rounded-pill bg-linha">
+              <span
+                className={cn('block h-full rounded-pill', cheio ? 'bg-ambar' : 'bg-salvia')}
+                style={{ width: `${pct}%` }}
+              />
+            </span>
+          </span>
+        )
+      },
     },
     {
       chave: 'situacao',
@@ -126,7 +166,7 @@ export default function Promocoes() {
   const filtrando = tipo !== '' || estado !== 'todas'
 
   return (
-    <div>
+    <div className="animate-rise">
       <PageHeader titulo="Promoções" descricao="Cupons e combos para vender mais." acoes={botoes} />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

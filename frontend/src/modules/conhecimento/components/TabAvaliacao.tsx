@@ -6,6 +6,7 @@ import {
   Badge,
   Banner,
   Button,
+  cn,
   Dialog,
   EmptyState,
   ErrorState,
@@ -67,9 +68,16 @@ export function TabAvaliacao() {
         />
       )}
       {lista.isSuccess && lista.data.length > 0 && (
+        <>
+        <p className="text-sm text-tinta-2" aria-live="polite">
+          {lista.data.length} {lista.data.length === 1 ? 'pergunta' : 'perguntas'}
+        </p>
         <ul className="flex flex-col gap-2">
           {lista.data.map((a) => (
-            <li key={a.id} className="flex flex-col gap-2 rounded-card border border-linha bg-cartao p-4">
+            <li
+              key={a.id}
+              className="flex flex-col gap-2 rounded-card border border-linha bg-cartao p-4 shadow-[0_1px_2px_rgba(32,50,42,0.05)] transition-shadow hover:shadow-[0_6px_16px_-8px_rgba(32,50,42,0.18)]"
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="min-w-0 flex-1 font-medium text-tinta">{a.pergunta}</p>
                 {a.tipo && <Badge>{ROTULO_TIPO[a.tipo]}</Badge>}
@@ -94,6 +102,7 @@ export function TabAvaliacao() {
             </li>
           ))}
         </ul>
+        </>
       )}
 
       <Dialog aberto={aberto} onFechar={() => setAberto(false)} titulo="Nova pergunta de teste" className="sm:max-w-xl">
@@ -173,14 +182,23 @@ function FormAvaliacao({
         {aprovados.isSuccess && aprovados.data.length === 0 && (
           <p className="text-sm text-tinta-2">Nenhum documento aprovado ainda.</p>
         )}
-        <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
-          {aprovados.data?.map((d) => (
-            <label key={d.id} className="flex min-h-11 items-center gap-2 text-sm">
+        {aprovados.data && aprovados.data.length > 0 && (
+        <div className="flex max-h-40 flex-col overflow-y-auto rounded-input border border-linha">
+          {aprovados.data.map((d, i) => (
+            <label
+              key={d.id}
+              className={cn(
+                'flex min-h-11 cursor-pointer items-center gap-2.5 px-3 text-sm transition-colors hover:bg-papel-2/50',
+                i > 0 && 'border-t border-linha',
+                docs.includes(d.id) && 'text-tinta',
+              )}
+            >
               <input type="checkbox" checked={docs.includes(d.id)} onChange={() => alternarDoc(d.id)} className="size-4 accent-salvia" />
               <span className="min-w-0 truncate">{d.titulo}</span>
             </label>
           ))}
         </div>
+        )}
       </fieldset>
       {(local ?? erro) && <Banner tom="erro">{local ?? erro}</Banner>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

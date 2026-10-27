@@ -15,7 +15,7 @@ export default function Fiscal() {
   const [aba, setAba] = useState<Aba>('documentos')
 
   return (
-    <div>
+    <div className="animate-rise">
       <PageHeader titulo="Fiscal" descricao="Notas fiscais dos pedidos, emitidas pelo serviço emissor da sua loja." />
       <div className="mb-4">
         <SegmentedControl ariaLabel="Seção fiscal" value={aba} onChange={setAba} options={ABAS} />
