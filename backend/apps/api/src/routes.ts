@@ -30,6 +30,7 @@ import { plataformaPainelRoutes } from './modules/plataforma_painel'
 import { despachoRoutes } from './modules/despacho'
 import { avaliacoesRoutes } from './modules/avaliacoes'
 import { campanhasRoutes } from './modules/campanhas'
+import { cardapioImportacaoRoutes } from './modules/cardapio_importacao'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -68,6 +69,7 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'despacho', plugin: despachoRoutes },
   { prefixo: 'avaliacoes', plugin: avaliacoesRoutes },
   { prefixo: 'campanhas', plugin: campanhasRoutes },
+  { prefixo: 'cardapio-importacao', plugin: cardapioImportacaoRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/

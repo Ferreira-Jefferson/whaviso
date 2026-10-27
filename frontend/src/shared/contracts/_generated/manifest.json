@@ -5,6 +5,7 @@
     "caixa.ts",
     "campanhas.ts",
     "cardapio.ts",
+    "cardapio_importacao.ts",
     "clientes.ts",
     "configuracoes_llm.ts",
     "conta.ts",
@@ -36,5 +37,5 @@
     "sessao.ts",
     "zonas_entrega.ts"
   ],
-  "hash": "41bb1c45118e50336d5f3aefcc8a9d5aecb388a88e422621fa8cbf88f6ba79fa"
+  "hash": "8c7316e42535ef26366881a1aacfd1e686240415bd59acea4ad9011992b5ea71"
 }
