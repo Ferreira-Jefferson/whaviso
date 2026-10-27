@@ -5,22 +5,47 @@
 //   - um SEC marcado `verde` nao tem nenhum teste com esse id no titulo;
 //   - um teste cita um SEC-### que nao existe no documento.
 // E o que impede "esquecer" um item do catalogo.
-import { readFileSync, readdirSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { resolve, join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 
 const RAIZ = resolve(__dirname, '../../..') // .../whaviso
 const CAMINHO_SEGURANCA = resolve(RAIZ, 'docs/pivot/SEGURANCA.md')
 const CAMINHO_REGISTRO = resolve(__dirname, '../catalogo_estado.json')
 const RAIZ_SUITE = resolve(__dirname, '..') // backend/security
-// A suite exercita um id quando ele aparece no titulo de um teste (test/) OU na matriz declarativa
-// que gera esses titulos em tempo de execucao (matriz/). Ambos contam como "a suite cobre o id".
+const RAIZ_BACKEND = resolve(__dirname, '../..') // backend
+// A suite exercita um id quando ele aparece no titulo de um teste. Isso vale para tres fontes:
+//   - os testes desta propria suite (test/) e a matriz declarativa que gera titulos (matriz/);
+//   - os testes dos modulos de feature (apps/**/*.test.ts): ~90% da cobertura SEC vive la (ex.:
+//     apps/api/.../seguranca.test.ts, apps/atendente/test/security/*, apps/zap/test/*);
+//   - os testes do kernel compartilhado (packages/**/*.test.ts).
+// Sem indexar apps/ e packages/, um SEC coberto por um modulo nunca poderia virar `verde` no catalogo.
 const DIRS_SUITE = ['test', 'matriz']
+const DIRS_FEATURE = ['apps', 'packages']
 
-const RE_SEC = /SEC-\d{3}/g
+// Catalogo de ids rastreaveis: SEC-### e tambem as familias RAG (isolamento/avaliacao do retrieval) e
+// RES (resiliencia). O regex antigo (`/SEC-\d{3}/`) ignorava RAG-ISO-001, RAG-EVAL-001/002 e
+// RES-001..003, entao esses nunca eram contados nem no documento nem nos testes.
+const RE_SEC = /SEC-\d{3}|RAG-ISO-\d{3}|RAG-EVAL-\d{3}|RES-\d{3}/g
 
 function idsDe(texto: string): Set<string> {
   return new Set(texto.match(RE_SEC) ?? [])
+}
+
+/** Caminhos de todos os `*.test.ts` sob `dir` (recursivo), ignorando node_modules/dist/coverage. */
+function arquivosDeTeste(dir: string): string[] {
+  if (!existsSync(dir)) return []
+  const achados: string[] = []
+  for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+    const nome = entrada.name
+    if (entrada.isDirectory()) {
+      if (nome === 'node_modules' || nome === 'dist' || nome === 'coverage' || nome === '.vite') continue
+      achados.push(...arquivosDeTeste(join(dir, nome)))
+    } else if (nome.endsWith('.test.ts')) {
+      achados.push(join(dir, nome))
+    }
+  }
+  return achados
 }
 
 interface ItemCatalogo {
@@ -37,13 +62,19 @@ const idsDoc = idsDe(readFileSync(CAMINHO_SEGURANCA, 'utf8'))
 const registro = JSON.parse(readFileSync(CAMINHO_REGISTRO, 'utf8')) as Registro
 const idsRegistro = new Set(Object.keys(registro.itens))
 
-// Todos os SEC-### que a suite exercita (titulos de teste + matriz declarativa).
+// Todos os ids que a suite exercita: titulos de teste desta suite (+ matriz declarativa) e dos
+// testes dos modulos de feature (apps/**) e do kernel (packages/**).
 const idsNosTestes = new Set<string>()
 for (const dir of DIRS_SUITE) {
   const caminhoDir = resolve(RAIZ_SUITE, dir)
   for (const arquivo of readdirSync(caminhoDir)) {
     if (!arquivo.endsWith('.ts')) continue
     for (const id of idsDe(readFileSync(resolve(caminhoDir, arquivo), 'utf8'))) idsNosTestes.add(id)
+  }
+}
+for (const dir of DIRS_FEATURE) {
+  for (const arquivo of arquivosDeTeste(resolve(RAIZ_BACKEND, dir))) {
+    for (const id of idsDe(readFileSync(arquivo, 'utf8'))) idsNosTestes.add(id)
   }
 }
 

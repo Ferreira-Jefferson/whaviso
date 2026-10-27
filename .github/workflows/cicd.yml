@@ -41,7 +41,10 @@ jobs:
     # superusuario postgres). O banco whaviso_dev e criado no passo de bootstrap.
     services:
       postgres:
-        image: postgres:18
+        # Imagem com a extensao pgvector: a migration 0018_rag so cria a coluna `embedding` + indice
+        # HNSW quando a extensao `vector` existe. Com ela, os testes de RAG vetorial (RAG-ISO-001,
+        # cache SEC-062, hit@k RAG-EVAL-001) exercitam o caminho VETORIAL no CI, nao so o fallback BM25.
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -77,6 +80,10 @@ jobs:
           set -euo pipefail
           psql -d postgres -c "drop database if exists whaviso_dev;"
           psql -d postgres -c "create database whaviso_dev;"
+          # pgvector: habilita a extensao ANTES das migrations. So vale no CI (imagem pgvector); o
+          # Postgres local nao tem a extensao e a 0018 degrada para BM25 sozinha (nao mexer no
+          # validate_migrations.sh). Com a extensao, a 0018 cria a coluna embedding + indice HNSW.
+          psql -v ON_ERROR_STOP=1 -q -d whaviso_dev -c "create extension if not exists vector;"
           psql -v ON_ERROR_STOP=1 -q -d whaviso_dev -f backend/scripts/test_shim_auth.sql
           for m in backend/supabase/migrations/0*.sql; do
             psql -v ON_ERROR_STOP=1 -q -d whaviso_dev -f "$m"
