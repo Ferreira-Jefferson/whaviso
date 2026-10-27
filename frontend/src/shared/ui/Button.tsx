@@ -4,10 +4,19 @@ import { Spinner } from './Spinner'
 
 type Variante = 'primary' | 'secondary' | 'ghost' | 'destructive'
 
+type Tamanho = 'md' | 'icone'
+
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variante?: Variante
+  /** `icone` = botao quadrado so-icone (44px, sem padding horizontal). */
+  tamanho?: Tamanho
   loading?: boolean
   children: ReactNode
+}
+
+const TAMANHOS: Record<Tamanho, string> = {
+  md: 'px-5 py-2.5',
+  icone: 'w-11 px-0',
 }
 
 const VARIANTES: Record<Variante, string> = {
@@ -21,6 +30,7 @@ const VARIANTES: Record<Variante, string> = {
 
 export function Button({
   variante = 'primary',
+  tamanho = 'md',
   loading = false,
   disabled,
   className,
@@ -30,10 +40,11 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-pill px-5 py-2.5',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-pill',
         'text-sm font-medium transition-[background-color,opacity] duration-150',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia',
         'disabled:cursor-not-allowed',
+        TAMANHOS[tamanho],
         VARIANTES[variante],
         className,
       )}

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from './cn'
 
-type Tom = 'info' | 'sucesso' | 'erro'
+type Tom = 'info' | 'sucesso' | 'atencao' | 'erro'
 
 interface BannerProps {
   tom?: Tom
@@ -12,7 +12,8 @@ interface BannerProps {
 const TONS: Record<Tom, string> = {
   info: 'bg-salvia-claro text-salvia border-salvia/20',
   sucesso: 'bg-salvia-claro text-folha border-folha/20',
-  erro: 'bg-ambar-claro text-barro border-barro/20',
+  atencao: 'bg-ambar-claro text-ambar border-ambar/20',
+  erro: 'bg-barro/10 text-barro border-barro/20',
 }
 
 // Aviso curto no topo de um formulário/página (sucesso, erro amigável, info).

@@ -18,6 +18,7 @@
   /* marca */
   --color-folha: #3e7c5b; /* sucesso/pago-recebido */
   --color-dourado: #b8860b; /* sino da marca (acento dourado, ouro velho) */
+  --color-dourado-claro: #f3e7c9; /* fundo suave do dourado (chips/selos) */
 
   /* semânticas (sempre suaves, nunca alarmistas) */
   --color-ambar: #b97e22; /* pendente / no ciclo */

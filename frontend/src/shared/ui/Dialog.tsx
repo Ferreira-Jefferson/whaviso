@@ -36,7 +36,7 @@ export function Dialog({ aberto, onFechar, titulo, children, acoes, className }:
         if (e.target === ref.current) onFechar()
       }}
       className={cn(
-        'm-auto w-[calc(100vw-2rem)] max-w-sm rounded-card border border-linha bg-cartao p-6',
+        'm-auto max-h-[88vh] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-card border border-linha bg-cartao p-6',
         'text-tinta shadow-[0_12px_40px_rgba(32,50,42,0.18)] backdrop:bg-tinta/30',
         className,
       )}

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from './cn'
 
-type Tom = 'neutro' | 'marca' | 'sucesso' | 'atencao' | 'erro'
+type Tom = 'neutro' | 'marca' | 'sucesso' | 'atencao' | 'erro' | 'revisao'
 
 const TONS: Record<Tom, string> = {
   neutro: 'bg-papel-2 text-tinta-2',
@@ -9,6 +9,7 @@ const TONS: Record<Tom, string> = {
   sucesso: 'bg-salvia-claro text-folha',
   atencao: 'bg-ambar-claro text-ambar',
   erro: 'bg-barro/10 text-barro',
+  revisao: 'bg-revisao-claro text-revisao',
 }
 
 /** Selo curto de status/contagem. O significado nunca depende so da cor: sempre leva texto. */
