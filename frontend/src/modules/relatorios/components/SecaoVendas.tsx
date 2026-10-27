@@ -45,7 +45,7 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
       alinhar: 'direita',
       render: (l) => (
         <span className="inline-flex items-center justify-end gap-2">
-          <span className="hidden h-1.5 w-16 overflow-hidden rounded-pill bg-papel-2 md:inline-block" aria-hidden>
+          <span className="inline-block h-1.5 w-16 overflow-hidden rounded-pill bg-papel-2" aria-hidden>
             <span className="block h-full rounded-pill bg-salvia" style={{ width: `${Math.round((l.participacao ?? 0) * 100)}%` }} />
           </span>
           <span className="tabular w-10 text-right">{pct(l.participacao)}</span>
@@ -70,15 +70,27 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
             <Tile rotulo="Pedidos entregues" carregando={q.isPending} valor={d ? String(d.total_pedidos) : null} icone={<ShoppingBag className="size-4" aria-hidden />} />
             <Tile rotulo="Ticket médio" carregando={q.isPending} valor={d ? (d.total_pedidos > 0 ? formatarCentavos(Math.round(d.total_faturamento_centavos / d.total_pedidos)) : '-') : null} icone={<Receipt className="size-4" aria-hidden />} />
           </div>
-          <Card className="!p-2 sm:!p-4">
-            {q.isPending ? (
-              <div className="grid gap-2 p-3" aria-busy="true"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-3/4" /></div>
-            ) : d && d.linhas.length === 0 ? (
-              <EmptyState icone={<ShoppingBag className="size-7" aria-hidden />} titulo="Sem vendas no período" descricao="Só pedidos entregues entram aqui. Experimente um período maior." />
-            ) : (
-              d && <TableResponsive legenda={`Vendas ${dim.label.toLowerCase()}`} colunas={colunas} linhas={d.linhas} chaveLinha={(l) => l.chave} />
-            )}
-          </Card>
+          <div className="grid gap-3">
+            <div className="flex items-end justify-between gap-3">
+              <h2 className="text-lg text-salvia">Vendas {dim.label.toLowerCase()}</h2>
+              {d && d.linhas.length > 0 && (
+                <span className="text-xs text-tinta-2">{d.linhas.length} {d.linhas.length === 1 ? 'linha' : 'linhas'}</span>
+              )}
+            </div>
+            <Card className="border-0 bg-transparent !p-0 md:border md:border-linha md:bg-cartao md:!p-4">
+              {q.isPending ? (
+                <div className="grid gap-2.5 p-3" aria-busy="true" aria-label="Carregando vendas">
+                  {['w-full', 'w-11/12', 'w-10/12', 'w-9/12', 'w-10/12', 'w-8/12'].map((w, i) => (
+                    <Skeleton key={i} className={`h-5 ${w}`} />
+                  ))}
+                </div>
+              ) : d && d.linhas.length === 0 ? (
+                <EmptyState icone={<ShoppingBag className="size-7" aria-hidden />} titulo="Sem vendas no período" descricao="Só pedidos entregues entram aqui. Experimente um período maior." />
+              ) : (
+                d && <TableResponsive legenda={`Vendas ${dim.label.toLowerCase()}`} colunas={colunas} linhas={d.linhas} chaveLinha={(l) => l.chave} />
+              )}
+            </Card>
+          </div>
         </>
       )}
     </div>

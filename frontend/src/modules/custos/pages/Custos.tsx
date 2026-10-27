@@ -36,7 +36,16 @@ export default function Custos() {
   }, [r, periodo])
 
   const semCusto = q.isSuccess && r?.total_centavos === 0
-  const maxCategoria = Math.max(1, ...(r?.por_categoria.map((c) => c.total_centavos) ?? [0]))
+  const categorias = useMemo(
+    () => [...(r?.por_categoria ?? [])].sort((a, b) => b.total_centavos - a.total_centavos),
+    [r],
+  )
+  const maxCategoria = Math.max(1, ...categorias.map((c) => c.total_centavos))
+
+  const resumoGrafico = r
+    ? `Custo por dia nos últimos ${dias} dias. Total ${formatarCentavos(r.total_centavos)}.` +
+      (r.pico_dia ? ` Maior custo em ${diaMes(r.pico_dia.dia)}: ${formatarCentavos(r.pico_dia.total_centavos)}.` : '')
+    : `Custo por dia, ${colunas.length} dias`
 
   return (
     <div className="animate-rise">
@@ -63,15 +72,23 @@ export default function Custos() {
       )}
 
       {!semCusto && !q.isError && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-4 flex flex-col gap-4">
           <Secao titulo="Custo por dia" descricao={r?.pico_dia ? 'O dia de maior custo fica em destaque.' : undefined} carregando={q.isPending}>
-            <BarrasVerticais dados={colunas} passo={Math.max(1, Math.ceil(colunas.length / 6))} resumo={`Custo por dia, ${colunas.length} dias`} cor="var(--color-ambar)" />
+            <BarrasVerticais
+              dados={colunas}
+              passo={Math.max(1, Math.ceil(colunas.length / 6))}
+              resumo={resumoGrafico}
+              cor="var(--color-ambar)"
+              corDestaque="var(--color-dourado)"
+              rotuloMax={r?.pico_dia ? formatarCentavos(r.pico_dia.total_centavos) : undefined}
+            />
           </Secao>
 
+          <div className="grid gap-4 lg:grid-cols-2">
           <Secao titulo="Por categoria" carregando={q.isPending}>
             <ul className="flex flex-col gap-3">
-              {r?.por_categoria.map((c) => {
-                const p = r.total_centavos > 0 ? Math.round((c.total_centavos / r.total_centavos) * 100) : 0
+              {categorias.map((c) => {
+                const p = r && r.total_centavos > 0 ? Math.round((c.total_centavos / r.total_centavos) * 100) : 0
                 return (
                   <li key={c.categoria}>
                     <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
@@ -81,7 +98,7 @@ export default function Custos() {
                     <div className="h-2 w-full overflow-hidden rounded-pill bg-papel-2" role="img" aria-label={`${ROTULO_CATEGORIA[c.categoria]}: ${formatarCentavos(c.total_centavos)} (${p}%)`}>
                       <div className="h-full rounded-pill" style={{ width: `${Math.round((c.total_centavos / maxCategoria) * 100)}%`, backgroundColor: COR_CATEGORIA[c.categoria] }} />
                     </div>
-                    <span className="text-xs text-tinta-2">{c.eventos.toLocaleString('pt-BR')} {c.eventos === 1 ? 'evento' : 'eventos'}</span>
+                    <span className="mt-1 block text-xs text-tinta-2">{c.eventos.toLocaleString('pt-BR')} {c.eventos === 1 ? 'evento' : 'eventos'}</span>
                   </li>
                 )
               })}
@@ -98,6 +115,7 @@ export default function Custos() {
               ))}
             </ul>
           </Secao>
+          </div>
 
           <Card>
             <h2 className="text-lg text-salvia">Eventos</h2>

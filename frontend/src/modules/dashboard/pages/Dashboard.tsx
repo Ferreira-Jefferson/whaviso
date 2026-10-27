@@ -89,7 +89,7 @@ export default function Dashboard() {
         <Secao titulo="Resumo" erro aoTentarDeNovo={() => void resumo.refetch()} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Tile rotulo="Faturamento realizado" carregando={carregando} valor={dinheiro(r?.faturamento_realizado_centavos)} tom="folha" icone={<Wallet className="size-4" aria-hidden />} detalhe="Pedidos entregues" />
+          <Tile rotulo="Faturamento realizado" destaque carregando={carregando} valor={dinheiro(r?.faturamento_realizado_centavos)} tom="folha" icone={<Wallet className="size-4" aria-hidden />} detalhe="Pedidos entregues" />
           <Tile rotulo="Em andamento" carregando={carregando} valor={dinheiro(r?.faturamento_em_andamento_centavos)} tom="ambar" icone={<TrendingUp className="size-4" aria-hidden />} detalhe="Novos, em preparo e a caminho" />
           <Tile rotulo="Pedidos" carregando={carregando} valor={r ? String(r.total_pedidos) : null} icone={<ShoppingBag className="size-4" aria-hidden />} detalhe={r ? `${r.por_status.entregue} entregues` : undefined} />
           <Tile rotulo="Ticket médio" carregando={carregando} valor={dinheiro(r?.ticket_medio_centavos)} icone={<Receipt className="size-4" aria-hidden />} detalhe={r?.tempo_medio_entrega_minutos != null ? `Entrega em ${Math.round(r.tempo_medio_entrega_minutos)} min, em média` : undefined} />
@@ -107,7 +107,7 @@ export default function Dashboard() {
       )}
 
       {!semPedidos && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-6 grid gap-4 lg:grid-cols-2 lg:gap-5">
           <Secao titulo="Pedidos por dia" carregando={diaria.isPending} erro={diaria.isError} aoTentarDeNovo={() => void diaria.refetch()}>
             <BarrasVerticais dados={colunasDia} passo={Math.max(1, Math.ceil(colunasDia.length / 6))} resumo={`Pedidos por dia, ${colunasDia.length} dias`} />
           </Secao>
@@ -144,17 +144,28 @@ export default function Dashboard() {
             {top.data && top.data.itens.length === 0 ? (
               <p className="text-sm text-tinta-2">Nenhum item vendido no período.</p>
             ) : (
-              <ol className="divide-y divide-linha">
-                {top.data?.itens.map((it, i) => (
-                  <li key={it.nome} className="flex items-center gap-3 py-2 text-sm">
-                    <span className="tabular w-5 flex-none text-tinta-2">{i + 1}</span>
-                    <span className="min-w-0 flex-1 truncate text-tinta" title={it.nome}>{it.nome}</span>
-                    <span className="tabular flex-none text-tinta-2">{it.quantidade} un.</span>
-                    {it.receita_centavos !== null && (
-                      <span className="tabular w-24 flex-none text-right text-tinta">{formatarCentavos(it.receita_centavos)}</span>
-                    )}
-                  </li>
-                ))}
+              <ol className="flex flex-col gap-3">
+                {top.data?.itens.map((it, i) => {
+                  const maxQtd = Math.max(1, ...(top.data?.itens.map((x) => x.quantidade) ?? [1]))
+                  const prop = Math.max(4, Math.round((it.quantidade / maxQtd) * 100))
+                  return (
+                    <li key={it.nome}>
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="tabular inline-flex size-5 flex-none items-center justify-center rounded-full bg-papel-2 text-xs text-tinta-2">
+                          {i + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-tinta" title={it.nome}>{it.nome}</span>
+                        <span className="tabular flex-none text-tinta-2">{it.quantidade} un.</span>
+                        {it.receita_centavos !== null && (
+                          <span className="tabular w-24 flex-none text-right text-tinta">{formatarCentavos(it.receita_centavos)}</span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 ml-8 h-1 overflow-hidden rounded-pill bg-papel-2" aria-hidden>
+                        <div className="h-full rounded-pill bg-salvia/70" style={{ width: `${prop}%` }} />
+                      </div>
+                    </li>
+                  )
+                })}
               </ol>
             )}
           </Secao>

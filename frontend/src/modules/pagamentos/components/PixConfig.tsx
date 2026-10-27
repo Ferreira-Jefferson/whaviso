@@ -2,9 +2,9 @@
 // tela (so tipo, titular, cidade e os ultimos 4 caracteres). O campo e limpo assim que o envio
 // termina, com sucesso ou nao, para a chave nao ficar em estado de componente.
 import { useState } from 'react'
-import { KeyRound, ShieldCheck } from 'lucide-react'
+import { KeyRound, Lock, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Banner, Button, Card, ChavePixInput, ErrorState, Field, Input, Skeleton, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, ChavePixInput, ErrorState, Field, Input, Skeleton, useToast } from '@/shared/ui'
 import { ROTULO_TIPO_CHAVE, formatarDataHora } from '@/shared/format'
 import { LojaPixEntrada } from '@/shared/contracts/_generated/pagamentos'
 import type { TipoChavePix } from '@/shared/contracts/_generated/enums'
@@ -81,23 +81,38 @@ export function PixConfig() {
         {estado.isPending && <Skeleton className="h-20 w-full" />}
         {estado.isError && <ErrorState aoTentarDeNovo={() => void estado.refetch()} />}
         {estado.isSuccess && !pix && (
-          <p className="text-sm text-tinta-2">
-            Nenhuma chave cadastrada. Sem ela, não é possível gerar o Pix de copia e cola nos pedidos.
-          </p>
+          <div className="flex flex-col items-start gap-2 rounded-input border border-dashed border-linha bg-papel-2 px-4 py-5">
+            <Badge tom="atencao">Sem chave</Badge>
+            <p className="text-sm text-tinta-2">
+              Nenhuma chave cadastrada. Sem ela, não é possível gerar o Pix de copia e cola nos pedidos.
+            </p>
+          </div>
         )}
         {estado.isSuccess && pix && (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-tinta-2">Tipo</dt>
-            <dd className="text-tinta">{ROTULO_TIPO_CHAVE[pix.tipo]}</dd>
-            <dt className="text-tinta-2">Chave</dt>
-            <dd className="tabular text-tinta">{pix.ultimos4 ? `•••• ${pix.ultimos4}` : 'Cadastrada'}</dd>
-            <dt className="text-tinta-2">Titular</dt>
-            <dd className="text-tinta">{pix.titular}</dd>
-            <dt className="text-tinta-2">Cidade</dt>
-            <dd className="text-tinta">{pix.cidade ?? 'Não informada'}</dd>
-            <dt className="text-tinta-2">Atualizada em</dt>
-            <dd className="text-tinta">{formatarDataHora(pix.atualizado_em)}</dd>
-          </dl>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tom="sucesso">Chave ativa</Badge>
+              <span className="text-xs text-tinta-2">{ROTULO_TIPO_CHAVE[pix.tipo]}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-input border border-linha bg-papel-2 px-3 py-2.5">
+              <Lock strokeWidth={1.75} className="size-4 flex-none text-salvia" aria-hidden />
+              <span
+                className="tabular text-tinta"
+                aria-label={pix.ultimos4 ? `Chave terminada em ${pix.ultimos4}` : 'Chave cadastrada'}
+              >
+                {pix.ultimos4 ? `•••• ${pix.ultimos4}` : 'Cadastrada'}
+              </span>
+              <span className="ml-auto text-xs text-tinta-2">Protegida</span>
+            </div>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-tinta-2">Titular</dt>
+              <dd className="text-tinta">{pix.titular}</dd>
+              <dt className="text-tinta-2">Cidade</dt>
+              <dd className="text-tinta">{pix.cidade ?? 'Não informada'}</dd>
+              <dt className="text-tinta-2">Atualizada em</dt>
+              <dd className="text-tinta">{formatarDataHora(pix.atualizado_em)}</dd>
+            </dl>
+          </div>
         )}
         <p className="flex items-start gap-2 border-t border-linha pt-3 text-xs text-tinta-2">
           <ShieldCheck strokeWidth={1.75} className="mt-0.5 size-4 flex-none" aria-hidden />
@@ -127,6 +142,10 @@ export function PixConfig() {
           <Button type="submit" loading={definir.isPending} className="max-md:w-full md:self-start">
             Salvar chave
           </Button>
+          <p className="flex items-start gap-2 text-xs text-tinta-2">
+            <ShieldCheck strokeWidth={1.75} className="mt-0.5 size-3.5 flex-none" aria-hidden />
+            A chave é guardada cifrada e não volta para esta tela. O campo é limpo assim que você salva.
+          </p>
         </form>
       </Card>
     </div>

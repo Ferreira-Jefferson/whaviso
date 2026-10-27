@@ -2,10 +2,11 @@
 // as regras (nao no passado, ate 30 dias, so pedido novo) e o cliente so exibe a mensagem dela.
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/shared/api_client'
-import { Banner, Button, Dialog, Field, Input, useToast } from '@/shared/ui'
+import { Banner, Button, Dialog, Field, Input, MoneyText, useToast } from '@/shared/ui'
 import type { AgendamentoDto } from '@/shared/contracts/_generated/agendamento'
+import { formatarDataHora } from '@/shared/format'
 import { useDefinirAgendamento } from '../api'
-import { agoraComoCampo, campoParaIso, isoParaCampo } from '../estados'
+import { agoraComoCampo, campoParaIso, isoParaCampo, limiteCampo, ROTULO_MODALIDADE } from '../estados'
 
 interface Props {
   pedido: AgendamentoDto | null
@@ -58,11 +59,24 @@ export function ReagendarDialog({ pedido, onFechar }: Props) {
     >
       <div className="flex flex-col gap-4">
         {erro && <Banner tom="erro">{erro}</Banner>}
-        <Field label="Data e hora" dica="Horário de Brasília. Até 30 dias a partir de agora.">
+        {pedido && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-input border border-linha bg-papel-2 px-3 py-2.5 text-sm">
+            <span className="text-tinta-2">
+              {ROTULO_MODALIDADE[pedido.modalidade]} · <MoneyText centavos={pedido.total_centavos} className="text-tinta" />
+            </span>
+            {pedido.agendado_para && (
+              <span className="text-tinta-2">
+                Atual: <span className="tabular font-medium text-tinta">{formatarDataHora(pedido.agendado_para)}</span>
+              </span>
+            )}
+          </div>
+        )}
+        <Field label="Novo horário" dica="Horário de Brasília. Até 30 dias a partir de agora.">
           <Input
             type="datetime-local"
             value={valor}
             min={agoraComoCampo()}
+            max={limiteCampo()}
             onChange={(e) => setValor(e.target.value)}
             autoFocus
           />

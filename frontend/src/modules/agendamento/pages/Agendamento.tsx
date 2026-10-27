@@ -49,18 +49,27 @@ export default function Agendamento() {
         descricao="Pedidos marcados para outro horário. A cozinha vê com antecedência o que vem por aí."
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <SegmentedControl ariaLabel="Janela da agenda" value={filtro} onChange={setFiltro} options={OPCOES_FILTRO} />
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-tinta-2">Liberar com</span>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Em telas estreitas os segmentos rolam na horizontal em vez de quebrar linha. */}
+        <div className="-mb-1 overflow-x-auto pb-1">
+          <SegmentedControl
+            semQuebra
+            ariaLabel="Janela da agenda"
+            value={filtro}
+            onChange={setFiltro}
+            options={OPCOES_FILTRO}
+          />
+        </div>
+        <div className="flex flex-none items-center gap-2 text-sm text-tinta-2">
+          <span className="whitespace-nowrap">Liberar com</span>
           <Select
             ariaLabel="Antecedência para liberar à cozinha"
             value={antecedencia}
             onChange={setAntecedencia}
             options={OPCOES_ANTECEDENCIA}
-            className="w-32"
+            className="w-28"
           />
-          <span className="text-sm text-tinta-2">de antecedência</span>
+          <span className="whitespace-nowrap">de antecedência</span>
         </div>
       </div>
 

@@ -28,14 +28,22 @@ export function SecaoCancelamentos({ periodo }: { periodo: Periodo }) {
           ) : d && d.motivos.length === 0 ? (
             <EmptyState icone={<CircleAlert className="size-7" aria-hidden />} titulo="Nenhum problema no período" descricao="Pedidos marcados com problema aparecem aqui, agrupados pelo motivo." />
           ) : (
-            <ul className="divide-y divide-linha">
-              {d?.motivos.map((m) => (
-                <li key={m.motivo} className="flex items-center gap-3 py-2.5 text-sm">
-                  <span className="min-w-0 flex-1 break-words text-tinta first-letter:uppercase">{m.motivo}</span>
-                  <span className="tabular flex-none text-tinta-2">{m.pedidos} {m.pedidos === 1 ? 'pedido' : 'pedidos'}</span>
-                  <span className="tabular w-24 flex-none text-right text-tinta">{formatarCentavos(m.valor_centavos)}</span>
-                </li>
-              ))}
+            <ul className="flex flex-col gap-3.5">
+              {(() => {
+                const maxValor = Math.max(1, ...(d?.motivos ?? []).map((m) => m.valor_centavos))
+                return d?.motivos.map((m) => (
+                  <li key={m.motivo} className="text-sm">
+                    <div className="flex items-baseline gap-3">
+                      <span className="min-w-0 flex-1 break-words text-tinta first-letter:uppercase">{m.motivo}</span>
+                      <span className="tabular flex-none text-tinta-2">{m.pedidos} {m.pedidos === 1 ? 'pedido' : 'pedidos'}</span>
+                      <span className="tabular w-24 flex-none text-right text-tinta">{formatarCentavos(m.valor_centavos)}</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-pill bg-papel-2" aria-hidden>
+                      <div className="h-full rounded-pill bg-barro/70" style={{ width: `${Math.max(3, Math.round((m.valor_centavos / maxValor) * 100))}%` }} />
+                    </div>
+                  </li>
+                ))
+              })()}
             </ul>
           )}
         </div>

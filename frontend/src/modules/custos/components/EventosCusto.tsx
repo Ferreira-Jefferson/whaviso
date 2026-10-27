@@ -34,19 +34,23 @@ export function EventosCusto({ periodo }: { periodo: Periodo }) {
         <>
           <ul className="divide-y divide-linha">
             {itens.map((e) => (
-              <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm">
-                <Badge tom="neutro">{ROTULO_CATEGORIA[e.categoria]}</Badge>
-                <span className="min-w-0 flex-1 truncate text-tinta-2" title={e.origem}>
-                  {e.origem}{e.quantidade > 1 ? ` · ${e.quantidade.toLocaleString('pt-BR')} un.` : ''}
-                </span>
-                <span className="tabular text-xs text-tinta-2">{formatarDataHora(e.criado_em)}</span>
-                <span className="tabular w-24 text-right text-tinta">{formatarCentavos(e.valor_centavos)}</span>
+              <li key={e.id} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Badge tom="neutro">{ROTULO_CATEGORIA[e.categoria]}</Badge>
+                    <span className="min-w-0 truncate text-tinta" title={e.origem}>
+                      {e.origem}{e.quantidade > 1 ? ` · ${e.quantidade.toLocaleString('pt-BR')} un.` : ''}
+                    </span>
+                  </div>
+                  <span className="tabular mt-1 block text-xs text-tinta-2">{formatarDataHora(e.criado_em)}</span>
+                </div>
+                <span className="tabular flex-none pt-0.5 text-right text-tinta">{formatarCentavos(e.valor_centavos)}</span>
               </li>
             ))}
           </ul>
           {q.hasNextPage && (
-            <div>
-              <Button variante="secondary" onClick={() => void q.fetchNextPage()} disabled={q.isFetchingNextPage}>
+            <div className="flex justify-center pt-1">
+              <Button variante="secondary" onClick={() => void q.fetchNextPage()} disabled={q.isFetchingNextPage} loading={q.isFetchingNextPage}>
                 {q.isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
               </Button>
             </div>

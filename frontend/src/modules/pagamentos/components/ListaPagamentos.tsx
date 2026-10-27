@@ -1,7 +1,7 @@
 // Cobrancas Pix da loja: filtro por status, ver o codigo copia e cola, marcar pago (conciliar)
 // e cancelar as pendentes. Datas em America/Sao_Paulo, valor em centavos.
 import { useState } from 'react'
-import { QrCode, Wallet } from 'lucide-react'
+import { Clock, QrCode, Wallet } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import {
   Badge,
@@ -46,6 +46,11 @@ export function ListaPagamentos() {
   const cancelar = useCancelarPagamento()
   const lista = consulta.data ?? []
 
+  // Resumo da lista visível (o filtro define o que entra). Soma o que ainda aguarda Pix:
+  // é o dinheiro acionável, por isso ganha destaque acima da tabela.
+  const pendentes = lista.filter((p) => p.status === 'pendente')
+  const totalAguardando = pendentes.reduce((soma, p) => soma + p.valor_centavos, 0)
+
   async function confirmar() {
     if (!acao) return
     const { tipo, pagamento } = acao
@@ -65,7 +70,11 @@ export function ListaPagamentos() {
       chave: 'pedido',
       titulo: 'Pedido',
       principal: true,
-      render: (p) => <span className="font-medium text-tinta">Pedido {refPedido(p.pedido_id)}</span>,
+      render: (p) => (
+        <span className="font-medium text-tinta">
+          Pedido <span className="tabular font-semibold">#{refPedido(p.pedido_id)}</span>
+        </span>
+      ),
     },
     {
       chave: 'status',
@@ -90,17 +99,23 @@ export function ListaPagamentos() {
       ocultarRotuloMobile: true,
       alinhar: 'direita',
       render: (p) => (
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
           {p.br_code && (
-            <Button variante="secondary" onClick={() => setVerCodigo(p)}>
+            <Button variante="secondary" className="max-md:flex-1" onClick={() => setVerCodigo(p)}>
               <QrCode strokeWidth={1.75} className="size-4" aria-hidden />
               Ver Pix
             </Button>
           )}
           {p.status === 'pendente' && (
             <>
-              <Button onClick={() => setAcao({ tipo: 'conciliar', pagamento: p })}>Marcar pago</Button>
-              <Button variante="ghost" onClick={() => setAcao({ tipo: 'cancelar', pagamento: p })}>
+              <Button className="max-md:flex-1" onClick={() => setAcao({ tipo: 'conciliar', pagamento: p })}>
+                Marcar pago
+              </Button>
+              <Button
+                variante="ghost"
+                className="max-md:flex-1"
+                onClick={() => setAcao({ tipo: 'cancelar', pagamento: p })}
+              >
                 Cancelar
               </Button>
             </>
@@ -112,8 +127,25 @@ export function ListaPagamentos() {
 
   return (
     <div>
-      <div className="mb-4">
-        <SegmentedControl ariaLabel="Status da cobrança" value={filtro} onChange={setFiltro} options={OPCOES} />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="-mx-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
+          <SegmentedControl
+            ariaLabel="Status da cobrança"
+            value={filtro}
+            onChange={setFiltro}
+            options={OPCOES}
+            semQuebra
+          />
+        </div>
+        {pendentes.length > 0 && (
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-tinta-2">
+            <Clock className="size-4 flex-none text-ambar" strokeWidth={1.75} aria-hidden />
+            <MoneyText centavos={totalAguardando} className="text-ambar" />
+            <span>
+              aguardando Pix em {pendentes.length} {pendentes.length === 1 ? 'cobrança' : 'cobranças'}
+            </span>
+          </p>
+        )}
       </div>
 
       {consulta.isPending && (

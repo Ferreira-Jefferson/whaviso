@@ -64,25 +64,40 @@ export default function Avaliacoes() {
         {lista.isSuccess && itens.length > 0 && (
           <>
             <ul className="flex flex-col gap-3" aria-label="Avaliações">
-              {itens.map((a) => (
-                <li key={a.id}>
-                  <Card className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Estrelas nota={a.nota} />
-                      <span className="text-xs tabular-nums text-tinta-2">{formatarDataHora(a.criado_em)}</span>
-                    </div>
-                    <p className="text-sm text-tinta">
-                      <span className="font-medium">{a.cliente_nome ?? 'Cliente sem nome'}</span>
-                      <span className="text-tinta-2"> · pedido #{a.pedido_codigo}</span>
-                    </p>
-                    {a.comentario ? (
-                      <p className="whitespace-pre-line break-words text-sm text-tinta-2">{a.comentario}</p>
-                    ) : (
-                      <p className="text-sm italic text-tinta-2">Sem comentário.</p>
-                    )}
-                  </Card>
-                </li>
-              ))}
+              {itens.map((a) => {
+                const inicial = (a.cliente_nome?.trim()?.[0] ?? '?').toUpperCase()
+                return (
+                  <li key={a.id}>
+                    <Card className="flex flex-col gap-3">
+                      <div className="flex items-start gap-3">
+                        <span
+                          aria-hidden
+                          className="flex size-9 flex-none items-center justify-center rounded-pill bg-salvia-claro text-sm font-semibold text-salvia"
+                        >
+                          {inicial}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+                            <p className="text-sm text-tinta">
+                              <span className="font-medium">{a.cliente_nome ?? 'Cliente sem nome'}</span>
+                              <span className="text-tinta-2"> · pedido #{a.pedido_codigo}</span>
+                            </p>
+                            <span className="text-xs tabular-nums text-tinta-2">{formatarDataHora(a.criado_em)}</span>
+                          </div>
+                          <Estrelas nota={a.nota} className="mt-1" />
+                        </div>
+                      </div>
+                      {a.comentario ? (
+                        <p className="whitespace-pre-line break-words border-l-2 border-linha pl-3 text-sm text-tinta">
+                          {a.comentario}
+                        </p>
+                      ) : (
+                        <p className="text-sm italic text-tinta-2">Sem comentário.</p>
+                      )}
+                    </Card>
+                  </li>
+                )
+              })}
             </ul>
             {lista.hasNextPage && (
               <div className="flex justify-center">

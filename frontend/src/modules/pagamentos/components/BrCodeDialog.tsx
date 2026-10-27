@@ -1,10 +1,10 @@
 // Mostra o BR Code (Pix copia e cola) de uma cobranca para o dono copiar. O texto so existe em
 // memoria enquanto o dialog esta aberto: nao e logado, nao vai para URL nem storage.
 import { useState } from 'react'
-import { Check, Copy } from 'lucide-react'
-import { Button, Dialog, MoneyText, useToast } from '@/shared/ui'
+import { Check, Copy, Info } from 'lucide-react'
+import { Badge, Button, Dialog, MoneyText, useToast } from '@/shared/ui'
 import type { PagamentoSaida } from '@/shared/contracts/_generated/pagamentos'
-import { refPedido } from '../estados'
+import { ROTULO_STATUS, TOM_STATUS, refPedido } from '../estados'
 
 interface Props {
   pagamento: PagamentoSaida | null
@@ -58,24 +58,37 @@ export function BrCodeDialog({ pagamento, onFechar }: Props) {
       }
     >
       {pagamento && (
-        <div className="flex flex-col gap-3">
-          <p>
-            Valor: <MoneyText centavos={pagamento.valor_centavos} className="font-medium text-tinta" />
-          </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3 rounded-input border border-linha bg-papel-2 px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-xs text-tinta-2">Valor da cobrança</span>
+              <MoneyText centavos={pagamento.valor_centavos} className="text-xl text-tinta" />
+            </div>
+            <Badge tom={TOM_STATUS[pagamento.status]}>{ROTULO_STATUS[pagamento.status]}</Badge>
+          </div>
+
           {codigo ? (
-            <textarea
-              readOnly
-              rows={5}
-              value={codigo}
-              aria-label="Código Pix copia e cola"
-              onFocus={(e) => e.currentTarget.select()}
-              className="w-full resize-none break-all rounded-input border border-linha bg-papel-2 p-3 font-mono text-xs text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-            />
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-tinta-2">Pix copia e cola</span>
+              <textarea
+                readOnly
+                rows={5}
+                value={codigo}
+                aria-label="Código Pix copia e cola"
+                onFocus={(e) => e.currentTarget.select()}
+                className="w-full resize-none break-all rounded-input border border-linha bg-papel-2 p-3 font-mono text-xs text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+              />
+              <p className="text-xs text-tinta-2">Envie este código para o cliente pagar pelo app do banco.</p>
+            </div>
           ) : (
-            <p>Esta cobrança não tem código Pix disponível.</p>
+            <p className="text-sm text-tinta-2">Esta cobrança não tem código Pix disponível.</p>
           )}
+
           {pagamento.status !== 'pendente' && (
-            <p className="text-xs">Esta cobrança não está mais aguardando pagamento.</p>
+            <p className="flex items-start gap-2 rounded-input border border-linha bg-papel-2 px-3 py-2 text-xs text-tinta-2">
+              <Info strokeWidth={1.75} className="mt-0.5 size-4 flex-none" aria-hidden />
+              Esta cobrança não está mais aguardando pagamento.
+            </p>
           )}
         </div>
       )}

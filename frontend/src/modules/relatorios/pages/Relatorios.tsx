@@ -37,8 +37,8 @@ export default function Relatorios() {
         descricao="Vendas, pagamentos, problemas e retenção de clientes."
         acoes={<SeletorPeriodo dias={dias} onChange={setDias} opcoes={OPCOES_PERIODO} />}
       />
-      <div className="mb-4 max-w-full overflow-x-auto">
-        <SegmentedControl ariaLabel="Relatório" value={aba} onChange={setAba} options={ABAS} />
+      <div className="mb-4 sm:max-w-xl">
+        <SegmentedControl ariaLabel="Relatório" value={aba} onChange={setAba} options={ABAS} preencher />
       </div>
       {aba === 'vendas' && <SecaoVendas periodo={periodo} />}
       {aba === 'pagamentos' && <SecaoPagamentos periodo={periodo} />}

@@ -130,6 +130,11 @@ function Formulario({ aoFechar, aoCriar }: Pick<Props, 'aoFechar' | 'aoCriar'>) 
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-medium text-tinta">Variáveis do template</legend>
         <p className="text-xs text-tinta-2">Valores fixos, iguais para todos os destinatários.</p>
+        {variaveis.length === 0 && (
+          <p className="rounded-input border border-dashed border-linha px-3 py-2.5 text-xs text-tinta-2">
+            Nenhuma variável. Adicione se o template tiver campos a preencher.
+          </p>
+        )}
         {variaveis.map((v, i) => (
           <div key={i} className="flex items-start gap-2">
             <Input
@@ -151,6 +156,7 @@ function Formulario({ aoFechar, aoCriar }: Pick<Props, 'aoFechar' | 'aoCriar'>) 
               type="button"
               variante="ghost"
               aria-label={`Remover variável ${i + 1}`}
+              className="w-11 flex-none px-0 text-tinta-2 hover:bg-barro/10 hover:text-barro"
               onClick={() => setVariaveis((l) => l.filter((_, j) => j !== i))}
             >
               <Trash2 className="size-4" aria-hidden />

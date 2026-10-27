@@ -72,13 +72,18 @@ export default function Campanhas() {
         />
       )}
       {lista.isSuccess && itens.length > 0 && (
-        <TableResponsive
-          colunas={COLUNAS}
-          linhas={itens}
-          chaveLinha={(c) => c.id}
-          onRowClick={(c) => setAbertoId(c.id)}
-          legenda="Campanhas"
-        />
+        <>
+          <p className="mb-3 text-sm text-tinta-2" aria-live="polite">
+            {itens.length} {itens.length === 1 ? 'campanha' : 'campanhas'}
+          </p>
+          <TableResponsive
+            colunas={COLUNAS}
+            linhas={itens}
+            chaveLinha={(c) => c.id}
+            onRowClick={(c) => setAbertoId(c.id)}
+            legenda="Campanhas"
+          />
+        </>
       )}
 
       <NovaCampanhaDialog aberto={criando} aoFechar={() => setCriando(false)} aoCriar={setAbertoId} />

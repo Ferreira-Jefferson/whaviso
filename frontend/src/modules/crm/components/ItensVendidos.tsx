@@ -21,15 +21,23 @@ const JANELAS = [
 
 export function ItensVendidos({ dias, aoMudarDias }: { dias: number; aoMudarDias: (d: number) => void }) {
   const consulta = useCrmItens(dias)
+  const total = consulta.data?.itens.length ?? 0
   return (
     <div className="flex flex-col gap-4">
-      <Select
-        ariaLabel="Período"
-        value={String(dias)}
-        onChange={(v) => aoMudarDias(Number(v))}
-        options={JANELAS}
-        className="w-full sm:w-56"
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Select
+          ariaLabel="Período"
+          value={String(dias)}
+          onChange={(v) => aoMudarDias(Number(v))}
+          options={JANELAS}
+          className="w-full sm:w-56"
+        />
+        {consulta.isSuccess && total > 0 && (
+          <p className="text-xs text-tinta-2">
+            {total === 1 ? '1 item' : `${total} itens`} com venda no período
+          </p>
+        )}
+      </div>
       {consulta.isPending && (
         <div aria-busy="true" className="flex flex-col gap-3">
           {[0, 1, 2, 3].map((i) => (

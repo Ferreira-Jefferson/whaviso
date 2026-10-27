@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Send, UsersRound } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { formatarDataHora } from '@/shared/format'
-import { Badge, Banner, Button, ConfirmDialog, Dialog, ErrorState, Skeleton, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, cn, ConfirmDialog, Dialog, ErrorState, Skeleton, useToast } from '@/shared/ui'
 import { useCampanha, useCancelarCampanha, useDestinatarios, useDispararCampanha, type CampanhaDetalhe } from '../api'
 import { ROTULO_STATUS, rotuloPublico, TOM_STATUS } from '../estados'
 
@@ -16,6 +16,19 @@ interface Props {
 const ERROS_DISPARO: Record<string, string> = {
   campanha_nao_disparavel: 'Esta campanha já foi disparada ou cancelada.',
 }
+
+// As seis contagens de entrega são estados mutuamente exclusivos de cada envio (somam o total de
+// destinatários): dá para ler como um funil, da fila à leitura, com as falhas e cancelamentos à parte.
+// A ordem segue o ciclo de vida da mensagem; a cor de cada etapa é reusada na barra e no marcador.
+type ChaveEntrega = keyof CampanhaDetalhe['entrega']
+const METRICAS: ReadonlyArray<{ chave: ChaveEntrega; rotulo: string; cor: string; texto: string }> = [
+  { chave: 'enfileirados', rotulo: 'Na fila', cor: 'bg-ambar', texto: 'text-ambar' },
+  { chave: 'enviados', rotulo: 'Enviadas', cor: 'bg-revisao', texto: 'text-revisao' },
+  { chave: 'entregues', rotulo: 'Entregues', cor: 'bg-folha', texto: 'text-folha' },
+  { chave: 'lidos', rotulo: 'Lidas', cor: 'bg-salvia', texto: 'text-salvia' },
+  { chave: 'falhas', rotulo: 'Falhas', cor: 'bg-barro', texto: 'text-barro' },
+  { chave: 'cancelados', rotulo: 'Canceladas', cor: 'bg-cinza-expirado', texto: 'text-cinza-expirado' },
+]
 
 export function DetalheCampanhaDialog({ id, aoFechar }: Props) {
   const consulta = useCampanha(id)
@@ -49,7 +62,6 @@ function Corpo({ campanha }: { campanha: CampanhaDetalhe }) {
   }
 
   const total = previa.data?.total
-  const e = campanha.entrega
   const variaveis = Object.entries(campanha.variaveis)
 
   return (
@@ -118,29 +130,7 @@ function Corpo({ campanha }: { campanha: CampanhaDetalhe }) {
         </section>
       )}
 
-      {!rascunho && (
-        <section>
-          <h3 className="mb-2 text-sm font-medium text-tinta">
-            Entrega ({campanha.total_destinatarios} {campanha.total_destinatarios === 1 ? 'destinatário' : 'destinatários'})
-          </h3>
-          {campanha.enfileirado_em && (
-            <p className="mb-2 text-xs text-tinta-2">Disparada em {formatarDataHora(campanha.enfileirado_em)}</p>
-          )}
-          <div className="grid grid-cols-3 gap-2.5">
-            <Contagem rotulo="Na fila" valor={e.enfileirados} />
-            <Contagem rotulo="Enviadas" valor={e.enviados} />
-            <Contagem rotulo="Entregues" valor={e.entregues} />
-            <Contagem rotulo="Lidas" valor={e.lidos} />
-            <Contagem rotulo="Falhas" valor={e.falhas} destaque={e.falhas > 0} />
-            <Contagem rotulo="Canceladas" valor={e.cancelados} />
-          </div>
-          {campanha.status === 'enfileirada' && (
-            <Button className="mt-3" variante="secondary" onClick={() => setConfirmaCancelar(true)}>
-              Cancelar envios pendentes
-            </Button>
-          )}
-        </section>
-      )}
+      {!rascunho && <PainelEntrega campanha={campanha} aoCancelar={() => setConfirmaCancelar(true)} />}
 
       <ConfirmDialog
         aberto={confirmaDisparo}
@@ -197,11 +187,88 @@ function Corpo({ campanha }: { campanha: CampanhaDetalhe }) {
   )
 }
 
-function Contagem({ rotulo, valor, destaque }: { rotulo: string; valor: number; destaque?: boolean }) {
+function PainelEntrega({
+  campanha,
+  aoCancelar,
+}: {
+  campanha: CampanhaDetalhe
+  aoCancelar: () => void
+}) {
+  const e = campanha.entrega
+  const total = campanha.total_destinatarios
+  const ativa = campanha.status === 'enfileirada'
+  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0)
+  const plural = total === 1 ? 'destinatário' : 'destinatários'
+  const resumo =
+    `Entrega para ${total} ${plural}: ${e.enfileirados} na fila, ${e.enviados} enviadas, ` +
+    `${e.entregues} entregues, ${e.lidos} lidas, ${e.falhas} falhas e ${e.cancelados} canceladas.`
+
   return (
-    <div className="flex flex-col gap-1 rounded-input border border-linha bg-papel-2 p-3">
-      <span className="text-xs text-tinta-2">{rotulo}</span>
-      <span className={`text-lg font-semibold tabular-nums ${destaque ? 'text-barro' : 'text-tinta'}`}>{valor}</span>
-    </div>
+    <section>
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h3 className="text-sm font-medium text-tinta">
+          Entrega <span className="font-normal text-tinta-2">· {total} {plural}</span>
+        </h3>
+        {ativa ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-tinta-2">
+            <span className="relative flex size-2" aria-hidden>
+              <span className="absolute inline-flex size-full animate-ping rounded-pill bg-folha opacity-60" />
+              <span className="relative inline-flex size-2 rounded-pill bg-folha" />
+            </span>
+            Atualiza sozinho
+          </span>
+        ) : (
+          campanha.enfileirado_em && (
+            <span className="text-xs text-tinta-2">Disparada em {formatarDataHora(campanha.enfileirado_em)}</span>
+          )
+        )}
+      </div>
+      {ativa && campanha.enfileirado_em && (
+        <p className="mb-3 text-xs text-tinta-2">Disparada em {formatarDataHora(campanha.enfileirado_em)}</p>
+      )}
+
+      {/* Barra-funil: cada etapa ocupa sua fatia do total. Decorativa; o texto vai nos cartões + resumo. */}
+      <div className="mt-1 flex h-2.5 w-full gap-px overflow-hidden rounded-pill bg-papel-2" aria-hidden>
+        {total > 0 &&
+          METRICAS.map((m) => {
+            const n = e[m.chave]
+            if (n === 0) return null
+            return <div key={m.chave} className={m.cor} style={{ width: `${(n / total) * 100}%` }} />
+          })}
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        {METRICAS.map((m) => {
+          const n = e[m.chave]
+          const alerta = (m.chave === 'falhas' || m.chave === 'cancelados') && n > 0
+          return (
+            <div
+              key={m.chave}
+              className={cn('rounded-input border bg-papel-2 px-3 py-2.5', alerta ? 'border-barro/30' : 'border-linha')}
+            >
+              <dt className="flex items-center gap-1.5 text-xs text-tinta-2">
+                <span className={cn('size-2 flex-none rounded-pill', m.cor)} aria-hidden />
+                {m.rotulo}
+              </dt>
+              <dd className="mt-1 flex items-baseline gap-1.5">
+                <span className={cn('text-lg font-semibold tabular-nums', n > 0 ? m.texto : 'text-tinta-2')}>{n}</span>
+                {total > 0 && n > 0 && <span className="text-xs tabular-nums text-tinta-2">{pct(n)}%</span>}
+              </dd>
+            </div>
+          )
+        })}
+      </dl>
+
+      {/* Único ponto de leitura dinâmica: anuncia apenas quando os números mudam (a cada refetch de 15s). */}
+      <p className="sr-only" aria-live="polite">
+        {resumo}
+      </p>
+
+      {ativa && (
+        <Button className="mt-3" variante="secondary" onClick={aoCancelar}>
+          Cancelar envios pendentes
+        </Button>
+      )}
+    </section>
   )
 }

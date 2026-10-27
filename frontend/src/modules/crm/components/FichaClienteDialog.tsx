@@ -17,7 +17,7 @@ interface Props {
 export function FichaClienteDialog({ id, aoFechar }: Props) {
   const consulta = useCrmDetalhe(id)
   return (
-    <Dialog aberto={id != null} onFechar={aoFechar} titulo="Ficha do cliente" className="max-w-xl">
+    <Dialog aberto={id != null} onFechar={aoFechar} titulo="Ficha do cliente" className="max-h-[88vh] max-w-xl overflow-y-auto">
       {consulta.isPending && id != null && <Esqueleto />}
       {consulta.isError && <ErrorState aoTentarDeNovo={() => void consulta.refetch()} />}
       {consulta.data && <Corpo ficha={consulta.data} />}
@@ -46,7 +46,11 @@ function Corpo({ ficha }: { ficha: CrmDetalhe }) {
           rotulo="Última compra"
           valor={
             <span className="tabular-nums">
-              {m.recencia_dias == null ? 'Nenhuma' : m.recencia_dias === 0 ? 'Hoje' : `há ${m.recencia_dias} d`}
+              {m.recencia_dias == null
+                ? 'Nenhuma'
+                : m.recencia_dias === 0
+                  ? 'Hoje'
+                  : `há ${m.recencia_dias} ${m.recencia_dias === 1 ? 'dia' : 'dias'}`}
             </span>
           }
         />
@@ -71,13 +75,18 @@ function Corpo({ ficha }: { ficha: CrmDetalhe }) {
           <p className="text-sm text-tinta-2">Ainda sem itens para mostrar.</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
-            {ficha.itens_favoritos.map((i) => (
+            {ficha.itens_favoritos.map((i, idx) => (
               <li
                 key={i.item_id ?? i.nome}
                 className="flex items-center justify-between gap-3 rounded-input border border-linha bg-papel-2 px-3 py-2 text-sm"
               >
-                <span className="min-w-0 truncate text-tinta">{i.nome}</span>
-                <span className="tabular-nums text-tinta-2">{i.quantidade}x</span>
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex size-5 flex-none items-center justify-center rounded-pill bg-salvia-claro text-[11px] font-bold tabular-nums text-salvia">
+                    {idx + 1}
+                  </span>
+                  <span className="min-w-0 truncate text-tinta">{i.nome}</span>
+                </span>
+                <span className="flex-none tabular-nums text-tinta-2">{i.quantidade}x</span>
               </li>
             ))}
           </ul>

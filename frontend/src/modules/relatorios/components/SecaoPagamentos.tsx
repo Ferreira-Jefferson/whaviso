@@ -22,6 +22,8 @@ export function SecaoPagamentos({ periodo }: { periodo: Periodo }) {
         <Tile rotulo="Transações" carregando={q.isPending} valor={d ? String(d.linhas.reduce((s, l) => s + l.transacoes, 0)) : null} />
       </div>
       <Card>
+        <h2 className="text-lg text-salvia">Formas de pagamento</h2>
+        <div className="mt-3">
         {q.isPending ? (
           <div className="grid gap-3" aria-busy="true"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-2/3" /></div>
         ) : d && d.linhas.length === 0 ? (
@@ -46,6 +48,7 @@ export function SecaoPagamentos({ periodo }: { periodo: Periodo }) {
             })}
           </ul>
         )}
+        </div>
       </Card>
     </div>
   )
