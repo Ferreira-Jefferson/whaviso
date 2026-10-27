@@ -20,6 +20,10 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 
 ## Onda 0: Fundação (quase tudo depende daqui)
 
+> **FUNDAÇÃO CONCLUÍDA** (F0..F7 todos `CONCLUIDO`). Gate verde ponta a ponta: lint + typecheck +
+> `npm test` (api 82, atendente 5, zap 26, shared 115) + `test:security` (105) + `check:contracts`.
+> A Onda 1 (laço do pedido) pode abrir em paralelo, cada módulo de backend no seu banco de teste.
+
 | ID | Módulo | Objetivo | Depende de | Modelo | Arquivo | Status |
 |---|---|---|---|---|---|---|
 | F0  | db-baseline | Schema multi-tenant, roles, RLS, grants por coluna | — | — | 00-fundacao/db-baseline.md | CONCLUIDO |
@@ -29,7 +33,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | F4  | api-core | server/app/routes registry, http_errors, config, logger, fronteira `shared/db` | F0, F1, F3 | Sonnet | 00-fundacao/api-core.md | CONCLUIDO |
 | F5  | realtime-sse | SSE na api sobre `LISTEN/NOTIFY` do Postgres | F4 | Sonnet | 00-fundacao/realtime-sse.md | CONCLUIDO |
 | F6  | front-shell | SPA shell, api_client, auth (login), `_generated`, ui kit, tenant/branding, realtime client | F1, F4 | Sonnet | 00-fundacao/front-shell.md | CONCLUIDO |
-| F7  | seguranca-harness | Suíte `security/`, helpers `SET ROLE`, redaction, cobertura RLS no CI | F0, F4 | Opus | seguranca/harness.md | EM ANDAMENTO (agente) |
+| F7  | seguranca-harness | Suíte `security/`, helpers `SET ROLE`, redaction, cobertura RLS no CI | F0, F4 | Opus | seguranca/harness.md | CONCLUIDO (revisao Opus ok; 105 testes, gate no CI) |
 
 ## Onda 1: Núcleo do pedido (loop ponta a ponta, fluxo hardcoded, sem LLM)
 
