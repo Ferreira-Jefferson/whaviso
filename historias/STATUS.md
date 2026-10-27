@@ -50,7 +50,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | ZAP-webhook | webhook_whatsapp | Inbound -> enfileira; recibos; idempotência `wamid` | F4, API-conversas, API-clientes, ZAP-meta | Opus | backend-zap/webhook_whatsapp.md | CONCLUIDO |
 | ZAP-enviar | enviar | Drena outbox `envios` -> Meta, claim SKIP LOCKED | ZAP-meta | Sonnet | backend-zap/enviar.md | CONCLUIDO |
 | AT-motor-min | motor_fluxo (hardcoded) | Grafo fixo do pedido por botões/regras, sem LLM | API-pedidos, API-cardapio, API-conversas, ZAP-enviar | Opus | backend-atendente/motor_fluxo.md | CONCLUIDO (revisao Opus: 1 critico + achados corrigidos e reverificados) |
-| FR-nucleo | telas do núcleo | Lojas, números, cardápio, pedidos (kanban), clientes, conversas | F6 + cada API-* da tela; **mock HTML + autoverificação visual** | Sonnet | frontend/nucleo.md | A FAZER |
+| FR-nucleo | telas do núcleo | Lojas, números, cardápio, pedidos (kanban), clientes, conversas | F6 + cada API-* da tela; **mock HTML + autoverificação visual** | Sonnet | frontend/nucleo.md | CONCLUIDO (6 telas no git; kanban com arrastar+Mover bidirecional) |
 
 > **Onda 1, camada 1 integrada e no git (2026-10-27).** 7 modulos construidos em paralelo (cada um no
 > seu banco de teste), integrados com commits atomicos: matriz de seguranca (0013 convites), kernel
@@ -85,8 +85,26 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 > area). O laco do pedido anda ponta a ponta no backend: inbound -> motor -> pedido no kanban -> outbox
 > -> envio. Limitacoes documentadas do motor-min (nao-bloqueantes): sem 2o pedido na mesma conversa sem
 > handoff; `sugerivel` a nivel de item (cross-sell) adiado; gate de area so bloqueia bairro conhecido.
-> **Falta da Onda 1 so o FR-nucleo (telas).** Antes dele: promover os contratos Zod dos modulos para
-> `packages/shared/contracts` + `gen:contracts` (hoje cada modulo os tem locais em `schemas.ts`).
+> **Onda 1 COMPLETA (2026-10-27):** FR-nucleo integrado e no git. 5 telas (cardapio, clientes,
+> conversas, lojas, numeros) construidas em fan-out paralelo + o kanban de pedidos (tela de referencia,
+> com arrastar entre colunas no desktop e botao Mover bidirecional no mobile/a11y). Rotas ligadas; front
+> typecheck+lint verdes. Gap aberto: handoff assumir/devolver na tela de conversas espera o modulo
+> **API-handoff** (ainda nao existe) para ligar o botao.
+>
+> **Onda 2 (gestao do restaurante) BACKEND COMPLETO (2026-10-27):** 7 modulos construidos em fan-out
+> paralelo (ate 13 subagentes simultaneos) e integrados um a um com commit atomico: API-estoque-itens
+> (0023), API-disponibilidade (0024), API-pessoas (0025, renomeado de funcionarios: "pessoas" porque
+> motoboy/churrasqueiro trabalham pro restaurante sem ser CLT), API-estoque-insumos (0026),
+> API-ficha-tecnica (0027), API-caixa/PDV (0028), API-salao (0029). Gate verde ponta a ponta: typecheck
+> + lint + 648 testes (api 418, atendente 25, zap 65, shared 140) + 175 de seguranca (matriz: 156 casos).
+> Revisao de integracao achou 7 falhas (1 bug real de meia-noite na disponibilidade, 1 de listagem, e 5
+> fragilidades de teste/status), TODAS corrigidas e reverificadas. Contratos regenerados para o front.
+> Regras de negocio em `historias/regras-negocio/`. PENDENTE do cloud: `supabase db push` das 0023-0029
+> (perguntar antes, acao de producao).
+>
+> **Proximas frentes:** FR das telas da Onda 2 (pessoas, estoque, disponibilidade, caixa/PDV, salao);
+> API-handoff; promover a baixa de estoque/insumo para dentro do laco de venda; Onda 2 IA (atendente:
+> human-in-the-loop, trava de escopo, anti prompt-injection, ver historias/regras-negocio e memoria).
 
 ## Onda 2: IA no atendimento
 
@@ -188,7 +206,7 @@ migration usa o número reservado; se precisar de uma não listada, pega o próx
 | 0022 | fluxos (fluxos/versoes) | API-fluxo |
 | 0023 | itens_quantidade_disponivel (contador por item + decremento na venda) | API-cardapio (+) / API-pedidos |
 | 0024 | lojas_disponibilidade (feriados/excecoes + janela do atendente LLM) | API-lojas (+) |
-| 0025 | funcionarios (funcionarios, cargos, escalas; vincula motoboy) | API-funcionarios |
+| 0025 | pessoas (pessoas, cargos, escalas; motoboy cargo fixo) | API-pessoas |
 | 0026 | estoque_insumos (insumos, unidades, minimos, movimentos) | API-estoque-insumos |
 | 0027 | ficha_tecnica (receita item -> insumos; baixa na venda) | API-ficha-tecnica |
 
