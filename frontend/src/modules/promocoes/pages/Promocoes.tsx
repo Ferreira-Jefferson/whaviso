@@ -14,12 +14,12 @@ import {
   SegmentedControl,
   Select,
   Skeleton,
+  Switch,
   TableResponsive,
   useToast,
   type ColunaTabela,
 } from '@/shared/ui'
 import { useAtualizarPromocao, usePromocoes, type Promocao, type PromocaoTipo } from '../api'
-import { Alternador } from '../components/Alternador'
 import { PromocaoDialog } from '../components/PromocaoDialog'
 import { TestarCupomDialog } from '../components/TestarCupomDialog'
 import { ROTULO_SITUACAO, ROTULO_TIPO, situacaoDe, TIPOS, TOM_SITUACAO } from '../estados'
@@ -132,20 +132,23 @@ export default function Promocoes() {
       ocultarRotuloMobile: true,
       alinhar: 'direita',
       render: (p) => (
-        <Alternador
-          ligado={p.ativo}
-          rotulo={`${p.ativo ? 'Desligar' : 'Ligar'} ${p.nome}`}
-          carregando={ocupadoId === p.id}
-          onMudar={(ligado) =>
-            alternar.mutate(
-              { id: p.id, body: { ativo: ligado } },
-              {
-                onError: (e) =>
-                  mostrarToast(e instanceof ApiError ? e.message : 'Não foi possível mudar a promoção.', { tom: 'erro' }),
-              },
-            )
-          }
-        />
+        // Envolve em span que barra a propagacao: a linha abre a edicao ao clicar, o Switch nao deve dispara-la.
+        <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+          <Switch
+            ligado={p.ativo}
+            rotulo={`${p.ativo ? 'Desligar' : 'Ligar'} ${p.nome}`}
+            carregando={ocupadoId === p.id}
+            onMudar={(ligado) =>
+              alternar.mutate(
+                { id: p.id, body: { ativo: ligado } },
+                {
+                  onError: (e) =>
+                    mostrarToast(e instanceof ApiError ? e.message : 'Não foi possível mudar a promoção.', { tom: 'erro' }),
+                },
+              )
+            }
+          />
+        </span>
       ),
     },
   ]

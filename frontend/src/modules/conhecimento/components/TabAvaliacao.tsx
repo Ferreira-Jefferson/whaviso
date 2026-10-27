@@ -14,12 +14,12 @@ import {
   Input,
   Select,
   Skeleton,
+  Textarea,
   useToast,
 } from '@/shared/ui'
 import { AvaliacaoCriar, type DocumentoTipo } from '@/shared/contracts/_generated/conhecimento'
 import { useAtualizarAvaliacao, useAvaliacoes, useCriarAvaliacao, useDocumentos } from '../api'
 import { OPCOES_TIPO, ROTULO_TIPO, mensagemErro } from '../estados'
-import { Textarea } from './Textarea'
 
 const OPCOES_TIPO_ESPERADO = [{ value: 'nenhum' as const, label: 'Qualquer tipo' }, ...OPCOES_TIPO]
 

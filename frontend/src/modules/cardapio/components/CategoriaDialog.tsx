@@ -1,10 +1,9 @@
 // Criar / editar categoria. Nome e descricao; a categoria pode ser ligada/desligada pela lista.
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/shared/api_client'
-import { Banner, Button, Dialog, Field, Input } from '@/shared/ui'
+import { Banner, Button, Dialog, Field, Input, Textarea } from '@/shared/ui'
 import type { CategoriaResolvida } from '@/shared/contracts/_generated/cardapio'
 import { useAtualizarCategoria, useCriarCategoria } from '../api'
-import { Textarea } from './Textarea'
 
 interface Props {
   aberto: boolean

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Store } from 'lucide-react'
 import {
+  Avatar,
   Badge,
   Button,
   EmptyState,
@@ -23,7 +24,6 @@ import { useContas } from '../api'
 import { ROTULO_SAUDE, ROTULO_SITUACAO, TOM_SAUDE, TOM_SITUACAO } from '../rotulos'
 import { AreaErro } from './AreaErro'
 import { FichaContaDialog } from './FichaContaDialog'
-import { Monograma } from './Monograma'
 
 type FiltroSituacao = PlataformaSituacaoConta | 'todas'
 
@@ -39,7 +39,7 @@ const COLUNAS: ReadonlyArray<ColunaTabela<PlataformaContaResumo>> = [
     principal: true,
     render: (c) => (
       <span className="flex items-center gap-3">
-        <Monograma nome={c.nome} />
+        <Avatar nome={c.nome} forma="quadrado" tamanho="md" />
         <span className="min-w-0 truncate font-medium text-tinta">{c.nome}</span>
       </span>
     ),

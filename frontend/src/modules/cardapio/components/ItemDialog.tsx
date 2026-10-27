@@ -2,11 +2,10 @@
 // A disponibilidade (ligar/desligar, esgotado) tem fluxo proprio na lista, nao fica aqui.
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/shared/api_client'
-import { Banner, Button, Dialog, Field, Input, MoneyInput, Select } from '@/shared/ui'
+import { Banner, Button, Dialog, Field, Input, MoneyInput, Select, Textarea } from '@/shared/ui'
 import type { ItemResolvido } from '@/shared/contracts/_generated/cardapio'
 import { useAtualizarItem, useCriarItem } from '../api'
 import { CampoCheck } from './CampoCheck'
-import { Textarea } from './Textarea'
 
 interface Props {
   aberto: boolean

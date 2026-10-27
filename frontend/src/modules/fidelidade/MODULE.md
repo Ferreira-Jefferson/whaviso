@@ -27,4 +27,4 @@ e consultar saldo e extrato por cliente. Rota `/fidelidade`.
 - Nao ha listagem de clientes com saldo (so saldo por cliente), por isso a busca previa de cliente.
 
 ## Primitivos locais
-- `Alternador` (copia do padrao do cardapio), `PercentInput`.
+- `Switch` de `@/shared/ui` (antes era copia local `Alternador`, ja consolidada), `PercentInput`.

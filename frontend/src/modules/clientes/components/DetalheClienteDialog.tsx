@@ -5,6 +5,7 @@ import { Lock, MapPin, Package, Wallet } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { formatarData } from '@/shared/format'
 import {
+  Avatar,
   Badge,
   Button,
   cn,
@@ -17,7 +18,6 @@ import {
   useToast,
 } from '@/shared/ui'
 import { useAtualizarCliente, useClienteDetalhe, type ClienteDetalhe } from '../api'
-import { AvatarCliente } from './AvatarCliente'
 
 interface Props {
   /** Id do cliente aberto; null fecha o modal. */
@@ -45,7 +45,7 @@ function Corpo({ cliente }: { cliente: ClienteDetalhe }) {
   return (
     <div className="flex flex-col gap-5 text-left">
       <div className="flex items-start gap-3">
-        <AvatarCliente nome={cliente.nome} tamanho="lg" />
+        <Avatar nome={cliente.nome} tamanho="lg" tom="neutro" />
         <div className="min-w-0 flex-1">
           <EditarNome id={cliente.id} nome={cliente.nome} criadoEm={cliente.criado_em} />
         </div>

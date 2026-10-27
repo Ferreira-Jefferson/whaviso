@@ -26,4 +26,4 @@ minimo, teto de desconto e liga/desliga, mais um simulador de cupom. Rota `/prom
 - Nao ha ordenacao nem busca por nome/codigo na lista.
 
 ## Primitivos locais
-- `Alternador` (copia do padrao do cardapio; para a linha da tabela nao propagar o clique), helpers de data/situacao em `estados.ts`.
+- Usa o `Switch` compartilhado (`@/shared/ui`); na linha da tabela ele vai dentro de um span que barra a propagacao do clique (a linha abre a edicao). Helpers de data/situacao em `estados.ts`.

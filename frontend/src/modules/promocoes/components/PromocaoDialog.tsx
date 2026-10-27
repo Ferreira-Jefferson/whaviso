@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { brl } from '@/shared/format'
-import { Button, Dialog, Field, Input, MoneyInput, Select, SegmentedControl, useToast } from '@/shared/ui'
+import { Button, Dialog, Field, Input, MoneyInput, Select, SegmentedControl, Switch, useToast } from '@/shared/ui'
 import { PromocaoAtualizarEntrada, PromocaoCriarEntrada } from '@/shared/contracts/_generated/promocoes'
 import {
   useAtualizarPromocao,
@@ -15,7 +15,6 @@ import {
   type PromocaoTipo,
 } from '../api'
 import { campoParaIso, isoParaCampo, ROTULO_TIPO, TIPOS } from '../estados'
-import { Alternador } from './Alternador'
 
 interface Props {
   aberto: boolean
@@ -296,7 +295,7 @@ function Formulario({ promocao, aoFechar }: Pick<Props, 'promocao' | 'aoFechar'>
             {ativo ? 'Vale para novos pedidos.' : 'Não vale enquanto estiver desligada.'}
           </span>
         </span>
-        <Alternador ligado={ativo} onMudar={setAtivo} rotulo="Promoção ligada" />
+        <Switch ligado={ativo} onMudar={setAtivo} rotulo="Promoção ligada" />
       </div>
 
       {erroGeral && (

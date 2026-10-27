@@ -2,7 +2,7 @@
 // sem contato (telefone/e-mail) e sem nenhum conteudo da loja (conversa, pedido, cliente final).
 // Suspender/reativar assinatura NAO mora aqui (modulo de cobranca).
 import type { ReactNode } from 'react'
-import { Badge, Dialog, Button, Skeleton } from '@/shared/ui'
+import { Avatar, Badge, Dialog, Button, Skeleton } from '@/shared/ui'
 import { brl, formatarData, formatarDataHora } from '@/shared/format'
 import type {
   PlataformaContaFicha,
@@ -21,7 +21,6 @@ import {
   idCurto,
 } from '../rotulos'
 import { AreaErro } from './AreaErro'
-import { Monograma } from './Monograma'
 
 /** Tom do selo de status do numero (apresentacao; nunca expoe o numero em si). */
 const TOM_STATUS_NUMERO: Record<StatusNumero, TomBadge> = {
@@ -79,7 +78,7 @@ function Conteudo({ ficha }: { ficha: PlataformaContaFicha }) {
   return (
     <div className="text-tinta">
       <div className="flex items-center gap-3">
-        <Monograma nome={ficha.nome} className="size-11" />
+        <Avatar nome={ficha.nome} forma="quadrado" tamanho="lg" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tom={TOM_SITUACAO[ficha.situacao]}>{ROTULO_SITUACAO[ficha.situacao]}</Badge>

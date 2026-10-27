@@ -5,10 +5,9 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, Gift } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { brl, formatarDataHora } from '@/shared/format'
-import { Badge, Banner, Button, Card, Field, Input, MoneyInput, SegmentedControl, cn, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, Field, Input, MoneyInput, SegmentedControl, Switch, cn, useToast } from '@/shared/ui'
 import { ProgramaEntrada } from '@/shared/contracts/_generated/fidelidade'
 import { useSalvarPrograma, type ModoFidelidadeTipo, type Programa, type ProgramaForm as Valores } from '../api'
-import { Alternador } from './Alternador'
 import { PercentInput } from './PercentInput'
 
 type Chave = keyof Valores
@@ -112,7 +111,7 @@ export function ProgramaForm({ programa }: { programa: Programa }) {
             {v.ativo ? 'Clientes acumulam e podem resgatar.' : 'Ninguém acumula nem resgata enquanto estiver desligado.'}
           </p>
         </div>
-        <Alternador ligado={v.ativo} onMudar={(l) => set('ativo', l)} rotulo="Programa ligado" />
+        <Switch ligado={v.ativo} onMudar={(l) => set('ativo', l)} rotulo="Programa ligado" />
       </Card>
 
       <Card className="flex flex-col gap-4">

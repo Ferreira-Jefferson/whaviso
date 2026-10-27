@@ -24,4 +24,4 @@ Gerência do cardápio da loja ativa. Duas seções numa só tela (`/cardapio`):
 - Disponibilidade é decidida pelo servidor (a UI só envia `{ ativo }`); as flags da árvore mandam no visual.
 - Reordenação (endpoints `PUT .../ordem`) ainda não tem UI aqui; a ordem vem do servidor.
 - Vínculos de grupo por categoria/item (herança/exceção) ainda não têm UI aqui.
-- Primitivos locais candidatos a `@/shared/ui`: `components/Alternador.tsx` (switch), `components/Textarea.tsx`.
+- Usa os primitivos compartilhados `Switch` e `Textarea` de `@/shared/ui` (antes eram copias locais, ja consolidadas).

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, Users } from 'lucide-react'
 import { formatarData } from '@/shared/format'
 import {
+  Avatar,
   Button,
   cn,
   EmptyState,
@@ -12,7 +13,6 @@ import {
   type ColunaTabela,
 } from '@/shared/ui'
 import { useClientes, type ClienteItem } from '../api'
-import { AvatarCliente } from '../components/AvatarCliente'
 import { DetalheClienteDialog } from '../components/DetalheClienteDialog'
 
 const COLUNAS: ReadonlyArray<ColunaTabela<ClienteItem>> = [
@@ -22,7 +22,7 @@ const COLUNAS: ReadonlyArray<ColunaTabela<ClienteItem>> = [
     principal: true,
     render: (c) => (
       <span className="flex items-center gap-3">
-        <AvatarCliente nome={c.nome} />
+        <Avatar nome={c.nome} tamanho="md" tom="neutro" />
         <span className={cn('min-w-0 truncate font-medium', c.nome ? 'text-tinta' : 'italic text-tinta-2')}>
           {c.nome ?? 'Cliente sem nome'}
         </span>

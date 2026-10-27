@@ -1,9 +1,8 @@
 // Uma linha de item dentro da categoria: nome, preco, estado e acoes (ligar/desligar, editar).
 import { Pencil } from 'lucide-react'
 import { formatarCentavos } from '@/shared/format'
-import { Badge, Button, cn } from '@/shared/ui'
+import { Badge, Button, Switch, cn } from '@/shared/ui'
 import type { ItemResolvido } from '@/shared/contracts/_generated/cardapio'
-import { Alternador } from './Alternador'
 
 interface Props {
   item: ItemResolvido
@@ -27,7 +26,7 @@ export function ItemLinha({ item, ocupado, aoAlternar, aoEditar }: Props) {
         {item.descricao && <p className="mt-0.5 truncate text-xs text-tinta-2">{item.descricao}</p>}
       </div>
       <span className="flex-none tabular-nums text-sm font-semibold text-tinta">{formatarCentavos(item.preco_centavos)}</span>
-      <Alternador
+      <Switch
         ligado={item.ativo}
         carregando={ocupado}
         onMudar={(ligado) => aoAlternar(item, ligado)}

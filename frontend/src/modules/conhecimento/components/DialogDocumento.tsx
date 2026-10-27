@@ -2,10 +2,9 @@
 // com o dialog aberto, entao o formulario sempre nasce com o estado inicial certo.
 // Validacao de borda com o contrato Zod; a trava de conteudo estavel e do servidor (422).
 import { useState, type FormEvent } from 'react'
-import { Banner, Button, cn, Dialog, Field, Input, Select } from '@/shared/ui'
+import { Banner, Button, cn, Dialog, Field, Input, Select, Textarea } from '@/shared/ui'
 import { DocumentoCriar, type DocumentoTipo } from '@/shared/contracts/_generated/conhecimento'
 import { OPCOES_TIPO } from '../estados'
-import { Textarea } from './Textarea'
 
 export interface ValoresDocumento {
   tipo: DocumentoTipo

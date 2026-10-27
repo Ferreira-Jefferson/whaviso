@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Plus, UserCog } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import {
+  Avatar,
   Badge,
   Banner,
   Button,
@@ -25,7 +26,6 @@ import { papelOperador, type PapelOperador } from '@/shared/contracts/_generated
 import { useAtualizarOperador, useConvidarOperador, useOperadores } from '../api'
 import { ROTULO_PAPEL_OPERADOR } from '../rotulos'
 import { AreaErro } from './AreaErro'
-import { Monograma } from './Monograma'
 
 const OPCOES_PAPEL = papelOperador.options.map((p) => ({ value: p, label: ROTULO_PAPEL_OPERADOR[p] }))
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -48,7 +48,7 @@ export function PainelEquipe() {
       principal: true,
       render: (o) => (
         <span className="flex items-center gap-3">
-          <Monograma nome={o.nome} forma="redondo" inativo={!o.ativo} />
+          <Avatar nome={o.nome} forma="redondo" inativo={!o.ativo} tamanho="md" />
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-medium">
             <span className="truncate text-tinta">{o.nome}</span>
             {!o.ativo && <Badge tom="neutro">Desativado</Badge>}

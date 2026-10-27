@@ -1,9 +1,8 @@
 // Uma linha de opcao dentro do grupo: nome, acrescimo de preco, estado e acoes.
 import { Pencil } from 'lucide-react'
 import { formatarCentavos } from '@/shared/format'
-import { Badge, Button, cn } from '@/shared/ui'
+import { Badge, Button, Switch, cn } from '@/shared/ui'
 import type { OpcaoSaida } from '@/shared/contracts/_generated/cardapio'
-import { Alternador } from './Alternador'
 
 interface Props {
   opcao: OpcaoSaida
@@ -25,7 +24,7 @@ export function OpcaoLinha({ opcao, ocupado, aoAlternar, aoEditar }: Props) {
       {opcao.preco_centavos > 0 && (
         <span className="flex-none tabular-nums text-sm text-tinta-2">+ {formatarCentavos(opcao.preco_centavos)}</span>
       )}
-      <Alternador
+      <Switch
         ligado={opcao.ativo}
         carregando={ocupado}
         onMudar={(ligado) => aoAlternar(opcao, ligado)}
