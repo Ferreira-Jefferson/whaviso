@@ -10,6 +10,7 @@ import {
   ConfirmDialog,
   ErrorState,
   PageHeader,
+  SegmentedControl,
   Select,
   Skeleton,
   useToast,
@@ -37,8 +38,10 @@ import {
 } from '../grafo'
 import { mensagemErro, rotuloNode } from '../estados'
 import { CartaoNode } from './CartaoNode'
+import { ConfigNode } from './ConfigNode'
 import { DialogVersoes } from './DialogVersoes'
 import { PainelValidacao } from './PainelValidacao'
+import { FluxoCanvas } from '../canvas/FluxoCanvas'
 
 interface Props {
   fluxoId: string
@@ -95,6 +98,8 @@ function Corpo({
   const [versoesAberto, setVersoesAberto] = useState(false)
   const [restaurar, setRestaurar] = useState<ResumoVersao | null>(null)
   const [novoTipo, setNovoTipo] = useState(catalogo[0]?.tipo ?? 'saudacao')
+  const [vista, setVista] = useState<'mapa' | 'lista'>('mapa')
+  const [selecionado, setSelecionado] = useState<string | null>(null)
 
   const dirty = !grafosIguais(grafo, salvo)
   const ocupado =
@@ -191,6 +196,14 @@ function Corpo({
   const tipos = catalogo.map((c) => ({ value: c.tipo, label: rotuloNode(c.tipo, c.rotulo) }))
   const ativo = fluxo.ativo
   const podePublicar = temRascunho || dirty
+  // Erros e avisos num array so (a UI marca a etapa; a validade e do servidor).
+  const problemas = (validacao?.erros ?? []).concat(validacao?.avisos ?? [])
+  const nodeSel = selecionado ? (grafo.nodes.find((n) => n.id === selecionado) ?? null) : null
+
+  /** Reposiciona um node (arrasto no canvas): vira rascunho, como qualquer alteracao. */
+  function moverNode(id: string, x: number, y: number) {
+    editar((g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === id ? { ...n, posicao: { x, y } } : n)) }))
+  }
 
   return (
     <div>
@@ -243,7 +256,22 @@ function Corpo({
         </div>
 
         {erro && <Banner tom="erro">{erro}</Banner>}
-        {validacao && <PainelValidacao resultado={validacao} />}
+        {validacao && <PainelValidacao resultado={validacao} aoSelecionar={setSelecionado} />}
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SegmentedControl
+            value={vista}
+            onChange={setVista}
+            options={[
+              { value: 'mapa', label: 'Mapa do fluxo' },
+              { value: 'lista', label: 'Lista de etapas' },
+            ]}
+            ariaLabel="Como ver o fluxo"
+          />
+          <span className="text-xs text-tinta-2">
+            {grafo.nodes.length === 1 ? '1 etapa' : `${grafo.nodes.length} etapas`}
+          </span>
+        </div>
 
         <div className="flex flex-col gap-1.5 rounded-card border border-linha bg-cartao p-4">
           <span className="text-sm font-medium text-tinta">Etapa inicial</span>
@@ -260,47 +288,85 @@ function Corpo({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-display text-base font-semibold text-tinta">Etapas</h2>
-            <span className="text-xs text-tinta-2">
-              {grafo.nodes.length === 1 ? '1 etapa' : `${grafo.nodes.length} etapas`}
-            </span>
-          </div>
-          <ol className="flex flex-col gap-2">
-          {grafo.nodes.map((n, i) => (
-            <CartaoNode
-              key={n.id}
-              node={n}
+        {vista === 'mapa' ? (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <FluxoCanvas
               grafo={grafo}
               catalogo={catalogo}
-              problemas={(validacao?.erros ?? []).concat(validacao?.avisos ?? []).filter((p) => p.node_id === n.id)}
-              indice={i + 1}
+              problemas={problemas}
+              selecionado={selecionado}
+              onSelecionar={setSelecionado}
+              onMover={moverNode}
               podeEditar
-              onTrocarTipo={(tipo) =>
-                editar((g) =>
-                  trocarTipo(g, n.id, tipo, catalogo.find((c) => c.tipo === tipo)?.handles.map((h) => h.id) ?? []),
-                )
-              }
-              onConfig={(c, v) => editar((g) => definirConfig(g, n.id, c, v))}
-              onTransicao={(h, para) => editar((g) => definirTransicao(g, n.id, h, para))}
-              onInicial={() => editar((g) => ({ ...g, inicial: n.id }))}
-              onRemover={() => editar((g) => removerNode(g, n.id))}
             />
-          ))}
-        </ol>
+            <div className="rounded-card border border-linha bg-cartao p-4">
+              {nodeSel ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col">
+                    <span className="font-display text-base font-semibold text-tinta">
+                      {rotuloNode(nodeSel.tipo, catalogo.find((c) => c.tipo === nodeSel.tipo)?.rotulo)}
+                    </span>
+                    <span className="font-mono text-xs text-tinta-2">{nodeSel.id}</span>
+                  </div>
+                  <ConfigNode
+                    node={nodeSel}
+                    grafo={grafo}
+                    catalogo={catalogo}
+                    problemas={problemas.filter((p) => p.node_id === nodeSel.id)}
+                    podeEditar
+                    onTrocarTipo={(tipo) =>
+                      editar((g) =>
+                        trocarTipo(g, nodeSel.id, tipo, catalogo.find((c) => c.tipo === tipo)?.handles.map((h) => h.id) ?? []),
+                      )
+                    }
+                    onConfig={(c, v) => editar((g) => definirConfig(g, nodeSel.id, c, v))}
+                    onTransicao={(h, para) => editar((g) => definirTransicao(g, nodeSel.id, h, para))}
+                    onInicial={() => editar((g) => ({ ...g, inicial: nodeSel.id }))}
+                    onRemover={() => {
+                      editar((g) => removerNode(g, nodeSel.id))
+                      setSelecionado(null)
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-tinta-2">
+                  Toque numa etapa do mapa para configurar o tipo, as mensagens e para onde cada saída leva. Arraste as
+                  etapas para reorganizar o desenho.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <ol className="flex flex-col gap-2">
+            {grafo.nodes.map((n, i) => (
+              <CartaoNode
+                key={n.id}
+                node={n}
+                grafo={grafo}
+                catalogo={catalogo}
+                problemas={problemas.filter((p) => p.node_id === n.id)}
+                indice={i + 1}
+                podeEditar
+                onTrocarTipo={(tipo) =>
+                  editar((g) =>
+                    trocarTipo(g, n.id, tipo, catalogo.find((c) => c.tipo === tipo)?.handles.map((h) => h.id) ?? []),
+                  )
+                }
+                onConfig={(c, v) => editar((g) => definirConfig(g, n.id, c, v))}
+                onTransicao={(h, para) => editar((g) => definirTransicao(g, n.id, h, para))}
+                onInicial={() => editar((g) => ({ ...g, inicial: n.id }))}
+                onRemover={() => editar((g) => removerNode(g, n.id))}
+              />
+            ))}
+          </ol>
+        )}
 
         <div className="flex flex-col gap-2 rounded-card border border-dashed border-linha bg-cartao p-4 sm:flex-row sm:items-center">
           <Select value={novoTipo} onChange={setNovoTipo} options={tipos} ariaLabel="Tipo da nova etapa" className="sm:w-64" />
-          <Button
-            variante="secondary"
-            disabled={noLimite}
-            onClick={() => editar((g) => adicionarNode(g, novoTipo).grafo)}
-          >
+          <Button variante="secondary" disabled={noLimite} onClick={() => editar((g) => adicionarNode(g, novoTipo).grafo)}>
             <Plus className="size-4" aria-hidden /> Adicionar etapa
           </Button>
           {noLimite && <span className="text-xs text-tinta-2">Limite de {FLUXO_LIMITES.nodes} etapas atingido.</span>}
-        </div>
         </div>
       </div>
 

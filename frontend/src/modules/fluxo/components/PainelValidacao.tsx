@@ -4,11 +4,20 @@ import { Banner } from '@/shared/ui'
 import type { FluxoProblema, FluxoValidacao } from '@/shared/contracts/_generated/fluxo'
 import { ROTULO_PROBLEMA } from '../estados'
 
-function irParaNode(id: string) {
+function irParaNode(id: string, aoSelecionar?: (id: string) => void) {
+  aoSelecionar?.(id)
   document.getElementById(`node-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
-function Lista({ itens, tom }: { itens: FluxoProblema[]; tom: 'erro' | 'info' }) {
+function Lista({
+  itens,
+  tom,
+  aoSelecionar,
+}: {
+  itens: FluxoProblema[]
+  tom: 'erro' | 'info'
+  aoSelecionar?: (id: string) => void
+}) {
   return (
     <ul className="flex flex-col gap-2">
       {itens.map((p, i) => (
@@ -18,7 +27,7 @@ function Lista({ itens, tom }: { itens: FluxoProblema[]; tom: 'erro' | 'info' })
             {p.node_id && (
               <button
                 type="button"
-                onClick={() => irParaNode(p.node_id as string)}
+                onClick={() => irParaNode(p.node_id as string, aoSelecionar)}
                 className="ml-2 min-h-8 font-medium underline underline-offset-2"
               >
                 Ver etapa
@@ -31,7 +40,14 @@ function Lista({ itens, tom }: { itens: FluxoProblema[]; tom: 'erro' | 'info' })
   )
 }
 
-export function PainelValidacao({ resultado }: { resultado: FluxoValidacao }) {
+export function PainelValidacao({
+  resultado,
+  aoSelecionar,
+}: {
+  resultado: FluxoValidacao
+  /** Opcional: no canvas, também seleciona a etapa do problema (na lista o scroll já a revela). */
+  aoSelecionar?: (id: string) => void
+}) {
   return (
     <section aria-label="Resultado da validação" className="flex flex-col gap-3">
       {resultado.valido ? (
@@ -49,11 +65,11 @@ export function PainelValidacao({ resultado }: { resultado: FluxoValidacao }) {
           </h3>
         </div>
       )}
-      {resultado.erros.length > 0 && <Lista itens={resultado.erros} tom="erro" />}
+      {resultado.erros.length > 0 && <Lista itens={resultado.erros} tom="erro" aoSelecionar={aoSelecionar} />}
       {resultado.avisos.length > 0 && (
         <>
           <h3 className="text-sm font-medium text-tinta">Avisos</h3>
-          <Lista itens={resultado.avisos} tom="info" />
+          <Lista itens={resultado.avisos} tom="info" aoSelecionar={aoSelecionar} />
         </>
       )}
     </section>

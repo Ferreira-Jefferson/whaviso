@@ -1,26 +1,14 @@
-// Uma etapa do fluxo: tipo, configuracao (gerada do catalogo) e para onde cada saida leva.
-// Handle sem ligacao = o atendimento termina naquele ponto (fim do turno).
-import {
-  CheckCircle2,
-  ChevronDown,
-  CircleDot,
-  CreditCard,
-  Flag,
-  ListChecks,
-  MapPin,
-  MessageCircle,
-  PackageSearch,
-  ShoppingCart,
-  Trash2,
-  type LucideIcon,
-} from 'lucide-react'
+// Uma etapa do fluxo na visão em lista: cabeçalho (tipo, id, selos) que expande para a edição
+// completa (ConfigNode). Handle sem ligação = o atendimento termina naquele ponto (fim do turno).
+import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
-import { Badge, IconChip, Select, cn } from '@/shared/ui'
+import { Badge, IconChip, cn } from '@/shared/ui'
 import type { FluxoGrafo, FluxoNode, FluxoProblema } from '@/shared/contracts/_generated/fluxo'
 import type { ItemCatalogo } from '../api'
 import { arestaDe } from '../grafo'
 import { ROTULO_HANDLE, rotuloNode } from '../estados'
-import { CampoConfig } from './CampoConfig'
+import { iconeDoTipo } from '../icones'
+import { ConfigNode } from './ConfigNode'
 
 interface Props {
   node: FluxoNode
@@ -34,19 +22,6 @@ interface Props {
   onTransicao: (handle: string, para: string | null) => void
   onInicial: () => void
   onRemover: () => void
-}
-
-const FIM = '__fim__'
-
-// Icone por tipo de etapa: ancora visual para reconhecer a etapa de relance, sem implicar ordem.
-const ICONE_TIPO: Record<string, LucideIcon> = {
-  saudacao: MessageCircle,
-  pedir_categoria: ListChecks,
-  montar_pedido: ShoppingCart,
-  confirmar: CheckCircle2,
-  endereco: MapPin,
-  pagamento: CreditCard,
-  acompanhar: PackageSearch,
 }
 
 export function CartaoNode({
@@ -66,20 +41,12 @@ export function CartaoNode({
   const item = catalogo.find((c) => c.tipo === node.tipo)
   const inicial = grafo.inicial === node.id
   const erros = problemas.length
-  const Icone = ICONE_TIPO[node.tipo] ?? CircleDot
+  const Icone = iconeDoTipo(node.tipo)
   const rotuloDestino = (id: string) => {
     const alvo = grafo.nodes.find((n) => n.id === id)
     if (!alvo) return id
     return rotuloNode(alvo.tipo, catalogo.find((c) => c.tipo === alvo.tipo)?.rotulo)
   }
-  const destinos = [
-    { value: FIM, label: 'Encerra o atendimento aqui' },
-    ...grafo.nodes.map((n) => ({
-      value: n.id,
-      label: `${rotuloNode(n.tipo, catalogo.find((c) => c.tipo === n.tipo)?.rotulo)} (${n.id})`,
-    })),
-  ]
-  const tipos = catalogo.map((c) => ({ value: c.tipo, label: rotuloNode(c.tipo, c.rotulo) }))
 
   return (
     <li
@@ -135,79 +102,19 @@ export function CartaoNode({
       )}
 
       {aberto && (
-        <div className="flex flex-col gap-4 border-t border-linha p-4">
-          {problemas.length > 0 && (
-            <ul className="flex flex-col gap-1 text-sm text-barro">
-              {problemas.map((p, i) => (
-                <li key={i}>{p.mensagem}</li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-tinta">Tipo da etapa</span>
-            <Select
-              value={node.tipo}
-              onChange={onTrocarTipo}
-              options={tipos}
-              ariaLabel="Tipo da etapa"
-              disabled={!podeEditar}
-            />
-            <span className="text-xs text-tinta-2">Trocar o tipo apaga a configuração e as saídas que não existem no novo.</span>
-          </div>
-
-          {item && (
-            <CampoConfig
-              esquema={item.config_schema}
-              valores={node.config}
-              onMudar={(c, v) => podeEditar && onConfig(c, v)}
-            />
-          )}
-
-          {item && item.handles.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h4 className="text-sm font-medium text-tinta">Para onde vai depois</h4>
-              {item.handles.map((h) => {
-                const a = arestaDe(grafo, node.id, h.id)
-                return (
-                  <div key={h.id} className="flex flex-col gap-1.5">
-                    <span className="text-sm text-tinta-2">{ROTULO_HANDLE[h.id] ?? h.rotulo}</span>
-                    <Select
-                      value={a?.para ?? FIM}
-                      onChange={(v) => onTransicao(h.id, v === FIM ? null : v)}
-                      options={destinos}
-                      ariaLabel={`Destino de "${ROTULO_HANDLE[h.id] ?? h.rotulo}"`}
-                      disabled={!podeEditar}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          {item && item.handles.length === 0 && (
-            <p className="text-sm text-tinta-2">Etapa final: o atendimento termina aqui.</p>
-          )}
-
-          {podeEditar && (
-            <div className="flex flex-wrap gap-2 border-t border-linha pt-3">
-              {!inicial && (
-                <button
-                  type="button"
-                  onClick={onInicial}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-linha px-4 text-sm font-medium text-tinta hover:bg-papel-2"
-                >
-                  <Flag className="size-4" aria-hidden /> Tornar etapa inicial
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onRemover}
-                className="inline-flex min-h-11 items-center gap-2 rounded-pill px-4 text-sm font-medium text-barro hover:bg-barro/10"
-              >
-                <Trash2 className="size-4" aria-hidden /> Remover etapa
-              </button>
-            </div>
-          )}
+        <div className="border-t border-linha p-4">
+          <ConfigNode
+            node={node}
+            grafo={grafo}
+            catalogo={catalogo}
+            problemas={problemas}
+            podeEditar={podeEditar}
+            onTrocarTipo={onTrocarTipo}
+            onConfig={onConfig}
+            onTransicao={onTransicao}
+            onInicial={onInicial}
+            onRemover={onRemover}
+          />
         </div>
       )}
     </li>

@@ -5,9 +5,10 @@ import { useState } from 'react'
 import { MapPinOff, Route, Sparkles } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { formatarHora } from '@/shared/format'
-import { Banner, Button, Card, EmptyState, Field, Input, useToast } from '@/shared/ui'
-import { useGeocodificarPendentes, useMotoboysAtivos, useSugerir, type Sugestao } from '../api'
+import { Banner, Button, Card, EmptyState, Field, Input, cn, useToast } from '@/shared/ui'
+import { useConfig, useGeocodificarPendentes, useMotoboysAtivos, useSugerir, type Sugestao } from '../api'
 import { ROTULO_MOTIVO } from '../estados'
+import { MapaDespacho } from '../mapa/MapaDespacho'
 import { CorridaSugeridaCard } from './CorridaSugeridaCard'
 
 export function PainelSugestoes() {
@@ -17,10 +18,13 @@ export function PainelSugestoes() {
   // Corridas ja aceitas na rodada atual (por ordem_saida); zera a cada nova sugestao.
   const [aceitas, setAceitas] = useState<ReadonlySet<number>>(new Set())
   const [erro, setErro] = useState<string | null>(null)
+  // Corrida em destaque no mapa (sincroniza mapa <-> cartao). null = nenhuma.
+  const [ativa, setAtiva] = useState<number | null>(null)
 
   const sugerir = useSugerir()
   const geocodificarPendentes = useGeocodificarPendentes()
   const motoboys = useMotoboysAtivos()
+  const config = useConfig()
   const { mostrarToast } = useToast()
 
   function gerar() {
@@ -35,6 +39,7 @@ export function PainelSugestoes() {
         onSuccess: (r) => {
           setResultado(r)
           setAceitas(new Set())
+          setAtiva(null)
         },
         onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível gerar as sugestões.'),
       },
@@ -137,17 +142,32 @@ export function PainelSugestoes() {
                   {corridas.length} {corridas.length === 1 ? 'corrida' : 'corridas'}
                 </span>
               </div>
-              <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                {corridas.map((c) => (
-                  <li key={c.ordem_saida}>
-                    <CorridaSugeridaCard
-                      sugestao={c}
-                      motoboys={motoboys.data ?? []}
-                      aoAceitar={() => setAceitas((atual) => new Set(atual).add(c.ordem_saida))}
-                    />
-                  </li>
-                ))}
-              </ul>
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+                <div className="lg:sticky lg:top-4">
+                  <MapaDespacho corridas={corridas} config={config.data} ativa={ativa} onAtiva={setAtiva} />
+                </div>
+                <ul className="flex flex-col gap-3">
+                  {corridas.map((c) => (
+                    <li
+                      key={c.ordem_saida}
+                      onMouseEnter={() => setAtiva(c.ordem_saida)}
+                      onMouseLeave={() => setAtiva(null)}
+                      onFocus={() => setAtiva(c.ordem_saida)}
+                      onBlur={() => setAtiva(null)}
+                      className={cn(
+                        'rounded-card transition-shadow',
+                        ativa === c.ordem_saida && 'shadow-[0_0_0_2px_var(--color-salvia)]',
+                      )}
+                    >
+                      <CorridaSugeridaCard
+                        sugestao={c}
+                        motoboys={motoboys.data ?? []}
+                        aoAceitar={() => setAceitas((atual) => new Set(atual).add(c.ordem_saida))}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
 
