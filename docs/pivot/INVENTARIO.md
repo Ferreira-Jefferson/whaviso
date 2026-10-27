@@ -97,8 +97,8 @@ migrations) que recria só o que sobra. Tabelas/conceitos que **saem** do novo b
   `shared/ui/*` (design system: Button, Card, Input, Dialog, Toast, StatCard, etc.),
   `shared/format` (formatadores brl/data/telefone).
 - **Infra/dev:** `deploy/` inteiro (nginx, systemd, scripts, `CICD.md`, `META_CLOUD_API.md`,
-  envs), `docs/seguranca/*`, `backend/scripts/*`, `graphify-out/`, `secrets/`,
-  `package.json` raiz, `.gitignore`, skills `graphify`/`frontend-design`/`deploy`.
+  envs), `docs/seguranca/*`, `backend/scripts/*`, `secrets/`,
+  `package.json` raiz, `.gitignore`, skills `frontend-design`/`deploy`.
 
 ## 4. ADAPTA (mantém a casca, reescreve o conteúdo)
 
@@ -164,7 +164,7 @@ Proposta de ordem, em passos reversíveis por commit, sem quebrar o build a cada
    recriam profiles/auth/templates/envios/webhook/config/chaves_pix/roles). Sem cliente em
    produção, não há migração de dados.
 4. Docs/raiz/historias/business: apagar os arquivos de cobrança; esvaziar `historias/`.
-5. Atualizar `CLAUDE.md`, regenerar o graphify, rodar lint+typecheck+test (devem passar
+5. Atualizar `CLAUDE.md`, rodar lint+typecheck+test (devem passar
    vazios/adaptados) antes de commitar.
 
 Cada passo vira um commit próprio, revisável e revertível.

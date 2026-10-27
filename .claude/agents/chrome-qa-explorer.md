@@ -59,7 +59,7 @@ Leia `chrome-qa-loop.config.json` na raiz do repo pra resolver os placeholders a
 
 - **QA:** fluxos quebrados, erros, estados vazio/carregando/erro, entradas de borda, layout mobile, cheiros de a11y.
 - **Product:** bate com a intencao da historia? atrito, copy confusa, affordance faltando, correcao de locale (pt-BR, centavos, fuso America/Sao_Paulo), copy que viola compliance (palavra proibida, genero).
-- **Engineering:** erros de console, chamadas de rede falhando/lentas, avisos de hidratacao; hipotetize onde vive no codigo (o triage refina com `/graphify`).
+- **Engineering:** erros de console, chamadas de rede falhando/lentas, avisos de hidratacao; hipotetize onde vive no codigo (o triage refina com Grep/Glob).
 - **Security:** segredo/PII exposto, authz quebrada numa rota (ex.: devedor acessando `/admin`, ou trocar `:id`/`:token` por outro valor e ver dado alheio), redirect inseguro, prompt-injection em superficie de IA (se houver).
 
 ## Arquivos de relatorio

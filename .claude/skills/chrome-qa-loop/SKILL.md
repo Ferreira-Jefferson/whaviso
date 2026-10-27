@@ -5,7 +5,7 @@ description: Loop de QA exploratorio sobre o app whaviso rodando de verdade num 
 
 # Chrome QA Loop (whaviso)
 
-Ciclo de QA exploratorio com humano no meio, dirigido pelo Claude via **Chrome DevTools MCP** (`chrome-devtools-mcp`). Adaptado do plugin `chrome-qa-loop@lemon-ai-hub` para o whaviso: os "docs donos" sao as historias em `historias/`, e o triage localiza o codigo com `/graphify`.
+Ciclo de QA exploratorio com humano no meio, dirigido pelo Claude via **Chrome DevTools MCP** (`chrome-devtools-mcp`). Adaptado do plugin `chrome-qa-loop@lemon-ai-hub` para o whaviso: os "docs donos" sao as historias em `historias/`, e o triage localiza o codigo com Grep/Glob.
 
 ```
 voce dispara > EXPLORE (Chrome DevTools MCP) > REPORT (1 md por achado) > voce REVISA > TRIAGE > IMPLEMENTA (loop de feature) > REFLETE > (volta pra voce)
@@ -63,7 +63,7 @@ Abra a pasta de relatorios, leia cada achado e marque `status: triaged` nos que 
 
 ## Passo 3: TRIAGE (delegado)
 
-No `/chrome-qa-loop triage run=<run-id>`: dispare o agente **`qa-report-triage`**. Ele deduplica, prioriza (P0 a P3), localiza o codigo provavel via `/graphify` e emite `triage/TASKS.md` + stubs de `PLAN.md` por correcao.
+No `/chrome-qa-loop triage run=<run-id>`: dispare o agente **`qa-report-triage`**. Ele deduplica, prioriza (P0 a P3), localiza o codigo provavel e emite `triage/TASKS.md` + stubs de `PLAN.md` por correcao.
 
 ## Passo 4: IMPLEMENTA (handoff, fora deste loop)
 
@@ -78,8 +78,6 @@ Registre a rodada: o que foi corrigido, o que o explorer deixou passar, lacunas 
 - **Agente** `chrome-qa-explorer` (`.claude/agents/`): o cerebro que dirige o navegador (4 lentes, por tela, por rodada).
 - **Agente** `qa-report-triage` (`.claude/agents/`): ponte revisao > implementacao.
 - **MCP** `chrome-devtools` (`chrome-devtools-mcp`, oficial do Google Chrome DevTools): registrado no config local do Claude Code (`claude mcp add`). Verifique com `list_pages`.
-- **`/graphify`**: mapa do codigo, usado pelo triage pra apontar `file:line`.
-
 ## Guardrails (resumo; conjunto completo no PLAN)
 
 Read-only sempre (mesmo em dev, que aponta pro Supabase cloud) - nunca disparar envio de WhatsApp real, gastar credito ou completar pagamento - nada de dialog nativo bloqueante (use `handle_dialog`) - fundamentar o "esperado" na historia dona antes de julgar - segredo/PII visivel = P0 (so a localizacao, nunca o valor) - sonda de prompt-injection so benigna - um relatorio por achado escrito na hora (auto-salvo em disco, sem download manual).

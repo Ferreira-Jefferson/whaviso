@@ -144,7 +144,7 @@ Rode as três checagens da seção "Regras de linguagem" no arquivo salvo. Corri
 
 Objetivo: condensar num único arquivo tudo que é preciso saber do produto, do público e do que o projeto oferece, para construir marketing sem reler o código toda vez.
 
-**Fontes a ler** (use a ferramenta Read; opcionalmente `graphify query "<pergunta>"` para detalhes do produto como planos e templates):
+**Fontes a ler** (use a ferramenta Read):
 
 - `PROJETO.md` (visão, problema, dois pilares, fluxos, estados, painel, planos, público, branding, tom de voz)
 - `CLAUDE.md` (regras de ouro, stack, restrições)

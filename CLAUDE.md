@@ -53,14 +53,6 @@ VPS Hostinger `srv1779602` (Ubuntu 24.04, IP atual `187.127.22.133`). O Claude C
 - **Claude Code no servidor:** instalado em `~/.local/bin/claude` (userspace, sem sudo), autenticado com a assinatura. Em SSH **não-interativo** (`ssh deploy@host 'cmd'`) o `.bashrc` do Ubuntu sai cedo e não carrega o PATH: chame `~/.local/bin/claude` por caminho completo ou `export PATH="$HOME/.local/bin:$PATH"` antes.
 - Detalhes e histórico em [[whaviso-claude-no-servidor]].
 
-## Graphify (mapa do código, use sempre)
-
-Existe um grafo de conhecimento do projeto em `graphify-out/` (`graph.json`, `graph.html`, `GRAPH_REPORT.md`), gerado pela skill `/graphify`. Ferramenta de DEV, não é dependência do app. Setup desta máquina em [[whaviso-graphify]].
-
-- **ANTES de qualquer análise ou alteração de código**, consulte o grafo primeiro para entender estrutura, dependências e quem chama quem, de forma mais eficiente e correta que ler/grepar arquivos no escuro. Use `/graphify query "<pergunta>"` (subgrafo focado), `/graphify path "<A>" "<B>"` (caminho entre dois pontos) ou `/graphify explain "<conceito>"`. Só leia/grep arquivos crus depois que o grafo orientou, ou para mexer/depurar linhas específicas.
-- **DEPOIS de toda mudança de código**, atualize o grafo: `/graphify . --update` (reextrai só os arquivos novos/alterados). Mantém o mapa em dia com o código.
-- Os hooks em `.claude/settings.json` já cutucam esse fluxo quando `graphify-out/graph.json` existe. Vale para subagents também: inclua a regra no prompt deles ao explorar código.
-
 ## Arquitetura e stack (decisões técnicas, não reverter sem combinar)
 
 Decisões de **engenharia**. Não são regra de negócio (essas estão em `historias/`).
@@ -86,13 +78,3 @@ Valem para tudo que você escreve (código, comentários, commits, docs). Não s
 
 - **Nunca usar travessão (—, em dash)** em texto algum: prefira vírgula, dois-pontos, parênteses ou reescreva a frase. (A linguagem das mensagens ao usuário, palavras proibidas e gênero neutro, é regra de produto: ver `historias/13-compliance.md`.)
 - **Nenhum modelo de IA (Claude, Anthropic, etc.) pode aparecer como autor ou co-autor** em commits nem em qualquer lugar do projeto. Proibido: trailer `Co-Authored-By: Claude...`, rodapés tipo `Generated with Claude Code`, ou menção a modelo/IA em mensagens de commit, código, comentários e docs. Commits saem **apenas** no nome do humano (autor do git).
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
