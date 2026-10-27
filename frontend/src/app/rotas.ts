@@ -26,6 +26,7 @@ import {
   MessageCircle,
   QrCode,
   Receipt,
+  ReceiptText,
   Rocket,
   Route,
   Smartphone,
@@ -89,6 +90,7 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'llm', rotulo: 'Atendente', descricao: 'Chave do provedor e consumo do atendente.', icone: KeyRound, grupo: 'config', pagina: lazy(() => import('@/modules/llm')) },
   { caminho: 'conhecimento', rotulo: 'Conhecimento', descricao: 'O que o atendente sabe sobre a loja.', icone: BookOpen, grupo: 'config', pagina: lazy(() => import('@/modules/conhecimento')) },
   { caminho: 'fluxo', rotulo: 'Fluxo', descricao: 'Etapas da conversa do atendente.', icone: GitBranch, grupo: 'config', pagina: lazy(() => import('@/modules/fluxo')) },
+  { caminho: 'fatura', rotulo: 'Minha fatura', descricao: 'Sua assinatura e faturas do Whaviso.', icone: ReceiptText, grupo: 'config', pagina: lazy(() => import('@/modules/plataforma_cobranca').then((m) => ({ default: m.MinhaFaturaPage }))) },
 ]
 
 export const ROTULO_GRUPO: Record<GrupoNav, string> = {
