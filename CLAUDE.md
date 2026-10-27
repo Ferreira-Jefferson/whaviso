@@ -35,6 +35,8 @@ curl 127.0.0.1:3001/healthz   # use 127.0.0.1 (há outro app no ::1 desta máqui
 ./scripts/scaffold_module.sh <api|zap> <nome>     # novo módulo (depois: 1 linha em src/routes.ts)
 ```
 
+> **Disciplina de commit (inegociável):** todo trabalho **concluído e verificado** (lint + typecheck + testes verdes) é commitado **imediatamente, de forma atômica**. Nunca acumule trabalho pronto sem commit nem deixe o working tree inchar. Em fan-out paralelo no mesmo checkout, os subagentes **não** rodam `git commit` (evita corrida no índice): eles reportam, e o **integrador verifica e commita CADA módulo assim que o integra**, um a um, não em lote. Isso tem que estar no briefing de cada subagente e nas specs dos módulos. (Autoria só do humano; ver convenções de escrita.)
+
 > **Regra de commit + migrations no cloud:** ao fazer um `git commit` que envolva migrations novas ou alteradas, **pergunte** se deve também aplicar essas migrations no Supabase **cloud** (`supabase db push`, session pooler 5432, rodando de dentro de `backend/`). Nem o `git commit` nem o `git push` aplicam migration: esquema e dados de catálogo (ex.: planos) só mudam no app depois do `db push` no cloud.
 
 **Frontend** (rode de dentro de `frontend/`): `npm run dev` (Vite, :5173) · `npm run build` (estáticos p/ nginx na VPS) · `npm run lint` · `npm run typecheck`.

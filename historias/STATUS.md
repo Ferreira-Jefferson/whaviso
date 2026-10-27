@@ -258,11 +258,16 @@ Decisoes tomadas (default, sem travar o dono):
 - **Dois estoques distintos:** quantidade por item do cardapio (contador direto, onda 1) e estoque de
   insumo (baixado por ficha tecnica, onda 5). Complementares, nao excludentes.
 - **Escala** registra turnos e diaria e soma por periodo, cruzando com o fechamento do motoboy; sem folha.
-- **Suposicao de posicionamento (o dono corrige se quiser):** publico = delivery por WhatsApp. Por isso
-  **PDV/caixa** e **salao (mesas/comandas)** ficam `futuro`/opcional (decisoes em aberto no doc). Se o
-  alvo incluir salao com dinheiro no balcao, abrir `API-caixa` e `API-mesas`.
+- **Posicionamento CONFIRMADO pelo dono (2026-10-27):** NAO e so delivery. O uso real e o dono no
+  restaurante com o sistema aberto atendendo presencialmente E o agente de WhatsApp rodando em paralelo,
+  tudo num sistema so. Entao **PDV/caixa e salao (mesas/comandas) ENTRAM como modulos**, com testes e no
+  padrao do projeto, nao ficam como futuro/opcional.
 
-Fora de escopo confirmado: folha de pagamento/RH; nota fiscal/fiscal (so via `ClienteFiscal` de terceiro).
+| PDV / caixa (abrir/fechar, sangria, suprimento, formas de pagamento, fechamento de turno; sem fiscal) | importante | API-caixa + FR-caixa | 4 | migration 0028 |
+| Salao: mesas e comandas (abrir mesa/comanda, lancar itens, fechar/dividir conta, app do garcom) | importante | API-salao + FR-salao | 4 | migration 0029 |
+
+Fora de escopo confirmado: folha de pagamento/RH; nota fiscal/fiscal (so via `ClienteFiscal` de
+terceiro). PDV de hardware pesado nao; PDV/caixa como software, sim.
 
 ### Segurança desta leva (vai pro catálogo)
 
