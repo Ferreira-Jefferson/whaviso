@@ -17,6 +17,15 @@ import { estoqueInsumosRoutes } from './modules/estoque_insumos'
 import { fichaTecnicaRoutes } from './modules/ficha_tecnica'
 import { caixaRoutes } from './modules/caixa'
 import { salaoRoutes } from './modules/salao'
+import { zonasEntregaRoutes } from './modules/zonas_entrega'
+import { motoboysRoutes } from './modules/motoboys'
+import { pagamentosRoutes } from './modules/pagamentos'
+import { dashboardRoutes } from './modules/dashboard'
+import { crmRoutes } from './modules/crm'
+import { configuracoesLlmRoutes } from './modules/configuracoes_llm'
+import { plataformaClientesRoutes } from './modules/plataforma_clientes'
+import { cobrancaRoutes } from './modules/plataforma_cobranca'
+import { plataformaFunilRoutes } from './modules/plataforma_funil'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -41,6 +50,16 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'ficha-tecnica', plugin: fichaTecnicaRoutes },
   { prefixo: 'caixa', plugin: caixaRoutes },
   { prefixo: 'salao', plugin: salaoRoutes },
+  // Onda 3 (entrega) e Onda 4 (negocio/plataforma). Um prefixo por modulo.
+  { prefixo: 'zonas', plugin: zonasEntregaRoutes },
+  { prefixo: 'motoboys', plugin: motoboysRoutes },
+  { prefixo: 'pagamentos', plugin: pagamentosRoutes },
+  { prefixo: 'dashboard', plugin: dashboardRoutes },
+  { prefixo: 'crm', plugin: crmRoutes },
+  { prefixo: 'llm', plugin: configuracoesLlmRoutes },
+  { prefixo: 'plataforma-clientes', plugin: plataformaClientesRoutes },
+  { prefixo: 'plataforma-cobranca', plugin: cobrancaRoutes },
+  { prefixo: 'plataforma-funil', plugin: plataformaFunilRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/
