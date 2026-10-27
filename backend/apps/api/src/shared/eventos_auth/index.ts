@@ -37,3 +37,41 @@ export async function registrarEventoAuth(
     [tipo, hash, detalhes ?? null],
   )
 }
+
+/** Tipos de auditoria de ACESSO (resolucao/negacao de escopo) do kernel F3. */
+export type TipoEventoAcesso = 'login_ok' | 'login_negado'
+
+/** Executor minimo para a auditoria de acesso (um Pool/PoolClient satisfaz). */
+export interface ExecutorAuditoria {
+  query(texto: string, valores: unknown[]): Promise<unknown>
+}
+
+/**
+ * Audita a resolucao ou a NEGACAO de escopo (F3, etapa 10). Append-only, SEM PII: o
+ * usuario entra apenas como sha256 em `detalhes.sujeito` (irreversivel, para correlacao),
+ * nunca o UUID cru nem telefone. `motivo` e um rotulo curto e estavel, sem dado sensivel.
+ *
+ * BEST-EFFORT: falha de auditoria nunca derruba a requisicao (a seguranca ja decidiu;
+ * o log e consequencia). Por isso engole o erro aqui dentro.
+ */
+export async function registrarEventoAcesso(
+  ex: ExecutorAuditoria,
+  tipo: TipoEventoAcesso,
+  userId: string | null,
+  motivo: string,
+  detalhesExtra?: Record<string, unknown>,
+): Promise<void> {
+  const detalhes = {
+    motivo,
+    ...(userId ? { sujeito: sha256Hex(userId) } : {}),
+    ...(detalhesExtra ?? {}),
+  }
+  try {
+    await ex.query(
+      `insert into public.eventos_auth (tipo, telefone_hash, detalhes) values ($1, null, $2)`,
+      [tipo, detalhes],
+    )
+  } catch {
+    // auditoria e best-effort: nunca propaga
+  }
+}

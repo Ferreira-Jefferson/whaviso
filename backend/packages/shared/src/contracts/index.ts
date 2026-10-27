@@ -4,3 +4,4 @@
 export * from './enums'
 export * from './primitivos'
 export * from './pix'
+export * from './sessao'
