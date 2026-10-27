@@ -54,7 +54,7 @@ sente), **FALTANDO** (não existe no plano). A coluna "onde" cita o módulo ou d
 | Pagamento: dinheiro com troco, cartão na entrega | PARCIAL | formas existem no node `pagamento`; **troco não é calculado/registrado**; gap G9 |
 | Impressão na cozinha / KDS | PARCIAL | gera comanda HTML/térmica; sem envio direto ESC/POS nem tela de cozinha; gap G10 |
 | Onboarding rápido (subir e vender no mesmo dia) | PARCIAL | há `conta`+`lojas`+import de cardápio, mas sem fluxo guiado nem tempo-para-primeiro-pedido; gap G11 |
-| Relatórios/BI mais fundo (DRE, fechamento de caixa, por canal) | PARCIAL | dashboard cobre o essencial; falta caixa/por-canal; gap G12 (backlog) |
+| Relatórios/BI mais fundo (DRE, fechamento de caixa, por canal) | PARCIAL | dashboard cobre o essencial; falta caixa/por-canal; gap G12 |
 
 ### 2.2 Consumidor final (o cliente do cliente)
 
@@ -85,144 +85,163 @@ sente), **FALTANDO** (não existe no plano). A coluna "onde" cita o módulo ou d
 | Absorver a nova cobrança por mensagem do WhatsApp (out/2026) | FALTANDO | mudança de preço da Meta não está modelada no billing; gap G17 |
 | Emitir a própria NF de serviço da assinatura | FALTANDO | billing da plataforma não emite NF; gap G18 (decisão do dono) |
 
-## 3. Gaps priorizados
+## 3. Gaps a construir: ordem de execução
 
-Recomendação por gap: **MVP** (antes de vender), **Onda** (próximas ondas planejadas), **Backlog**
-(depois, quando houver tração). "Decisão do dono" marca escopo de negócio, não de engenharia.
+**Enquadramento:** isto não é um MVP, é o produto completo indo para produção. Todo gap real abaixo
+**entra no plano como módulo/tarefa a construir agora**, granular e paralelizável, com dependências e
+onda de execução. "Priorizar" aqui significa **ordem por dependência**, não cortar escopo. O rótulo
+**expansão futura** fica só para o que é genuinamente opcional além da visão do produto. **Decisão do
+dono** marca apenas escolha de escopo de negócio (qual provedor, qual profundidade), e nesses casos o
+**default é INCLUIR**, com a opção explícita.
 
-### G1. CRM do restaurante sobre o consumidor final (campanha, recompra, segmentação) — MVP (parcial) + Onda
+A onda citada em cada gap é a sugestão de **quando construir** dado o grafo de dependências das ondas já
+existentes (0 fundação, 1 núcleo, 2 IA, 3 entrega, 4 negócio/plataforma, 5 roteirização/builder). Vários
+destes gaps são independentes entre si e podem ser construídos em paralelo por agentes distintos.
 
-Este é o **diferencial mais vendável e hoje o maior buraco**. O plano tem o dado (clientes + pedidos)
-mas só `API-clientes` (cadastro, endereços, agregado cru de contagem/soma/último pedido na ficha) e o
-`API-dashboard` (métrica agregada). Não existe: histórico de compra por cliente (itens favoritos,
-frequência, recência, ticket), segmentação (novo, recorrente, inativo, VIP), nem **envio de campanha**
-(retorno/recompra via WhatsApp respeitando janela de 24h e template aprovado). Isso não é penduricalho:
-é o que transforma o whaviso de "ferramenta de pedido" em "ferramenta de **faturamento**", e é
-exatamente onde o restaurante que fugiu do iFood mais sofre (perdeu o CRM que o iFood tinha). Ele
-compete de frente com o **Saipos CRM** (módulos de fidelidade e de marketing para cliente ocioso, com
-cupom automático e envio no horário de consumo) e com o movimento do **iFood/CRMBonus** (cashback). O
-whaviso tem uma vantagem estrutural: a conversa já passa por ele, então a campanha sai do mesmo número,
-com o mesmo histórico, sem integração externa.
+### G1. CRM do restaurante sobre o consumidor final (histórico, segmentação, campanha): construir agora, Ondas 2 e 4
 
-**Delta concreto (ver seção 5):** um módulo novo de API `crm` (ou `clientes_crm`) que leia pedidos por
-cliente e compute segmento/RFM por read-model, mais um módulo `campanhas` que monte públicos
-(segmentos), dispare envio em lote pelo outbox `envios` **só por template aprovado** e **respeitando a
-janela de 24h e o opt-out**, com uma tela `FR` de base de clientes + funil de retenção. O risco a travar
-por construção: campanha é o vetor perfeito de virar spam e queimar o número na Meta; precisa de limite
-de frequência, consentimento (G16) e uso exclusivo de template fora da janela. Parte do MVP: a **ficha
-de cliente com histórico e os segmentos** (barato, só leitura). Onda seguinte: o **disparo de campanha**
-(exige template, opt-out, rate limit).
+O **diferencial mais vendável e hoje o maior buraco**. O plano tem o dado (clientes + pedidos) mas só
+`API-clientes` (cadastro, endereços, agregado cru na ficha) e `API-dashboard` (métrica agregada). Falta
+histórico de compra por cliente (itens favoritos, frequência, recência, ticket), segmentação (novo,
+recorrente, inativo, VIP) e **envio de campanha** (retorno/recompra via WhatsApp, respeitando janela de
+24h e template aprovado). É o que transforma o whaviso de "ferramenta de pedido" em "ferramenta de
+**faturamento**", exatamente onde o restaurante que fugiu do iFood mais sofre. Compete de frente com o
+**Saipos CRM** (fidelidade + marketing para cliente ocioso, cupom automático, envio no horário de
+consumo) e com o **iFood/CRMBonus** (cashback). Vantagem estrutural do whaviso: a conversa já passa por
+ele, a campanha sai do mesmo número, com o mesmo histórico, sem integração externa.
 
-### G2. Estoque / inventário — Onda futura (decisão do dono sobre profundidade)
+Construir em duas peças paralelizáveis: **`API-crm`** (read-model de RFM/segmento por cliente; depende de
+`API-pedidos`+`API-clientes`, pode começar já na Onda 2) e **`API-campanhas`** + **`FR-crm`** (público por
+segmento, disparo em lote pelo outbox `envios` só por template aprovado, com opt-out e rate limit de
+frequência; depende de `API-crm`, `API-conversas`, `numeros_whatsapp`, templates; Onda 4, revisão Opus
+por ser superfície de spam e de custo). O consentimento de marketing (G16) nasce junto.
 
-Hoje só existe o liga/desliga manual e o "esgotado hoje" (`esgotado_ate`). Falta baixa automática por
-pedido e, mais fundo, estoque por **ingrediente** com ficha técnica (vender o X-Burger baixa pão, carne,
-queijo; quando a carne acaba, 86 automático em tudo que a usa). O Anota AI e o Saipos têm isso nos
-planos superiores. Recomendação: **MVP cobre com o manual que já existe** (dá para operar); o estoque
-por produto com baixa automática é Onda futura; o estoque por ingrediente com ficha técnica é **decisão
-do dono** sobre entrar nessa briga de ERP ou não. Minha opinião: entrar com estoque **por produto**
-(simples, alto valor percebido, evita vender o que acabou) e **ficar fora** de ficha técnica por
-ingrediente na v1 (complexidade de ERP que dilui o foco em canal próprio + retenção).
+### G2. Estoque / inventário: construir agora, Onda 3 · decisão do dono: profundidade (default incluir)
 
-### G3. Fiscal (NFC-e / SAT / XML) — Decisão do dono; recomendação: não no MVP
+Hoje só o liga/desliga manual e o "esgotado hoje". Entra um módulo **`API-estoque`** com estoque por
+produto e **baixa automática por pedido** (vendeu, baixou; zerou, 86 automático). **Decisão do dono:**
+incluir também estoque **por ingrediente com ficha técnica** (vender o X-Burger baixa pão/carne/queijo e
+86 em tudo que usa a carne), como etapa seguinte do mesmo módulo. **Default: incluir**, construindo
+primeiro por produto (simples, alto valor) e depois a ficha técnica por ingrediente como fatia posterior
+do `API-estoque`. Depende de `API-cardapio` e `API-pedidos`.
 
-Ausente por completo. É o divisor entre "assistente de vendas" e "ERP fiscal". Fiscal é caro (certificado,
-SEFAZ por estado, homologação), muda por UF, e é um poço de manutenção. O Saipos vende justamente isso.
-**Recomendação forte: ficar fora do MVP e provavelmente do produto**, e integrar com um emissor fiscal
-de terceiro (ou com o PDV que a loja já usa) quando a demanda aparecer. Vender canal próprio + retenção
-sem fiscal é um posicionamento legítimo; virar meio-ERP fiscal é mudar de produto. Marcar como **decisão
-do dono** explícita.
+### G3. Fiscal (NFC-e / SAT / XML): construir agora, Onda 4 · decisão do dono: qual provedor (default incluir)
 
-### G4. Integração iFood e outros canais (unificar pedidos) — Onda futura
+Ausente. Entra um módulo **`API-fiscal`** atrás de uma interface **`ClienteFiscal`** (mesma família de
+`ClienteWhats`), que emite NFC-e por pedido e gera XML para o contador **integrando com um emissor de
+terceiro** (não reconstruir o motor fiscal por UF, que é poço de manutenção). **Decisão do dono:** qual
+provedor de emissão (ex.: Focus NFe, NFe.io, Tecnospeed ou o PDV fiscal que a loja já usa) e se emite
+NFC-e ou só NF-e conforme o perfil da loja. **Default: incluir** a integração; o que varia é o provedor.
+Depende de `API-pedidos` e do cadastro fiscal da loja (novo: dados de emissão em `lojas`).
 
-`pedidos.origem` já prevê `ifood`/`manual`/`whatsapp`, mas não há módulo que **puxe** o pedido do iFood
-para o kanban. Para um restaurante que não vai abandonar o iFood da noite pro dia, "tudo num painel só"
-é um gancho de adoção forte (e o próprio Anota/Saipos integram iFood, Rappi, 99, Keeta). Recomendação:
-**Onda futura**, atrás de uma interface `ClienteCanal` (como `ClienteWhats`), começando por iFood
-(webhook/polling da API de parceiro). Não é MVP, mas é o caminho natural de crescimento e reduz o atrito
-de "mas eu já tenho iFood".
+### G4. Integração iFood e outros canais (unificar pedidos num painel): construir agora, Onda 4/5
 
-### G5. Promoções, cupons, combos com desconto, pedido mínimo, frete grátis — Onda (MVP mínimo)
+`pedidos.origem` já prevê `ifood`, mas falta o módulo que **puxa** o pedido. "Tudo num painel só" é gancho
+de adoção forte (Anota/Saipos integram iFood, Rappi, 99, Keeta). Entra **`API-canais`** atrás de
+**`ClienteCanal`**, começando por iFood (webhook/polling da API de parceiro), escrevendo pedido com
+`origem='ifood'` no kanban. Depende de `API-pedidos`. **Decisão do dono:** quais canais além do iFood
+entram primeiro (default: iFood agora, demais em sequência pela mesma interface).
 
-O cardápio tem preço fixo por item+opções; não há camada de **preço promocional**: cupom, combo com
-desconto, "frete grátis acima de X", pedido mínimo por zona. Pedido mínimo e frete grátis são quase
-expectativa mínima no delivery. Recomendação: **MVP inclui pedido mínimo e frete grátis por zona**
-(barato, alto valor, encaixa em `zonas_entrega`/`pedidos`); cupom e combo promocional ficam para **Onda
-seguinte**. É também matéria-prima das campanhas (G1): campanha sem cupom converte menos.
+### G5. Preço promocional: cupom, combo, pedido mínimo, frete grátis: construir agora, Onda 3 e 4
 
-### G6. Fidelidade / cashback — Backlog (ou dentro do CRM)
+Não há camada de preço promocional. **Pedido mínimo e frete grátis por zona** entram como ampliação de
+`API-zonas` (Onda 3, barato e expectativa mínima do delivery). **Cupom e combo com desconto** entram como
+módulo **`API-promocoes`** (Onda 4), matéria-prima das campanhas (G1). Dependem de `API-cardapio`,
+`API-zonas`, `API-pedidos`.
 
-Programa de pontos/cashback. O iFood comprou 20% da CRMBonus para isso; o Saipos tem fidelidade. É
-diferencial de retenção, mas é construção grande. Recomendação: **Backlog**, e quando entrar, nascer
-**dentro do módulo de CRM/campanha** (G1), não solto. Cashback simples ("acumule e ganhe") antes de
-pontos complexos.
+### G6. Fidelidade / cashback: construir agora, Onda 4 (dentro do CRM)
 
-### G7. Pausar a loja no pico / capacidade por janela — Onda (MVP mínimo)
+Pontos/cashback para recompra (o iFood comprou 20% da CRMBonus por isso; o Saipos tem fidelidade). Entra
+como fatia **`API-fidelidade`** acoplada ao `API-crm`/`API-campanhas`, começando por cashback simples
+("acumule e ganhe") antes de pontos complexos. Depende de `API-crm` e `API-pedidos`.
 
-Há horário de funcionamento e `esgotado`, mas não o botão "pausar pedidos agora" (cozinha afogada) nem
-limite de N pedidos por faixa de horário. "Pausar agora" é expectativa mínima e é barato. Recomendação:
-**MVP** para o pausar manual (um estado em `lojas` que o `saudacao`/node de entrada respeita);
-capacidade por janela é Onda futura.
+### G7. Pausar a loja no pico e capacidade por janela: construir agora, Onda 1 e 3
 
-### G8. Agendamento de pedido — Backlog
+"Pausar pedidos agora" (cozinha afogada) entra já na Onda 1 como estado `lojas.pausada` respeitado pelo
+node `saudacao`. **Capacidade por janela** (limite de N pedidos por faixa) entra na Onda 3 junto com
+zonas/horários. Depende de `API-lojas` e `AT-motor-min`.
 
-Pedir às 15h para entregar às 20h. Útil para pizzaria/eventos, não para a maioria no dia um.
-Recomendação: **Backlog**, decisão do dono conforme o nicho-alvo.
+### G8. Agendamento de pedido: construir agora, Onda 2
 
-### G9. Troco (dinheiro) e forma de pagamento completa — MVP
+Pedir às 15h para entregar às 20h (pizzaria, eventos, confeitaria). Entra como node/estado no fluxo
+(`AT-motor-min`) mais `pedidos.agendado_para`, com o kanban respeitando a hora-alvo. Depende de
+`API-pedidos` e do motor.
 
-O node `pagamento` oferece Pix, dinheiro e cartão na entrega, mas **não pergunta/registra o troco**
-("troco para quanto?") nem carimba a forma escolhida no pedido para a comanda e o motoboy. Isso gera
-erro operacional real (motoboy sem troco). Recomendação: **MVP**, é pequeno e evita atrito na porta.
-A conciliação de Pix é manual hoje (G sem número, aceitável na v1); PSP com webhook é backlog.
+### G9. Troco e forma de pagamento completa: construir agora, Onda 1/3
 
-### G10. Impressão de cozinha / KDS — Onda futura
+O node `pagamento` oferece Pix, dinheiro e cartão, mas não pergunta/registra o troco ("troco para
+quanto?") nem carimba a forma na comanda e para o motoboy (erro operacional real: motoboy sem troco).
+Entra como `pedidos.forma_pagamento` + `pedidos.troco_para_centavos` e pergunta no fluxo. A conciliação
+automática de Pix via PSP com webhook é ampliação posterior isolada atrás de interface (o copia-e-cola
+manual já funciona); construir quando o volume pedir.
 
-Gera comanda HTML e texto para térmica, mas sem envio direto ESC/POS (precisa de agente local) nem tela
-de cozinha (KDS). Para o MVP a impressão pelo navegador resolve; **envio direto à impressora** e **KDS**
-são Onda futura (KDS é diferencial em cozinha movimentada).
+### G10. Impressão de cozinha direta e KDS: construir agora, Onda 3/4
 
-### G11. Onboarding rápido — Onda 1 (merece módulo próprio)
+Hoje gera comanda HTML/texto para térmica. Falta **envio direto ESC/POS** (agente local de impressão) e
+**tela de cozinha (KDS)**. Entram como: um `ClienteImpressora`/agente local (ESC/POS) e um módulo/tela
+`FR-kds` (fila de produção em tela, diferencial em cozinha movimentada). Dependem de `API-pedidos`.
 
-As peças existem (criar conta, loja, importar cardápio), mas não há um **fluxo guiado** nem a métrica
-"tempo até o primeiro pedido". Para SaaS de restaurante, o onboarding é o maior ponto de evasão.
-Recomendação: tratar o onboarding como **entrega de primeira classe na Onda 1** (checklist guiado:
-conectar número, importar cardápio, configurar zona/Pix, pedido de teste), não como subproduto do
-cadastro.
+### G11. Onboarding guiado: construir agora, Onda 1
 
-### G12. Relatórios/BI mais fundos (caixa, por canal, DRE simples) — Backlog
+As peças existem (conta, loja, import de cardápio), mas falta o **fluxo guiado** e a métrica
+tempo-até-primeiro-pedido (maior ponto de evasão em SaaS de restaurante). Entra como módulo
+**`API-onboarding`** + tela, orquestrando conta/loja/número/cardápio/zona/Pix/pedido-de-teste. Depende dos
+módulos de cadastro da Onda 1.
+
+### G12. Relatórios/BI mais fundos (fechamento de caixa, por canal, margem): construir agora, Onda 4
 
 O dashboard cobre o essencial (faturamento, ticket, pico, ranking). Fechamento de caixa, faturamento por
-canal e visão de margem são backlog, puxados pela demanda.
+canal e visão de margem entram como ampliação de `API-dashboard`/`FR-negocio`. Dependem de `API-pedidos`,
+`API-pagamentos`, `API-canais` (para a visão por canal).
 
-### G13-G15. Repetir pedido inteiro (MVP), ETA de entrega (Onda), avaliação pós-pedido (Onda)
+### G13. Repetir o último pedido inteiro: construir agora, Onda 1/2
 
-- **G13 Repetir o último pedido inteiro** (não só o endereço): forte redutor de atrito de recompra,
-  casa com o CRM. **MVP** no fluxo (um atalho "repetir meu último pedido").
-- **G14 ETA de entrega** (preparo + rota) informada ao cliente: hoje só há status. **Onda** (depende da
-  roteirização para a parte de rota; o tempo de preparo pode ser um número por loja já na Onda 1).
-- **G15 Avaliação/pós-venda**: coletar nota/comentário após `entregue` e abrir canal de problema. **Onda
-  futura**; alimenta o CRM e o RAG (reclamação recorrente vira conhecimento).
+Hoje repete só o endereço. "Repetir meu último pedido" (não só o endereço) é redutor forte de atrito de
+recompra e casa com o CRM. Entra como atalho no fluxo (`AT-motor-min`) lendo o último pedido do cliente.
+Depende de `API-pedidos` e `API-clientes`.
 
-### G16. LGPD operável (apagar/anonimizar + consentimento de marketing) — Onda (parte MVP)
+### G14. ETA de entrega (preparo + rota): construir agora, Ondas 1 e 5
+
+O cliente só vê status. A ETA informada ("sai em ~X min") entra em duas fatias: **tempo de preparo por
+loja/categoria** já na Onda 1 (um número configurável, exposto pelo node `acompanhar`), e a **parte de
+rota** na Onda 5 junto com `API-roteiriza` (`ClienteMapas`). Depende de `API-lojas`/`API-pedidos` e, para
+a rota, da roteirização.
+
+### G15. Avaliação e pós-venda: construir agora, Onda 4
+
+Coletar nota/comentário após `entregue` e abrir canal de problema. Entra como módulo **`API-avaliacoes`**,
+que também alimenta o CRM (G1) e o RAG (reclamação recorrente vira conhecimento). Depende de `API-pedidos`
+e `API-conversas`.
+
+### G16. LGPD operável: exclusão/anonimização e consentimento de marketing: construir agora, Ondas 1 e 4
 
 A base é boa (hash+cifra, log sem PII, sem DELETE). Falta o **direito de exclusão/anonimização** do
-consumidor (hoje registrado como melhoria futura em `API-clientes`) e, crítico para G1, o
-**consentimento de marketing** (opt-in/opt-out) antes de qualquer campanha. Recomendação: opt-out e a
-base do consentimento entram **junto com a campanha (G1)**, não depois; a anonimização sob pedido é Onda.
+consumidor (hoje só anotado como futuro em `API-clientes`) e o **consentimento de marketing**
+(opt-in/opt-out) antes de qualquer campanha. O opt-out e o consentimento nascem **junto com a campanha
+(G1)** na Onda 4; a anonimização sob pedido entra como fatia de `API-clientes` (UPDATE que zera PII
+preservando os agregados). Construir, não diferir.
 
-### G17. Billing por consumo e a mudança de preço da Meta (out/2026) — Onda (decisão do dono)
+### G17. Billing por uso e a mudança de preço da Meta (out/2026): construir agora, Onda 4 · decisão do dono: política de preço (default incluir medição)
 
-O billing da plataforma é assinatura fixa (~R$700/mês). A partir de **1/out/2026 o WhatsApp muda para
-cobrança por mensagem** (modelo de serviço), e o LLM por conversa também é custo variável. Assinatura
-fixa sem teto de uso **expõe a margem da Whaviso** a quem manda muita mensagem. Recomendação: modelar
-**franquia + excedente** (mensagens/conversas no plano, excedente cobrado) ou repasse do custo de
-mensagem, e usar `uso_llm` (já existe) como base de medição. **Decisão do dono** sobre a política de
-preço; a engenharia precisa estar pronta para medir e cobrar por uso.
+O billing da plataforma é assinatura fixa (~R$700/mês). A partir de **1/out/2026 o WhatsApp cobra por
+mensagem** (modelo de serviço) e o LLM por conversa é custo variável: assinatura fixa sem teto **expõe a
+margem da Whaviso**. Construir no `P-cobranca`/`P-painel` a medição e a cobrança por uso (franquia +
+excedente, com base em `uso_llm` e na contagem de `envios`). **Decisão do dono:** a política de preço
+(franquia incluída, valor do excedente, repasse ou absorção). **Default: incluir** a infraestrutura de
+medir e cobrar por uso; só o número é escolha de negócio.
 
-### G18. NF de serviço da própria assinatura — Backlog (decisão do dono)
+### G18. Emissão de NFS-e da própria assinatura: construir agora, Onda 4 · decisão do dono: qual provedor (default incluir)
 
-A Whaviso precisa emitir NFS-e das assinaturas. Não está no plano. Backlog/integração contábil externa.
+A Whaviso precisa emitir NFS-e das assinaturas que cobra. Entra no `P-cobranca` atrás do mesmo
+`ClienteFiscal` do G3 (ou integração contábil). **Decisão do dono:** qual provedor/município de emissão.
+**Default: incluir** a emissão automática na geração da fatura.
+
+### Expansão futura (genuinamente opcional, fora da visão atual)
+
+Só aqui vão itens opcionais além do produto: conciliação de Pix por PSP com webhook em tempo real (o
+copia-e-cola manual atende; só compensa com volume alto), múltiplos idiomas no atendimento, e o builder
+visual de fluxo além do que a Onda 5 já prevê. Tudo o mais listado acima **é escopo a construir agora**.
+</content>
 
 ## 4. Estabilidade e qualidade ("não cair durante um atendimento")
 
@@ -301,9 +320,14 @@ sexta-feira de pico com a Meta lenta é um risco não medido.
 - **Ampliar `AT-motor-min`/`API-pedidos`:** node de **troco** ("troco para quanto?") e carimbo da forma
   de pagamento na comanda; atalho **"repetir último pedido"**.
 - **Ampliar `API-lojas`:** estado **"pausar pedidos agora"** respeitado pelo `saudacao`.
-- **Módulos futuros a registrar (Onda 5+ / backlog):** `API-canais` (integração iFood atrás de
-  `ClienteCanal`), `API-estoque` (por produto, baixa por pedido), `API-promocoes` (cupom/combo),
-  `API-avaliacoes` (pós-pedido), `API-fidelidade` (cashback, dentro de CRM).
+- **Novos módulos a construir agora (registrar com onda e dependências):** `API-estoque` (Onda 3, por
+  produto com baixa por pedido, depois ficha técnica por ingrediente), `API-fiscal` + `ClienteFiscal`
+  (Onda 4, emissão via provedor de terceiro), `API-canais` + `ClienteCanal` (Onda 4/5, iFood e afins),
+  `API-promocoes` (Onda 4, cupom/combo), `API-fidelidade` (Onda 4, cashback, acoplado ao CRM),
+  `API-avaliacoes` (Onda 4, pós-pedido), node de **agendamento** em `AT-motor-min` (Onda 2,
+  `pedidos.agendado_para`), `FR-kds` + `ClienteImpressora` ESC/POS (Onda 3/4), capacidade por janela em
+  `API-lojas`/`API-zonas` (Onda 3), ampliação de `API-dashboard` (caixa/por-canal/margem, Onda 4) e de
+  `P-cobranca`/`P-painel` (billing por uso + NFS-e da assinatura, Onda 4).
 - **Nova categoria de teste transversal `RES-###` (resiliência):** carga do caminho de pedido, caos
   (derrubar provedor/banco), idempotência sob crash, idade/alerta de outbox.
 
@@ -353,15 +377,19 @@ sexta-feira de pico com a Meta lenta é um risco não medido.
 O plano cobre um **produto profissional e diferenciado** no núcleo que escolheu (atender e vender no
 WhatsApp próprio + operar a entrega), com uma disciplina de banco, segurança e modularidade acima do
 normal para o estágio. O diferencial defensável existe e está nos lugares certos (BYO key, RAG que se
-realimenta, operação de entrega, canal próprio sem comissão), **desde que** duas lacunas sejam tratadas
-como primeira classe e não como "depois": o **CRM/retenção do consumidor final** (hoje o maior buraco e o
-que mais vende, porque o concorrente Saipos já o tem e o iFood o sequestra) e a **estabilidade sob pico**
-(circuit breaker, observabilidade com alerta de queda, teste de carga e caos). Fora do núcleo, a decisão
-estratégica do dono é **não virar ERP fiscal** (fiscal, estoque por ingrediente): competir como sistema
-de canal próprio + retenção, integrando com quem já faz fiscal, em vez de reconstruir o Saipos. Promoção,
-pedido mínimo, troco, pausar-agora e onboarding guiado são gaps pequenos de alto valor que cabem no MVP;
-iFood, KDS, fidelidade e agendamento são crescimento. Estável o bastante para o caminho feliz; ainda não
-provado sob pico real.
+realimenta, operação de entrega, canal próprio sem comissão). Como o alvo é o **produto completo em
+produção**, todos os gaps da seção 3 entram no plano agora, dobrados em módulos/tarefas paralelizáveis
+com onda e dependência; o que muda é a **ordem de execução**, não o escopo. Duas frentes merecem o maior
+cuidado de construção: o **CRM/retenção do consumidor final** (hoje o maior buraco e o que mais vende,
+porque o Saipos já o tem e o iFood o sequestra) e a **estabilidade sob pico** (circuit breaker,
+observabilidade com alerta de queda, teste de carga e caos). Fiscal, estoque, promoções, fidelidade,
+canais, KDS, agendamento, avaliação e billing por uso são escopo a construir, não cortes: onde há escolha
+de negócio (qual provedor fiscal, profundidade do estoque, política de preço por uso) a recomendação é
+**incluir por padrão** e deixar a opção explícita para o dono. A única decisão estratégica de fundo é
+**não reconstruir o motor fiscal por UF do zero**: emitir NFC-e integrando com um emissor de terceiro
+atrás de `ClienteFiscal`, mantendo o foco em canal próprio + retenção sem virar um ERP de manutenção
+pesada. Estável o bastante para o caminho feliz e os modos de falha previstos; ainda não provado sob pico
+real até entrarem breaker/timeout nos provedores, observabilidade com alerta e os testes de carga e caos.
 
 ## Fontes
 
