@@ -175,6 +175,3 @@ export function formatarValorBr(centavos: number): string {
   const inteiro = reais.toLocaleString('pt-BR')
   return `R$ ${inteiro},${resto}`
 }
-
-// Alocação do horário reservado por segundo (H6.9): núcleo puro + constantes.
-export * from './horario_reservado'

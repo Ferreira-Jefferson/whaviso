@@ -23,9 +23,7 @@ export async function listarUsuarios(
     params,
   )
   params.push(q.per_page, offset(q.page, q.per_page))
-  // TODO(pivo): remover saldo/creditos_carteira (cobrança); depende do contrato adminUsuariosResposta em shared.
-  // E11: mostra o SALDO da carteira de créditos (não mais o plano). coalesce cobre a
-  // conta sem linha de carteira (defesa: o trigger cria com cortesia, mas é idempotente).
+  // TODO(pivo): remover saldo/creditos_carteira (dominio antigo); depende do contrato adminUsuariosResposta em shared.
   const { rows } = await pool.query<AdminUsuario & { criado_em: Date; atualizado_em: Date }>(
     `select p.id, p.nome, p.telefone, p.role, p.suspenso, p.criado_em, p.atualizado_em,
             coalesce(c.saldo_livre, 0) as saldo_livre,

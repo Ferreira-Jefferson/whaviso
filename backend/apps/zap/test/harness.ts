@@ -292,7 +292,6 @@ export function envZapFake(over: Partial<EnvZap> = {}): EnvZap {
     DATABASE_URL: 'x',
     SCHEDULER_INTERVAL_MS: 30_000,
     LOG_LEVEL: 'silent',
-    ZAP_APP_URL: 'http://app.local',
     META_GRAPH_URL: 'https://graph.facebook.com',
     META_API_VERSION: 'v23.0',
     META_OTP_TEMPLATE: 'whaviso_otp',

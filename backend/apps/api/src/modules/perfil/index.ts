@@ -8,7 +8,7 @@ import { comTransacao, type PoolClient } from '@whaviso/shared/db'
 
 const COLS_PERFIL = 'id, nome, telefone, role, criado_em, atualizado_em'
 
-// TODO(pivo): vincularAvisosPorTelefone referencia public.avisos (cobrança); remover/trocar.
+// TODO(pivo): vincularAvisosPorTelefone referencia tabela do dominio antigo (public.avisos); remover/trocar.
 /**
  * Backfill por telefone: ao definir o telefone do perfil, "puxa" para esta conta os
  * avisos abertos por esse número (vínculo por telefone, criados sem conta), nos dois papéis:

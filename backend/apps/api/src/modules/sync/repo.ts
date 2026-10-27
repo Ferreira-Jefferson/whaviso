@@ -1,6 +1,6 @@
 import type { Pool } from '@whaviso/shared/db'
 
-// TODO(pivo): consulta tabelas de cobrança (avisos, aviso_ocorrencias, envios, eventos_aviso); reapontar p/ pedidos.
+// TODO(pivo): consulta tabelas do dominio antigo (avisos, aviso_ocorrencias, envios, eventos_aviso); reapontar p/ pedidos.
 /**
  * Carimbo de versão do estado do usuário logado: o maior `atualizado_em`/`criado_em` entre
  * avisos, aviso_ocorrencias, envios e eventos_aviso do escopo dele (mesmo escopo do painel,
