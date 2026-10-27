@@ -12,7 +12,9 @@
     "build": "npm run lint && npm run typecheck",
     "test": "npm run test --workspaces --if-present",
     "dev:api": "npm run dev -w @whaviso/api",
-    "dev:zap": "npm run dev -w @whaviso/zap"
+    "dev:zap": "npm run dev -w @whaviso/zap",
+    "gen:contracts": "node scripts/gen_contracts/index.mjs",
+    "check:contracts": "node scripts/gen_contracts/index.mjs --check"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

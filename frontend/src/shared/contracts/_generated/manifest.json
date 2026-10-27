@@ -1,0 +1,13 @@
+{
+  "gerado_de": "backend/packages/shared/src/contracts",
+  "arquivos": [
+    "enums.ts",
+    "eventos.ts",
+    "index.ts",
+    "node.ts",
+    "pix.ts",
+    "primitivos.ts",
+    "sessao.ts"
+  ],
+  "hash": "8e9907a676e7b31c63f6a67f7f1c8a802fefe731097e0d6323e0fc2370104932"
+}

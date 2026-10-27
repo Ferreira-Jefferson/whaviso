@@ -10,18 +10,13 @@ import boundaries from 'eslint-plugin-boundaries'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
-// Regras de linguagem do produto (H13.10): barram travessao e vocabulario
-// proibido em codigo e copy de PRODUCAO. Os padroes abaixo sao COPIA de
-// src/shared/contracts/linguagem.ts (PALAVRAS_PROIBIDAS_PATTERN e
-// TRAVESSAO_PATTERN); duplicamos porque o eslint.config.mjs e ESM e a fonte e
-// .ts. Mudar um padrao = mudar os DOIS lados (este config e o linguagem.ts do
-// front e do back) juntos.
-const PALAVRAS_PROIBIDAS_PATTERN = '(d[ií]vida|devendo|atras(o|ad)|cobran[çc]a|inadimpl)'
+// Regra de escrita do repositorio: barra travessao (em/en dash). O vocabulario proibido
+// da era cobranca (divida/atraso/cobranca/inadimplencia) foi REMOVIDO no pivo: "cobranca"
+// agora e termo de dominio legitimo (billing da plataforma). Regras de copy do produto
+// novo virao do modulo de compliance/atendente, nao deste lint.
 const TRAVESSAO_PATTERN = '[—–]'
-const RE_PALAVRAS = new RegExp(PALAVRAS_PROIBIDAS_PATTERN, 'i')
 const RE_TRAVESSAO = new RegExp(TRAVESSAO_PATTERN)
 const MSG_TRAVESSAO = 'Travessao proibido (em/en dash): use virgula, dois-pontos ou parenteses.'
-const MSG_PALAVRA = 'Palavra proibida (linguagem do produto): use combinado, lembrete ou aviso.'
 
 // Plugin inline: varre o texto de literais, template literals, JSXText e
 // comentarios (linha e bloco) procurando travessao e vocabulario proibido.
@@ -33,7 +28,6 @@ const linguagem = {
         const checa = (texto, node) => {
           if (typeof texto !== 'string') return
           if (RE_TRAVESSAO.test(texto)) context.report({ node, message: MSG_TRAVESSAO })
-          if (RE_PALAVRAS.test(texto)) context.report({ node, message: MSG_PALAVRA })
         }
         const src = context.sourceCode ?? context.getSourceCode()
         return {
@@ -57,7 +51,7 @@ const linguagem = {
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/dist/**', 'vite.config.ts'],
+    ignores: ['**/node_modules/**', '**/dist/**', 'vite.config.ts', 'src/shared/contracts/_generated/**'],
   },
   ...tseslint.configs.recommended,
   {
@@ -144,6 +138,25 @@ export default tseslint.config(
             {
               from: ['app-root', 'entry'],
               allow: ['module', 'app-shared', 'app-root', 'entry'],
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // F1 (independencia de deploy): o front NAO importa @whaviso/shared; os contratos vem
+    // de src/shared/contracts/_generated (reemitidos por `npm run gen:contracts` no backend).
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@whaviso/shared', '@whaviso/shared/*'],
+              message:
+                'O front nao importa @whaviso/shared; use src/shared/contracts/_generated (npm run gen:contracts).',
             },
           ],
         },

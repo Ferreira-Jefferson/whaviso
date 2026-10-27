@@ -105,6 +105,10 @@ jobs:
         working-directory: backend
         run: npm run typecheck
 
+      - name: Contratos gerados em sincronia (front)
+        working-directory: backend
+        run: npm run check:contracts
+
       - name: Backend, testes (vitest com banco)
         working-directory: backend
         env:
