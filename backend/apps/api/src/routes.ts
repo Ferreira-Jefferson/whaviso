@@ -3,6 +3,12 @@
 //   { prefixo: 'pedidos', plugin: pedidosRoutes },   // vira /v1/pedidos/*
 // Auth/escopo sao opt-in por rota (ver AGENTS.md): config.acesso + preHandler.
 import type { FastifyPluginAsync } from 'fastify'
+import { contaRoutes } from './modules/conta'
+import { lojasRoutes } from './modules/lojas'
+import { numerosRoutes } from './modules/numeros_whatsapp'
+import { cardapioRoutes } from './modules/cardapio'
+import { clientesRoutes } from './modules/clientes'
+import { conversasRoutes } from './modules/conversas'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -11,7 +17,13 @@ export interface ModuloRota {
 }
 
 export const MODULOS: ModuloRota[] = [
-  // API-* registram aqui, 1 linha cada.
+  // Onda 1 (nucleo do pedido). API-* registram aqui, 1 linha cada.
+  { prefixo: 'conta', plugin: contaRoutes },
+  { prefixo: 'lojas', plugin: lojasRoutes },
+  { prefixo: 'numeros', plugin: numerosRoutes },
+  { prefixo: 'cardapio', plugin: cardapioRoutes },
+  { prefixo: 'clientes', plugin: clientesRoutes },
+  { prefixo: 'conversas', plugin: conversasRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/

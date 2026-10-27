@@ -1,0 +1,1 @@
+export { cardapioRoutes } from './routes'
