@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest'
 import { ErroMontagem, montarLinha } from './cardapio'
 import { montarCardapio } from './montar_cardapio'
-import { criarRegistry } from './registry'
+import { criarRegistry, NODES_COM_LLM } from './registry'
+import { elegivelParaHarness, validarRascunho } from './texto_livre'
 import { confirmarNode } from './nodes/confirmar'
 import { EFEITO } from './acoes'
 import type { CardapioRaw } from './repo_leitura'
@@ -126,10 +127,60 @@ describe('confirmar (SEC-061: texto livre nao confirma)', () => {
   })
 })
 
+describe('texto livre -> harness (elegibilidade)', () => {
+  const registry = criarRegistry()
+  const texto = { tipo: 'texto', texto: 'quero um burger', botaoId: null } as const
+  const elegivel = (etapa: string, evento: EntradaTurno['evento'], estado: Partial<EstadoFluxo> = {}) =>
+    elegivelParaHarness(registry.get(etapa)!, entrada(evento, { etapa, carrinho: [], ...estado }))
+
+  it('texto livre nas etapas de entendimento vai ao harness', () => {
+    expect(elegivel('pedir_categoria', texto)).toBe(true)
+    expect(elegivel('montar_pedido', texto)).toBe(true)
+  })
+
+  it('botao, numero de menu e sub-passos deterministicos nao vao ao harness', () => {
+    expect(elegivel('pedir_categoria', { tipo: 'botao', texto: null, botaoId: 'x' })).toBe(false)
+    expect(elegivel('pedir_categoria', { tipo: 'texto', texto: '1', botaoId: null }, { apresentados: ['cat1'] })).toBe(false)
+    expect(elegivel('montar_pedido', texto, { item_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' })).toBe(false)
+    expect(elegivel('endereco', texto, { aguardando: 'endereco_rua' })).toBe(false)
+  })
+
+  it('confirmar, saudacao, pagamento e acompanhar nunca vao ao harness (SEC-061)', () => {
+    for (const etapa of ['confirmar', 'saudacao', 'pagamento', 'acompanhar', 'endereco']) {
+      expect(elegivel(etapa, texto)).toBe(false)
+    }
+  })
+})
+
+describe('validarRascunho (proposta do harness validada pelo motor)', () => {
+  const ITEM = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+  const cardapio = (): EntradaTurno['cardapio'] => ({
+    categorias: [],
+    itensPorCategoria: new Map(),
+    itensPorId: new Map([[ITEM, { id: ITEM, categoria_id: 'c', nome: 'Burger', preco_centavos: 2000 }]]),
+    gruposPorItem: new Map([[ITEM, []]]),
+  })
+
+  it('aceita linha valida do cardapio vivo', () => {
+    expect(validarRascunho(cardapio(), { linhas: [{ item_id: ITEM, quantidade: 2, opcoes_ids: [] }] })).toEqual([
+      { item_id: ITEM, quantidade: 2, opcoes_ids: [] },
+    ])
+  })
+
+  it('recusa item fora do cardapio, quantidade invalida e observacao livre', () => {
+    const outro = '5b2504e0-4f89-41d3-9a0c-0305e82c3302'
+    expect(validarRascunho(cardapio(), { linhas: [{ item_id: outro, quantidade: 1, opcoes_ids: [] }] })).toBeNull()
+    expect(validarRascunho(cardapio(), { linhas: [{ item_id: ITEM, quantidade: 0, opcoes_ids: [] }] })).toBeNull()
+    expect(validarRascunho(cardapio(), { linhas: [{ item_id: ITEM, quantidade: 1, opcoes_ids: [], observacao: 'x' }] })).toBeNull()
+    expect(validarRascunho(cardapio(), { linhas: [] })).toBeNull()
+  })
+})
+
 describe('criarRegistry', () => {
-  it('monta o registry com todos os nodes do grafo e nenhum usa LLM', () => {
+  it('monta o registry com todos os nodes do grafo e so o entendimento de texto livre declara LLM', () => {
     const r = criarRegistry()
     expect(r.size).toBe(7)
-    for (const node of r.values()) expect(node.usaLlm).toBe(false)
+    for (const node of r.values()) expect(node.usaLlm).toBe(NODES_COM_LLM.has(node.tipo))
+    expect([...NODES_COM_LLM].sort()).toEqual(['montar_pedido', 'pedir_categoria'])
   })
 })

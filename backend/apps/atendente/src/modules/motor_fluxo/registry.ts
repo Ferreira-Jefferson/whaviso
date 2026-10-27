@@ -1,7 +1,7 @@
 // Registry de nodes: tipo -> implementacao do NodeContract. Validado na carga contra o grafo fixo
 // (todo node do grafo tem implementacao e vice-versa; toda transicao aponta para um tipo
-// conhecido). Invariante do motor-min: nenhum node usa LLM (a fronteira sagrada fica fixada no
-// contrato; ver HARNESS-ATENDENTE.md). O motor resolve o node pelo `estado.etapa`.
+// conhecido). Invariante: so os nodes de NODES_COM_LLM declaram `usaLlm` (a fronteira sagrada fica
+// fixada no contrato; ver HARNESS-ATENDENTE.md). O motor resolve o node pelo `estado.etapa`.
 import type { NodeContract, NodeRegistry } from '@whaviso/shared/contracts'
 import { GRAFO } from './grafo'
 import { saudacaoNode } from './nodes/saudacao'
@@ -22,6 +22,14 @@ const NODES: NodeContract[] = [
   acompanharNode as NodeContract,
 ]
 
+/**
+ * Unicos nodes cujo TEXTO LIVRE pode ir ao harness (entendimento de linguagem natural). O flag
+ * `usaLlm` do node so declara isso: o node em si segue deterministico (botao/regra) e quem chama o
+ * harness e o motor. Os demais (saudacao com gate de horario, confirmar, endereco, pagamento,
+ * acompanhar) nunca usam LLM. Qualquer divergencia entre o flag e esta lista derruba o boot.
+ */
+export const NODES_COM_LLM: ReadonlySet<string> = new Set(['pedir_categoria', 'montar_pedido'])
+
 export class ErroRegistry extends Error {
   constructor(mensagem: string) {
     super(mensagem)
@@ -34,7 +42,12 @@ export function criarRegistry(): NodeRegistry {
   const registry: NodeRegistry = new Map()
   for (const node of NODES) {
     if (!node.tipo) throw new ErroRegistry('node sem tipo')
-    if (node.usaLlm) throw new ErroRegistry(`node ${node.tipo}: motor-min nao admite usaLlm`)
+    if (node.usaLlm && !NODES_COM_LLM.has(node.tipo)) {
+      throw new ErroRegistry(`node ${node.tipo}: usaLlm so e admitido nos nodes de entendimento de texto livre`)
+    }
+    if (!node.usaLlm && NODES_COM_LLM.has(node.tipo)) {
+      throw new ErroRegistry(`node ${node.tipo}: deveria declarar usaLlm (entendimento de texto livre)`)
+    }
     if (!node.configSchema) throw new ErroRegistry(`node ${node.tipo}: sem configSchema`)
     if (registry.has(node.tipo)) throw new ErroRegistry(`node duplicado: ${node.tipo}`)
     registry.set(node.tipo, node)

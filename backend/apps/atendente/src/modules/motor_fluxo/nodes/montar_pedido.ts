@@ -18,7 +18,7 @@ const FINALIZAR = '0'
 
 export const montarPedidoNode: NodeContract<ConfigVazia, EntradaTurno> = {
   tipo: 'montar_pedido',
-  usaLlm: false,
+  usaLlm: true, // so declara que o TEXTO LIVRE pode ir ao harness (motor); o node segue deterministico
   configSchema: ConfigVazia,
   async executar(entrada) {
     return entrada.estado.item_id === null ? escolherItem(entrada) : coletarGrupo(entrada)

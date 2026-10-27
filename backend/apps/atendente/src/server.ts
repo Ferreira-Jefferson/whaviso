@@ -1,11 +1,20 @@
 // Boot do worker atendente (AT-motor-min): valida env, abre o pool (user whaviso_atendente),
 // monta e VALIDA o registry de nodes contra o grafo fixo (crash no boot se inconsistente) e sobe
-// o laco que drena o inbound a cada tick. SEM Meta, SEM LLM: o motor decide por botao/regra.
+// o laco do tick: drena o inbound (motor por botao/regra; so o texto livre passa pelo harness de
+// LLM, que propoe e o motor efetiva), a fila de importacao de cardapio e a ingestao de conhecimento.
+// SEM Meta: o envio e do zap.
 import { parseEnv } from '@whaviso/shared/config'
 import { criarPool } from '@whaviso/shared/db'
 import { criarLogger } from '@whaviso/shared/logger'
 import { envSchema } from './env'
-import { criarRegistry, drenarInbound } from './modules/motor_fluxo'
+import { criarEntendedor } from './modules/entender_mensagem'
+import { drenarImportacoes } from './modules/importar_cardapio'
+import { criarRegistry, drenarInbound, type LlmMotor } from './modules/motor_fluxo'
+import { criarRegistroTools, ferramentasPadrao, selarConversaCtx } from './modules/tools'
+import { criarRepoHarness } from './shared/harness'
+import { criarServicoLlmProducao } from './shared/llm_client'
+import { criarClienteEmbeddingsProducao, criarRerankerNulo, type DepsRetriever } from './shared/rag'
+import { drenarConhecimento } from './drenar_conhecimento'
 import { iniciarScheduler } from './scheduler'
 import { iniciarSaude } from './saude'
 
@@ -26,13 +35,47 @@ const pool = criarPool({
 })
 
 // Registry validado no boot: todo node do grafo tem implementacao, toda transicao aponta para um
-// tipo conhecido e nenhum node usa LLM (fronteira do motor-min). Inconsistencia derruba o boot.
+// tipo conhecido e so os nodes de entendimento de texto livre declaram LLM. Inconsistencia derruba o boot.
 const registry = criarRegistry()
 
+// Fiacao do LLM (montada uma vez). Credencial de LLM e por loja (decifrada so no uso); embedding e
+// rerank usam a credencial da plataforma. Sem credencial/teto/erro o harness devolve `sem_llm` e o
+// motor segue por botoes. O harness so PROPOE; o motor efetiva (fronteira sagrada).
+const servicoLlm = criarServicoLlmProducao({ logger })
+const rag: DepsRetriever = {
+  exec: pool,
+  embeddings: criarClienteEmbeddingsProducao({ logger }),
+  reranker: criarRerankerNulo(),
+}
+const llm: LlmMotor = {
+  harness: {
+    servico: servicoLlm,
+    registro: criarRegistroTools(ferramentasPadrao({ exec: pool, rag })),
+    repo: criarRepoHarness(pool),
+    logger,
+    exec: pool,
+  },
+  entendedor: criarEntendedor({ servico: servicoLlm, logger }),
+  selar: selarConversaCtx,
+}
+
 const intervaloMs = Number(process.env.ATENDENTE_INTERVALO_MS ?? 5000)
+// Cada drenagem e independente e nunca lanca (falha fechada): uma nao trava as outras.
 const tick = async () => {
-  const resumo = await drenarInbound({ pool, logger, registry })
+  const resumo = await drenarInbound({ pool, logger, registry, llm })
   if (resumo.processadas || resumo.suprimidas) logger.info(resumo, 'dreno de inbound')
+
+  const importacoes = await drenarImportacoes({ pool, servico: servicoLlm, logger })
+  if (importacoes.rascunhos || importacoes.erros || importacoes.reenfileirados) {
+    logger.info(importacoes, 'dreno de importacao de cardapio')
+  }
+
+  const conhecimento = await drenarConhecimento({
+    exec: pool,
+    logger,
+    ingestor: { exec: pool, embeddings: rag.embeddings, logger },
+  })
+  if (conhecimento.ingeridos || conhecimento.arquivados) logger.info(conhecimento, 'dreno de conhecimento')
 }
 const scheduler = iniciarScheduler({ logger, intervaloMs, tick })
 const saude = iniciarSaude(env.HOST, env.PORT)

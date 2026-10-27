@@ -23,6 +23,16 @@ O scheduler do app chama `drenarInbound`/`processarProximaMensagem`. Cada turno 
    efeitos (estado, criar_endereco, criar_pedido, handoff, encerrar), enfileira as respostas em
    `envios` (texto/interativo, janela de 24h) e registra as saidas, e marca a entrada processada.
 
+## Texto livre pelo harness (texto_livre.ts)
+
+Os nodes sao deterministicos. So o TEXTO LIVRE de `pedir_categoria` e `montar_pedido` (flag `usaLlm`,
+lista `NODES_COM_LLM` validada no boot), fora de menu/numero/sub-passo/coleta de opcoes, passa antes
+pelo `rodarTurno` do harness (`DepsMotor.llm`, injetado pelo app-root). O harness propoe; o motor
+efetiva: `resposta` enfileira as mensagens, `escalar_humano` vira `status='humano'` + handoff,
+`rascunho_pedido` e validado contra o cardapio vivo (`montarLinha`) e vira carrinho em `confirmar`
+(confirmacao so por botao); `silencio` so consome a mensagem; `sem_llm`, erro ou rascunho invalido
+seguem pelo node (botoes). Rascunho com `observacao` nao e aplicado (carrinho nao tem o campo).
+
 ## Grafo (grafo.ts, dados)
 
 `saudacao -> pedir_categoria -> montar_pedido -> confirmar -> endereco -> pagamento -> acompanhar`.

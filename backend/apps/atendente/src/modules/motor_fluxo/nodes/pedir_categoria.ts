@@ -9,7 +9,7 @@ import { ConfigVazia, type EntradaTurno } from '../tipos'
 
 export const pedirCategoriaNode: NodeContract<ConfigVazia, EntradaTurno> = {
   tipo: 'pedir_categoria',
-  usaLlm: false,
+  usaLlm: true, // so declara que o TEXTO LIVRE pode ir ao harness (motor); o node segue deterministico
   configSchema: ConfigVazia,
   async executar(entrada) {
     const { evento, estado, cardapio } = entrada
