@@ -91,6 +91,13 @@ export async function getSession(): Promise<Session | null> {
   return data.session
 }
 
+/** Renova a sessao (refresh token) e devolve o novo access token; null se falhar. */
+export async function renovarSessao(): Promise<string | null> {
+  const { data, error } = await supabase.auth.refreshSession()
+  if (error) return null
+  return data.session?.access_token ?? null
+}
+
 export async function getAccessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession()
   return data.session?.access_token ?? null

@@ -1,18 +1,12 @@
-// 404 amigável (estética editorial). Leva de volta à home do papel quando há
-// sessão (user → /app, owner → /admin) ou à landing quando não há.
-// Sem termos alarmistas, só um caminho de volta gentil.
+// 404 amigavel: leva de volta ao painel (a RequireAuth manda para o login se nao houver sessao).
 import { useEffect } from 'react'
 import { Link } from 'react-router'
-import { Button, BellLogo } from '@/shared/ui'
-import { useAuth, homeDoPapel } from '@/shared/auth'
+import { BellLogo, Button } from '@/shared/ui'
+import { ROTA_INICIAL } from './rotas'
 
 export default function NotFound() {
-  const { status, role } = useAuth()
-  const destino = status === 'logado' ? homeDoPapel(role) : '/'
-  const rotuloDestino = status === 'logado' ? 'Ir para o início' : 'Voltar à página inicial'
-
   useEffect(() => {
-    document.title = 'Página não encontrada | whaviso'
+    document.title = 'Página não encontrada | Whaviso'
   }, [])
 
   return (
@@ -22,12 +16,9 @@ export default function NotFound() {
       </span>
       <p className="font-display text-6xl font-semibold text-linha">404</p>
       <h1 className="font-display text-3xl text-salvia">Não encontramos esta página</h1>
-      <p className="max-w-sm text-tinta-2">
-        O link pode ter mudado ou expirado. Vamos te levar de volta por um
-        caminho seguro.
-      </p>
-      <Link to={destino}>
-        <Button>{rotuloDestino}</Button>
+      <p className="max-w-sm text-tinta-2">O link pode ter mudado. Vamos te levar de volta ao painel.</p>
+      <Link to={ROTA_INICIAL}>
+        <Button>Ir para o painel</Button>
       </Link>
     </div>
   )

@@ -1,27 +1,37 @@
-// Composição de providers: React Query + Auth + Router.
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthProvider } from '@/shared/auth'
+// Composicao de providers: Query > Auth > Toast > Tenant > Realtime > Router.
+import { useEffect } from 'react'
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
+import { AuthProvider, useSessao } from '@/shared/auth'
+import { RealtimeProvider } from '@/shared/realtime'
+import { TenantProvider } from '@/shared/tenant'
+import { ToastProvider } from '@/shared/ui'
 import { AppRouter } from './router'
+import { criarQueryClient } from './query_client'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Dado permanece fresco pela navegação normal (sem refetch-on-mount ao voltar de
-      // tela); o frescor real vem do poller de versão (shared/sync), não do staleTime
-      // curto nem do foco de janela (por isso refetchOnWindowFocus desligado abaixo).
-      staleTime: 300_000,
-      gcTime: 1_800_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+const queryClient = criarQueryClient()
+
+/** Ao encerrar a sessao, nada do usuario anterior pode ficar em cache. */
+function LimpaCacheAoSair() {
+  const { status } = useSessao()
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (status === 'deslogado') qc.clear()
+  }, [status, qc])
+  return null
+}
 
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <AppRouter />
+        <LimpaCacheAoSair />
+        <ToastProvider>
+          <TenantProvider>
+            <RealtimeProvider>
+              <AppRouter />
+            </RealtimeProvider>
+          </TenantProvider>
+        </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

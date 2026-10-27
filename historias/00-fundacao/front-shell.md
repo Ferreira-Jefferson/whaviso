@@ -1,8 +1,8 @@
 # F6 front-shell
 
 - **ID:** F6  ·  **Área:** F (frontend)  ·  **Onda:** 0
-- **Modelo sugerido:** Sonnet  ·  **Status:** `A FAZER`
-- **Reivindicado por:** (livre)
+- **Modelo sugerido:** Sonnet  ·  **Status:** `EM REVISAO`
+- **Reivindicado por:** F6-agent
 
 ## Objetivo
 
@@ -44,54 +44,54 @@ nome, `logo_url`, `cores`), `CanalRealtime`/`EventoDominio`. O front **nunca** f
 
 ## Etapas
 
-- [ ] 1. Inventário do `frontend/src` atual (app/shared/modules, `sync`, `pix`, cobrança): o que
+- [x] 1. Inventário do `frontend/src` atual (app/shared/modules, `sync`, `pix`, cobrança): o que
   reaproveita (api_client, auth, ui base) e o que o pivô aposenta. Registrar em Notas.
   (commit: `chore(frontend): inventario do shell atual`)
-- [ ] 2. **Artifact primeiro** do shell: layout desktop + mobile (navegação lateral/bottom bar, topo com
+- [x] 2. **Mock HTML primeiro** (protocolo atualizado de historias/README.md, sem a ferramenta Artifact) do shell: layout desktop + mobile (navegação lateral/bottom bar, topo com
   seletor de loja, estado vazio/carregando/erro). Aprovado, linkado em "Design". Sem código antes.
-- [ ] 3. Tokens de design (cores, tipografia, espaçamento, raio) em Tailwind v4 (`@theme`), com
+- [x] 3. Tokens de design (cores, tipografia, espaçamento, raio) em Tailwind v4 (`@theme`), com
   **branding por loja** via variáveis CSS (`--cor-primaria`...) aplicadas do `cores` da loja ativa.
   (commit: `feat(frontend): tokens de design e tema por loja`)
-- [ ] 4. ui kit base em `shared/ui`: Button, Input, Select, Dialog, Toast, Tabs, Card, Badge, Skeleton,
+- [x] 4. ui kit base em `shared/ui`: Button, Input, Select, Dialog, Toast, Tabs, Card, Badge, Skeleton,
   EmptyState, ErrorState, Spinner, Tabela básica; acessíveis (foco, aria, teclado), responsivos.
   Cada componente com teste de renderização/acessibilidade.
   (commit: `feat(frontend): ui kit base`)
-- [ ] 5. `shared/format`: `formatarCentavos` (BRL), data/hora em America/Sao_Paulo a partir de ISO UTC.
+- [x] 5. `shared/format`: `formatarCentavos` (BRL), data/hora em America/Sao_Paulo a partir de ISO UTC.
   Testes de unidade, incluindo virada de dia e horário de verão histórico.
   (commit: `feat(frontend): formatacao de moeda e data`)
-- [ ] 6. Importar `_generated`: configurar alias/`tsconfig` e confirmar que o typecheck passa só com o
+- [x] 6. Importar `_generated`: configurar alias/`tsconfig` e confirmar que o typecheck passa só com o
   gerado local. Confirmar a regra de lint contra `@whaviso/shared`.
   (commit: `chore(frontend): consumo do _generated`)
-- [ ] 7. `shared/supabase` + `shared/auth`: cliente supabase configurado **só** com URL e anon key
+- [x] 7. `shared/supabase` + `shared/auth`: cliente supabase configurado **só** com URL e anon key
   públicas, persistência de sessão, `useSessao`, login (Google OAuth e/ou OTP conforme o auth vigente),
   logout, refresh automático; sem nenhuma query a tabela. Guard de rota.
   (commit: `feat(frontend): autenticacao via supabase-js so para JWT`)
-- [ ] 8. `shared/api_client`: wrapper de `fetch` com Bearer do JWT atual, base URL de config, parse e
+- [x] 8. `shared/api_client`: wrapper de `fetch` com Bearer do JWT atual, base URL de config, parse e
   **validação Zod da resposta** com os contratos gerados, tradução do envelope `{ error: { code,
   message } }` para um erro tipado, tratamento de 401 (refresh uma vez, depois logout) e 403/429.
   Integração com TanStack Query (defaults, retry só em erro transitório).
   (commit: `feat(frontend): api_client com contratos gerados e erro tipado`)
-- [ ] 9. `shared/tenant`: carrega `GET` de lojas do usuário, seletor de loja (persistência por usuário em
+- [x] 9. `shared/tenant`: carrega `GET` de lojas do usuário, seletor de loja (persistência por usuário em
   `localStorage` com try/catch), aplica branding (logo/cores) ao shell, envia a loja ativa no header
   esperado pela api; troca de loja **limpa o cache de queries**. Estado "sem loja" (onboarding mínimo,
   sem implementar a tela de criar loja, que é de `FR-nucleo`).
   (commit: `feat(frontend): seletor de loja e branding`)
-- [ ] 10. `shared/realtime`: cliente SSE via `fetch` stream (envia Bearer), reconexão com backoff,
+- [x] 10. `shared/realtime`: cliente SSE via `fetch` stream (envia Bearer), reconexão com backoff,
   heartbeat watchdog, `Last-Event-ID`, e ponte para TanStack Query (`invalidateQueries` por tipo de
   evento; no evento `resync` ou reconexão, invalida tudo). API de hook `useRealtime(tipo, handler)`.
   Testado com servidor SSE fake. (commit: `feat(frontend): cliente de realtime SSE`)
-- [ ] 11. Shell/layout e roteamento: `app/` com router, rotas protegidas, layout responsivo (nav,
+- [x] 11. Shell/layout e roteamento: `app/` com router, rotas protegidas, layout responsivo (nav,
   topo), páginas placeholder por área (`/pedidos`, `/cardapio`...) apenas como slots vazios que os
   `FR-*` preencherão; 404 e erro global (error boundary). Registry de rotas por módulo (1 linha por
   módulo), espelhando a regra do backend. (commit: `feat(frontend): shell, rotas protegidas e layout`)
-- [ ] 12. Transpor o artifact aprovado do shell sem degradar (desktop e mobile conferidos num browser).
+- [x] 12. Transpor o artifact aprovado do shell sem degradar (desktop e mobile conferidos num browser).
   (commit: `feat(frontend): shell conforme artifact aprovado`)
-- [ ] 13. Teste de fumaça e2e leve (browser ou testing-library): login mockado -> shell -> chamada
+- [x] 13. Teste de fumaça e2e leve (browser ou testing-library): login mockado -> shell -> chamada
   autenticada -> troca de loja limpa cache -> evento realtime invalida query.
   (commit: `test(frontend): fluxo do shell`)
-- [ ] 14. Verificação de bundle: build não contém `service_role` e só a anon key esperada. (SEC-025)
+- [x] 14. Verificação de bundle: build não contém `service_role` e só a anon key esperada. (SEC-025)
   (commit: `test(frontend): bundle sem service_role (SEC-025)`)
-- [ ] 15. `npm run lint`, `typecheck`, `build` verdes; abrir o app e conferir o shell em tela larga e estreita.
+- [x] 15. `npm run lint`, `typecheck`, `build` verdes; abrir o app e conferir o shell em tela larga e estreita.
 
 ## Testes e segurança exigidos
 
@@ -109,8 +109,9 @@ nome, `logo_url`, `cores`), `CanalRealtime`/`EventoDominio`. O front **nunca** f
 
 ## Design
 
-Artifact visual do shell (desktop + mobile): **a criar na etapa 2** (link: `<preencher ao aprovar>`).
-O código segue o artifact. Referências de inspiração: consoles de operação de restaurante (painéis
+Mock HTML do shell (desktop + mobile): `docs/pivot/mocks/shell/shell.html` (estados via hash: `#vazio`,
+`#carregando`, `#erro`, `#sem-loja`, `#seletor`, `#marca-2`, `#offline`), com PNGs `shell-*.png` ao lado e
+`render-react-*.png` (o app React real renderizado em 1280 e 390). O código segue o mock. Referências de inspiração: consoles de operação de restaurante (painéis
 kanban/pedidos), shells de SaaS multi-tenant com seletor de loja. Usar as skills de design do projeto.
 
 ## Notas e decisões
@@ -124,3 +125,23 @@ kanban/pedidos), shells de SaaS multi-tenant com seletor de loja. Usar as skills
   meio da onda. O shell novo não deve importar nada desses diretórios.
 - Telas (lojas, números, cardápio, pedidos, conversas, clientes) são de `FR-nucleo`; este módulo deixa só
   slots de rota e o registry para elas se encaixarem com 1 linha.
+
+### Notas de implementacao (F6-agent)
+
+- Etapas 2 e 12: usado o **mock HTML** (protocolo atualizado do README), nao Artifact. Autoverificado no Chrome headless
+  (1280 e 390); o app React real foi renderizado e comparado (`render-react-*.png`).
+- Inventario (etapa 1): reaproveitados `shared/supabase` (so auth, ganhou `renovarSessao`), `shared/ui` (ganhou Tabs,
+  Badge, ErrorState; Button com min-h-11; Toast acima da barra inferior) e os tokens "Calmo Editorial"
+  (`salvia` agora e a cor da loja ativa via `--cor-primaria`). Reescritos: `api_client`, `AuthProvider` (sem perfil/papel),
+  `app/*`. Aposentar depois (commit coordenado): `modules/**` (exceto `legal`), `shared/sync`, `shared/pix`,
+  `shared/auth/{perfil,OtpTelefoneDialog,papeis}`, `shared/contracts/{entidades,enums,payloads,pix,index}` legados,
+  rotulos de envio em `shared/format/index.ts`. Campos `profile/role/precisaOnboarding` do `AuthState` ficam so para o legado compilar.
+- `/politica-de-privacidade` e `/termos-de-uso` seguem servidas por `modules/legal` (paginas publicas ja em producao e
+  exigidas pela Meta); unico import de `modules/**` no shell.
+- Login do shell: so OTP por WhatsApp. Google (GIS + nonce) fica para o modulo de auth.
+- Contrato de loja (`LojaResumo`) e local em `shared/tenant/contratos.ts` ate `LojaSaida` entrar em `_generated`.
+  Assume `GET /v1/lojas` (lista ou `{itens}`) e `cores.primaria` em hex.
+- Troca de loja: `resetQueries` (zera e refaz as ativas com o novo `x-loja-id`), nao so `removeQueries`.
+- Realtime: aceita payload direto ou envelope `EventoDominio` em `data`; `event:` = tipo; `resync` invalida tudo; reconexao tambem.
+  Reconciliar com F5 (nome do evento `resync`, formato de `data`, URL `/realtime/stream` sem `/v1`).
+- Bundle: `npm run build` agora roda `scripts/verificar_bundle.mjs` (SEC-025).

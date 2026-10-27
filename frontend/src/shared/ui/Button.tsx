@@ -30,7 +30,7 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-pill px-5 py-2.5',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-pill px-5 py-2.5',
         'text-sm font-medium transition-[background-color,opacity] duration-150',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia',
         'disabled:cursor-not-allowed',

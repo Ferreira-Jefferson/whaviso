@@ -16,8 +16,6 @@
   --color-tinta-2: #5c6b62; /* texto secundário */
 
   /* marca */
-  --color-salvia: #1e4d3b; /* verde profundo, ações primárias, títulos */
-  --color-salvia-claro: #dceae0; /* fundos de destaque suaves */
   --color-folha: #3e7c5b; /* sucesso/pago-recebido */
   --color-dourado: #b8860b; /* sino da marca (acento dourado, ouro velho) */
 
@@ -37,6 +35,20 @@
   --radius-card: 12px;
   --radius-input: 8px;
   --radius-pill: 9999px;
+}
+
+/* Branding por loja (F6): a cor primaria vem da loja ativa (shared/tenant aplica
+   --cor-primaria e --cor-primaria-suave no <html>). `salvia` e o nome historico do token
+   de marca: todos os componentes que usam bg-salvia/text-salvia seguem a loja ativa. */
+:root {
+  --cor-primaria: #1e4d3b;
+  --cor-primaria-suave: #dceae0;
+  --cor-sobre-primaria: #faf7f0;
+}
+@theme inline {
+  --color-salvia: var(--cor-primaria);
+  --color-salvia-claro: var(--cor-primaria-suave);
+  --color-sobre-marca: var(--cor-sobre-primaria);
 }
 
 @layer base {

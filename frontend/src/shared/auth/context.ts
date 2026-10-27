@@ -8,7 +8,9 @@ export type AuthStatus = 'carregando' | 'deslogado' | 'logado'
 
 export interface AuthState {
   session: Session | null
-  /** Perfil real vindo de GET /v1/perfil (fonte de verdade do role). */
+  /** Id do usuario no Supabase Auth (so identidade; permissoes vem da api). */
+  userId: string | null
+  /** @deprecated legado de cobranca; sempre null no shell novo. */
   profile: Perfil | null
   /** Papel do usuário, sempre do perfil; null enquanto carrega ou sem perfil. */
   role: RoleUsuario | null

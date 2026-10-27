@@ -21,3 +21,8 @@ export function useRole(): RoleUsuario | null {
 export function usePerfil(): Perfil | null {
   return useAuth().profile
 }
+
+/** Estado da sessao do shell: { status, userId, session, signOut }. */
+export function useSessao(): AuthState {
+  return useAuth()
+}

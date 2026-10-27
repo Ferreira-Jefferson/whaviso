@@ -1,30 +1,45 @@
-// Erro tipado do envelope { error: { code, message } } da api.
+// Erro tipado do envelope { error: { code, message } } da api (SEC-020: nunca carrega
+// corpo nem headers da requisicao; so o code/message publicos do envelope).
 export class ApiError extends Error {
   readonly code: string
   readonly status: number
+  /** Segundos sugeridos pelo header Retry-After (429/503), quando presente. */
+  readonly retryAfterSegundos: number | null
 
-  constructor(code: string, message: string, status: number) {
+  constructor(code: string, message: string, status: number, retryAfterSegundos: number | null = null) {
     super(message)
     this.name = 'ApiError'
     this.code = code
     this.status = status
+    this.retryAfterSegundos = retryAfterSegundos
   }
 
-  /** 401 → sessão inválida/expirada; a UI deve sinalizar re-login. */
+  /** 401: sessao invalida/expirada (o client ja tentou refresh uma vez). */
   get isUnauthorized(): boolean {
     return this.status === 401
   }
 
-  /** 429 → rate limit. */
+  /** 403: sem permissao para a acao. */
+  get isForbidden(): boolean {
+    return this.status === 403
+  }
+
+  /** 404 (inclui loja fora do escopo: a api nao confirma existencia). */
+  get isNotFound(): boolean {
+    return this.status === 404
+  }
+
+  /** 429: limite de requisicoes. */
   get isRateLimited(): boolean {
     return this.status === 429
   }
 
-  /** Bloqueio por SALDO/agenda → CTA de recarga graciosa, sem destruir trabalho (E11
-   * H11.9). O backend responde 422 (regra de negócio) com um destes codes; a UI decide
-   * pelo code, não pelo status:
-   *   - saldo_insuficiente: faltam créditos para ativar/enviar (recarregue).
-   *   - agenda_cheia: teto de agenda (balde único) atingido (recarregue ou arquive). */
+  /** Falha de rede (status 0) ou indisponibilidade do servidor: vale tentar de novo. */
+  get isTransient(): boolean {
+    return this.status === 0 || this.status === 502 || this.status === 503 || this.status === 504
+  }
+
+  /** Bloqueio por saldo/agenda (legado do billing de creditos): decide pelo code. */
   get isLimiteDeSaldo(): boolean {
     return this.code === 'saldo_insuficiente' || this.code === 'agenda_cheia'
   }

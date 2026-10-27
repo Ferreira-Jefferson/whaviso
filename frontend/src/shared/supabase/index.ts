@@ -9,6 +9,7 @@ export {
   signOut,
   getSession,
   getAccessToken,
+  renovarSessao,
   onAuthStateChange,
   type Session,
 } from './client'

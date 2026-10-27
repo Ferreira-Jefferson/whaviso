@@ -1,5 +1,5 @@
 export { AuthProvider } from './AuthProvider'
-export { useAuth, useSession, useRole, usePerfil } from './hooks'
+export { useAuth, useSessao, useSession, useRole, usePerfil } from './hooks'
 export { atualizarPerfil, buscarPerfil, perfilIncompleto, statusTelefone, verificarSessao } from './perfil'
 export { homeDoPapel } from './papeis'
 export { nextSeguro } from './redirect'
