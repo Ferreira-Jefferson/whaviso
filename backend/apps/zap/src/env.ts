@@ -10,6 +10,11 @@ export const envSchema = z.object({
   SCHEDULER_INTERVAL_MS: z.coerce.number().int().min(1000).default(30_000),
   LOG_LEVEL: z.string().default('info'),
 
+  // Chave mestra da cifra (a MESMA da api): o zap decifra token_cifrado de numeros_whatsapp
+  // e telefone_cifrado de clientes só no instante do envio (drenar a outbox). Opcional no
+  // schema para o harness de teste; sem ela o dreno de envios não sobe (server.ts avisa).
+  MASTER_KEY: z.string().min(32, 'minimo 32 caracteres').optional(),
+
   // Meta Cloud API (transporte oficial do WhatsApp). Opcionais no schema para o harness
   // de teste e o typecheck; o server.ts EXIGE as 4 essenciais no boot (token, phone_id,
   // app_secret, verify_token) e encerra com mensagem clara se faltarem. O token NUNCA é
