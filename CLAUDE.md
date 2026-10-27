@@ -43,6 +43,16 @@ Quirks desta máquina (Bash + Postgres no Windows): caminho do `psql` tem espaç
 
 Estado do projeto e pendências (Supabase cloud, app Meta, secrets/VPS): ver memória [[whaviso-dev-db]].
 
+## Acesso ao servidor (VPS Hostinger) e Claude no servidor
+
+VPS Hostinger `srv1779602` (Ubuntu 24.04, IP atual `187.127.22.133`). O Claude Code roda lá dentro para trabalhar direto no servidor de qualquer lugar.
+
+- **Login: sempre o usuário `deploy` com a chave pessoal `~/.ssh/id_ed25519`.** Comando: `ssh deploy@187.127.22.133`. Nada de root (login de root por SSH está **desativado de propósito**: `PermitRootLogin no`, `PasswordAuthentication no`). O console local da Hostinger (browser terminal) é só emergência.
+- **NUNCA fique chutando usuário/senha no SSH.** O VPS tem **fail2ban** (`maxretry 5`, `bantime 1h`): poucos logins falhos seguidos **banem o IP de origem por 1h** (a porta 22 passa a dar timeout, mas o ping responde, pega fácil de confundir com "IP mudou"). Use só `deploy` + `id_ed25519`. Desbanir: no console root, `fail2ban-client set sshd unbanip <IP>`.
+- **Clone de trabalho no servidor:** `/home/deploy/whaviso`, branch `development` (NÃO é o checkout de produção `/opt/whaviso/app`, do user de serviço `whaviso`, que leva `git reset --hard origin/main` no deploy). Push habilitado por uma deploy key de escrita `whaviso-server-dev`. Fluxo igual ao daqui: trabalha na `development`, commita, push, publica via PR/merge `development -> main` (dispara o CI/CD, ver [[whaviso-cicd]]).
+- **Claude Code no servidor:** instalado em `~/.local/bin/claude` (userspace, sem sudo), autenticado com a assinatura. Em SSH **não-interativo** (`ssh deploy@host 'cmd'`) o `.bashrc` do Ubuntu sai cedo e não carrega o PATH: chame `~/.local/bin/claude` por caminho completo ou `export PATH="$HOME/.local/bin:$PATH"` antes.
+- Detalhes e histórico em [[whaviso-claude-no-servidor]].
+
 ## Graphify (mapa do código, use sempre)
 
 Existe um grafo de conhecimento do projeto em `graphify-out/` (`graph.json`, `graph.html`, `GRAPH_REPORT.md`), gerado pela skill `/graphify`. Ferramenta de DEV, não é dependência do app. Setup desta máquina em [[whaviso-graphify]].
