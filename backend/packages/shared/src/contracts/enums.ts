@@ -1,34 +1,98 @@
 import { z } from 'zod'
 
-export const direcaoAviso = z.enum(['receber', 'pagar'])
-export type DirecaoAviso = z.infer<typeof direcaoAviso>
+// Enums de domínio do restaurante. Espelham 1:1 os enums do Postgres (baseline
+// 0001-0012). A fonte da verdade é o banco; o teste de paridade compara estes valores
+// contra `pg_enum` do whaviso_dev e falha se divergirem (ver enums.test.ts / F7).
+// Convenção: um `z.enum` exportado por tipo + o tipo inferido. `ENUMS_POSTGRES` no fim
+// reúne os que têm contrapartida no banco, para a paridade.
 
-// Papel RELACIONAL de quem criou o aviso (não confundir com roleUsuario, que é só
-// owner/user). receber: criador é cobrador. pagar invertido: criador é devedor.
-export const papelAviso = z.enum(['cobrador', 'devedor'])
-export type PapelAviso = z.infer<typeof papelAviso>
+// --- Conta, loja, número ---
+export const papelMembro = z.enum(['dono', 'gerente', 'atendente'])
+export type PapelMembro = z.infer<typeof papelMembro>
 
-export const statusAviso = z.enum([
-  'sem_aviso',
-  'aguardando_aceite',
-  'programado',
-  'aguardando_aprovacao_aviso_editado',
-  // Item 7 (migration 0092): o devedor reportou valor/data/nome-motivo como incorreto;
-  // aguarda o cobrador aprovar (reabre a edição pré-preenchida) ou recusar. Suspende os
-  // lembretes, igual aguardando_aprovacao_aviso_editado (ver validar_transicao_aviso).
-  'aguardando_aprovacao_dado_incorreto',
-  'pausado',
-  'informado_pago',
-  'desregistrado',
-  'pago',
-  'cancelado',
-  'recusado',
-  'expirado',
+export const statusNumero = z.enum(['conectado', 'pausado', 'removido'])
+export type StatusNumero = z.infer<typeof statusNumero>
+
+// --- Cardápio ---
+export const tipoGrupo = z.enum(['tamanho', 'adicional', 'customizado'])
+export type TipoGrupo = z.infer<typeof tipoGrupo>
+
+// --- Pedido ---
+// `rascunho` é montado pelo atendente (IA) e fica fora do kanban até ser confirmado.
+export const statusPedido = z.enum([
+  'rascunho',
+  'novo',
+  'em_preparo',
+  'saiu_entrega',
+  'entregue',
+  'problema',
 ])
-export type StatusAviso = z.infer<typeof statusAviso>
+export type StatusPedido = z.infer<typeof statusPedido>
 
-export const etapaEnvio = z.enum(['d_menos_2', 'd_menos_1', 'd', 'd_mais_1'])
-export type EtapaEnvio = z.infer<typeof etapaEnvio>
+export const origemPedido = z.enum(['whatsapp', 'ifood', 'manual'])
+export type OrigemPedido = z.infer<typeof origemPedido>
+
+export const modalidadePedido = z.enum(['entrega', 'retirada'])
+export type ModalidadePedido = z.infer<typeof modalidadePedido>
+
+// --- Conversa e mensagem ---
+export const statusConversa = z.enum(['ia', 'humano', 'encerrada'])
+export type StatusConversa = z.infer<typeof statusConversa>
+
+export const direcaoMensagem = z.enum(['entrada', 'saida'])
+export type DirecaoMensagem = z.infer<typeof direcaoMensagem>
+
+export const tipoMensagem = z.enum(['texto', 'audio', 'imagem', 'interativo', 'outro'])
+export type TipoMensagem = z.infer<typeof tipoMensagem>
+
+export const autorMensagem = z.enum(['cliente', 'ia', 'humano', 'sistema'])
+export type AutorMensagem = z.infer<typeof autorMensagem>
+
+// --- Entrega (zonas, motoboys, corridas) ---
+export const tipoZona = z.enum(['bairro', 'poligono', 'raio'])
+export type TipoZona = z.infer<typeof tipoZona>
+
+export const tipoVeiculo = z.enum(['moto', 'bicicleta', 'carro', 'a_pe'])
+export type TipoVeiculo = z.infer<typeof tipoVeiculo>
+
+export const statusFechamento = z.enum(['aberto', 'pago'])
+export type StatusFechamento = z.infer<typeof statusFechamento>
+
+export const tipoLancamento = z.enum(['entrega', 'ajuste'])
+export type TipoLancamento = z.infer<typeof tipoLancamento>
+
+export const statusCorrida = z.enum(['montando', 'despachada', 'concluida'])
+export type StatusCorrida = z.infer<typeof statusCorrida>
+
+// --- Pagamento (Pix na conversa) ---
+export const statusPagamento = z.enum(['pendente', 'pago', 'expirado', 'cancelado'])
+export type StatusPagamento = z.infer<typeof statusPagamento>
+
+// --- Plataforma (operador) ---
+export const papelOperador = z.enum(['operador', 'admin'])
+export type PapelOperador = z.infer<typeof papelOperador>
+
+export const estagioProspecto = z.enum(['novo', 'contato', 'proposta', 'ativo', 'perdido'])
+export type EstagioProspecto = z.infer<typeof estagioProspecto>
+
+export const tipoAtividadeProspecto = z.enum([
+  'nota',
+  'ligacao',
+  'mensagem',
+  'reuniao',
+  'follow_up',
+])
+export type TipoAtividadeProspecto = z.infer<typeof tipoAtividadeProspecto>
+
+export const statusAssinatura = z.enum(['trial', 'ativa', 'suspensa', 'cancelada'])
+export type StatusAssinatura = z.infer<typeof statusAssinatura>
+
+export const statusFatura = z.enum(['aberta', 'paga', 'atrasada', 'cancelada'])
+export type StatusFatura = z.infer<typeof statusFatura>
+
+// --- Transporte (templates e outbox) ---
+export const statusMetaTemplate = z.enum(['pendente', 'aprovado', 'rejeitado'])
+export type StatusMetaTemplate = z.infer<typeof statusMetaTemplate>
 
 export const statusEnvio = z.enum([
   'agendado',
@@ -39,116 +103,64 @@ export const statusEnvio = z.enum([
 ])
 export type StatusEnvio = z.infer<typeof statusEnvio>
 
+// Status de entrega do recibo da Meta (webhook de status da mensagem).
 export const entregaStatus = z.enum(['sent', 'delivered', 'read', 'failed'])
 export type EntregaStatus = z.infer<typeof entregaStatus>
 
-export const roleUsuario = z.enum(['owner', 'user'])
-export type RoleUsuario = z.infer<typeof roleUsuario>
-
-export const tipoEvento = z.enum([
-  'criado',
-  'combinado_gerado',
-  'aceite',
-  'ativado',
-  'editado',
-  'editado_aprovado',
-  'editado_recusado',
-  'pausado',
-  'reativado',
-  'desregistrado',
-  'reregistrado',
-  'ja_paguei_devedor',
-  'confirmado_cobrador',
-  'marcado_pago_cobrador',
-  'rejeitado_cobrador',
-  'desmarcado_cobrador',
-  'reaberto_cobrador',
-  'reengajamento_cobrador',
-  'pago_manual',
-  'optout',
-  // 'cancelado_cobrador' é o valor legado; o cancelamento atual grava
-  // 'cancelado_criador' (ator = papel de quem criou). Mantemos ambos no enum.
-  'cancelado_cobrador',
-  'cancelado_criador',
-  'expirado',
-  'solicitou_pix',
-  'recusado',
-  // Item 7 (migration 0092): reporte de dado incorreto (valor/data/nome-motivo).
-  // `dado_incorreto_reportado` é gravado pelo grupo 1E (webhook do zap, wave 2); os
-  // outros dois pela api ao o cobrador aprovar/recusar (service.ts deste módulo).
-  'dado_incorreto_reportado',
-  'dado_incorreto_aprovado',
-  'dado_incorreto_recusado',
-])
-export type TipoEvento = z.infer<typeof tipoEvento>
-
-export const atorEvento = z.enum(['cobrador', 'devedor', 'sistema', 'admin'])
+// --- Auditoria ---
+export const atorEvento = z.enum(['loja', 'cliente', 'sistema', 'ia', 'operador'])
 export type AtorEvento = z.infer<typeof atorEvento>
 
-export const statusMetaTemplate = z.enum(['pendente', 'aprovado', 'rejeitado'])
-export type StatusMetaTemplate = z.infer<typeof statusMetaTemplate>
-
-// Categoria do template na Meta (exigida no create). UTILITY cobre quase tudo; AUTHENTICATION
-// é o OTP (formato fixo, registrado à parte); MARKETING fica permitido mas não é usado hoje.
-export const categoriaTemplate = z.enum(['UTILITY', 'AUTHENTICATION', 'MARKETING'])
-export type CategoriaTemplate = z.infer<typeof categoriaTemplate>
-
-// Contexto de um template: 'padrao' ou 'revisao' (variante para avisos em informado_pago).
-export const contextoTemplate = z.enum(['padrao', 'revisao'])
-export type ContextoTemplate = z.infer<typeof contextoTemplate>
-
-// Ações de botão conhecidas pelo código (comportamento). O rótulo é editável no template.
-// Este enum é o REGISTRO de ações do produto (E12 é dono do modelo de botões/ações) e
-// espelha ACOES_BOTAO do webhook do zap (apps/zap/.../webhook_whatsapp/service.ts), a
-// fonte da verdade de quais botões o transporte sabe tratar. Manter os dois em sincronia:
-// uma ação semeada em template (via migration, que não passa pela validação da api) e
-// ausente aqui faz GET /admin/mensagens falhar a validação Zod no front e a tela de
-// templates não carregar.
-//
-// E5: 'dado_incorreto' é a terceira opção do aceite (aceitar / algum dado incorreto /
-// recusar). Emitida no template combinado.resumo, enviado pelo zap via Meta Cloud API
-// (template aprovado, botões quick_reply); o webhook trata o toque (H5.4).
-export const acaoBotaoTemplate = z.enum([
-  'ja_paguei',
-  'optout',
-  'ver_pix',
-  'ativar',
-  'aceite',
-  'recusa',
-  'dado_incorreto',
-  'confirmar',
-  'rejeitar',
-  'solicitar_pix',
-  'informar_pix',
-  'pix_pular',
-  'pix_corrigir',
-  'pix_confirma_tipo',
-  'pix_corrige_tipo',
-  'pix_confirmar',
+export const tipoEventoAuth = z.enum([
+  'status_consultado',
+  'otp_solicitado',
+  'otp_entregue',
+  'otp_falha_envio',
+  'login_negado',
+  'cadastro_negado',
+  'login_ok',
+  'cadastro_ok',
 ])
-export type AcaoBotaoTemplate = z.infer<typeof acaoBotaoTemplate>
+export type TipoEventoAuth = z.infer<typeof tipoEventoAuth>
 
-// Tipos de mídia que o transporte entende.
-export const tipoMidiaTemplate = z.enum(['imagem', 'video', 'audio', 'documento'])
-export type TipoMidiaTemplate = z.infer<typeof tipoMidiaTemplate>
+// --- Credenciais de IA ---
+export const provedorLlm = z.enum(['openrouter', 'anthropic', 'outro'])
+export type ProvedorLlm = z.infer<typeof provedorLlm>
 
-export const acaoDevedor = z.enum(['ja_paguei', 'optout'])
-export type AcaoDevedor = z.infer<typeof acaoDevedor>
-
+// --- Pix (não é enum do Postgres: inferência de UX, usada por pix.ts) ---
+// Tipo de chave Pix inferido do formato. Auxílio de automação/exibição, não validação.
 export const tipoChavePix = z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria'])
 export type TipoChavePix = z.infer<typeof tipoChavePix>
 
-// H10.10: central de notificações (item 6, feedback 2026-07-22). `origem` distingue a
-// outbox de onde o item veio (a central UNE duas tabelas); `tipo` são só as categorias que
-// entram nesta leva. O `TipoNotificacao` completo (optout, reativação, encerramento,
-// edição, etc., em apps/api/src/shared/notificacoes) segue só WhatsApp/auditoria, de fora
-// da central por decisão deliberada de escopo (ver historias/10-notificacoes-cobrador.md).
-export const origemNotificacaoCentral = z.enum(['cobrador', 'billing'])
-export type OrigemNotificacaoCentral = z.infer<typeof origemNotificacaoCentral>
-
-export const tipoNotificacaoCentral = z.enum([
-  'pagamento_informado',
-  'combinado_dado_incorreto',
-  'recarga',
-])
-export type TipoNotificacaoCentral = z.infer<typeof tipoNotificacaoCentral>
+// Enums com contrapartida em `pg_enum`: nome do tipo no Postgres -> valores aceitos.
+// O teste de paridade garante que o Zod não diverge do banco. `tipoChavePix` fica de
+// fora de propósito (não existe como tipo no Postgres).
+export const ENUMS_POSTGRES = {
+  papel_membro: papelMembro.options,
+  status_numero: statusNumero.options,
+  tipo_grupo: tipoGrupo.options,
+  status_pedido: statusPedido.options,
+  origem_pedido: origemPedido.options,
+  modalidade_pedido: modalidadePedido.options,
+  status_conversa: statusConversa.options,
+  direcao_mensagem: direcaoMensagem.options,
+  tipo_mensagem: tipoMensagem.options,
+  autor_mensagem: autorMensagem.options,
+  tipo_zona: tipoZona.options,
+  tipo_veiculo: tipoVeiculo.options,
+  status_fechamento: statusFechamento.options,
+  tipo_lancamento: tipoLancamento.options,
+  status_corrida: statusCorrida.options,
+  status_pagamento: statusPagamento.options,
+  papel_operador: papelOperador.options,
+  estagio_prospecto: estagioProspecto.options,
+  tipo_atividade_prospecto: tipoAtividadeProspecto.options,
+  status_assinatura: statusAssinatura.options,
+  status_fatura: statusFatura.options,
+  status_meta_template: statusMetaTemplate.options,
+  status_envio: statusEnvio.options,
+  entrega_status: entregaStatus.options,
+  ator_evento: atorEvento.options,
+  tipo_evento_auth: tipoEventoAuth.options,
+  provedor_llm: provedorLlm.options,
+} as const
