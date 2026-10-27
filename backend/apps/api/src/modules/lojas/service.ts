@@ -61,7 +61,8 @@ export async function listar(
   escopo: EscopoLoja,
   incluirInativas: boolean,
 ): Promise<LojaSaida[]> {
-  const ehDono = Object.values(escopo.papel_por_loja).every((p) => p === 'dono')
+  const papeis = Object.values(escopo.papel_por_loja)
+  const ehDono = papeis.length > 0 && papeis.every((p) => p === 'dono')
   const contaInativas = incluirInativas && ehDono ? await contaDonoOuNull(pool, escopo) : null
   const linhas = await repo.listar(pool, escopo.loja_ids, contaInativas)
   return linhas.map((l) => paraSaida(l, escopo.papel_por_loja[l.id] ?? 'dono'))
