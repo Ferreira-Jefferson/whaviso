@@ -124,7 +124,13 @@ pelo kernel da api por role de aplicação, não por RLS.
   hora da chamada; texto claro nunca volta pro cliente (campo write-only) nem entra em log. Entra como
   migration dedicada **`0012_credenciais_llm`**, acrescentada depois do baseline (o reset em andamento
   escreve 0001..0011), pelo peso de segurança que a tabela carrega. Plano de teste em
-  [SEGURANCA.md](SEGURANCA.md).
+  [SEGURANCA.md](SEGURANCA.md). A **chave da plataforma** (fallback do onboarding, a chave do dono do
+  SaaS) **não** fica aqui: é env do servidor (`OPEN_ROUTER`), nunca por loja, nunca no front; a
+  resolução é loja -> plataforma. `uso_llm` ganha `origem` (plataforma x loja) e `tipo_uso`.
+- **Migrations pós-baseline (reserva):** novas tabelas levantadas no detalhamento (convites, `ativo`
+  nos vínculos de cardápio, estado de processamento em `mensagens`, importação de cardápio, RAG,
+  Pix do atendente, suspensão de loja, config de despacho, fluxos) seguem a **numeração reservada em
+  [../../historias/STATUS.md](../../historias/STATUS.md)** (a partir de `0013`), para não colidir.
 
 ### DDL esboçada das tabelas centrais
 

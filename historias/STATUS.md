@@ -55,6 +55,8 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | AT-rag | rag + base_conhecimento | Retrieval efetivo escopado por loja (ver RAG.md) | AT-llm, docs/pivot/RAG.md | Opus | backend-atendente/rag.md | A FAZER |
 | AT-realimentar | retroalimentar_base | LLM gera/curadoria de novos documentos, aprovação do dono | AT-rag | Opus | backend-atendente/retroalimentar_base.md | A FAZER |
 | API-cardapio-imp | cardapio_importacao | Importar cardápio por foto/PDF via LLM | AT-llm, API-cardapio | Sonnet | backend-api/cardapio_importacao.md | A FAZER |
+| API-conhecimento | conhecimento | Curadoria/aprovação/versionamento da base (RAG.md) | AT-rag | Opus | backend-api/conhecimento.md | A FAZER |
+| AT-importar | importar_cardapio | Consumidor no atendente que roda o LLM da importação | AT-llm, API-cardapio-imp | Sonnet | backend-atendente/importar_cardapio.md | A FAZER |
 
 ## Onda 3: Operação de entrega
 
@@ -104,3 +106,60 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
   plataforma) passa por revisão Opus contra o SEGURANCA.md antes de `CONCLUIDO`.
 - **Cada módulo detalhado** tem suas etapas no arquivo apontado na coluna "arquivo". Os arquivos são
   escritos a partir de [TEMPLATE-modulo.md](TEMPLATE-modulo.md).
+
+---
+
+## Integração: decisões consolidadas (pós-detalhamento)
+
+Vários autores do plano levantaram pontos que cruzam módulos. Esta é a resolução canônica; onde um
+arquivo de módulo divergir, vale o que está aqui.
+
+### Credencial de LLM: escada de resolução
+
+Ordem na hora da chamada: **credencial da loja** (`credenciais_llm`, se ativa) -> senão **chave da
+plataforma** (env do servidor `OPEN_ROUTER`, em `secrets/production.env`, testada e válida). Nunca
+expõe a da plataforma nem cruza lojas. Implementado em `AT-llm` e respeitado por `API-cardapio-imp` /
+`AT-importar`. **Embedding e rerank usam sempre a credencial da plataforma** (ver `RAG.md`). O
+`uso_llm` ganha `origem` (plataforma x loja) e `tipo_uso` (geracao/embedding/rerank).
+
+### Reserva de numeração de migrations (a partir de 0013; evita colisão)
+
+Vários planos propuseram "0013/0014" para coisas diferentes. Numeração canônica. Quem escrever a
+migration usa o número reservado; se precisar de uma não listada, pega o próximo livre e atualiza aqui.
+
+| Nº | Migration | Módulo dono |
+|---|---|---|
+| 0013 | convites | API-conta |
+| 0014 | cardapio_vinculos_ativo (ativo em categoria_grupos/item_grupos) | API-cardapio |
+| 0015 | mensagens_processamento (claim do inbound) | ZAP-webhook / AT-motor-min |
+| 0016 | notify_triggers (SSE, se o F5 não fizer inline) | F5 |
+| 0017 | importacoes_cardapio (fila + rascunho) | API-cardapio-imp |
+| 0018 | rag (documentos, chunks, base_avaliacao, rag_feedback, uso_llm.tipo_uso/origem) | API-conhecimento / AT-rag |
+| 0019 | pix_atendente (SELECT por coluna em loja_pix) | API-pagamentos |
+| 0020 | cobranca_suspensao (lojas.suspensa por trigger) | P-cobranca |
+| 0021 | despacho_config_geocode (despacho_config + dono de geocode) | API-roteiriza |
+| 0022 | fluxos (fluxos/versoes) | API-fluxo |
+
+### Donos de escrita a combinar (um dono por coluna/tabela)
+
+- `enderecos.lat/lng/geocodificado_em`: dono = `API-roteiriza`; `API-clientes` é dono das demais
+  colunas de `enderecos`.
+- `conversas.status` (handoff): dono = `API-handoff` (sub-fatia de `conversas`); `AT-motor-min` relê a
+  cada turno.
+- `lojas.suspensa` (de `P-cobranca`, por trigger a partir da assinatura) é diferente de `lojas.ativo`
+  (do dono da loja). **`ZAP-webhook` e `AT-motor-min` devem respeitar `suspensa`** (somar essa etapa
+  nesses dois módulos).
+
+### Segurança (muda o catálogo, exige revisão Opus)
+
+- **SEC-032 muda:** o atendente passa a ter SELECT por coluna em `loja_pix` (gerar BR Code na conversa)
+  além da `chave_cifrada` já prevista. Revisão Opus + atualização do `SEGURANCA.md` antes do merge das
+  migrations 0018/0019.
+- **Novos testes de RAG** (no catálogo): `RAG-ISO-001` (isolamento de retrieval entre lojas, gate),
+  `RAG-EVAL-001` (hit@k sobre a semente, gate), `RAG-EVAL-002` (faithfulness amostrado, monitoramento).
+
+### Limpeza de legado coordenada
+
+Resta código de cobrança em `apps/zap/src/shared/meta_client`, `modules/webhook_whatsapp`, `contracts`,
+módulos de api/front, `shared/sync` e `shared/pix`. Regra: **adaptar o genérico, não reescrever**; a
+remoção do resto é um commit coordenado à parte, nunca no meio de uma onda.

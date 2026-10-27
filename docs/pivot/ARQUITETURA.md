@@ -111,8 +111,17 @@ movimentos:
 - **Chave do próprio cliente (BYO key):** cada loja configura a **própria** credencial (provedor +
   chave + modelo preferido) numa área do painel. Módulo `configuracoes_llm` na api + tela no front. Em
   runtime, o `atendente` resolve a credencial **daquela loja**, decifra na hora da chamada e chama o
-  provedor com a chave dela. Sem credencial configurada, as features de IA da loja ficam desligadas
-  (degrada para o fluxo sem LLM), nunca caem na chave de outra loja nem numa chave global.
+  provedor com a chave dela.
+- **Escada de resolução (padrão da plataforma -> override da loja):** no onboarding, e sempre que a
+  loja ainda não tiver chave própria, o sistema usa a **chave da plataforma** (a chave OpenRouter do
+  dono do SaaS), para a importação de cardápio e o atendimento já funcionarem antes de a loja ter a
+  dela. Quando a loja cadastra a própria, a resolução passa a usar **só a dela** e para de tocar na da
+  plataforma. A chave da plataforma vive **só no servidor** (secret/env, `OPEN_ROUTER`), **nunca no
+  banco por loja e nunca no front**: nenhuma loja a enxerga, nem vê a chave de outra loja. O
+  provedor inicial é OpenRouter, mas tudo isso é atrás do `ClienteLLM`, aberto a outros provedores. O
+  `uso_llm` marca a origem (plataforma x loja) para medir o custo que corre por nossa conta. Nota de
+  RAG: embedding e rerank usam sempre a credencial da **plataforma**, nunca a BYO da loja (a dimensão
+  do vetor é propriedade do índice; ver [RAG.md](RAG.md)).
 
 **Esta é a informação mais perigosa do sistema:** uma chave vazada vira custo imediato pro cliente e
 pra nós. O tratamento é de nível máximo e está especificado em [SEGURANCA.md](SEGURANCA.md); em resumo:

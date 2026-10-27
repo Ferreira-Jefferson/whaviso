@@ -80,8 +80,10 @@ vive em `backend/**/test/security/` (vitest) mais os scripts de banco; roda no g
   *Verde:* `SET ROLE` + delete falha nas tabelas de negócio e passa só em `templates`.
 - **SEC-031** `whaviso_zap` só escreve as colunas do outbox que lhe cabem (grant por coluna em
   `envios` e no estado de saúde de `numeros_whatsapp`). *Verde:* update fora dessas colunas falha.
-- **SEC-032** `whaviso_atendente` não toca billing/plataforma nem credencial da Meta. *Verde:*
-  select/insert/update nessas tabelas falha para o role do atendente.
+- **SEC-032** `whaviso_atendente` não toca billing/plataforma nem a credencial da Meta, e seu acesso a
+  segredo é **exatamente** a `chave_cifrada` de `credenciais_llm` e a coluna do BR Code em `loja_pix`,
+  nada além. *Verde:* a matriz por `SET ROLE` confirma esses dois SELECT por coluna e nega todo o resto
+  (billing, plataforma, `token_cifrado` da Meta). Revisão Opus ao habilitar o acesso ao `loja_pix`.
 - **SEC-033** Trilhas append-only (`eventos`, `eventos_auth`, `*_lancamentos`, `uso_llm`) rejeitam
   UPDATE e não têm grant de DELETE. *Verde:* update dispara exceção; delete falha por privilégio.
 
@@ -122,6 +124,14 @@ vive em `backend/**/test/security/` (vitest) mais os scripts de banco; roda no g
 - **SEC-100** Alerta de consumo anômalo de LLM por loja (pico de `uso_llm`) dispara investigação.
 - **SEC-101** Rate limit nos endpoints sensíveis (login, config de chave, webhook) contra força bruta.
 
+### L. RAG e conhecimento
+- **RAG-ISO-001** O retrieval só devolve documentos da loja da conversa; nada cruza loja. *Verde:*
+  busca na loja A nunca retorna chunk da loja B (extensão do SEC-062, no gate).
+- **RAG-EVAL-001** Qualidade de retrieval: hit@k sobre o conjunto semente da loja acima do piso.
+  *Verde:* métrica determinística passa no gate do CI.
+- **RAG-EVAL-002** Fidelidade da geração (faithfulness/groundedness) por LLM-judge, **amostrado fora
+  do gate** (caro e não determinístico), como monitoramento.
+
 ## 5. Como automatizar
 
 - **Suíte `security/` no CI:** os SEC-### viram testes vitest que rodam no mesmo gate de
@@ -146,6 +156,7 @@ vive em `backend/**/test/security/` (vitest) mais os scripts de banco; roda no g
 | Prompt injection | SEC-060..062 | a implementar |
 | Replay/forja de webhook | SEC-050, SEC-051 | a implementar |
 | Vazamento passivo (log/dump/bundle) | SEC-023..025 | a implementar |
+| Qualidade e isolamento do RAG | RAG-ISO-001, RAG-EVAL-001/002 | a implementar |
 
 ## 7. Processo
 
