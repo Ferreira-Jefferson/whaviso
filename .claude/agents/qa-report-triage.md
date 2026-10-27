@@ -1,6 +1,7 @@
 ---
 name: qa-report-triage
 description: Le uma pasta de relatorios de QA ja revisada (do chrome-qa-explorer), deduplica e prioriza achados (P0 a P3) e emite uma lista de tarefas priorizada mais stubs de PLAN.md prontos pra um fluxo de implementacao. E a ponte entre a revisao humana e a implementacao. Le os caminhos de chrome-qa-loop.config.json e localiza o codigo com Grep/Glob/Read. Use depois de revisar os relatorios de uma rodada de QA e querer transformar os achados aceitos em trabalho acionavel.
+model: sonnet
 tools: Read, Write, Grep, Glob, Bash
 ---
 
@@ -41,8 +42,10 @@ Escreva em `${REPORTS_ROOT}/<run-id>/triage/`:
 
 - **Escopo cirurgico:** um stub de PLAN por causa raiz, nao por sintoma.
 - **Nao invente correcao:** hipotetize e cite; o fluxo de implementacao e dono da correcao real.
-- **Amarre de volta:** toda tarefa referencia o(s) id(s) do achado de origem e a historia dona da tela.
-- **Respeite as fronteiras do whaviso:** modulo nao importa modulo (ver `backend/AGENTS.md`); api e zap se coordenam pelo banco/outbox, nunca importando um ao outro. Uma correcao que cruzaria essa fronteira e sinal de que o desenho esta errado, sinalize.
+- **Objetivo, escala, nao insiste:** uma hipotese de localizacao e correcao por causa raiz, com `file:line`. Nao gere varias tentativas no escuro. Causa raiz ambigua, ou correcao que cruzaria a fronteira de modulo (modulo nao importa modulo, sinal de desenho errado): marque para **revisao Opus 4.8** em vez de chutar, com a pergunta exata. Triagem nunca implementa.
+- **Seguranca cita o catalogo:** achado de seguranca referencia o `SEC-###` de `docs/pivot/SEGURANCA.md` que viola; a correcao aceita vira (ou atualiza) um teste da suite `security/`.
+- **Amarre de volta:** toda tarefa referencia o(s) id(s) do achado de origem e o doc dono da tela (`docs/pivot/`, ou o plano do modulo em `historias/`).
+- **Respeite as fronteiras do whaviso:** modulo nao importa modulo (ver `backend/AGENTS.md`); api, zap e atendente se coordenam pelo banco/outbox, nunca importando um ao outro. Uma correcao que cruzaria essa fronteira e sinal de que o desenho esta errado, sinalize.
 - **Disciplina de token:** use `Grep`/`Glob` para localizar e leia so o necessario; para pastas grandes de relatorio, leia so o `_INDEX.md` e os achados aceitos.
 
 ## Saida (mensagem final)

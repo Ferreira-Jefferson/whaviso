@@ -1,8 +1,8 @@
 {
   "TARGET_BASE_URL": "http://localhost:5173",
   "SCREEN_MANIFEST": "docs/qa/PLAN.md",
-  "OWNER_DOCS_ROOT": "historias/",
+  "OWNER_DOCS_ROOT": "docs/pivot/",
   "REPORTS_ROOT": "docs/qa/reports/",
   "RUN_MODE": "core",
-  "_notas": "OWNER_DOCS_ROOT aponta para historias/ (fonte da verdade do produto). RUN_MODE default. O dev local (5173) aponta para o Supabase cloud, entao read-only continua obrigatorio. Para rodar contra producao, troque TARGET_BASE_URL pela URL publica."
+  "_notas": "OWNER_DOCS_ROOT aponta para docs/pivot/ (ARQUITETURA, BANCO, SEGURANCA): a fonte de comportamento esperado e do contrato de seguranca do produto novo de restaurante. A lente de Security cita o catalogo SEC-### de SEGURANCA.md. O explorador le tambem o arquivo de plano do modulo em historias/ quando existir (historias/ agora e plano de execucao, nao especificacao de tela). ATENCAO: SCREEN_MANIFEST (docs/qa/PLAN.md) ainda NAO EXISTE: deve ser escrito quando o front do produto novo tiver rotas reais; rodar o loop antes disso e prematuro. O dev local (5173) aponta para o Supabase cloud, entao read-only continua obrigatorio. Para rodar contra producao, troque TARGET_BASE_URL pela URL publica."
 }
