@@ -69,6 +69,11 @@ export function promptPagamento(): MensagemProposta {
   ])
 }
 
+/** Aviso de loja com pedidos pausados agora (G7). Linguagem neutra; nao aceita pedido novo. */
+export function mensagemPausada(nomeLoja: string): MensagemProposta {
+  return texto(`Ola! No momento a ${nomeLoja} esta com os pedidos pausados. Volte daqui a pouco, por favor.`)
+}
+
 /** Limpa o scratch da etapa (selecao de item/opcoes e menu), preservando carrinho e rascunho. */
 export function limparScratch(estado: EstadoFluxo): EstadoFluxo {
   return { ...estado, item_id: null, grupos_pendentes: [], opcoes_ids: [], apresentados: [], falhas: 0 }

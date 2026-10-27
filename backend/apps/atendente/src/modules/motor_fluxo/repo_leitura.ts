@@ -45,9 +45,15 @@ export interface LojaRow {
   id: string
   nome: string
   horarios: unknown
+  /** Pausa operacional (G7): liga/desliga. `pausada_ate` limita a pausa no tempo (null = indefinida). */
+  pausada: boolean
+  pausada_ate: Date | null
 }
 export async function lerLoja(tx: Executor, lojaId: string): Promise<LojaRow | null> {
-  return consultarUm<LojaRow>(tx, sql`select id, nome, horarios from public.lojas where id = ${lojaId}`)
+  return consultarUm<LojaRow>(
+    tx,
+    sql`select id, nome, horarios, pausada, pausada_ate from public.lojas where id = ${lojaId}`,
+  )
 }
 
 export interface ClienteRow {

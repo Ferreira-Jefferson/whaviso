@@ -9,11 +9,13 @@
 // pelo harness (propoe) e o motor efetiva. NUNCA loga telefone nem conteudo (so ids, etapa e desfecho).
 import { comTransacao, notificar, type Pool, type PoolClient } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
-import { SaidaNode, type MensagemProposta, type NodeContext, type NodeRegistry } from '@whaviso/shared/contracts'
+import { SaidaNode, type MensagemProposta, type NodeContext, type NodeContract, type NodeRegistry } from '@whaviso/shared/contracts'
 import type { ResultadoHarness } from '../../shared/harness'
 import { botoes, texto } from './acoes'
+import { mensagemPausada } from './comum'
 import { montarContexto, type ContextoTurno } from './contexto'
 import { aplicarEfeitos } from './efeitos'
+import { configDaEtapa } from './fluxo_fonte'
 import { BOTAO_CANCELAR, BOTAO_CONFIRMAR, BOTAO_MAIS } from './ids'
 import { claimMensagem, lockConversa } from './repo_leitura'
 import * as escrita from './repo_escrita'
@@ -55,7 +57,7 @@ export async function processarProximaMensagem(deps: DepsMotor): Promise<Desfech
       return 'suprimida'
     }
 
-    const ctx = await montarContexto(tx, claim, conversa, agora)
+    const ctx = await montarContexto(tx, claim, conversa, agora, deps.logger)
     if (!ctx) {
       await escrita.marcarProcessada(tx, claim.id)
       return 'descartada'
@@ -92,9 +94,36 @@ async function degradarFalha(tx: PoolClient, ctx: ContextoTurno, mensagemId: str
   await escrita.marcarProcessada(tx, mensagemId)
 }
 
+/**
+ * Etapas da trilha de ACEITE de pedido: com a loja pausada (G7), nenhuma delas avanca o pedido. So
+ * `acompanhar` (status de um pedido ja feito, leitura pura) segue respondendo com a loja pausada.
+ */
+const ETAPAS_ACEITE: ReadonlySet<string> = new Set([
+  'saudacao', 'pedir_categoria', 'montar_pedido', 'confirmar', 'endereco', 'pagamento',
+])
+
+/** Config publicada do node da etapa, validada pelo proprio schema; invalida cai no default (`{}`). */
+function configDoNode(node: NodeContract, ctx: ContextoTurno, etapa: string): unknown {
+  const bruta = configDaEtapa(ctx.fonte.grafo, etapa)
+  const r = node.configSchema.safeParse(bruta)
+  return r.success ? r.data : node.configSchema.parse({})
+}
+
 async function rodarTurno(deps: DepsMotor, tx: PoolClient, ctx: ContextoTurno, mensagemId: string): Promise<void> {
   const { entrada } = ctx
-  const node = deps.registry.get(entrada.estado.etapa) ?? deps.registry.get(ETAPA_INICIAL)
+  const etapa = entrada.estado.etapa
+
+  // Loja pausada (G7): a trilha de aceite nao cria nem avanca pedido; so informa e consome a mensagem.
+  // Fixa a versao do fluxo antes de encerrar o turno (conversa nova ja nasce ancorada numa versao).
+  if (entrada.loja.pausada_agora && ETAPAS_ACEITE.has(etapa)) {
+    await escrita.salvarContexto(tx, ctx.conversaId, entrada.estado)
+    await enfileirar(tx, ctx, mensagemPausada(entrada.loja.nome), `${mensagemId}:0`)
+    await escrita.marcarProcessada(tx, mensagemId)
+    deps.logger.info({ conversa_id: ctx.conversaId, etapa_ate: etapa, motivo: 'loja_pausada' }, 'turno suprimido (pausada)')
+    return
+  }
+
+  const node = deps.registry.get(etapa) ?? deps.registry.get(ETAPA_INICIAL)
   if (!node) throw new Error('registry sem node inicial')
 
   // Texto livre fora do que o node consome de forma deterministica: o harness ENTENDE e PROPOE, o
@@ -102,7 +131,9 @@ async function rodarTurno(deps: DepsMotor, tx: PoolClient, ctx: ContextoTurno, m
   if (deps.llm && elegivelParaHarness(node, entrada) && (await tentarHarness(deps, deps.llm, tx, ctx, mensagemId))) return
 
   const nodeCtx: NodeContext = { loja_id: ctx.lojaId, conversa_id: ctx.conversaId }
-  const bruta = await node.executar(entrada, node.configSchema.parse({}), nodeCtx)
+  // O grafo publicado CONFIGURA o node determinístico (texto da saudacao, metodos de pagamento, ...);
+  // sem config publicada, vale o default do node (comportamento do fluxo padrao, inalterado).
+  const bruta = await node.executar(entrada, configDoNode(node, ctx, etapa), nodeCtx)
   const saida = SaidaNode.parse(bruta)
 
   const resultado = await aplicarEfeitos(

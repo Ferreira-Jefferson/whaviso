@@ -42,6 +42,12 @@ export const EstadoFluxo = z
     pedido_id: z.string().uuid().nullable().default(null),
     codigo: z.string().nullable().default(null),
     falhas: z.number().int().min(0).default(0),
+    /**
+     * Versao do fluxo FIXADA nesta conversa (uuid de uma versao publicada ou `padrao`). null = ainda
+     * nao fixada: o motor fixa no primeiro turno. Fixar garante que a conversa termina na versao em
+     * que comecou, mesmo que a loja publique outra no meio (contrato de API-fluxo).
+     */
+    fluxo_versao_id: z.string().min(1).nullable().default(null),
   })
   .strict()
 export type EstadoFluxo = z.infer<typeof EstadoFluxo>
@@ -66,6 +72,8 @@ export interface LojaCtx {
   readonly id: string
   readonly nome: string
   readonly horarios: unknown
+  /** Pausa operacional em vigor agora (G7, migration 0053): nao aceita pedido novo enquanto durar. */
+  readonly pausada_agora: boolean
 }
 
 /** Cliente no contexto do turno. */

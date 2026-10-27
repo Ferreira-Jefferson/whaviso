@@ -33,12 +33,36 @@ efetiva: `resposta` enfileira as mensagens, `escalar_humano` vira `status='human
 (confirmacao so por botao); `silencio` so consome a mensagem; `sem_llm`, erro ou rascunho invalido
 seguem pelo node (botoes). Rascunho com `observacao` nao e aplicado (carrinho nao tem o campo).
 
-## Grafo (grafo.ts, dados)
+## Grafo (grafo.ts, dados) e fonte publicada (fluxo_fonte.ts)
 
 `saudacao -> pedir_categoria -> montar_pedido -> confirmar -> endereco -> pagamento -> acompanhar`.
 Lacos cobrem "adicionar mais", reapresentacao e sub-passos de texto. O estado do fluxo vive em
-`conversas.contexto` (jsonb), unica fonte; o builder visual (onda 5) troca a FONTE do grafo (arquivo
--> banco) sem mexer no motor.
+`conversas.contexto` (jsonb), unica fonte.
+
+O **builder visual** (API-fluxo, onda 5) personaliza o fluxo por loja. O motor le a versao **publicada**
+do fluxo ativo direto do banco (`fluxos`/`fluxo_versoes`, grant SELECT de `whaviso_atendente`, migration
+0049), read-only, sem importar o modulo `fluxo` da api (integracao so pelo banco). Sem fluxo publicado,
+cai no `FLUXO_PADRAO` do kernel (o mesmo grafo fixo): loja que nunca editou segue intacta.
+
+- **Fixacao por conversa:** no primeiro turno a conversa fixa a versao vigente em
+  `estado.fluxo_versao_id` (uuid de uma versao publicada ou `padrao`). Versao publicada e imutavel, entao
+  a conversa termina na versao em que comecou; uma nova publicacao so vale em conversa nova. Cache do
+  grafo parseado por id de versao (invalida sozinho: id novo => chave nova).
+- **O que a publicacao DIRIGE hoje (P1):** a config do node da etapa atual e passada ao `executar`
+  (casada por `tipo`); a saudacao usa `config.mensagem` para personalizar o texto de boas-vindas. Sem
+  config, vale o default do node.
+- **Limite conhecido (P1):** a TOPOLOGIA (reordenar/religar arestas por handle) ainda nao e dirigida pelo
+  grafo publicado: os nodes fixam a proxima etapa no proprio efeito de estado. Dirigir topologia arbitraria
+  exige os nodes emitirem HANDLES do catalogo (evolucao do NodeContract no kernel), fora do escopo desta
+  lane. Config de nodes alem de saudacao (max_tentativas, pagamento.metodos, ...) segue o mesmo cano quando
+  cada node passar a ler sua config.
+
+## Loja pausada (G7, migration 0053)
+
+Com a loja pausada agora (`pausada` e sem prazo ou prazo no futuro), a trilha de aceite
+(`saudacao`..`pagamento`) NAO cria nem avanca pedido: o motor informa o cliente (linguagem neutra) e
+consome a mensagem, mantendo a etapa. So `acompanhar` (status de um pedido ja feito, leitura pura) segue
+respondendo. A pausa e lida no contexto do turno pelo relogio injetavel (nao por `now()`).
 
 ### montar_pedido (coleta de opcoes)
 
