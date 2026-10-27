@@ -1,0 +1,79 @@
+// Apresentacao do atendimento: rotulos e tons de status/autor, e como exibir cada
+// tipo de mensagem. A transicao de estado (ia/humano/encerrada) e decidida pelo
+// servidor; aqui so escolhemos rotulo, cor e alinhamento das bolhas.
+import type { AutorMensagem, StatusConversa, TipoMensagem } from '@/shared/contracts/_generated/enums'
+import type { MensagemSaida } from '@/shared/contracts/_generated/conversas'
+
+export type FiltroStatus = 'todas' | StatusConversa
+
+/** Abas de filtro da lista. 'ia' aparece como "Automacao" (sem citar IA ao usuario). */
+export const FILTROS_STATUS: ReadonlyArray<{ value: FiltroStatus; label: string }> = [
+  { value: 'todas', label: 'Todas' },
+  { value: 'ia', label: 'Automação' },
+  { value: 'humano', label: 'Humano' },
+  { value: 'encerrada', label: 'Encerradas' },
+]
+
+export const ROTULO_STATUS: Record<StatusConversa, string> = {
+  ia: 'Com a automação',
+  humano: 'Em atendimento',
+  encerrada: 'Encerrada',
+}
+
+export type TomBadge = 'neutro' | 'marca' | 'sucesso' | 'atencao' | 'erro'
+
+export const TOM_STATUS: Record<StatusConversa, TomBadge> = {
+  ia: 'marca',
+  humano: 'sucesso',
+  encerrada: 'neutro',
+}
+
+/** Rotulo do autor de uma bolha. 'ia' = a automacao; 'humano' = a propria equipe. */
+export const ROTULO_AUTOR: Record<AutorMensagem, string> = {
+  cliente: 'Cliente',
+  ia: 'Automação',
+  humano: 'Atendente',
+  sistema: 'Sistema',
+}
+
+/** Lado da bolha: o cliente entra pela esquerda; a loja (automacao/atendente) sai pela direita. */
+export function ladoDaBolha(autor: AutorMensagem): 'esquerda' | 'direita' | 'centro' {
+  if (autor === 'cliente') return 'esquerda'
+  if (autor === 'sistema') return 'centro'
+  return 'direita'
+}
+
+const ROTULO_MIDIA: Record<Exclude<TipoMensagem, 'texto'>, string> = {
+  audio: 'Áudio',
+  imagem: 'Imagem',
+  interativo: 'Resposta de botão',
+  outro: 'Mensagem',
+}
+
+export interface ConteudoExibido {
+  /** Texto a renderizar na bolha (ja resolvido a partir do tipo). */
+  texto: string
+  /** True quando e um substituto de midia (sem texto proprio), para estilizar diferente. */
+  placeholder: boolean
+}
+
+/**
+ * O que mostrar na bolha para cada tipo de mensagem. Texto usa o conteudo; audio usa a
+ * transcricao quando houver; imagem/interativo/outro caem num rotulo curto. Nunca expomos
+ * `midia_ref` (referencia interna, nao URL publica).
+ */
+export function conteudoExibido(m: MensagemSaida): ConteudoExibido {
+  if (m.tipo === 'texto' && m.conteudo) return { texto: m.conteudo, placeholder: false }
+  if (m.tipo === 'audio' && m.transcricao) return { texto: m.transcricao, placeholder: false }
+  if (m.tipo === 'interativo' && m.conteudo) return { texto: m.conteudo, placeholder: false }
+  if (m.conteudo) return { texto: m.conteudo, placeholder: false }
+  const rotulo = m.tipo === 'texto' ? 'Mensagem' : ROTULO_MIDIA[m.tipo]
+  return { texto: rotulo, placeholder: true }
+}
+
+/** Previa curta da ultima mensagem na lista. Entrada do cliente ganha o prefixo vazio. */
+export function previaLista(previa: string | null, tipo: TipoMensagem): string {
+  if (previa && previa.trim()) return previa
+  if (tipo === 'texto') return 'Mensagem'
+  return ROTULO_MIDIA[tipo as Exclude<TipoMensagem, 'texto'>]
+}
