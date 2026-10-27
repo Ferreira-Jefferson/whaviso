@@ -138,6 +138,11 @@ export interface DadosPixCopiaCola {
   /** Identificador da transação (Reference Label, subcampo 05 do campo 62); sem valor
    *  vira "***" (marcador padrão do spec para "sem identificador"). */
   identificador?: string | null
+  /** Cidade do titular (Merchant City, campo 60); truncada a 15 caracteres. Vazia/ausente
+   *  cai no placeholder fixo (`CIDADE_PLACEHOLDER`), preservando o comportamento histórico de
+   *  quem gera o BR Code sem cadastro de cidade (ex.: o auxílio de UX). API-pagamentos passa a
+   *  cidade real da loja (`loja_pix.cidade`). */
+  cidade?: string | null
 }
 
 // O cadastro da chave (wizard/painel) guarda texto livre de propósito (UX, não
@@ -175,6 +180,7 @@ function normalizarChaveDict(chave: string, tipo?: TipoChavePix | null): string 
 export function gerarPayloadPixCopiaCola(dados: DadosPixCopiaCola): string {
   const chave = normalizarChaveDict(dados.chave, dados.tipo)
   const nome = truncar(normalizarAscii(dados.nomeTitular).toUpperCase() || 'RECEBEDOR', 25)
+  const cidade = truncar(normalizarAscii(dados.cidade ?? '').toUpperCase(), 15) || CIDADE_PLACEHOLDER
   const identificadorBruto = normalizarAscii(dados.identificador ?? '').toUpperCase()
   const identificador = truncar(identificadorBruto, 25) || '***'
 
@@ -190,9 +196,25 @@ export function gerarPayloadPixCopiaCola(dados: DadosPixCopiaCola): string {
     (valorValido ? tlv('54', (dados.valorCentavos! / 100).toFixed(2)) : '') +
     tlv('58', 'BR') + // Country Code
     tlv('59', nome) + // Merchant Name
-    tlv('60', CIDADE_PLACEHOLDER) + // Merchant City (placeholder fixo, ver decisão acima)
+    tlv('60', cidade) + // Merchant City (cidade da loja ou placeholder fixo)
     tlv('62', tlv('05', identificador)) // Additional Data Field Template: Reference Label
 
   semCrc += '6304' // ID + tamanho do próprio campo CRC, ANTES de calcular o checksum
   return semCrc + crc16(semCrc)
+}
+
+/**
+ * Valida um payload Pix Copia e Cola conferindo o CRC16 do campo 63 (o checksum tem que bater
+ * com o recálculo sobre todo o conteúdo anterior, inclusive "6304"). Função PURA, usada pela
+ * api e pelo atendente para garantir que o BR Code gerado/recebido não foi corrompido. Não
+ * valida a chave contra o DICT (isso só o banco do pagador resolve): confere só a integridade.
+ */
+export function validarBrCode(payload: string): boolean {
+  if (typeof payload !== 'string' || payload.length < 8) return false
+  const corpo = payload.slice(0, -4)
+  const crc = payload.slice(-4)
+  if (!/^[0-9A-F]{4}$/.test(crc)) return false
+  // O payload tem que terminar com o identificador+tamanho do campo CRC ("6304") antes do valor.
+  if (!corpo.endsWith('6304')) return false
+  return crc16(corpo) === crc
 }
