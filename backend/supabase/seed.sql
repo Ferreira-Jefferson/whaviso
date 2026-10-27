@@ -1,30 +1,66 @@
--- Seed de desenvolvimento. NÃO usar em produção (em prod, senhas vêm do dashboard).
+-- Seed de DESENVOLVIMENTO LOCAL. Nunca roda no cloud (o db push pula o seed): catálogo de
+-- produção (ex.: templates-padrão) vai em migration, não aqui.
 
--- Senhas dev dos roles de serviço (coincidem com .env.example).
-alter role whaviso_api with password 'whaviso_api_dev';
-alter role whaviso_zap with password 'whaviso_zap_dev';
+-- Senhas dev dos roles de serviço (coincidem com .env.example; em produção vêm do painel).
+alter role whaviso_api       with password 'whaviso_api_dev';
+alter role whaviso_zap       with password 'whaviso_zap_dev';
+alter role whaviso_atendente with password 'whaviso_atendente_dev';
 
--- Planos: o catálogo agora é UPSERT na migration 0019 (fonte única, chega ao
--- cloud/prod via db push). Não duplicar aqui.
+-- Só em dev/teste: deixa o catálogo de templates-padrão enviável (em produção o status vem da Meta).
+update public.templates set ativo = true, status_meta = 'aprovado' where loja_id is null;
 
--- Os templates do CICLO (lembretes D-2..D+1, padrão e revisão) agora vivem na
--- tabela unificada `templates` (chaves 'ciclo.<etapa>'), semeados pela migration
--- 0024 (catálogo em migration chega ao cloud via db push; o seed não roda lá).
--- O template de aviso ao COBRADOR ("pagamento informado") agora vive na tabela
--- unificada `templates` (chave 'cobrador.pagamento_informado'), semeado pela
--- migration 0023. Não há mais seed de templates_cobrador (tabela aposentada).
+-- Identidade de login de teste (dona da conta de exemplo).
+insert into auth.users (id, email)
+values ('00000000-0000-0000-0000-0000000000a1', 'dono@exemplo.test')
+on conflict (id) do nothing;
 
--- APENAS TESTE/DEV: em PRODUÇÃO o status/ativação real vem da Meta e este seed NÃO roda lá
--- (o db push pula o seed). Nos testes, TODO dreno do zap (envios, notificacoes_cobrador,
--- notificacoes_billing) e as réplicas na janela de 24h só usam template com ativo=true (e o
--- ciclo/notificações também exigem status_meta='aprovado'). As migrations recentes deixaram
--- o catálogo INATIVO/pendente de propósito para produção: a 0068 zerou aprovações fantasmas
--- da era Baileys, a 0072 reescreveu textos (re-submissão => pendente) e a 0073 rebaixou a
--- ativo=false tudo que não estava aprovado. Sem reativar aqui, a suíte inteira (e o gate de
--- testes do CI) fica vermelha porque nada é enviável.
---
--- Então, SÓ no dev/test, restauramos o catálogo para enviável (ativo + aprovado). É seguro:
--- cada teste limpa suas linhas de outbox pelo cascade de `limpar` (delete em auth.users ->
--- avisos -> notificacoes_cobrador), então uma notificação residual não vaza para o dreno de
--- outro teste, e nenhum teste depende de "template inativo => não envia".
-update public.templates set ativo = true, status_meta = 'aprovado';
+-- Conta, loja e número de teste.
+insert into public.contas (id, dono_user_id, nome)
+values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', 'Conta Exemplo');
+
+insert into public.lojas (id, conta_id, nome, cores, horarios)
+values ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c1',
+        'Pizzaria Exemplo', '{"primaria":"#c0392b"}'::jsonb,
+        '{"seg_dom":{"abre":"18:00","fecha":"23:30"}}'::jsonb);
+
+insert into public.membros (conta_id, loja_id, user_id, papel)
+values ('00000000-0000-0000-0000-0000000000c1', null, '00000000-0000-0000-0000-0000000000a1', 'dono');
+
+insert into public.numeros_whatsapp (id, loja_id, phone_number_id, waba_id, numero_hash, verificado)
+values ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d1',
+        'dev-phone-number-id', 'dev-waba-id',
+        encode(digest('+5511999990000', 'sha256'), 'hex'), true);
+
+-- Cardápio mínimo: pizzas com tamanho (obrigatório), borda (adicional dependente do tamanho
+-- grande) e uma bebida sem grupos.
+insert into public.grupos_opcoes (id, loja_id, nome, tipo, obrigatorio, min_escolhas, max_escolhas) values
+  ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000d1', 'Tamanho', 'tamanho', true, 1, 1),
+  ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-0000000000d1', 'Borda', 'adicional', false, 0, 1);
+
+insert into public.opcoes (id, loja_id, grupo_id, nome, preco_centavos, padrao, ordem) values
+  ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000101', 'Média', 0, true, 1),
+  ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000101', 'Grande', 1000, false, 2),
+  ('00000000-0000-0000-0000-000000000203', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000102', 'Catupiry', 800, false, 1),
+  ('00000000-0000-0000-0000-000000000204', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000102', 'Cheddar', 800, false, 2);
+
+-- A borda só se oferece quando o tamanho Grande foi escolhido.
+update public.grupos_opcoes
+   set aplica_a_opcao_id = '00000000-0000-0000-0000-000000000202'
+ where id = '00000000-0000-0000-0000-000000000102';
+
+insert into public.categorias (id, loja_id, nome, ordem) values
+  ('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-0000000000d1', 'Pizzas', 1),
+  ('00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-0000000000d1', 'Bebidas', 2);
+
+insert into public.categoria_grupos (categoria_id, grupo_id, loja_id, ordem) values
+  ('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000d1', 1),
+  ('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-0000000000d1', 2);
+
+insert into public.itens (id, loja_id, categoria_id, nome, descricao, preco_centavos, sugerivel, ordem) values
+  ('00000000-0000-0000-0000-000000000401', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000301', 'Margherita', 'Molho de tomate, mussarela e manjericão', 4500, false, 1),
+  ('00000000-0000-0000-0000-000000000402', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000301', 'Calabresa', 'Calabresa fatiada e cebola', 4800, false, 2),
+  ('00000000-0000-0000-0000-000000000403', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000302', 'Refrigerante 2L', null, 1200, true, 1);
+
+-- Uma zona de entrega para ter o que precificar.
+insert into public.zonas_entrega (loja_id, nome, tipo, bairro, taxa_cliente_centavos, valor_motoboy_centavos)
+values ('00000000-0000-0000-0000-0000000000d1', 'Centro', 'bairro', 'Centro', 500, 400);
