@@ -9,6 +9,7 @@
 import { comTransacao, notificar, type Pool, type PoolClient } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import { SaidaNode, type MensagemProposta, type NodeContext, type NodeRegistry } from '@whaviso/shared/contracts'
+import { texto } from './acoes'
 import { montarContexto, type ContextoTurno } from './contexto'
 import { aplicarEfeitos } from './efeitos'
 import { claimMensagem, lockConversa } from './repo_leitura'
@@ -53,9 +54,35 @@ export async function processarProximaMensagem(deps: DepsMotor): Promise<Desfech
       return 'descartada'
     }
 
-    await rodarTurno(deps, tx, ctx, claim.id)
+    // Backstop anti-poison: erro inesperado no turno NAO pode abortar a transacao sem consumir a
+    // mensagem (senao a fila global trava neste inbound). Desfaz so o turno (savepoint), consome a
+    // mensagem e passa a conversa para um humano, para o cliente nao ficar sem resposta.
+    await tx.query('savepoint sp_turno')
+    try {
+      await rodarTurno(deps, tx, ctx, claim.id)
+    } catch (erro) {
+      await tx.query('rollback to savepoint sp_turno')
+      deps.logger.error({ conversa_id: ctx.conversaId, err: erro }, 'turno falhou: consumindo mensagem e acionando humano')
+      await degradarFalha(tx, ctx, claim.id)
+    }
     return 'processada'
   })
+}
+
+/** Falha inesperada no turno: avisa o cliente, passa para humano e marca a mensagem processada. */
+async function degradarFalha(tx: PoolClient, ctx: ContextoTurno, mensagemId: string): Promise<void> {
+  const corpo = 'Tivemos um problema tecnico ao processar seu pedido. Vou te passar para uma pessoa da loja.'
+  await escrita.inserirMensagemSaida(tx, { lojaId: ctx.lojaId, conversaId: ctx.conversaId, tipo: 'texto', conteudo: corpo })
+  await escrita.enfileirarEnvio(tx, {
+    lojaId: ctx.lojaId, numeroId: ctx.numeroId, clienteId: ctx.clienteId, destinatarioHash: ctx.destinatarioHash,
+    conversaId: ctx.conversaId, payload: texto(corpo), dedupeChave: `${mensagemId}:falha`,
+  })
+  await escrita.marcarHumano(tx, ctx.conversaId)
+  await notificar(tx, {
+    tipo: 'conversa.handoff', loja_id: ctx.lojaId,
+    payload: { conversa_id: ctx.conversaId, loja_id: ctx.lojaId, status: 'humano' },
+  })
+  await escrita.marcarProcessada(tx, mensagemId)
 }
 
 async function rodarTurno(deps: DepsMotor, tx: PoolClient, ctx: ContextoTurno, mensagemId: string): Promise<void> {

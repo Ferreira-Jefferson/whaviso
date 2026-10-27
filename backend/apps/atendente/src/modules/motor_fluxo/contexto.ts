@@ -35,7 +35,8 @@ export async function montarContexto(
 
   const estado = lerEstado(conversa.contexto)
   const cardapioRaw = await leitura.lerCardapioRaw(tx, conversa.loja_id)
-  const ultimoEnderecoId = await leitura.lerUltimoEnderecoId(tx, conversa.loja_id, conversa.cliente_id)
+  const ultimoEndereco = await leitura.lerUltimoEndereco(tx, conversa.loja_id, conversa.cliente_id)
+  const zonasBairros = await leitura.lerZonasBairros(tx, conversa.loja_id)
   const pedidoStatus = estado.pedido_id
     ? await leitura.lerStatusPedido(tx, conversa.loja_id, estado.pedido_id)
     : null
@@ -46,7 +47,9 @@ export async function montarContexto(
     loja: { id: loja.id, nome: loja.nome, horarios: loja.horarios },
     cliente: { id: cliente.id, nome: cliente.nome, telefone_hash: cliente.telefone_hash },
     cardapio: montarCardapio(cardapioRaw, agora),
-    ultimoEnderecoId,
+    ultimoEnderecoId: ultimoEndereco?.id ?? null,
+    ultimoEnderecoBairro: ultimoEndereco?.bairro ?? null,
+    zonasBairros,
     pedidoStatus,
     agora,
   }

@@ -70,9 +70,23 @@ export function montarLinha(item: ItemCtx, grupos: readonly GrupoCtx[], linha: L
   }
 }
 
-/** Grupos obrigatorios do item ainda a perguntar, em ordem (os opcionais o motor-min pula). */
-export function gruposObrigatorios(grupos: readonly GrupoCtx[]): GrupoCtx[] {
-  return grupos
-    .filter((g) => g.obrigatorio && g.aplica_a_opcao_id === null)
-    .sort((a, b) => a.ordem - b.ordem || (a.id < b.id ? -1 : 1))
+const porOrdem = (a: GrupoCtx, b: GrupoCtx): number => a.ordem - b.ordem || (a.id < b.id ? -1 : 1)
+
+/**
+ * Grupos independentes do item (sem `aplica_a_opcao_id`), em ordem: a fila inicial a perguntar.
+ * Inclui obrigatorios (exigem o minimo) E opcionais (podem ser pulados / "quer adicionar?"). Os
+ * dependentes de uma opcao entram so quando a opcao gatilho e escolhida (`gruposDependentesDe`).
+ */
+export function gruposIndependentes(grupos: readonly GrupoCtx[]): GrupoCtx[] {
+  return grupos.filter((g) => g.aplica_a_opcao_id === null).sort(porOrdem)
+}
+
+/** Grupos efetivos do item que dependem da opcao `opcaoId` (add-on dependente de tamanho). */
+export function gruposDependentesDe(grupos: readonly GrupoCtx[], opcaoId: string): GrupoCtx[] {
+  return grupos.filter((g) => g.aplica_a_opcao_id === opcaoId).sort(porOrdem)
+}
+
+/** Quantidade minima de escolhas exigida por um grupo (obrigatorio implica pelo menos 1). */
+export function minimoDoGrupo(g: GrupoCtx): number {
+  return g.obrigatorio ? Math.max(g.min_escolhas, 1) : g.min_escolhas
 }

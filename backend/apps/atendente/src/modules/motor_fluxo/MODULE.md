@@ -30,6 +30,41 @@ Lacos cobrem "adicionar mais", reapresentacao e sub-passos de texto. O estado do
 `conversas.contexto` (jsonb), unica fonte; o builder visual (onda 5) troca a FONTE do grafo (arquivo
 -> banco) sem mexer no motor.
 
+### montar_pedido (coleta de opcoes)
+
+Por item, monta a fila de grupos independentes (sem `aplica_a_opcao_id`): obrigatorios exigem o
+minimo, opcionais podem ser pulados ("0"). Respeita `min_escolhas`/`max_escolhas` por grupo
+(acumula ate o maximo; grupo de escolha unica avanca sozinho). Ao escolher uma opcao, injeta os
+grupos que dependem dela (`aplica_a_opcao_id`, ex.: adicional so no tamanho grande). A linha so
+fecha quando a fila esvazia, e e revalidada por `montarLinha` antes de entrar no carrinho.
+
+### endereco (bairro e area)
+
+"Ultimo endereco" reusa o endereco do cliente, mas aplica o gate de area: se a loja tem zonas e o
+bairro do ultimo endereco nao esta entre elas, e **fora da area** (resposta fixa de recusa) e
+oferece informar outro. "Informar outro" cadastra um endereco novo: escolhe o BAIRRO numa lista de
+zonas ativas (isso resolve a zona/taxa e restringe a area) e depois informa a rua; sem zonas
+configuradas, informa por texto (taxa 0, sem restricao). A taxa e calculada no motor pela zona do
+bairro na criacao do pedido.
+
+## Robustez (anti-poison)
+
+A criacao do pedido e a prova de falha: linha que nao reprecifica contra o cardapio vivo (item
+sumiu/opcao invalida) NAO cria pedido divergente e NUNCA sobe erro para abortar a transacao do
+turno (senao a mensagem nunca recebe `processada_em` e trava a fila global). Degradacao elegante:
+retira as linhas invalidas, avisa o cliente e volta a confirmar (ou a escolher, se o carrinho
+esvaziou). Alem disso, um SAVEPOINT por turno garante que qualquer erro inesperado ainda consome a
+mensagem e passa a conversa para humano, sem deixar o cliente sem resposta.
+
+## Limitacoes conhecidas do motor-min (aceitas)
+
+- Apos o 1o pedido a conversa fica em `acompanhar` (nao ha 2o pedido na mesma conversa sem passar
+  por handoff/encerrar); aceitavel no motor-min.
+- `sugerivel` (cross-sell de item, "quer adicionar?") a nivel de ITEM nao e implementado; os grupos
+  opcionais do item ja sao oferecidos. Entra numa onda posterior.
+- Area fora de zona: o ultimo endereco com bairro NULO (desconhecido) nao e bloqueado (taxa 0); so
+  bairro conhecido fora das zonas e recusado.
+
 ## Tabelas
 
 - **Le** (vivo, nunca cache): `lojas`, `clientes`, `enderecos`, `categorias`, `itens`, `grupos_opcoes`,

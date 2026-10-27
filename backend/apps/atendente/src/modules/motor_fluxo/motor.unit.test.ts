@@ -91,13 +91,15 @@ function entrada(evento: EntradaTurno['evento'], estado: Partial<EstadoFluxo>): 
     evento,
     estado: {
       etapa: 'confirmar', carrinho: [{ item_id: 'i1', quantidade: 1, opcoes_ids: [] }], apresentados: [],
-      categoria_id: null, item_id: null, grupos_pendentes: [], opcoes_ids: [], endereco_id: null,
-      aguardando: null, pagamento: null, pedido_id: null, codigo: null, falhas: 0, ...estado,
+      categoria_id: null, item_id: null, grupos_pendentes: [], opcoes_grupo: [], opcoes_ids: [], endereco_id: null,
+      aguardando: null, bairro_rascunho: null, pagamento: null, pedido_id: null, codigo: null, falhas: 0, ...estado,
     },
     loja: { id: 'l1', nome: 'Loja', horarios: null },
     cliente: { id: 'cli', nome: null, telefone_hash: 'x'.repeat(64) },
     cardapio: { categorias: [], itensPorCategoria: new Map(), itensPorId: new Map(), gruposPorItem: new Map() },
     ultimoEnderecoId: 'end1',
+    ultimoEnderecoBairro: 'Centro',
+    zonasBairros: ['Centro'],
     pedidoStatus: null,
     agora: HOJE,
   }

@@ -67,7 +67,10 @@ async function um<T = { id: string }>(sqlTexto: string, params: unknown[]): Prom
 
 export interface OpcoesCenario {
   horarios?: unknown
+  /** bairro do endereco do cliente (default 'Centro'). */
   bairro?: string
+  /** bairro da zona de entrega ativa (default = `bairro`); use para simular fora de area. */
+  zonaBairro?: string
   taxaZonaCentavos?: number | null
   statusConversa?: 'ia' | 'humano' | 'encerrada'
 }
@@ -98,9 +101,10 @@ export async function semear(op: OpcoesCenario = {}): Promise<Cenario> {
   )).id
 
   if (op.taxaZonaCentavos != null) {
+    const zonaBairro = op.zonaBairro ?? bairro
     await poolSuper.query(
       `insert into public.zonas_entrega (loja_id, nome, tipo, bairro, taxa_cliente_centavos) values ($1,$2,'bairro',$3,$4)`,
-      [lojaId, `Zona ${bairro}`, bairro, op.taxaZonaCentavos],
+      [lojaId, `Zona ${zonaBairro}`, zonaBairro, op.taxaZonaCentavos],
     )
   }
 
@@ -184,6 +188,39 @@ export async function contexto(conversaId: string): Promise<Record<string, unkno
 
 export async function resetProcessada(mensagemId: string): Promise<void> {
   await poolSuper.query('update public.mensagens set processada_em = null where id = $1', [mensagemId])
+}
+
+/** Forca o estado do fluxo (conversas.contexto) para montar cenarios de borda. */
+export async function setContexto(conversaId: string, estado: unknown): Promise<void> {
+  await poolSuper.query('update public.conversas set contexto = $2::jsonb where id = $1', [conversaId, JSON.stringify(estado)])
+}
+
+/** Marca um item como esgotado ate o futuro (simula item que some entre adicionar e pagar). */
+export async function esgotarItem(itemId: string): Promise<void> {
+  await poolSuper.query(
+    `update public.itens set esgotado_ate = now() + interval '1 day' where id = $1`,
+    [itemId],
+  )
+}
+
+export async function processadaEm(mensagemId: string): Promise<Date | null> {
+  const { rows } = await poolSuper.query('select processada_em from public.mensagens where id = $1', [mensagemId])
+  return rows[0].processada_em as Date | null
+}
+
+export async function lerEnderecos(clienteId: string): Promise<Array<{ logradouro: string; bairro: string | null }>> {
+  const { rows } = await poolSuper.query('select logradouro, bairro from public.enderecos where cliente_id = $1 order by criado_em', [clienteId])
+  return rows
+}
+
+export async function lerOpcoesItem(pedidoId: string): Promise<string[]> {
+  const { rows } = await poolSuper.query(
+    `select o.nome_snapshot from public.itens_pedido_opcoes o
+       join public.itens_pedido ip on ip.id = o.item_pedido_id
+      where ip.pedido_id = $1`,
+    [pedidoId],
+  )
+  return rows.map((r) => r.nome_snapshot as string)
 }
 
 export async function limpar(contaId: string): Promise<void> {

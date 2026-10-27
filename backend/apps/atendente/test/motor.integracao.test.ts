@@ -5,9 +5,11 @@
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { criarLogger, type Logger } from '@whaviso/shared/logger'
 import { criarRegistry, processarProximaMensagem, type DepsMotor } from '../src/modules/motor_fluxo'
+import { EstadoFluxo } from '../src/modules/motor_fluxo/tipos'
 import {
-  bancoAcessivel, contexto, fecharPools, inserirEntrada, lerEnvios, lerItens, lerPedidos, limpar,
-  resetProcessada, semear, statusConversa, poolAtendente, poolSuper, type Cenario,
+  bancoAcessivel, contexto, esgotarItem, fecharPools, inserirEntrada, lerEnderecos, lerEnvios, lerItens,
+  lerOpcoesItem, lerPedidos, limpar, processadaEm, resetProcessada, semear, setContexto, statusConversa,
+  poolAtendente, poolSuper, type Cenario,
 } from './db'
 
 const online = await bancoAcessivel()
@@ -31,7 +33,8 @@ async function dialogoFeliz(c: Cenario): Promise<string> {
   await turno(c, 'texto', 'oi') // saudacao -> lista de categorias
   await turno(c, 'texto', '1') // escolhe categoria Lanches -> lista de itens
   await turno(c, 'texto', '1') // escolhe Burger -> pergunta Tamanho
-  await turno(c, 'texto', '2') // escolhe Grande -> resumo + confirmar
+  await turno(c, 'texto', '2') // escolhe Grande -> injeta Adicionais (dependente de Grande)
+  await turno(c, 'texto', '0') // pula Adicionais (opcional) -> resumo + confirmar
   await turno(c, 'interativo', 'conf:ok') // confirma -> endereco
   await turno(c, 'interativo', 'end:ultimo') // usa ultimo endereco -> pagamento
   return turno(c, 'interativo', 'pag:pix') // paga -> cria pedido novo + avisa
@@ -134,8 +137,9 @@ describe.skipIf(!online)('motor_fluxo (integracao)', () => {
     expect(ctxA['item_id']).toBeNull()
 
     // Conclui o pedido na loja A normalmente e confere o isolamento.
-    await turno(a, 'texto', '1')
-    await turno(a, 'texto', '2')
+    await turno(a, 'texto', '1') // Burger
+    await turno(a, 'texto', '2') // Grande
+    await turno(a, 'texto', '0') // pula Adicionais
     await turno(a, 'interativo', 'conf:ok')
     await turno(a, 'interativo', 'end:ultimo')
     await turno(a, 'interativo', 'pag:pix')
@@ -143,5 +147,102 @@ describe.skipIf(!online)('motor_fluxo (integracao)', () => {
     expect(await lerPedidos(a.lojaId)).toHaveLength(1)
     expect(await lerPedidos(b.lojaId)).toHaveLength(0)
     expect(await statusConversa(b.conversaId)).toBe('ia')
+  })
+
+  it('ALTO: item com grupo dependente (Adicionais no Grande) e multi pode ser pedido com o adicional', async () => {
+    const c = await novoCenario({ bairro: 'Centro', taxaZonaCentavos: 700 })
+    await turno(c, 'texto', 'oi')
+    await turno(c, 'texto', '1') // Lanches
+    await turno(c, 'texto', '1') // Burger
+    await turno(c, 'texto', '2') // Grande -> injeta Adicionais (dependente)
+    await turno(c, 'texto', '1') // Bacon (adicional, grupo multi max 2)
+    await turno(c, 'texto', '0') // finaliza Adicionais -> confirmar
+    await turno(c, 'interativo', 'conf:ok')
+    await turno(c, 'interativo', 'end:ultimo')
+    await turno(c, 'interativo', 'pag:pix')
+
+    const pedidos = await lerPedidos(c.lojaId)
+    expect(pedidos).toHaveLength(1)
+    expect(pedidos[0]!.subtotal_centavos).toBe(2800) // 2000 + Grande 500 + Bacon 300
+    expect(pedidos[0]!.total_centavos).toBe(3500) // + taxa 700
+    const opcoes = await lerOpcoesItem(pedidos[0]!.id)
+    expect(opcoes.sort()).toEqual(['Bacon', 'Grande'])
+  })
+
+  it('CRITICO: linha invalida (item esgotado) na efetivacao nao envenena a fila; marca processada, sem pedido', async () => {
+    const c = await novoCenario({ bairro: 'Centro', taxaZonaCentavos: 700 })
+    const estado = EstadoFluxo.parse({
+      etapa: 'pagamento', pagamento: 'pix', endereco_id: c.enderecoId,
+      carrinho: [{ item_id: c.cardapio.burger, quantidade: 1, opcoes_ids: [c.cardapio.grande] }],
+    })
+    await setContexto(c.conversaId, estado)
+    await esgotarItem(c.cardapio.burger) // o item some entre confirmar e pagar
+
+    const msgId = await inserirEntrada(c, 'interativo', 'pag:pix')
+    expect(await processarProximaMensagem(deps(c.conversaId))).toBe('processada')
+    expect(await processadaEm(msgId)).not.toBeNull() // mensagem consumida: fila nao trava
+    expect(await lerPedidos(c.lojaId)).toHaveLength(0) // nao cria pedido divergente
+    expect((await lerEnvios(c.conversaId)).length).toBeGreaterThanOrEqual(1) // cliente recebe resposta
+    expect((await contexto(c.conversaId))['etapa']).toBe('pedir_categoria') // volta a escolher
+  })
+
+  it('MEDIO divergencia: com 1 de 2 itens indisponivel, nao cria pedido divergente; avisa e volta a confirmar', async () => {
+    const c = await novoCenario({ bairro: 'Centro', taxaZonaCentavos: 700 })
+    const estado = EstadoFluxo.parse({
+      etapa: 'pagamento', pagamento: 'pix', endereco_id: c.enderecoId,
+      carrinho: [
+        { item_id: c.cardapio.burger, quantidade: 1, opcoes_ids: [c.cardapio.grande] },
+        { item_id: c.cardapio.suco, quantidade: 1, opcoes_ids: [] },
+      ],
+    })
+    await setContexto(c.conversaId, estado)
+    await esgotarItem(c.cardapio.burger) // so o Burger some; o Suco segue valido
+
+    const msgId = await inserirEntrada(c, 'interativo', 'pag:pix')
+    expect(await processarProximaMensagem(deps(c.conversaId))).toBe('processada')
+    expect(await processadaEm(msgId)).not.toBeNull()
+    expect(await lerPedidos(c.lojaId)).toHaveLength(0)
+    const ctx = await contexto(c.conversaId)
+    expect(ctx['etapa']).toBe('confirmar')
+    expect((ctx['carrinho'] as unknown[]).length).toBe(1) // so a linha valida (Suco) restou
+    expect((await lerEnvios(c.conversaId)).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('MEDIO frete: endereco novo captura o bairro e a taxa da zona e aplicada (nao fica 0)', async () => {
+    const c = await novoCenario({ bairro: 'Centro', taxaZonaCentavos: 700 })
+    await turno(c, 'texto', 'oi')
+    await turno(c, 'texto', '1')
+    await turno(c, 'texto', '1')
+    await turno(c, 'texto', '2')
+    await turno(c, 'texto', '0')
+    await turno(c, 'interativo', 'conf:ok')
+    await turno(c, 'interativo', 'end:novo') // informar outro -> pergunta o bairro (zonas)
+    await turno(c, 'texto', '1') // bairro Centro (unica zona)
+    await turno(c, 'texto', 'Rua Nova 123') // rua -> cria endereco e vai ao pagamento
+    await turno(c, 'interativo', 'pag:pix')
+
+    const pedidos = await lerPedidos(c.lojaId)
+    expect(pedidos).toHaveLength(1)
+    expect(pedidos[0]!.taxa_entrega_centavos).toBe(700) // bairro capturado -> zona resolvida
+    const ends = await lerEnderecos(c.clienteId)
+    expect(ends.some((e) => e.bairro === 'Centro' && e.logradouro === 'Rua Nova 123')).toBe(true)
+  })
+
+  it('MEDIO fora de area: ultimo endereco em bairro sem zona e bloqueado (sem pedido, pede outro)', async () => {
+    const c = await novoCenario({ bairro: 'Centro', zonaBairro: 'Jardim', taxaZonaCentavos: 500 })
+    await turno(c, 'texto', 'oi')
+    await turno(c, 'texto', '1')
+    await turno(c, 'texto', '1')
+    await turno(c, 'texto', '2')
+    await turno(c, 'texto', '0')
+    await turno(c, 'interativo', 'conf:ok')
+    await turno(c, 'interativo', 'end:ultimo') // Centro nao esta na zona (Jardim): fora de area
+
+    expect(await lerPedidos(c.lojaId)).toHaveLength(0)
+    const ctx = await contexto(c.conversaId)
+    expect(ctx['etapa']).toBe('endereco')
+    expect(ctx['aguardando']).toBe('endereco_bairro') // oferece informar outro endereco
+    const envios = await lerEnvios(c.conversaId)
+    expect(JSON.stringify(envios.map((e) => e.payload))).toContain('nao entregamos')
   })
 })

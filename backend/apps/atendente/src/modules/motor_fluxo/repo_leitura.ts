@@ -62,16 +62,19 @@ export async function lerCliente(tx: Executor, lojaId: string, clienteId: string
   )
 }
 
-/** Ultimo endereco ativo do cliente (base do "repetir ultimo"). */
-export async function lerUltimoEnderecoId(tx: Executor, lojaId: string, clienteId: string): Promise<string | null> {
-  const linha = await consultarUm<{ id: string }>(
+/** Ultimo endereco ativo do cliente (base do "repetir ultimo"), com o bairro (gate de area). */
+export async function lerUltimoEndereco(
+  tx: Executor,
+  lojaId: string,
+  clienteId: string,
+): Promise<{ id: string; bairro: string | null } | null> {
+  return consultarUm<{ id: string; bairro: string | null }>(
     tx,
-    sql`select id from public.enderecos
+    sql`select id, bairro from public.enderecos
          where loja_id = ${lojaId} and cliente_id = ${clienteId} and ativo
          order by ultimo_uso_em desc nulls last, criado_em desc
          limit 1`,
   )
-  return linha?.id ?? null
 }
 
 export async function lerBairroEndereco(tx: Executor, lojaId: string, enderecoId: string): Promise<string | null> {
@@ -92,6 +95,17 @@ export async function lerZonas(tx: Executor, lojaId: string): Promise<ZonaRow[]>
     sql`select bairro, taxa_cliente_centavos from public.zonas_entrega
          where loja_id = ${lojaId} and ativo and tipo = 'bairro'`,
   )
+}
+
+/** Bairros das zonas ativas da loja (area atendida), sem nulos e sem repetir. */
+export async function lerZonasBairros(tx: Executor, lojaId: string): Promise<string[]> {
+  const linhas = await consultar<{ bairro: string | null }>(
+    tx,
+    sql`select distinct bairro from public.zonas_entrega
+         where loja_id = ${lojaId} and ativo and tipo = 'bairro' and bairro is not null
+         order by bairro`,
+  )
+  return linhas.map((l) => l.bairro!).filter((b) => b.length > 0)
 }
 
 export async function lerStatusPedido(tx: Executor, lojaId: string, pedidoId: string): Promise<string | null> {

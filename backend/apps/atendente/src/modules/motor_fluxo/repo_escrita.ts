@@ -77,11 +77,12 @@ export async function criarEndereco(
   lojaId: string,
   clienteId: string,
   logradouro: string,
+  bairro: string | null,
 ): Promise<string> {
   const linha = await consultarUm<{ id: string }>(
     tx,
-    sql`insert into public.enderecos (loja_id, cliente_id, logradouro, ultimo_uso_em)
-        values (${lojaId}, ${clienteId}, ${logradouro}, now())
+    sql`insert into public.enderecos (loja_id, cliente_id, logradouro, bairro, ultimo_uso_em)
+        values (${lojaId}, ${clienteId}, ${logradouro}, ${bairro}, now())
         returning id`,
   )
   if (!linha) throw new Error('insert de endereco sem retorno')

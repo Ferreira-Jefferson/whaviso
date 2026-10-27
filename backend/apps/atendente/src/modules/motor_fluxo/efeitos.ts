@@ -1,17 +1,24 @@
 // Effetivador: o motor aplica os efeitos propostos pelo node, em ordem, numa transacao. Aqui mora
 // a fronteira sagrada: o node PROPOE (estado, criar_endereco, criar_pedido, handoff, encerrar); o
 // motor VALIDA e EFETIVA. O preco e a taxa do pedido sao calculados AQUI (servidor, centavos), a
-// partir do cardapio vivo, nunca do conteudo da mensagem. Criar pedido e idempotente por conversa
-// (guarda por estado.pedido_id).
+// partir do cardapio vivo, nunca do conteudo da mensagem.
+//
+// A criacao do pedido e A PROVA DE FALHA: nenhuma regra de cardapio (item sumiu, opcao invalida,
+// preco) pode subir erro e abortar a transacao do turno (senao a mensagem nunca e marcada
+// processada e envenena a fila global). Linha que nao reprecifica e tratada por degradacao
+// elegante: avisa o cliente e volta a confirmar/escolher, nunca cria pedido divergente em silencio
+// nem deixa o cliente sem resposta. Criar pedido e idempotente por conversa (guarda pedido_id).
 import type { EfeitoProposto, MensagemProposta } from '@whaviso/shared/contracts'
 import { ErroBanco, notificar, type PoolClient } from '@whaviso/shared/db'
 import { TZ } from '@whaviso/shared/datas'
-import { EFEITO } from './acoes'
-import { formatarPreco } from './comum'
-import { montarLinha } from './cardapio'
+import { botoes, EFEITO, texto } from './acoes'
+import { formatarPreco, menuCategorias } from './comum'
+import { ErroMontagem, montarLinha, type LinhaSnapshot } from './cardapio'
+import { resumoCarrinho } from './resumo'
+import { BOTAO_CANCELAR, BOTAO_CONFIRMAR, BOTAO_MAIS } from './ids'
 import { lerBairroEndereco, lerZonas } from './repo_leitura'
 import * as escrita from './repo_escrita'
-import { EstadoFluxo, type CardapioCtx } from './tipos'
+import { EstadoFluxo, type CardapioCtx, type LinhaCarrinho } from './tipos'
 
 export interface DepsEfeito {
   tx: PoolClient
@@ -28,7 +35,7 @@ export interface ResultadoEfeitos {
   estado: EstadoFluxo
   handoff: boolean
   encerrar: boolean
-  /** Mensagens geradas pelo motor (ex.: aviso de pedido recebido com o codigo). */
+  /** Mensagens geradas pelo motor (aviso de pedido recebido, ou degradacao de carrinho). */
   mensagensExtra: MensagemProposta[]
 }
 
@@ -51,11 +58,7 @@ export async function aplicarEfeitos(
     if (efeito.tipo === EFEITO.estado) {
       estado = EstadoFluxo.parse((efeito.dados as { estado: unknown }).estado)
     } else if (efeito.tipo === EFEITO.criarEndereco) {
-      const logradouro = String((efeito.dados as { logradouro: unknown }).logradouro ?? '').trim()
-      if (logradouro.length >= 4) {
-        const id = await escrita.criarEndereco(deps.tx, deps.lojaId, deps.clienteId, logradouro)
-        estado = { ...estado, endereco_id: id }
-      }
+      estado = await efetivarEndereco(deps, estado, efeito.dados)
     } else if (efeito.tipo === EFEITO.criarPedido) {
       estado = await criarPedido(deps, estado, mensagensExtra)
     } else if (efeito.tipo === EFEITO.handoff) {
@@ -68,20 +71,62 @@ export async function aplicarEfeitos(
   return { estado, handoff, encerrar, mensagensExtra }
 }
 
-/** Cria o pedido `novo` a partir do carrinho + cardapio vivo (preco/taxa no servidor). Idempotente. */
-async function criarPedido(
-  deps: DepsEfeito,
-  estado: EstadoFluxo,
-  mensagensExtra: MensagemProposta[],
-): Promise<EstadoFluxo> {
+async function efetivarEndereco(deps: DepsEfeito, estado: EstadoFluxo, dados: Record<string, unknown>): Promise<EstadoFluxo> {
+  const logradouro = String(dados['logradouro'] ?? '').trim()
+  const bruto = dados['bairro']
+  const bairro = typeof bruto === 'string' && bruto.trim() ? bruto.trim() : null
+  if (logradouro.length < 4) return estado
+  const id = await escrita.criarEndereco(deps.tx, deps.lojaId, deps.clienteId, logradouro, bairro)
+  return { ...estado, endereco_id: id }
+}
+
+interface Reprecificacao {
+  linhas: LinhaSnapshot[]
+  subtotal: number
+  invalidas: number
+  carrinhoValido: LinhaCarrinho[]
+}
+
+/** Reprecifica o carrinho contra o cardapio vivo SEM nunca lancar: conta e separa as linhas invalidas. */
+function reprecificar(cardapio: CardapioCtx, carrinho: readonly LinhaCarrinho[]): Reprecificacao {
+  const linhas: LinhaSnapshot[] = []
+  const carrinhoValido: LinhaCarrinho[] = []
+  let subtotal = 0
+  let invalidas = 0
+  for (const l of carrinho) {
+    const item = cardapio.itensPorId.get(l.item_id)
+    const grupos = cardapio.gruposPorItem.get(l.item_id)
+    if (!item || !grupos) {
+      invalidas += 1
+      continue
+    }
+    try {
+      const m = montarLinha(item, grupos, l)
+      linhas.push(m)
+      carrinhoValido.push(l)
+      subtotal += m.total_centavos
+    } catch (erro) {
+      if (erro instanceof ErroMontagem) {
+        invalidas += 1
+        continue
+      }
+      throw erro
+    }
+  }
+  return { linhas, subtotal, invalidas, carrinhoValido }
+}
+
+/** Cria o pedido `novo` do carrinho (preco/taxa no servidor). Degrada sem criar se houver divergencia. */
+async function criarPedido(deps: DepsEfeito, estado: EstadoFluxo, mensagensExtra: MensagemProposta[]): Promise<EstadoFluxo> {
   if (estado.pedido_id) return estado // ja criado nesta conversa: no-op
 
-  const { linhas, subtotal } = montarLinhas(deps.cardapio, estado)
-  if (linhas.length === 0) return estado // nada a criar (carrinho vazio sob o cardapio atual)
+  const { linhas, subtotal, invalidas, carrinhoValido } = reprecificar(deps.cardapio, estado.carrinho)
+  if (invalidas > 0 || linhas.length === 0) {
+    return degradarCarrinho(deps, estado, carrinhoValido, mensagensExtra)
+  }
 
   const taxa = await resolverTaxa(deps, estado.endereco_id)
   const total = subtotal + taxa
-
   const { pedidoId, codigo } = await inserirComCodigo(deps, estado, subtotal, taxa, total, linhas)
   if (estado.endereco_id) await escrita.marcarUsoEndereco(deps.tx, deps.lojaId, estado.endereco_id)
 
@@ -90,12 +135,7 @@ async function criarPedido(
     loja_id: deps.lojaId,
     payload: { pedido_id: pedidoId, loja_id: deps.lojaId, status: 'novo' },
   })
-  await escrita.registrarEvento(deps.tx, {
-    lojaId: deps.lojaId,
-    tipo: 'pedido.criado',
-    entidade: 'pedido',
-    entidadeId: pedidoId,
-  })
+  await escrita.registrarEvento(deps.tx, { lojaId: deps.lojaId, tipo: 'pedido.criado', entidade: 'pedido', entidadeId: pedidoId })
 
   mensagensExtra.push({
     tipo: 'texto',
@@ -104,18 +144,30 @@ async function criarPedido(
   return { ...estado, pedido_id: pedidoId, codigo }
 }
 
-function montarLinhas(cardapio: CardapioCtx, estado: EstadoFluxo) {
-  const linhas = []
-  let subtotal = 0
-  for (const l of estado.carrinho) {
-    const item = cardapio.itensPorId.get(l.item_id)
-    const grupos = cardapio.gruposPorItem.get(l.item_id)
-    if (!item || !grupos) continue
-    const montada = montarLinha(item, grupos, l)
-    subtotal += montada.total_centavos
-    linhas.push(montada)
+/** Degradacao: nao cria pedido divergente. Avisa o cliente e volta a confirmar (ou a escolher). */
+function degradarCarrinho(
+  deps: DepsEfeito,
+  estado: EstadoFluxo,
+  carrinhoValido: LinhaCarrinho[],
+  mensagensExtra: MensagemProposta[],
+): EstadoFluxo {
+  if (carrinhoValido.length === 0) {
+    const menu = menuCategorias(deps.cardapio, 'Alguns itens ficaram indisponiveis. Vamos montar seu pedido de novo. Escolha uma categoria:')
+    mensagensExtra.push(texto(menu.texto))
+    return {
+      ...estado, etapa: 'pedir_categoria', carrinho: [], apresentados: menu.ids,
+      item_id: null, grupos_pendentes: [], opcoes_grupo: [], opcoes_ids: [], falhas: 0,
+    }
   }
-  return { linhas, subtotal }
+  const resumo = resumoCarrinho(deps.cardapio, carrinhoValido)
+  mensagensExtra.push(
+    botoes(`Um item ficou indisponivel e foi retirado.\n${resumo.texto}\n\nPosso confirmar o restante?`, [
+      { id: BOTAO_CONFIRMAR, rotulo: 'Confirmar' },
+      { id: BOTAO_MAIS, rotulo: 'Adicionar mais' },
+      { id: BOTAO_CANCELAR, rotulo: 'Cancelar' },
+    ]),
+  )
+  return { ...estado, etapa: 'confirmar', carrinho: carrinhoValido, apresentados: [], falhas: 0 }
 }
 
 async function resolverTaxa(deps: DepsEfeito, enderecoId: string | null): Promise<number> {
@@ -138,7 +190,7 @@ async function inserirComCodigo(
   subtotal: number,
   taxa: number,
   total: number,
-  linhas: ReturnType<typeof montarLinhas>['linhas'],
+  linhas: LinhaSnapshot[],
 ): Promise<{ pedidoId: string; codigo: string }> {
   const dia = aammdd(deps.agora)
   for (let tentativa = 0; tentativa < 3; tentativa++) {
@@ -146,15 +198,8 @@ async function inserirComCodigo(
     try {
       const codigo = await escrita.proximoCodigo(deps.tx, deps.lojaId, dia)
       const pedidoId = await escrita.inserirPedido(deps.tx, {
-        lojaId: deps.lojaId,
-        clienteId: deps.clienteId,
-        conversaId: deps.conversaId,
-        numeroId: deps.numeroId,
-        enderecoId: estado.endereco_id,
-        codigo,
-        subtotal,
-        taxa,
-        total,
+        lojaId: deps.lojaId, clienteId: deps.clienteId, conversaId: deps.conversaId, numeroId: deps.numeroId,
+        enderecoId: estado.endereco_id, codigo, subtotal, taxa, total,
       })
       for (const l of linhas) await escrita.inserirLinha(deps.tx, deps.lojaId, pedidoId, l)
       await deps.tx.query('release savepoint sp_pedido')

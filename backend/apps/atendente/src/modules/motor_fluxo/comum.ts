@@ -33,6 +33,33 @@ export function menuCategorias(cardapio: CardapioCtx, titulo: string): { texto: 
   )
 }
 
+/** Menu numerado dos bairros atendidos (zonas ativas). O "id" apresentado e o proprio bairro. */
+export function menuBairros(zonasBairros: readonly string[]): { texto: string; ids: string[] } {
+  return menuNumerado(
+    'Para qual bairro e a entrega?',
+    zonasBairros.map((b) => ({ id: b, rotulo: b })),
+  )
+}
+
+/**
+ * Inicia o cadastro de um endereco novo. Com zonas configuradas, pergunta o BAIRRO por lista (isso
+ * resolve a zona/taxa e restringe a area); sem zonas, pede o endereco por texto (sem restricao de
+ * area, taxa 0). O node de endereco segue a partir de `aguardando`.
+ */
+export function iniciarEnderecoNovo(estado: EstadoFluxo, zonasBairros: readonly string[]): SaidaNode {
+  if (zonasBairros.length > 0) {
+    const menu = menuBairros(zonasBairros)
+    const proximo: EstadoFluxo = {
+      ...estado, etapa: 'endereco', aguardando: 'endereco_bairro', bairro_rascunho: null, apresentados: menu.ids, falhas: 0,
+    }
+    return saida('endereco', [texto(menu.texto)], [efeitoEstado(proximo)])
+  }
+  const proximo: EstadoFluxo = {
+    ...estado, etapa: 'endereco', aguardando: 'endereco_rua', bairro_rascunho: null, apresentados: [], falhas: 0,
+  }
+  return saida('endereco', [texto('Informe o endereco de entrega (rua e numero):')], [efeitoEstado(proximo)])
+}
+
 /** Pergunta da forma de pagamento (botoes). Reusada ao chegar na etapa `pagamento`. */
 export function promptPagamento(): MensagemProposta {
   return botoes('Como voce prefere pagar?', [

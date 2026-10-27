@@ -30,9 +30,9 @@ export function efeitoEstado(estado: EstadoFluxo): EfeitoProposto {
   return { tipo: EFEITO.estado, dados: { estado } }
 }
 
-/** Efeito: criar um endereco novo a partir do texto informado (o motor insere e seta endereco_id). */
-export function efeitoCriarEndereco(logradouro: string): EfeitoProposto {
-  return { tipo: EFEITO.criarEndereco, dados: { logradouro } }
+/** Efeito: criar um endereco novo (logradouro + bairro). O motor insere e seta endereco_id. */
+export function efeitoCriarEndereco(logradouro: string, bairro: string | null): EfeitoProposto {
+  return { tipo: EFEITO.criarEndereco, dados: { logradouro, bairro } }
 }
 
 export function efeitoCriarPedido(): EfeitoProposto {

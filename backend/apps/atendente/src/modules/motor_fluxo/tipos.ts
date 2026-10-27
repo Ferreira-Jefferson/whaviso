@@ -27,11 +27,17 @@ export const EstadoFluxo = z
     apresentados: z.array(z.string()).max(50).default([]),
     categoria_id: z.string().uuid().nullable().default(null),
     item_id: z.string().uuid().nullable().default(null),
+    /** fila de grupos a perguntar do item em construcao ([0] = grupo atual). */
     grupos_pendentes: z.array(z.string().uuid()).max(30).default([]),
+    /** opcoes ja escolhidas no grupo ATUAL (acumula ate o minimo/maximo). */
+    opcoes_grupo: z.array(z.string().uuid()).max(30).default([]),
+    /** todas as opcoes ja fechadas do item em construcao. */
     opcoes_ids: z.array(z.string().uuid()).max(30).default([]),
     endereco_id: z.string().uuid().nullable().default(null),
-    /** sub-passo de texto livre aguardado (ex.: digitar um novo endereco). */
-    aguardando: z.enum(['endereco_novo']).nullable().default(null),
+    /** sub-passo de texto livre aguardado no cadastro de endereco novo. */
+    aguardando: z.enum(['endereco_bairro', 'endereco_rua']).nullable().default(null),
+    /** bairro ja escolhido do endereco novo em construcao (resolve a zona/taxa). */
+    bairro_rascunho: z.string().max(120).nullable().default(null),
     pagamento: z.enum(['pix', 'dinheiro', 'cartao']).nullable().default(null),
     pedido_id: z.string().uuid().nullable().default(null),
     codigo: z.string().nullable().default(null),
@@ -117,6 +123,10 @@ export interface EntradaTurno {
   readonly cardapio: CardapioCtx
   /** endereco anterior do cliente (base do "repetir ultimo"); null se nao ha. */
   readonly ultimoEnderecoId: string | null
+  /** bairro do ultimo endereco (checagem de area ao repetir); null se nao ha/sem bairro. */
+  readonly ultimoEnderecoBairro: string | null
+  /** bairros das zonas de entrega ATIVAS da loja (area atendida). Vazio = sem restricao de area. */
+  readonly zonasBairros: readonly string[]
   /** status VIVO do pedido corrente da conversa (estado.pedido_id); null se nao ha pedido. */
   readonly pedidoStatus: string | null
   readonly agora: Date
