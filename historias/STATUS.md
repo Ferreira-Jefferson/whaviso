@@ -45,10 +45,10 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | API-cardapio | cardapio | Grupos de opções, categorias, itens (herança + exceção) | F4 | Sonnet | backend-api/cardapio.md | CONCLUIDO |
 | API-clientes | clientes | Clientes por loja (hash+cifra), endereços | F4 | Sonnet | backend-api/clientes.md | CONCLUIDO |
 | API-conversas | conversas | Conversas e mensagens, janela 24h, handoff | F4, F5 | Sonnet | backend-api/conversas.md | CONCLUIDO |
-| API-pedidos | pedidos | Pedidos (kanban), itens com snapshot, impressão | F4, API-cardapio, API-clientes | Sonnet | backend-api/pedidos.md | A FAZER |
-| ZAP-meta | shared/meta_client | Implementação `ClienteWhats` (Meta Cloud API, multi-WABA) | F2 | Opus | backend-zap/meta_client.md | CONCLUIDO (transporte pronto; falta fiar no boot via ZAP-enviar) |
-| ZAP-webhook | webhook_whatsapp | Inbound -> enfileira; recibos; idempotência `wamid` | F4, API-conversas, API-clientes, ZAP-meta | Opus | backend-zap/webhook_whatsapp.md | A FAZER |
-| ZAP-enviar | enviar | Drena outbox `envios` -> Meta, claim SKIP LOCKED | ZAP-meta | Sonnet | backend-zap/enviar.md | A FAZER |
+| API-pedidos | pedidos | Pedidos (kanban), itens com snapshot, impressão | F4, API-cardapio, API-clientes | Sonnet | backend-api/pedidos.md | CONCLUIDO |
+| ZAP-meta | shared/meta_client | Implementação `ClienteWhats` (Meta Cloud API, multi-WABA) | F2 | Opus | backend-zap/meta_client.md | CONCLUIDO (transporte endurecido vivo no envio e no webhook) |
+| ZAP-webhook | webhook_whatsapp | Inbound -> enfileira; recibos; idempotência `wamid` | F4, API-conversas, API-clientes, ZAP-meta | Opus | backend-zap/webhook_whatsapp.md | CONCLUIDO |
+| ZAP-enviar | enviar | Drena outbox `envios` -> Meta, claim SKIP LOCKED | ZAP-meta | Sonnet | backend-zap/enviar.md | CONCLUIDO |
 | AT-motor-min | motor_fluxo (hardcoded) | Grafo fixo do pedido por botões/regras, sem LLM | API-pedidos, API-cardapio, API-conversas, ZAP-enviar | Opus | backend-atendente/motor_fluxo.md | A FAZER |
 | FR-nucleo | telas do núcleo | Lojas, números, cardápio, pedidos (kanban), clientes, conversas | F6 + cada API-* da tela; **mock HTML + autoverificação visual** | Sonnet | frontend/nucleo.md | A FAZER |
 
@@ -69,6 +69,14 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 > - `0014_cardapio_vinculos_ativo` opcional (cardapio funciona com neutralizacao por flag).
 > - `.env.test` local com senha de superuser desatualizada: so afeta rodar testes da raiz de backend/
 >   (usar `npm test` que roda por workspace); o CI usa o env do workflow e esta ok.
+>
+> **Onda 1, camada 2 integrada (2026-10-27):** API-pedidos, ZAP-enviar (dreno + transporte endurecido
+> vivo), ZAP-webhook (inbound + legado aposentado). Gate completo verde. **Revisao independente da
+> camada 2: APROVADA**; 2 MEDIO corrigidos na hora (teto de poison message; claim pula numero pausado)
+> + 1 BAIXO (guarda da janela pelo tipo do payload). Follow-ups rastreados: promover o resolvedor do
+> cardapio e a maquina de estados ao kernel e eliminar as copias em `pedidos` (BAIXO 2); a coluna de
+> claim do inbound (`0015_mensagens_processamento`) sera criada pelo `AT-motor-min` para o atendente
+> reivindicar mensagens com SKIP LOCKED.
 
 ## Onda 2: IA no atendimento
 
