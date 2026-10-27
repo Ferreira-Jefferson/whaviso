@@ -9,7 +9,6 @@ import {
 } from 'fastify-type-provider-zod'
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
-import { authPlugin } from './shared/auth'
 import { tratadorDeErros } from './shared/http_errors'
 import { registrarModulos } from './routes'
 import { criarAdminSupabase, type AdminSupabase } from './shared/supabase_admin'
@@ -75,7 +74,7 @@ export async function criarApp(deps: DepsApi) {
   // e credentials seria inútil. origin restrito à origem única do APP_URL.
   await app.register(cors, { origin: deps.env.APP_URL })
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
-  await app.register(authPlugin, { supabaseUrl: deps.env.SUPABASE_URL, pool: deps.pool })
+  // Autenticação (JWKS/tenant) entra em F3 (tenant-auth); o esqueleto sobe sem auth.
 
   app.get('/healthz', async () => ({ ok: true, servico: 'api' }))
 

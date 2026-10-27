@@ -21,5 +21,7 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     pool: 'forks',
     fileParallelism: false,
+    // Esqueleto da fundação: ainda sem módulos (logo sem testes). F4+ trazem os testes.
+    passWithNoTests: true,
   },
 })

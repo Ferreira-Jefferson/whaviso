@@ -5,18 +5,14 @@
 import tseslint from 'typescript-eslint'
 import boundaries from 'eslint-plugin-boundaries'
 
-// Regras de linguagem do produto (H13.10): barram travessao e vocabulario
-// proibido em codigo e copy de PRODUCAO. Os padroes abaixo sao COPIA de
-// packages/shared/src/contracts/linguagem.ts (PALAVRAS_PROIBIDAS_PATTERN e
-// TRAVESSAO_PATTERN); aqui duplicamos porque o eslint.config.mjs e ESM e a
-// fonte e .ts (sem build/emit no projeto). Mudar um padrao = mudar os DOIS
-// lados (este config e o linguagem.ts do back e do front) juntos.
-const PALAVRAS_PROIBIDAS_PATTERN = '(d[ií]vida|devendo|atras(o|ad)|cobran[çc]a|inadimpl)'
+// Regra de escrita do repositorio: barra travessao (em/en dash) em codigo e copy.
+// O vocabulario proibido da era cobranca (divida/atraso/cobranca/inadimplencia) foi
+// REMOVIDO no pivo: "cobranca" agora e termo de dominio legitimo (billing da plataforma,
+// modulo plataforma_cobranca). As regras de copy do produto novo (genero neutro, tom ao
+// consumidor) virao do modulo de compliance/atendente, nao deste lint.
 const TRAVESSAO_PATTERN = '[—–]'
-const RE_PALAVRAS = new RegExp(PALAVRAS_PROIBIDAS_PATTERN, 'i')
 const RE_TRAVESSAO = new RegExp(TRAVESSAO_PATTERN)
 const MSG_TRAVESSAO = 'Travessao proibido (em/en dash): use virgula, dois-pontos ou parenteses.'
-const MSG_PALAVRA = 'Palavra proibida (linguagem do produto): use combinado, lembrete ou aviso.'
 
 // Plugin inline: varre o texto de literais, template literals, JSXText e
 // comentarios (linha e bloco) procurando travessao e vocabulario proibido.
@@ -28,7 +24,6 @@ const linguagem = {
         const checa = (texto, node) => {
           if (typeof texto !== 'string') return
           if (RE_TRAVESSAO.test(texto)) context.report({ node, message: MSG_TRAVESSAO })
-          if (RE_PALAVRAS.test(texto)) context.report({ node, message: MSG_PALAVRA })
         }
         const src = context.sourceCode ?? context.getSourceCode()
         return {
@@ -63,7 +58,6 @@ export default tseslint.config(
     //     testar o bloqueio).
     files: ['apps/*/src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
-      '**/contracts/linguagem.ts',
       '**/*.test.ts',
       '**/tests/**',
       '**/test/**',

@@ -5,9 +5,6 @@ import { criarLogger } from '@whaviso/shared/logger'
 import { envSchema } from './env'
 import { criarApp } from './app'
 import { criarClienteMeta } from './shared/meta_client'
-import { registrarInboundWhats } from './modules/webhook_whatsapp'
-import { processarStatusTemplate } from './modules/sincronizar_templates'
-import { criarAdminSupabase } from './shared/supabase_admin'
 import { iniciarScheduler } from './scheduler'
 
 // Fonte única local: o .env da raiz traz vars prefixadas por serviço (ZAP_*).
@@ -47,20 +44,9 @@ const metaOpcoes = {
 
 const whats = criarClienteMeta(metaOpcoes, { logger, pool })
 
-// Admin API do Supabase, só se a service role key estiver
-// configurada (senão fica desligada).
-const admin =
-  env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
-    ? criarAdminSupabase(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-    : null
-
-// Inbound (status e, no futuro, texto/audio) pelo webhook (app-root liga o módulo; módulo não importa
-// módulo). Os handlers ficam guardados no cliente Meta e a rota do webhook os chama.
-registrarInboundWhats({ pool, logger, whats, admin })
-// Aprovação/recusa de template pela Meta (webhook message_template_status_update) reflete
-// no status_meta em tempo real (sincronizar_templates); o reconcile periódico é a rede de
-// segurança. App-root cruza a fronteira ligando o handler ao provider.
-whats.onTemplateStatus((e) => processarStatusTemplate({ pool, logger }, e))
+// Os handlers de inbound (status/texto/áudio/botões) e a reconciliação de templates com a
+// Meta entram em ZAP-webhook/ZAP-meta (Onda 1). O esqueleto sobe só com o transporte: a
+// rota /webhook/whatsapp faz o handshake e aceita eventos; o processamento vem depois.
 
 const app = await criarApp({ env, pool, logger, whats })
 // Monta GET/POST /webhook/whatsapp (handshake + eventos da Meta) antes do listen. O cast
@@ -72,8 +58,6 @@ const scheduler = iniciarScheduler({
   logger,
   whats,
   intervaloMs: env.SCHEDULER_INTERVAL_MS,
-  // Submissão/reconcile de templates só com WABA id (precisa dele nas chamadas Graph).
-  metaOpcoes: metaOpcoes.wabaId ? metaOpcoes : undefined,
 })
 
 // Valida as credenciais e grava o status (não há QR na Meta); não bloqueia o boot do HTTP.

@@ -8,7 +8,6 @@ import {
 import type { Pool } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import type { ClienteWhats } from './shared/whats'
-import { hookOtpRoutes } from './modules/hook_otp'
 import type { EnvZap } from './env'
 
 declare module 'fastify' {
@@ -68,9 +67,9 @@ export async function criarApp(deps: DepsZap) {
     whatsapp: { conectado: deps.whats.status().conectado },
   }))
 
-  // Send SMS Hook do Supabase (OTP). O inbound do WhatsApp (botões/texto/status) chega
-  // pela rota /webhook/whatsapp, montada pelo server.ts via whats.montarRotaWebhook(app).
-  await app.register(hookOtpRoutes)
+  // O inbound do WhatsApp (botões/texto/status) chega pela rota /webhook/whatsapp, montada
+  // pelo server.ts via whats.montarRotaWebhook(app). Os handlers de domínio entram em
+  // ZAP-webhook (Onda 1); o esqueleto sobe só com o transporte e o healthz.
 
   return app
 }
