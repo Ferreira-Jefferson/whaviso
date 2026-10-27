@@ -59,7 +59,7 @@ export default function Salao() {
     <div>
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-linha pb-4">
         <div>
-          <h1 className="text-2xl text-salvia md:text-3xl">Salao</h1>
+          <h1 className="text-2xl text-salvia md:text-3xl">Salão</h1>
           <p className="mt-1 text-sm text-tinta-2">Mesas e comandas. Abra uma comanda numa mesa livre e lance os itens do atendimento.</p>
         </div>
         <dl className="flex w-full justify-between gap-4 md:w-auto md:gap-6" aria-label="Resumo do salao">

@@ -130,7 +130,7 @@ export function FichaTecnicaEditor({ insumos }: Props) {
           <EmptyState
             icone={<Boxes className="size-7" aria-hidden />}
             titulo="Nenhum item no cardapio"
-            descricao="Cadastre itens no cardapio primeiro: a ficha tecnica descreve o que cada item consome."
+            descricao="Cadastre itens no cardápio primeiro: a ficha técnica descreve o que cada item consome."
           />
         ) : (
           <Field label="Item do cardapio" dica="A ficha e a lista de insumos que 1 unidade vendida deste item consome.">

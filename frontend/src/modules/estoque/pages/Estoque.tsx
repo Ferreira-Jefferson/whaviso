@@ -17,7 +17,7 @@ type Aba = 'insumos' | 'fichas'
 
 const ABAS = [
   { value: 'insumos', label: 'Insumos' },
-  { value: 'fichas', label: 'Fichas tecnicas' },
+  { value: 'fichas', label: 'Fichas técnicas' },
 ] as const
 
 export default function Estoque() {
@@ -36,7 +36,7 @@ export default function Estoque() {
         <div>
           <h1 className="text-2xl text-salvia md:text-3xl">Estoque</h1>
           <p className="mt-1 text-sm text-tinta-2">
-            Materia-prima da cozinha e a ficha tecnica de cada item (o que cada venda consome).
+            Matéria-prima da cozinha e a ficha técnica de cada item (o que cada venda consome).
           </p>
         </div>
         {aba === 'insumos' && (
