@@ -127,6 +127,22 @@ pelo kernel da api por role de aplicação, não por RLS.
   [SEGURANCA.md](SEGURANCA.md). A **chave da plataforma** (fallback do onboarding, a chave do dono do
   SaaS) **não** fica aqui: é env do servidor (`OPEN_ROUTER`), nunca por loja, nunca no front; a
   resolução é loja -> plataforma. `uso_llm` ganha `origem` (plataforma x loja) e `tipo_uso`.
+- **Custos externos (observabilidade, os dois planos):** `eventos_custo` (append-only, o livro-razão
+  único de todo gasto externo, não só LLM): `loja_id` (nulo = custo de plataforma não atribuível a
+  loja, ex. embedding/rerank, geocode de prospecção), `tipo` (enum `llm`/`whatsapp`/`mapas`/`fiscal`/
+  `outro`), `provedor`, `quem_paga` (enum `plataforma`/`loja`: `loja` quando a chave/credencial é BYO;
+  `plataforma` quando corre por nossa conta), `iniciador` (enum `loja`/`cliente`/`sistema`, a atribuição
+  de quem abriu a conversa no WhatsApp) e `categoria_meta` (marketing/utility/authentication/service),
+  `quantidade`, `custo_micros bigint` + `moeda` (usd/brl) e `custo_brl_micros` normalizado por um
+  snapshot de câmbio (centavo perde o sub-centavo da LLM; por isso micros), e `referencia`
+  (wamid/generation_id/id da nota) **única** para idempotência. O detalhe por token continua no
+  `uso_llm`, que alimenta o `eventos_custo` do tipo `llm`. A view `custos_diarios` agrega por
+  `loja_id`/`dia`/`tipo`/`quem_paga` para as duas telas. **Quem escreve:** `whaviso_zap` (custo Meta a
+  partir do `pricing` do webhook de status), `whaviso_atendente`/`whaviso_api` (LLM), e os
+  `ClienteMapas`/`ClienteFiscal`. **Quem lê:** `whaviso_api` serve o operador (base inteira, só
+  métrica, nunca conteúdo) e a loja (só o próprio: `quem_paga=loja` é custo direto dela, `quem_paga=
+  plataforma` é o que conta contra a franquia). A tarifa Meta (país x categoria) é catálogo em migration
+  (como `planos`), em `tarifas_meta`; alerta de gasto diário anômalo por loja. Reserva 0023+.
 - **Migrations pós-baseline (reserva):** novas tabelas levantadas no detalhamento (convites, `ativo`
   nos vínculos de cardápio, estado de processamento em `mensagens`, importação de cardápio, RAG,
   Pix do atendente, suspensão de loja, config de despacho, fluxos) seguem a **numeração reservada em
@@ -134,7 +150,7 @@ pelo kernel da api por role de aplicação, não por RLS.
   leva da revisão de produto acrescenta (reserva 0023+): `campanhas`, `campanha_envios`,
   `cliente_consentimento` (opt-out/LGPD), a view `clientes_metricas` (RFM: recência, frequência, valor,
   o que compra), `pedidos.forma_pagamento`/`troco_para`, `zonas.pedido_minimo`/`frete_gratis`,
-  `lojas.pausada`, `avaliacoes`, e colunas de anonimização LGPD. E, como ondas posteriores (tudo em
+  `lojas.pausada`, `avaliacoes`, `eventos_custo` + `tarifas_meta` (custos externos), e colunas de anonimização LGPD. E, como ondas posteriores (tudo em
   escopo, não é MVP): `estoque`/movimentos (baixa por produto, ficha técnica por ingrediente),
   `promocoes`/`cupons`, `fidelidade`, `agendamento` (em pedidos), referências de emissão em `API-fiscal`
   (via `ClienteFiscal` de terceiro, sem motor fiscal por UF) e os pedidos de canais (`ClienteCanal`).

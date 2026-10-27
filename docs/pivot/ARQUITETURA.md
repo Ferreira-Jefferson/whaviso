@@ -168,6 +168,20 @@ WhatsApp (desde jan/2026) e passou a cobrar por mensagem (out/2026). O produto s
 atendimento da loja (templates aprovados, persona de atendimento), nunca como bot genérico; o custo por
 mensagem entra no modelo de billing da plataforma (franquia + excedente).
 
+## Observabilidade de custos externos (os dois planos veem)
+
+Todo gasto externo (LLM, mensagem WhatsApp, mapas, fiscal) vira linha num livro-razão único
+(`eventos_custo`), não só o LLM. O mesmo dado, duas leituras: o **console da plataforma** vê o custo de
+toda a base, por loja, e cruza com o que cada loja paga (margem, custo por conversa, gasto diário); o
+**dashboard da loja** vê só o seu, separando o que ela paga direto (chave BYO) do que corre por nossa
+conta e conta contra a franquia. A atribuição da mensagem WhatsApp depende de **quem iniciou** a
+conversa (loja x cliente) e da categoria (marketing/utility/authentication/service): o `zap` lê isso do
+`pricing` no webhook de status da Meta e converte pela tarifa (catálogo em migration). O custo de LLM
+vem do provedor (o OpenRouter devolve o custo da geração) e é guardado em micros (o sub-centavo importa).
+O operador vê **métrica, nunca conteúdo** (mantém a regra dos dois planos). O livro-razão alimenta o
+alerta de gasto anômalo e o billing franquia + excedente. Schema no [BANCO.md](BANCO.md); módulo
+`API-custos` e as telas em [../../historias/STATUS.md](../../historias/STATUS.md).
+
 ## Insights da pesquisa (fundamentam as decisões)
 
 Ressalva honesta: é convergência de praticantes, não benchmark controlado. O ganho é mecânico

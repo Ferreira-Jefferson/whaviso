@@ -199,13 +199,15 @@ remoção do resto é um commit coordenado à parte, nunca no meio de uma onda.
 | API-agendamento | pedido agendado (data/hora futura) | 3 | amplia pedidos |
 | FR-kds + ClienteImpressora | tela de cozinha (KDS) e impressão ESC-POS da comanda | 3 | hardware atrás de interface |
 | API-relatorios | BI/relatórios de fundo além do dashboard | 4 | read-model |
+| API-custos | custos externos (LLM/WhatsApp/mapas/fiscal): livro-razão `eventos_custo` + telas loja e operador | 4 | read-model; **os dois planos veem**; ingestão em zap/atendente/clientes |
 
 ### Resiliência ("não cair durante um atendimento") -> categoria de teste RES-###
 
 - Contrato de resiliência (timeout + circuit breaker) nos `ClienteLLM`/`ClienteWhats`/`ClienteMapas`;
   degradação graciosa (motor por botões sem LLM).
 - Observabilidade com **alerta de queda** (hoje só `healthz` + alerta de custo); ver
-  [[whaviso-resiliencia-systemd]].
+  [[whaviso-resiliencia-systemd]]. O alerta de custo evolui para **gasto diário por loja** sobre o
+  `eventos_custo` (módulo `API-custos`), cobrindo LLM + WhatsApp + mapas + fiscal, não só LLM.
 - O webhook persiste o inbound **antes** do 200 à Meta (era gap do produto antigo).
 - Testes de **carga** do caminho de pedido + **caos** + **idempotência sob crash**. Nova categoria
   `RES-###` no catálogo do SEGURANCA.md.
@@ -218,7 +220,8 @@ Com o reenquadramento "não é MVP", tudo entra; o que resta pro dono é escopo 
 - **Estoque:** `API-estoque` por produto com baixa automática entra; **incluir também ficha técnica por
   ingrediente** (default incluir, fatia seguinte).
 - **Billing da plataforma:** modelar **franquia + excedente** por mensagem (novo preço da Meta,
-  out/2026), em vez da assinatura fixa que expõe a margem (revisar `P-cobranca`).
+  out/2026), em vez da assinatura fixa que expõe a margem (revisar `P-cobranca`). Apoia-se no
+  `eventos_custo` (`API-custos`): o excedente sai do custo real medido, não de estimativa.
 - **Compliance Meta (jan/2026):** o número é atendimento/vendas da loja, **nunca** chatbot de IA
   genérico. Requisito, não opção.
 
@@ -228,10 +231,13 @@ Com o reenquadramento "não é MVP", tudo entra; o que resta pro dono é escopo 
   revalidado contra a loja), `SEC-065` (injeção em tool-use), `SEC-066` (idempotência de ação),
   `SEC-067` (teto de passos/gasto degrada para botões).
 - Campanhas: `SEC-11x` (campanha não cruza loja, exige opt-out, só dentro de template/janela).
+- Custos: isolamento de `eventos_custo` (loja só lê o próprio `loja_id`; operador lê agregado/métrica,
+  **nunca conteúdo**; nenhuma coluna de conteúdo na tabela). Entra no catálogo do SEGURANCA.md.
 - Resiliência: categoria `RES-###`.
 
 ### Migrations desta leva (reserva 0023+)
 
 campanhas, campanha_envios, cliente_consentimento, view `clientes_metricas` (RFM),
 `pedidos.forma_pagamento`/`troco_para`, `zonas.pedido_minimo`/`frete_gratis`, `lojas.pausada`,
-`avaliacoes`, anonimização LGPD. Numeração sequencial a partir de 0023, atualizando a tabela de reserva.
+`avaliacoes`, `eventos_custo` + `tarifas_meta` (catálogo de tarifa Meta por país x categoria),
+anonimização LGPD. Numeração sequencial a partir de 0023, atualizando a tabela de reserva.
