@@ -6,14 +6,19 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import {
   BarChart3,
   Bike,
+  Boxes,
   CalendarCheck,
+  CalendarClock,
   ClipboardList,
+  Contact,
+  LayoutGrid,
   MapPinned,
   MessageCircle,
   Smartphone,
   Store,
   UtensilsCrossed,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -37,6 +42,8 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'conversas', rotulo: 'Conversas', descricao: 'Atendimento pelo WhatsApp.', icone: MessageCircle, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/conversas')) },
   { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/cardapio')) },
   { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/clientes')) },
+  { caminho: 'caixa', rotulo: 'Caixa', descricao: 'Abra, registre e feche o caixa do dia.', icone: Wallet, grupo: 'painel', pagina: lazy(() => import('@/modules/caixa')) },
+  { caminho: 'salao', rotulo: 'Salão', descricao: 'Mesas e comandas do salão.', icone: LayoutGrid, grupo: 'painel', pagina: lazy(() => import('@/modules/salao')) },
   { caminho: 'dashboard', rotulo: 'Dashboard', descricao: 'Números do dia e do período.', icone: BarChart3, grupo: 'painel' },
   { caminho: 'despacho', rotulo: 'Despacho', descricao: 'Pedidos prontos para sair.', icone: Bike, grupo: 'entrega' },
   { caminho: 'motoboys', rotulo: 'Motoboys', descricao: 'Cadastro de entregadores.', icone: Users, grupo: 'entrega' },
@@ -44,6 +51,9 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'fechamento', rotulo: 'Fechamento', descricao: 'Resumo do dia por entregador.', icone: CalendarCheck, grupo: 'entrega' },
   { caminho: 'lojas', rotulo: 'Lojas', descricao: 'Perfil, horários e área da loja.', icone: Store, grupo: 'config', pagina: lazy(() => import('@/modules/lojas')) },
   { caminho: 'numeros', rotulo: 'Números', descricao: 'Números de WhatsApp conectados.', icone: Smartphone, grupo: 'config', pagina: lazy(() => import('@/modules/numeros')) },
+  { caminho: 'pessoas', rotulo: 'Pessoas', descricao: 'Equipe, cargos e escalas.', icone: Contact, grupo: 'config', pagina: lazy(() => import('@/modules/pessoas')) },
+  { caminho: 'estoque', rotulo: 'Estoque', descricao: 'Insumos e fichas técnicas.', icone: Boxes, grupo: 'config', pagina: lazy(() => import('@/modules/estoque')) },
+  { caminho: 'disponibilidade', rotulo: 'Horários', descricao: 'Quando a loja atende e aceita pedidos.', icone: CalendarClock, grupo: 'config', pagina: lazy(() => import('@/modules/disponibilidade')) },
 ]
 
 export const ROTULO_GRUPO: Record<GrupoNav, string> = {
