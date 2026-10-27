@@ -8,7 +8,9 @@
     "./db": "./src/db/index.ts",
     "./logger": "./src/logger/index.ts",
     "./config": "./src/config/index.ts",
-    "./datas": "./src/datas/index.ts"
+    "./datas": "./src/datas/index.ts",
+    "./clientes": "./src/clientes/index.ts",
+    "./clientes/testing": "./src/clientes/contratos/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -1,8 +1,8 @@
 # F2 clientes-externos
 
 - **ID:** F2  ·  **Área:** F  ·  **Onda:** 0
-- **Modelo sugerido:** Sonnet  ·  **Status:** `A FAZER`
-- **Reivindicado por:** (livre)
+- **Modelo sugerido:** Sonnet  ·  **Status:** `FEITO (aguarda revisao/commit)`
+- **Reivindicado por:** F2-agent
 
 ## Objetivo
 
@@ -51,34 +51,34 @@ Nenhuma tabela. Contratos (em `packages/shared/src/clientes/`):
 
 ## Etapas
 
-- [ ] 1. Erros e utilitários comuns: `ErroProvedor` (e subtipos), `Resultado`, `PoliticaRetry` como dado,
+- [x] 1. Erros e utilitários comuns: `ErroProvedor` (e subtipos), `Resultado`, `PoliticaRetry` como dado,
   tipo `HostPermitido`. Testes de unidade.
   (commit: `feat(shared): erros tipados e politica de retry para clientes externos`)
-- [ ] 2. Interface `ClienteWhats` + Zod de entrada/saída + erros específicos (`JanelaExpirada`...).
+- [x] 2. Interface `ClienteWhats` + Zod de entrada/saída + erros específicos (`JanelaExpirada`...).
   Documentar a regra de janela 24h como **responsabilidade do chamador**: o cliente apenas reporta o erro.
   (commit: `feat(shared): interface ClienteWhats`)
-- [ ] 3. Fake `ClienteWhats` em memória (grava chamadas, permite programar falha por chamada) em
+- [x] 3. Fake `ClienteWhats` em memória (grava chamadas, permite programar falha por chamada) em
   `packages/shared/src/clientes/fakes`, para testes de ZAP-enviar/ZAP-webhook.
   (commit: `feat(shared): fake de ClienteWhats para testes`)
-- [ ] 4. Stub de `ClienteWhats` em `apps/zap/src/shared/whats_stub` (responde `wamid` sintético, loga
+- [x] 4. Stub de `ClienteWhats` em `apps/zap/src/shared/whats_stub` (responde `wamid` sintético, loga
   sem dado sensível). (commit: `feat(zap): stub de ClienteWhats`)
-- [ ] 5. Interface `ClienteLLM` + `CredencialResolvida` opaca + tipo de uso + fake determinístico.
+- [x] 5. Interface `ClienteLLM` + `CredencialResolvida` opaca + tipo de uso + fake determinístico.
   (commit: `feat(shared): interface ClienteLLM e fake`)
-- [ ] 6. Stub de `ClienteLLM` em `apps/atendente/src/shared/llm_client/stub` (resposta enlatada por
+- [x] 6. Stub de `ClienteLLM` em `apps/atendente/src/shared/llm_client/stub` (resposta enlatada por
   chave de cenário). (commit: `feat(atendente): stub de ClienteLLM`)
-- [ ] 7. Interface `ClienteMapas` + fake (distância euclidiana sobre lat/lng fixas).
+- [x] 7. Interface `ClienteMapas` + fake (distância euclidiana sobre lat/lng fixas).
   (commit: `feat(shared): interface ClienteMapas e fake`)
-- [ ] 8. Stub de `ClienteMapas` em `apps/api/src/shared/mapas_client`.
+- [x] 8. Stub de `ClienteMapas` em `apps/api/src/shared/mapas_client`.
   (commit: `feat(api): stub de ClienteMapas`)
-- [ ] 9. Allowlist de host + proteção de redirect: helper `fetchSeguro(host, opts)` (HTTPS only, sem
+- [x] 9. Allowlist de host + proteção de redirect: helper `fetchSeguro(host, opts)` (HTTPS only, sem
   seguir redirect para rede privada/localhost/169.254) usado por todas as implementações futuras.
   (commit: `feat(shared): fetchSeguro com allowlist e bloqueio de SSRF`)
-- [ ] 10. Teste de contrato reutilizável (`contratoClienteWhats(factory)` etc.): suíte parametrizável
+- [x] 10. Teste de contrato reutilizável (`contratoClienteWhats(factory)` etc.): suíte parametrizável
   que stub, fake e a implementação real (nos módulos futuros) devem passar.
   (commit: `test(shared): suites de contrato para os clientes externos`)
-- [ ] 11. Regra de lint: nenhum módulo importa SDK/HTTP de provedor diretamente; só a interface.
+- [x] 11. Regra de lint: nenhum módulo importa SDK/HTTP de provedor diretamente; só a interface.
   (commit: `chore(backend): lint barra uso direto de provedor fora do cliente`)
-- [ ] 12. `npm run lint`, `typecheck`, `test` verdes.
+- [x] 12. `npm run lint`, `typecheck`, `test` verdes.
 
 ## Testes e segurança exigidos
 
@@ -104,3 +104,6 @@ Nenhuma tabela. Contratos (em `packages/shared/src/clientes/`):
   ZAP-meta reescreve sobre a interface nova.
 - `embutir` (embeddings) está em `ClienteLLM` por ser o mesmo provedor/credencial; se RAG.md decidir
   outro provedor de embedding, vira `ClienteEmbeddings` separado (registrar aqui).
+- Implementação (F2-agent): kernel em `packages/shared/src/clientes` (export `@whaviso/shared/clientes`; suítes de contrato em `@whaviso/shared/clientes/testing`, separadas porque importam vitest). Stubs: `apps/zap/src/shared/whats_stub` (`criarWhatsStub`), `apps/api/src/shared/mapas_client` (`criarMapasStub`), `apps/atendente/src/shared/llm_client/stub` (`criarLlmStub`).
+- Decisões: `apps/atendente` criado como workspace mínimo (package.json, tsconfig, vitest.config; package-lock não regenerado, rodar `npm install` quando conveniente). `CredencialResolvida` é classe com campo privado (toJSON/toString/inspect ocultos), segredo só via `revelar()`; `montarRequisicaoLlm` é o ponto único de headers/body (SEC-026). `ClienteLLM.completar` aceita `chaveCenario` opcional (só stubs/fakes usam). `fetchSeguro(url, opts)` lança `ErroSsrf` (Permanente), revalida cada salto de redirect manualmente, rejeita IP literal e exige DNS público; aceita `fetchImpl`/`resolverDns` para teste. Regra de lint (etapa 11): módulos não importam SDK/HTTP de provedor nem usam `fetch` global (implementações vivem em shared/ de app). Mapas: fake/stub usam distância euclidiana (30 km/h) e rota por vizinho mais próximo.
+- SEC-024: o stub de whats loga só operação e wamid sintético; teste confirma ausência de telefone/token/texto.

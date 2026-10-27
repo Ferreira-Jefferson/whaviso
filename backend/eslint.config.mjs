@@ -137,4 +137,26 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // F2: modulos nunca falam com provedor externo (WhatsApp, LLM, mapas) por SDK ou HTTP direto:
+    // usam a interface (ClienteWhats/ClienteLLM/ClienteMapas de @whaviso/shared/clientes), cuja
+    // implementacao vive em shared/ do app e sai por fetchSeguro.
+    files: ['apps/*/src/modules/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/tests/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['axios', 'node-fetch', 'undici', 'got', 'openai', '@anthropic-ai/sdk', '@google/generative-ai', '@whiskeysockets/baileys', 'node:http', 'node:https', 'http', 'https'].map((name) => ({
+            name,
+            message: 'Modulo nao fala com provedor/HTTP direto: use a interface em @whaviso/shared/clientes.',
+          })),
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'fetch', message: 'Modulo nao chama HTTP direto: use a interface de cliente (fetchSeguro vive no shared).' },
+      ],
+    },
+  },
 )
