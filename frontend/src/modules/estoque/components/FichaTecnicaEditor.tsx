@@ -2,10 +2,10 @@
 // unidade vendida do item consome (para dar baixa no estoque na venda). Salvar substitui a
 // ficha inteira (lista vazia zera). Insumo repetido e rejeitado.
 //
-// LIMITACAO CONHECIDA: o contrato de ficha_tecnica so oferece GET/PUT por item_id e nao ha
-// contrato de listagem de itens do cardapio consumivel aqui (modulo nunca importa modulo).
-// Por isso o item e informado pelo seu ID (colar/digitar). Quando houver um contrato de
-// selecao de itens, trocar o campo de texto por um seletor. Ver MODULE.md.
+// O item e escolhido num seletor alimentado por GET /cardapio (hook useItensCardapio): e
+// chamada HTTP + contrato _generated compartilhado, nao import do slice cardapio (modulo nao
+// importa modulo vale para CODIGO). O insumo de cada linha vem da lista de insumos (useInsumos),
+// passada por prop.
 import { useEffect, useMemo, useState } from 'react'
 import { Boxes, Plus, Trash2 } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
@@ -21,7 +21,7 @@ import {
   useToast,
 } from '@/shared/ui'
 import type { InsumoDto } from '@/shared/contracts/_generated/estoque_insumos'
-import { useDefinirFichaTecnica, useFichaTecnica } from '../api'
+import { useDefinirFichaTecnica, useFichaTecnica, useItensCardapio } from '../api'
 import { parseQuantidade } from '../estados'
 
 interface LinhaEditavel {
@@ -40,12 +40,12 @@ const novaKey = () => `l${(contador += 1)}`
 
 export function FichaTecnicaEditor({ insumos }: Props) {
   const { mostrarToast } = useToast()
-  const [itemIdDigitado, setItemIdDigitado] = useState('')
-  const [itemId, setItemId] = useState<string | null>(null)
+  const [itemId, setItemId] = useState<string>('')
   const [linhas, setLinhas] = useState<LinhaEditavel[]>([])
   const [erro, setErro] = useState<string | null>(null)
 
-  const ficha = useFichaTecnica(itemId)
+  const itens = useItensCardapio()
+  const ficha = useFichaTecnica(itemId || null)
   const definir = useDefinirFichaTecnica()
 
   // Ao carregar a ficha do servidor, semeia as linhas editaveis.
@@ -73,15 +73,13 @@ export function FichaTecnicaEditor({ insumos }: Props) {
     }
   }, [insumos])
 
-  function carregar() {
-    const id = itemIdDigitado.trim()
-    if (!id) {
-      setErro('Informe o ID do item do cardapio.')
-      return
-    }
-    setErro(null)
-    setItemId(id)
-  }
+  const opcoesItem = useMemo(() => {
+    const base = (itens.data ?? []).map((i) => ({
+      value: i.id,
+      label: `${i.nome} (${i.categoria})`,
+    }))
+    return [{ value: '', label: 'Selecione um item...' }, ...base]
+  }, [itens.data])
 
   function alterarLinha(key: string, patch: Partial<LinhaEditavel>) {
     setLinhas((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
@@ -126,23 +124,24 @@ export function FichaTecnicaEditor({ insumos }: Props) {
   return (
     <div className="grid gap-4">
       <div className="rounded-card border border-linha bg-cartao p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Field label="Item do cardapio" dica="Informe o ID do item. A ficha e a lista de insumos que 1 unidade dele consome.">
-              <Input
-                value={itemIdDigitado}
-                onChange={(e) => setItemIdDigitado(e.target.value)}
-                placeholder="ID do item (ex.: UUID)"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') carregar()
-                }}
-              />
-            </Field>
-          </div>
-          <Button className="max-sm:w-full" onClick={carregar}>
-            Carregar ficha
-          </Button>
-        </div>
+        {itens.isPending && <Skeleton className="h-11" />}
+        {itens.isError && <ErrorState aoTentarDeNovo={() => void itens.refetch()} />}
+        {itens.isSuccess && (itens.data.length === 0 ? (
+          <EmptyState
+            icone={<Boxes className="size-7" aria-hidden />}
+            titulo="Nenhum item no cardapio"
+            descricao="Cadastre itens no cardapio primeiro: a ficha tecnica descreve o que cada item consome."
+          />
+        ) : (
+          <Field label="Item do cardapio" dica="A ficha e a lista de insumos que 1 unidade vendida deste item consome.">
+            <Select
+              ariaLabel="Item do cardapio"
+              value={itemId}
+              onChange={setItemId}
+              options={opcoesItem}
+            />
+          </Field>
+        ))}
       </div>
 
       {erro && <Banner tom="erro">{erro}</Banner>}
@@ -224,11 +223,11 @@ export function FichaTecnicaEditor({ insumos }: Props) {
         </div>
       )}
 
-      {!itemId && (
+      {!itemId && itens.isSuccess && itens.data.length > 0 && (
         <EmptyState
           icone={<Boxes className="size-7" aria-hidden />}
-          titulo="Edite a ficha de um item"
-          descricao="Informe o ID do item do cardapio acima para ver e editar os insumos que ele consome."
+          titulo="Escolha um item"
+          descricao="Selecione um item do cardapio acima para ver e editar os insumos que ele consome."
         />
       )}
     </div>

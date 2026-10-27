@@ -23,8 +23,16 @@ import {
   FichaTecnicaSaida,
   type FichaTecnicaSaida as FichaTecnica,
 } from '@/shared/contracts/_generated/ficha_tecnica'
+import { CardapioResolvidoSaida } from '@/shared/contracts/_generated/cardapio'
 
 export const RAIZ = 'estoque'
+
+/** Item do cardapio achatado para escolher a ficha (so o que a tela precisa). */
+export interface ItemCardapioResumo {
+  id: string
+  nome: string
+  categoria: string
+}
 
 // Corpos das mutacoes: inferidos da ENTRADA dos schemas (defaults viram opcionais).
 type CriarInsumoBody = z.input<typeof InsumoCriarEntrada>
@@ -95,6 +103,28 @@ export function useMovimentosInsumo(insumoId: string | null, limite = 20) {
         { schema: MovimentoInsumoListaSaida, query: { limite }, signal },
       ),
     select: (d): MovimentoInsumoDto[] => d.itens,
+  })
+}
+
+// ------------------------------------------------------------ itens do cardapio
+// GET /v1/cardapio (mesma rota REST que o modulo cardapio consome; aqui so para popular o
+// seletor de "de qual item e a ficha"). "Modulo nao importa modulo" vale para import de codigo:
+// aqui e chamada HTTP + contrato _generated compartilhado, nao import do slice cardapio. A arvore
+// resolvida e achatada em { id, nome, categoria }; so itens ativos entram no seletor.
+export function useItensCardapio() {
+  return useQuery({
+    queryKey: ['cardapio', 'itens-para-ficha'],
+    queryFn: ({ signal }) =>
+      apiClient.get<z.infer<typeof CardapioResolvidoSaida>>('/cardapio', {
+        schema: CardapioResolvidoSaida,
+        signal,
+      }),
+    select: (d): ItemCardapioResumo[] =>
+      d.categorias.flatMap((c) =>
+        c.itens
+          .filter((i) => i.ativo)
+          .map((i) => ({ id: i.id, nome: i.nome, categoria: c.nome })),
+      ),
   })
 }
 
