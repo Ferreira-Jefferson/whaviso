@@ -14,7 +14,7 @@ d('conversas: escrita (responder e encerrar)', () => {
   it('responder: grava mensagem + envio agendado atomicamente e emite conversa.mensagem sem conteudo', async () => {
     const m = await h.novo()
     const cli = await criarCliente(m.lojaId, 'Dani')
-    const c = await criarConversa(m, cli.id, { ultimaEntrada: new Date(Date.now() - horas(1)) })
+    const c = await criarConversa(m, cli.id, { ultimaEntrada: new Date(Date.now() - horas(1)), atendidoPor: m.membroId })
     await h.montar()
     const texto = 'Seu pedido sai em 20 minutos, segredo-xyz'
     const r = await h.app.inject({
@@ -56,7 +56,7 @@ d('conversas: escrita (responder e encerrar)', () => {
   it('responder: rollback desfaz mensagem E nao emite evento quando o outbox falha', async () => {
     const m = await h.novo()
     const cli = await criarCliente(m.lojaId, 'Edu')
-    const c = await criarConversa(m, cli.id, { ultimaEntrada: new Date() })
+    const c = await criarConversa(m, cli.id, { ultimaEntrada: new Date(), atendidoPor: m.membroId })
     await h.montar()
     await poolSuper.query(`create or replace function public.t_falha_envio() returns trigger language plpgsql as $$ begin raise exception 'falha de teste'; end $$`)
     await poolSuper.query('create trigger t_falha_envio before insert on public.envios for each row execute function public.t_falha_envio()')
@@ -77,7 +77,7 @@ d('conversas: escrita (responder e encerrar)', () => {
     const m = await h.novo()
     const cli = await criarCliente(m.lojaId, 'Fabi')
     const entrada = new Date('2026-10-27T10:00:00.000Z')
-    const c = await criarConversa(m, cli.id, { ultimaEntrada: entrada })
+    const c = await criarConversa(m, cli.id, { ultimaEntrada: entrada, atendidoPor: m.membroId })
     await h.montar()
     const enviar = (id: string) =>
       h.app.inject({ method: 'POST', url: `/v1/conversas/${id}/mensagens`, headers: bearer(m.userId), payload: { texto: 'oi' } })
@@ -89,7 +89,7 @@ d('conversas: escrita (responder e encerrar)', () => {
     expect(fechada.statusCode).toBe(409)
     expect(fechada.json().error.code).toBe('janela_fechada')
 
-    const semEntrada = await criarConversa(m, (await criarCliente(m.lojaId, 'G')).id, { ultimaEntrada: null })
+    const semEntrada = await criarConversa(m, (await criarCliente(m.lojaId, 'G')).id, { ultimaEntrada: null, atendidoPor: m.membroId })
     expect((await enviar(semEntrada)).json().error.code).toBe('janela_fechada')
 
     h.relogio = () => entrada
@@ -102,7 +102,7 @@ d('conversas: escrita (responder e encerrar)', () => {
     expect((await enviar(enc)).json().error.code).toBe('conversa_encerrada')
 
     await poolSuper.query(`update public.numeros_whatsapp set status='pausado' where id=$1`, [m.numeroId])
-    const pausado = await criarConversa(m, (await criarCliente(m.lojaId, 'J')).id, { ultimaEntrada: entrada })
+    const pausado = await criarConversa(m, (await criarCliente(m.lojaId, 'J')).id, { ultimaEntrada: entrada, atendidoPor: m.membroId })
     expect((await enviar(pausado)).json().error.code).toBe('numero_indisponivel')
 
     const { rows } = await poolSuper.query('select count(*)::int n from public.envios where loja_id=$1', [m.lojaId])
@@ -125,8 +125,8 @@ d('conversas: escrita (responder e encerrar)', () => {
 
   it('SEC-101: limite de respostas por conversa (429 no envelope), sem afetar outra conversa', async () => {
     const m = await h.novo()
-    const c1 = await criarConversa(m, (await criarCliente(m.lojaId, 'L')).id, { ultimaEntrada: new Date() })
-    const c2 = await criarConversa(m, (await criarCliente(m.lojaId, 'M')).id, { ultimaEntrada: new Date() })
+    const c1 = await criarConversa(m, (await criarCliente(m.lojaId, 'L')).id, { ultimaEntrada: new Date(), atendidoPor: m.membroId })
+    const c2 = await criarConversa(m, (await criarCliente(m.lojaId, 'M')).id, { ultimaEntrada: new Date(), atendidoPor: m.membroId })
     await h.montar({ respostasPorMinuto: 2 })
     const enviar = (id: string) =>
       h.app.inject({ method: 'POST', url: `/v1/conversas/${id}/mensagens`, headers: bearer(m.userId), payload: { texto: 'oi' } })

@@ -10,9 +10,10 @@ sistema), resposta como atendente e encerramento. Rota `/conversas`. Duas coluna
 - `index.ts`: export default da página (para `lazy(() => import('@/modules/conversas'))` no registry de rotas).
 
 ## Dados (api.ts)
-- `GET /v1/conversas` (lista, filtro `status`/`busca`), `GET /v1/conversas/:id` (detalhe + janela 24h),
-  `GET /v1/conversas/:id/mensagens` (histórico paginado para trás, `useInfiniteQuery`),
-  `POST /v1/conversas/:id/mensagens` (responder como humano), `POST /v1/conversas/:id/encerrar`.
+- `GET /v1/conversas` (lista, filtro `status`/`busca`), `GET /v1/conversas/:id` (detalhe + janela 24h
+  + `tem_atendente`/`atendido_por_mim`), `GET /v1/conversas/:id/mensagens` (histórico paginado para
+  trás, `useInfiniteQuery`), `POST /v1/conversas/:id/mensagens` (responder como humano),
+  `POST /v1/conversas/:id/assumir` e `/devolver` (handoff), `POST /v1/conversas/:id/encerrar`.
 - Contratos: `@/shared/contracts/_generated/conversas` e enums (`statusConversa`, `direcaoMensagem`,
   `tipoMensagem`, `autorMensagem`). Não redefinir.
 - Cache: raiz `['conversas']`. O realtime (`conversa.mensagem`, `conversa.handoff`) invalida essa raiz
@@ -20,14 +21,16 @@ sistema), resposta como atendente e encerramento. Rota `/conversas`. Duas coluna
 
 ## Notas
 - PII: os DTOs nunca trazem telefone; o cliente aparece por `nome`/`rotulo`. Nada sensível é exibido ou logado.
-- A caixa de resposta só habilita quando o contrato permite responder (conversa em `humano`, janela de
-  24h aberta e número conectado); os demais casos mostram o motivo do bloqueio, espelhando os 409 da api
-  (`conversa_com_ia`, `janela_fechada`, `numero_indisponivel`, `conversa_encerrada`).
-- Handoff (assumir a conversa da automação / devolver para a automação) **não existe no contrato de
-  conversas** (o backend declara que é responsabilidade de um módulo de API-handoff ainda não exposto).
-  Esta tela não inventa rota: quando a conversa está com a automação, a resposta fica bloqueada com a
-  explicação, e a única ação de estado disponível é **Encerrar** (válida para qualquer estado não encerrado).
-  Quando o endpoint de assumir/devolver existir, ligar aqui (botão no cabeçalho do painel).
+- A caixa de resposta só habilita quando **eu** sou o atendente responsável (`status = humano` e
+  `atendido_por_mim`), com janela de 24h aberta e número conectado; os demais casos mostram o motivo do
+  bloqueio, espelhando os 409/403 da api (`conversa_com_ia`, `nao_e_o_atendente`, `janela_fechada`,
+  `numero_indisponivel`, `conversa_encerrada`).
+- Handoff: o cabeçalho do painel traz **Assumir atendimento** quando a conversa está reivindicável
+  (`ia`, `aguardando`, ou `humano` sem atendente) e **Devolver** quando é a minha conversa. O servidor
+  decide o estado (claim atômico, 422 na disputa, 403 se não for o atendente); a tela só espelha os
+  botões a partir de `tem_atendente`/`atendido_por_mim`. O realtime `conversa.handoff` já invalida a raiz
+  `['conversas']`, então o painel reflete quem assumiu/devolveu ao vivo. **Encerrar** segue disponível em
+  qualquer estado não encerrado.
 
 ## Primitivos locais (candidatos a promover)
 - Nenhum. A tela usa só primitivos de `@/shared/ui`. As bolhas de mensagem (`components/Mensagem.tsx`)

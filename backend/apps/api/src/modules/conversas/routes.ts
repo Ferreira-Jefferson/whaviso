@@ -17,6 +17,7 @@ import {
 } from './schemas'
 import { abrir, encerrar, historico, listar, marcarLida, responder, type Relogio } from './service'
 import { assumir, devolver } from './handoff'
+import { papelNaLojaAtiva } from '../../shared/tenant'
 
 export interface OpcoesConversas {
   /** Relogio injetavel (testes de borda da janela). Padrao: agora. */
@@ -68,7 +69,7 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
     app.get(
       '/:id',
       { config: acesso, preHandler: guardas, schema: { params: ParamConversa, response: { 200: ConversaDetalheSaida } } },
-      async (req) => abrir(app.pool, lojaDaRequisicao(req), req.params.id, agora()),
+      async (req) => abrir(app.pool, lojaDaRequisicao(req), req.params.id, usuarioDaRequisicao(req), agora()),
     )
 
     app.get(
@@ -107,7 +108,14 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
         },
       },
       async (req, reply) => {
-        const saida = await responder(app.pool, lojaDaRequisicao(req), req.params.id, req.body.texto, agora())
+        const saida = await responder(
+          app.pool,
+          lojaDaRequisicao(req),
+          req.params.id,
+          usuarioDaRequisicao(req),
+          req.body.texto,
+          agora(),
+        )
         return reply.status(201).send(saida)
       },
     )
@@ -122,7 +130,14 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
     app.post(
       '/:id/devolver',
       { config: acesso, preHandler: guardas, schema: { params: ParamConversa, response: { 200: ConversaHandoffSaida } } },
-      async (req) => devolver(app.pool, lojaDaRequisicao(req), req.params.id),
+      async (req) =>
+        devolver(
+          app.pool,
+          lojaDaRequisicao(req),
+          req.params.id,
+          usuarioDaRequisicao(req),
+          req.escopo ? papelNaLojaAtiva(req.escopo) : null,
+        ),
     )
 
     app.post(

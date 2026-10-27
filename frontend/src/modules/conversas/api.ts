@@ -6,6 +6,7 @@ import { apiClient } from '@/shared/api_client'
 import {
   ConversaDetalheSaida,
   ConversaEncerradaSaida,
+  ConversaHandoffSaida,
   ConversaListaSaida,
   MensagemEnviadaSaida,
   MensagensSaida,
@@ -18,6 +19,7 @@ type ConversaDetalhe = z.infer<typeof ConversaDetalheSaida>
 type Mensagens = z.infer<typeof MensagensSaida>
 type MensagemEnviada = z.infer<typeof MensagemEnviadaSaida>
 type ConversaEncerrada = z.infer<typeof ConversaEncerradaSaida>
+type ConversaHandoff = z.infer<typeof ConversaHandoffSaida>
 
 export const RAIZ = 'conversas'
 
@@ -91,6 +93,40 @@ export function useEnviarMensagem(conversaId: string) {
         schema: MensagemEnviadaSaida,
       }),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [RAIZ] })
+    },
+  })
+}
+
+/**
+ * POST /v1/conversas/:id/assumir: um humano assume a conversa que estava com a automacao
+ * (ou aguardando atendente). O realtime `conversa.handoff` ja invalida ['conversas'];
+ * invalidamos tambem no sucesso para refletir na hora sem esperar o evento.
+ */
+export function useAssumir() {
+  const qc = useQueryClient()
+  return useMutation<ConversaHandoff, Error, string>({
+    mutationFn: (conversaId) =>
+      apiClient.post<ConversaHandoff>(`/conversas/${conversaId}/assumir`, {
+        body: {},
+        schema: ConversaHandoffSaida,
+      }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [RAIZ] })
+    },
+  })
+}
+
+/** POST /v1/conversas/:id/devolver: devolve o atendimento para a automacao. */
+export function useDevolver() {
+  const qc = useQueryClient()
+  return useMutation<ConversaHandoff, Error, string>({
+    mutationFn: (conversaId) =>
+      apiClient.post<ConversaHandoff>(`/conversas/${conversaId}/devolver`, {
+        body: {},
+        schema: ConversaHandoffSaida,
+      }),
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: [RAIZ] })
     },
   })

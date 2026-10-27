@@ -1,13 +1,14 @@
 // Regra do modulo. Sem acesso HTTP aqui; erros de dominio via shared/http_errors.
 // Nunca logar conteudo de mensagem nem telefone (SEC-024): so ids e codigos.
 import { comTransacao, notificar, type Executor, type Pool } from '@whaviso/shared/db'
-import { Conflito, NaoEncontrado } from '../../shared/http_errors'
+import { Conflito, NaoEncontrado, Proibido } from '../../shared/http_errors'
 import { codificarCursor, decodificarCursor } from './cursor'
 import { janela24h } from './janela'
 import {
   buscarConversa,
   listarConversas,
   listarMensagens,
+  membroDoUsuarioNaLoja,
   pedidoDaConversa,
   type LinhaConversa,
   type LinhaMensagem,
@@ -89,17 +90,24 @@ export async function abrir(
   exec: Executor,
   lojaId: string,
   conversaId: string,
+  userId: string,
   agora: Date,
 ): Promise<ConversaDetalheSaida> {
   const l = await buscarConversa(exec, lojaId, conversaId)
   if (!l) throw naoAchou()
   const pedido = await pedidoDaConversa(exec, lojaId, conversaId)
+  // Handoff: alguem segura a conversa e, em caso afirmativo, se e o proprio usuario (para
+  // habilitar devolver/responder no painel). So consultamos o membro quando ha dono.
+  const temAtendente = l.atendido_por_membro_id !== null
+  const meuMembro = temAtendente ? await membroDoUsuarioNaLoja(exec, userId, lojaId) : null
   return {
     id: l.id,
     status: l.status,
     cliente: rotuloCliente(l),
     numero_whatsapp: { id: l.numero_id, status: l.numero_status },
     humano_desde: l.humano_desde ? l.humano_desde.toISOString() : null,
+    tem_atendente: temAtendente,
+    atendido_por_mim: temAtendente && meuMembro !== null && l.atendido_por_membro_id === meuMembro,
     nao_lidas: l.nao_lidas,
     pedido_ligado: pedido,
     criado_em: l.criado_em.toISOString(),
@@ -142,6 +150,7 @@ export async function responder(
   pool: Pool,
   lojaId: string,
   conversaId: string,
+  userId: string,
   texto: string,
   agora: Date,
 ) {
@@ -149,8 +158,16 @@ export async function responder(
     const c = await travarConversa(tx, lojaId, conversaId)
     if (!c) throw naoAchou()
     if (c.status === 'encerrada') throw new Conflito('Conversa encerrada', 'conversa_encerrada')
-    if (c.status === 'ia') {
-      throw new Conflito('A conversa esta com a IA; assuma o atendimento antes de responder', 'conversa_com_ia')
+    if (c.status === 'ia' || c.status === 'aguardando') {
+      throw new Conflito('A conversa esta com a automacao; assuma o atendimento antes de responder', 'conversa_com_ia')
+    }
+    // status === 'humano': so o atendente que assumiu responde (spec step 6).
+    if (c.atendido_por_membro_id === null) {
+      throw new Conflito('Assuma o atendimento antes de responder', 'conversa_nao_assumida')
+    }
+    const meuMembro = await membroDoUsuarioNaLoja(tx, userId, lojaId)
+    if (meuMembro === null || c.atendido_por_membro_id !== meuMembro) {
+      throw new Proibido('Esta conversa esta com outro atendente; so quem assumiu pode responder', 'nao_e_o_atendente')
     }
     if (!janela24h(c.ultima_entrada_em, agora).janela_aberta) {
       throw new Conflito(

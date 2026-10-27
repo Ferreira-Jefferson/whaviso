@@ -10,12 +10,14 @@ export type FiltroStatus = 'todas' | StatusConversa
 export const FILTROS_STATUS: ReadonlyArray<{ value: FiltroStatus; label: string }> = [
   { value: 'todas', label: 'Todas' },
   { value: 'ia', label: 'Automação' },
+  { value: 'aguardando', label: 'Aguardando' },
   { value: 'humano', label: 'Humano' },
   { value: 'encerrada', label: 'Encerradas' },
 ]
 
 export const ROTULO_STATUS: Record<StatusConversa, string> = {
   ia: 'Com a automação',
+  aguardando: 'Aguardando atendente',
   humano: 'Em atendimento',
   encerrada: 'Encerrada',
 }
@@ -24,6 +26,7 @@ export type TomBadge = 'neutro' | 'marca' | 'sucesso' | 'atencao' | 'erro'
 
 export const TOM_STATUS: Record<StatusConversa, TomBadge> = {
   ia: 'marca',
+  aguardando: 'atencao',
   humano: 'sucesso',
   encerrada: 'neutro',
 }

@@ -7,19 +7,21 @@ export interface Mundo {
   contaId: string
   lojaId: string
   numeroId: string
+  /** Membro do userId na loja (para semear quem assumiu a conversa no handoff). */
+  membroId: string
 }
 
 export async function criarMundo(c: Cenario, papel: 'dono' | 'gerente' | 'atendente' = 'dono'): Promise<Mundo> {
   const userId = await criarUsuario(c)
   const contaId = await criarConta(c, userId)
   const lojaId = await criarLoja(contaId)
-  await criarMembro(contaId, userId, papel, lojaId)
+  const membroId = await criarMembro(contaId, userId, papel, lojaId)
   const numeroId = randomUUID()
   await poolSuper.query(
     `insert into public.numeros_whatsapp (id, loja_id, phone_number_id, waba_id) values ($1,$2,$3,'waba')`,
     [numeroId, lojaId, `pn_${numeroId}`],
   )
-  return { userId, contaId, lojaId, numeroId }
+  return { userId, contaId, lojaId, numeroId, membroId }
 }
 
 export async function criarCliente(lojaId: string, nome: string | null): Promise<{ id: string; hash: string }> {
@@ -37,13 +39,17 @@ export async function criarCliente(lojaId: string, nome: string | null): Promise
 export async function criarConversa(
   m: Mundo,
   clienteId: string,
-  o: { status?: 'ia' | 'humano' | 'encerrada'; ultimaEntrada?: Date | null } = {},
+  o: {
+    status?: 'ia' | 'aguardando' | 'humano' | 'encerrada'
+    ultimaEntrada?: Date | null
+    atendidoPor?: string | null
+  } = {},
 ): Promise<string> {
   const id = randomUUID()
   await poolSuper.query(
-    `insert into public.conversas (id, loja_id, numero_whatsapp_id, cliente_id, status, ultima_entrada_em)
-     values ($1,$2,$3,$4,$5,$6)`,
-    [id, m.lojaId, m.numeroId, clienteId, o.status ?? 'humano', o.ultimaEntrada ?? null],
+    `insert into public.conversas (id, loja_id, numero_whatsapp_id, cliente_id, status, ultima_entrada_em, atendido_por_membro_id)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [id, m.lojaId, m.numeroId, clienteId, o.status ?? 'humano', o.ultimaEntrada ?? null, o.atendidoPor ?? null],
   )
   return id
 }

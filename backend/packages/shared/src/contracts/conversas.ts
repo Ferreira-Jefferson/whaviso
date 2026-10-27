@@ -91,6 +91,10 @@ export const ConversaDetalheSaida = z.strictObject({
   cliente: ClienteResumo,
   numero_whatsapp: z.strictObject({ id: Uuid, status: statusNumero }),
   humano_desde: DataHora.nullable(),
+  // Handoff: alguem segura a conversa (atendido_por_membro_id preenchido) e se e o proprio
+  // usuario da requisicao. Sem nome/telefone: so o necessario para decidir os botoes do painel.
+  tem_atendente: z.boolean(),
+  atendido_por_mim: z.boolean(),
   nao_lidas: z.number().int().nonnegative(),
   pedido_ligado: PedidoLigado.nullable(),
   criado_em: DataHora,

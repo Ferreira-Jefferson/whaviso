@@ -11,6 +11,7 @@ export interface ConversaTravada {
   numero_whatsapp_id: string
   telefone_hash: string
   numero_status: 'conectado' | 'pausado' | 'removido'
+  atendido_por_membro_id: string | null
 }
 
 /** Trava a linha da conversa (FOR UPDATE OF c), escopada por loja. */
@@ -22,7 +23,7 @@ export async function travarConversa(
   return consultarUm<ConversaTravada>(
     exec,
     sql`select c.id, c.status, c.ultima_entrada_em, c.cliente_id, c.numero_whatsapp_id,
-               cl.telefone_hash, nw.status as numero_status
+               c.atendido_por_membro_id, cl.telefone_hash, nw.status as numero_status
           from public.conversas c
           join public.clientes cl on cl.id = c.cliente_id and cl.loja_id = c.loja_id
           join public.numeros_whatsapp nw on nw.id = c.numero_whatsapp_id and nw.loja_id = c.loja_id

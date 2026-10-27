@@ -1,7 +1,7 @@
 // Integracao (Postgres LOCAL whaviso_dev_conversas): handoff manual (assumir/devolver),
 // transicoes invalidas (422), isolamento por loja e emissao do evento realtime.
 import { describe, it, expect } from 'vitest'
-import { bancoAcessivel, poolSuper, novoCenario, limpar } from '../../../test/db'
+import { bancoAcessivel, poolSuper, novoCenario, limpar, criarUsuario, criarMembro } from '../../../test/db'
 import { criarHarness, bearer } from './tests/harness'
 import { criarCliente, criarConversa, criarMundo } from './tests/fixtures'
 
@@ -75,7 +75,8 @@ d('conversas: handoff manual (assumir e devolver)', () => {
 
   it('transicoes invalidas: 422 transicao_invalida; estado inalterado e sem evento', async () => {
     const m = await h.novo()
-    const humana = await criarConversa(m, (await criarCliente(m.lojaId, 'C')).id, { status: 'humano' })
+    // 'humano' COM dono = ja em atendimento de alguem: nao e reivindicavel (assumir -> 422).
+    const humana = await criarConversa(m, (await criarCliente(m.lojaId, 'C')).id, { status: 'humano', atendidoPor: m.membroId })
     const ia = await criarConversa(m, (await criarCliente(m.lojaId, 'D')).id, { status: 'ia' })
     const enc = await criarConversa(m, (await criarCliente(m.lojaId, 'E')).id, { status: 'encerrada' })
     await h.montar()
@@ -123,5 +124,56 @@ d('conversas: handoff manual (assumir e devolver)', () => {
     await h.montar()
     expect((await h.app.inject({ method: 'POST', url: `/v1/conversas/${c}/assumir`, headers: bearer(m.userId) })).statusCode).toBe(200)
     expect((await h.app.inject({ method: 'POST', url: `/v1/conversas/${c}/devolver`, headers: bearer(m.userId) })).statusCode).toBe(200)
+  })
+
+  it('assumir: parte de "aguardando" e de "humano" sem dono (pedido da IA por humano)', async () => {
+    const m = await h.novo()
+    const aguardando = await criarConversa(m, (await criarCliente(m.lojaId, 'Ag')).id, { status: 'aguardando' })
+    const humanoSemDono = await criarConversa(m, (await criarCliente(m.lojaId, 'Hs')).id, { status: 'humano', atendidoPor: null })
+    await h.montar()
+    for (const c of [aguardando, humanoSemDono]) {
+      const r = await h.app.inject({ method: 'POST', url: `/v1/conversas/${c}/assumir`, headers: bearer(m.userId) })
+      expect(r.statusCode, c).toBe(200)
+      expect(r.json().status).toBe('humano')
+      const { rows } = await poolSuper.query('select atendido_por_membro_id from public.conversas where id=$1', [c])
+      expect(rows[0].atendido_por_membro_id).toBe(m.membroId)
+    }
+  })
+
+  it('concorrencia: dois assumir simultaneos = exatamente um 200 e um 422', async () => {
+    const m = await h.novo()
+    const c = await criarConversa(m, (await criarCliente(m.lojaId, 'Race')).id, { status: 'ia' })
+    await h.montar()
+    const url = `/v1/conversas/${c}/assumir`
+    const [a, b] = await Promise.all([
+      h.app.inject({ method: 'POST', url, headers: bearer(m.userId) }),
+      h.app.inject({ method: 'POST', url, headers: bearer(m.userId) }),
+    ])
+    const codigos = [a.statusCode, b.statusCode].sort()
+    expect(codigos).toEqual([200, 422])
+    const perdedora = a.statusCode === 422 ? a : b
+    expect(perdedora.json().error.code).toBe('transicao_invalida')
+    const { rows } = await poolSuper.query('select status, atendido_por_membro_id from public.conversas where id=$1', [c])
+    expect(rows[0].status).toBe('humano')
+    expect(rows[0].atendido_por_membro_id).toBe(m.membroId)
+  })
+
+  it('devolver: atendente que NAO assumiu e barrado (403); quem assumiu e um dono podem', async () => {
+    const dono = await h.novo('dono')
+    // Segundo membro (atendente) na MESMA conta/loja.
+    const outroUser = await criarUsuario(h.cenario)
+    await criarMembro(dono.contaId, outroUser, 'atendente', dono.lojaId)
+    const c = await criarConversa(dono, (await criarCliente(dono.lojaId, 'Z')).id, { status: 'ia' })
+    await h.montar()
+    // O dono assume (vira o atendente responsavel).
+    expect((await h.app.inject({ method: 'POST', url: `/v1/conversas/${c}/assumir`, headers: bearer(dono.userId) })).statusCode).toBe(200)
+    // Outro atendente, que nao assumiu, nao pode devolver.
+    const barrado = await h.app.inject({ method: 'POST', url: `/v1/conversas/${c}/devolver`, headers: bearer(outroUser) })
+    expect(barrado.statusCode).toBe(403)
+    expect(barrado.json().error.code).toBe('nao_e_o_atendente')
+    const { rows } = await poolSuper.query('select status from public.conversas where id=$1', [c])
+    expect(rows[0].status).toBe('humano') // intacta
+    // Um dono pode devolver mesmo sem ter assumido.
+    expect((await h.app.inject({ method: 'POST', url: `/v1/conversas/${c}/devolver`, headers: bearer(dono.userId) })).statusCode).toBe(200)
   })
 })

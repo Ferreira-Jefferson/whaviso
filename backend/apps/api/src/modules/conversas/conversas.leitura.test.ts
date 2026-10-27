@@ -144,7 +144,8 @@ d('conversas: leitura, isolamento e seguranca', () => {
   it('papeis: dono, gerente e atendente respondem; sem membership e operador da plataforma sao negados', async () => {
     for (const papel of ['dono', 'gerente', 'atendente'] as const) {
       const m = await h.novo(papel)
-      const c = await criarConversa(m, (await criarCliente(m.lojaId, 'P')).id, { ultimaEntrada: new Date() })
+      // Responder exige ser o atendente responsavel: a conversa ja esta assumida pelo proprio membro.
+      const c = await criarConversa(m, (await criarCliente(m.lojaId, 'P')).id, { ultimaEntrada: new Date(), atendidoPor: m.membroId })
       await h.montar()
       const r = await h.app.inject({ method: 'POST', url: `/v1/conversas/${c}/mensagens`, headers: bearer(m.userId), payload: { texto: 'oi' } })
       expect(r.statusCode, papel).toBe(201)

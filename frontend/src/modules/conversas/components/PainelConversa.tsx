@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, CircleCheck, Clock, PackageCheck } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Clock, PackageCheck, Undo2, UserPlus } from 'lucide-react'
 import type { ConversaDetalheSaida } from '@/shared/contracts/_generated/conversas'
 import { ApiError } from '@/shared/api_client'
 import { cn, ConfirmDialog, ErrorState, Spinner, useToast } from '@/shared/ui'
 import { formatarData } from '@/shared/format'
 import { useRealtime } from '@/shared/realtime'
-import { useConversa, useEncerrar, useEnviarMensagem, useMensagens, mensagensEmOrdem } from '../api'
+import {
+  useAssumir,
+  useConversa,
+  useDevolver,
+  useEncerrar,
+  useEnviarMensagem,
+  useMensagens,
+  mensagensEmOrdem,
+} from '../api'
 import { ROTULO_STATUS, TOM_STATUS } from '../estados'
 import { Composer } from './Composer'
 import { Mensagem } from './Mensagem'
@@ -13,7 +21,20 @@ import { Mensagem } from './Mensagem'
 const TOM_BADGE: Record<string, string> = {
   marca: 'bg-salvia-claro text-salvia',
   sucesso: 'bg-salvia-claro text-folha',
+  atencao: 'bg-dourado-claro text-barro',
+  erro: 'bg-papel-2 text-barro',
   neutro: 'bg-papel-2 text-tinta-2',
+}
+
+/** A conversa pode ser assumida por um humano: automacao, aguardando, ou humano sem dono. */
+function podeAssumir(d: ConversaDetalheSaida): boolean {
+  if (d.status === 'ia' || d.status === 'aguardando') return true
+  return d.status === 'humano' && !d.tem_atendente
+}
+
+/** Eu sou o atendente responsavel por esta conversa (posso responder e devolver). */
+function minhaConversa(d: ConversaDetalheSaida): boolean {
+  return d.status === 'humano' && d.atendido_por_mim
 }
 
 interface Props {
@@ -28,6 +49,8 @@ export function PainelConversa({ conversaId, aoVoltar, className }: Props) {
   const mensagens = useMensagens(conversaId)
   const enviar = useEnviarMensagem(conversaId)
   const encerrar = useEncerrar()
+  const assumir = useAssumir()
+  const devolver = useDevolver()
   const { mostrarToast } = useToast()
   const [confirmarEncerrar, setConfirmarEncerrar] = useState(false)
 
@@ -77,9 +100,35 @@ export function PainelConversa({ conversaId, aoVoltar, className }: Props) {
     })
   }, [encerrar, conversaId, mostrarToast])
 
+  const aoAssumir = useCallback(() => {
+    assumir.mutate(conversaId, {
+      onSuccess: () => mostrarToast('Você assumiu o atendimento.', { tom: 'sucesso' }),
+      onError: (err) =>
+        mostrarToast(err instanceof ApiError ? err.message : 'Não foi possível assumir o atendimento.', { tom: 'erro' }),
+    })
+  }, [assumir, conversaId, mostrarToast])
+
+  const aoDevolver = useCallback(() => {
+    devolver.mutate(conversaId, {
+      onSuccess: () => mostrarToast('Atendimento devolvido para a automação.', { tom: 'sucesso' }),
+      onError: (err) =>
+        mostrarToast(err instanceof ApiError ? err.message : 'Não foi possível devolver o atendimento.', { tom: 'erro' }),
+    })
+  }, [devolver, conversaId, mostrarToast])
+
   return (
     <section aria-label="Conversa" className={cn('flex min-h-0 flex-col bg-papel-2', className)}>
-      <Cabecalho d={d} carregando={detalhe.isPending} aoVoltar={aoVoltar} aoEncerrar={() => setConfirmarEncerrar(true)} encerrando={encerrar.isPending} />
+      <Cabecalho
+        d={d}
+        carregando={detalhe.isPending}
+        aoVoltar={aoVoltar}
+        aoEncerrar={() => setConfirmarEncerrar(true)}
+        encerrando={encerrar.isPending}
+        aoAssumir={aoAssumir}
+        assumindo={assumir.isPending}
+        aoDevolver={aoDevolver}
+        devolvendo={devolver.isPending}
+      />
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {mensagens.isPending && (
@@ -137,13 +186,15 @@ export function PainelConversa({ conversaId, aoVoltar, className }: Props) {
 
 /**
  * Por que a caixa de resposta esta bloqueada (ou null se da para responder).
- * O servidor rejeita responder com a conversa na automacao, com a janela de 24h fechada
- * ou com o numero indisponivel; refletimos a mesma regra antes de habilitar a caixa.
- * Assumir o atendimento (handoff da automacao para humano) e feito por outra parte do sistema.
+ * So quem assumiu o atendimento responde: a caixa abre apenas quando a conversa esta em
+ * 'humano' sob a minha responsabilidade, a janela de 24h esta aberta e o numero conectado.
+ * Espelhamos os 409/403 da api (conversa_com_ia, janela_fechada, numero_indisponivel,
+ * nao_e_o_atendente) antes de habilitar.
  */
 function motivoBloqueio(d: ConversaDetalheSaida): string | null {
   if (d.status === 'encerrada') return 'Esta conversa foi encerrada.'
-  if (d.status === 'ia') return 'A automação está cuidando desta conversa. Para responder, o atendimento precisa ser assumido.'
+  if (podeAssumir(d)) return 'Assuma o atendimento para responder ao cliente.'
+  if (!minhaConversa(d)) return 'Esta conversa está com outro atendente.'
   if (d.numero_whatsapp.status !== 'conectado') return 'O número de WhatsApp desta loja está indisponível no momento.'
   if (!d.janela_aberta) return 'A janela de 24h está fechada. O cliente precisa escrever de novo para liberar a resposta livre.'
   return null
@@ -155,9 +206,13 @@ interface CabProps {
   aoVoltar: () => void
   aoEncerrar: () => void
   encerrando: boolean
+  aoAssumir: () => void
+  assumindo: boolean
+  aoDevolver: () => void
+  devolvendo: boolean
 }
 
-function Cabecalho({ d, carregando, aoVoltar, aoEncerrar, encerrando }: CabProps) {
+function Cabecalho({ d, carregando, aoVoltar, aoEncerrar, encerrando, aoAssumir, assumindo, aoDevolver, devolvendo }: CabProps) {
   const nome = d ? (d.cliente.nome ?? d.cliente.rotulo) : carregando ? 'Carregando…' : 'Conversa'
   return (
     <header className="flex flex-none items-center gap-3 border-b border-linha bg-cartao px-3 py-2.5">
@@ -201,6 +256,30 @@ function Cabecalho({ d, carregando, aoVoltar, aoEncerrar, encerrando }: CabProps
           </div>
         )}
       </div>
+
+      {d && podeAssumir(d) && (
+        <button
+          type="button"
+          onClick={aoAssumir}
+          disabled={assumindo}
+          className="inline-flex min-h-10 flex-none items-center gap-1.5 rounded-pill bg-salvia px-3.5 text-[13px] font-bold text-papel hover:bg-salvia/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia disabled:opacity-60"
+        >
+          {assumindo ? <Spinner className="text-papel" /> : <UserPlus className="size-4" aria-hidden />}
+          Assumir atendimento
+        </button>
+      )}
+
+      {d && minhaConversa(d) && (
+        <button
+          type="button"
+          onClick={aoDevolver}
+          disabled={devolvendo}
+          className="inline-flex min-h-10 flex-none items-center gap-1.5 rounded-pill border border-linha bg-cartao px-3 text-[13px] font-bold text-tinta-2 hover:bg-papel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia disabled:opacity-60"
+        >
+          {devolvendo ? <Spinner /> : <Undo2 className="size-4" aria-hidden />}
+          Devolver
+        </button>
+      )}
 
       {d && d.status !== 'encerrada' && (
         <button

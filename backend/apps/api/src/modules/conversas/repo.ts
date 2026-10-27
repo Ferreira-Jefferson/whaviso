@@ -27,6 +27,7 @@ export interface LinhaConversa {
   atualizado_em: Date
   criado_em: Date
   humano_desde: Date | null
+  atendido_por_membro_id: string | null
   cliente_id: string
   cliente_nome: string | null
   telefone_hash: string
@@ -41,7 +42,7 @@ export interface LinhaConversa {
 }
 
 const COLUNAS = `c.id, c.status, c.ultima_entrada_em, c.atualizado_em, c.criado_em, c.humano_desde,
-  c.cliente_id, cl.nome as cliente_nome, cl.telefone_hash, ${NAO_LIDAS} as nao_lidas,
+  c.atendido_por_membro_id, c.cliente_id, cl.nome as cliente_nome, cl.telefone_hash, ${NAO_LIDAS} as nao_lidas,
   ${TS_PRECISO('c.atualizado_em')} as cursor_t, nw.id as numero_id, nw.status as numero_status,
   lm.previa as prev_previa, lm.direcao as prev_direcao, lm.tipo as prev_tipo, lm.criado_em as prev_criado_em`
 

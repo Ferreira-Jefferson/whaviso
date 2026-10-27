@@ -36,7 +36,8 @@ export const modalidadePedido = z.enum(['entrega', 'retirada'])
 export type ModalidadePedido = z.infer<typeof modalidadePedido>
 
 // --- Conversa e mensagem ---
-export const statusConversa = z.enum(['ia', 'humano', 'encerrada'])
+// 'aguardando' = a automacao pediu ajuda humana e ninguem assumiu ainda (estado reivindicavel).
+export const statusConversa = z.enum(['ia', 'aguardando', 'humano', 'encerrada'])
 export type StatusConversa = z.infer<typeof statusConversa>
 
 export const direcaoMensagem = z.enum(['entrada', 'saida'])
