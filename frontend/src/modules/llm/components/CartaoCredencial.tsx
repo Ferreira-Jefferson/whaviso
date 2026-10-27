@@ -1,9 +1,9 @@
 // Estado da credencial do atendente: so metadado ("configurada, termina em 1234, validada em ...").
 // A chave nunca e exibida. Aqui tambem ficam ligar/desligar e o modelo preferido (PATCH, sem chave).
 import { useEffect, useState } from 'react'
-import { KeyRound, Lock, ShieldCheck } from 'lucide-react'
+import { KeyRound, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Banner, Button, Field, Input, cn, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Field, Input, SecretField, cn, useToast } from '@/shared/ui'
 import { formatarDataHora } from '@/shared/format'
 import { useAjustarCredencial, type Estado } from '../api'
 import { ROTULO_PROVEDOR } from '../estados'
@@ -68,16 +68,7 @@ export function CartaoCredencial({ estado }: { estado: Estado }) {
       </div>
 
       {/* Chave: dado protegido, write-only. Nunca é exibida, só o final mascarado. */}
-      <div className="flex items-center gap-2.5 rounded-input border border-linha bg-papel-2 px-3 py-2.5">
-        <Lock className="size-4 flex-none text-salvia" strokeWidth={1.75} aria-hidden />
-        <span
-          className="tabular font-medium text-tinta"
-          aria-label={estado.ultimos4 ? `Chave terminada em ${estado.ultimos4}` : 'Chave cadastrada'}
-        >
-          {estado.ultimos4 ? `•••• ${estado.ultimos4}` : 'Cadastrada'}
-        </span>
-        <span className="ml-auto text-xs font-medium text-tinta-2">Protegida</span>
-      </div>
+      <SecretField ultimos4={estado.ultimos4} className="w-full" />
 
       <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
         <div>

@@ -1,7 +1,7 @@
 // Vendas realizadas (pedidos entregues) agrupadas por uma dimensao escolhida no dropdown.
 import { useState } from 'react'
 import { Receipt, ShoppingBag, Wallet } from 'lucide-react'
-import { Card, EmptyState, Select, Skeleton, TableResponsive, type ColunaTabela } from '@/shared/ui'
+import { Card, EmptyState, MeterBar, SectionHeader, Select, Skeleton, TableResponsive, type ColunaTabela } from '@/shared/ui'
 import { formatarCentavos } from '@/shared/format'
 import type { VendasSaida } from '@/shared/contracts/_generated/relatorios'
 import { useVendas, type VendasDimensao } from '../api'
@@ -45,9 +45,7 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
       alinhar: 'direita',
       render: (l) => (
         <span className="inline-flex items-center justify-end gap-2">
-          <span className="inline-block h-1.5 w-16 overflow-hidden rounded-pill bg-papel-2" aria-hidden>
-            <span className="block h-full rounded-pill bg-salvia" style={{ width: `${Math.round((l.participacao ?? 0) * 100)}%` }} />
-          </span>
+          <MeterBar valor={(l.participacao ?? 0) * 100} className="w-16" />
           <span className="tabular w-10 text-right">{pct(l.participacao)}</span>
         </span>
       ),
@@ -71,12 +69,10 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
             <Tile rotulo="Ticket médio" carregando={q.isPending} valor={d ? (d.total_pedidos > 0 ? formatarCentavos(Math.round(d.total_faturamento_centavos / d.total_pedidos)) : '-') : null} icone={<Receipt className="size-4" aria-hidden />} />
           </div>
           <div className="grid gap-3">
-            <div className="flex items-end justify-between gap-3">
-              <h2 className="text-lg text-salvia">Vendas {dim.label.toLowerCase()}</h2>
-              {d && d.linhas.length > 0 && (
-                <span className="text-xs text-tinta-2">{d.linhas.length} {d.linhas.length === 1 ? 'linha' : 'linhas'}</span>
-              )}
-            </div>
+            <SectionHeader
+              titulo={`Vendas ${dim.label.toLowerCase()}`}
+              meta={d && d.linhas.length > 0 ? `${d.linhas.length} ${d.linhas.length === 1 ? 'linha' : 'linhas'}` : undefined}
+            />
             <Card className="border-0 bg-transparent !p-0 md:border md:border-linha md:bg-cartao md:!p-4">
               {q.isPending ? (
                 <div className="grid gap-2.5 p-3" aria-busy="true" aria-label="Carregando vendas">

@@ -1,6 +1,6 @@
 // Lista de fluxos da loja: nome, estado (ativo, versao publicada, rascunho) e acoes.
 import { ChevronRight, GitBranch, Plus } from 'lucide-react'
-import { Badge, Button, EmptyState, ErrorState, Skeleton, cn } from '@/shared/ui'
+import { Badge, Button, EmptyState, ErrorState, IconChip, Skeleton } from '@/shared/ui'
 import { formatarData } from '@/shared/format'
 import { useFluxos } from '../api'
 
@@ -45,15 +45,9 @@ export function ListaFluxos({ onAbrir, onNovo }: Props) {
             onClick={() => onAbrir(f.id)}
             className="group flex min-h-16 w-full flex-wrap items-center gap-3 rounded-card border border-linha bg-cartao p-4 text-left transition-colors hover:border-salvia/40 hover:bg-papel-2 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
           >
-            <span
-              aria-hidden
-              className={cn(
-                'flex size-10 flex-none items-center justify-center rounded-full',
-                f.ativo ? 'bg-salvia-claro text-salvia' : 'bg-papel-2 text-tinta-2',
-              )}
-            >
-              <GitBranch strokeWidth={1.75} className="size-5" />
-            </span>
+            <IconChip tom={f.ativo ? 'salvia' : 'neutro'} tamanho="md">
+              <GitBranch strokeWidth={1.75} className="size-5" aria-hidden />
+            </IconChip>
             <span className="min-w-0 flex-1">
               <span className="block truncate font-display text-base font-semibold text-tinta">{f.nome}</span>
               <span className="block text-xs text-tinta-2">criado em {formatarData(f.criado_em)}</span>

@@ -155,8 +155,9 @@ function Formulario({ aoFechar, aoCriar }: Pick<Props, 'aoFechar' | 'aoCriar'>) 
             <Button
               type="button"
               variante="ghost"
+              tamanho="icone"
               aria-label={`Remover variável ${i + 1}`}
-              className="w-11 flex-none px-0 text-tinta-2 hover:bg-barro/10 hover:text-barro"
+              className="flex-none text-tinta-2 hover:bg-barro/10 hover:text-barro"
               onClick={() => setVariaveis((l) => l.filter((_, j) => j !== i))}
             >
               <Trash2 className="size-4" aria-hidden />

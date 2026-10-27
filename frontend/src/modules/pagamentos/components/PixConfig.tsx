@@ -2,9 +2,9 @@
 // tela (so tipo, titular, cidade e os ultimos 4 caracteres). O campo e limpo assim que o envio
 // termina, com sucesso ou nao, para a chave nao ficar em estado de componente.
 import { useState } from 'react'
-import { KeyRound, Lock, ShieldCheck } from 'lucide-react'
+import { KeyRound, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Banner, Button, Card, ChavePixInput, ErrorState, Field, Input, Skeleton, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, ChavePixInput, ErrorState, Field, Input, SecretField, Skeleton, useToast } from '@/shared/ui'
 import { ROTULO_TIPO_CHAVE, formatarDataHora } from '@/shared/format'
 import { LojaPixEntrada } from '@/shared/contracts/_generated/pagamentos'
 import type { TipoChavePix } from '@/shared/contracts/_generated/enums'
@@ -94,16 +94,7 @@ export function PixConfig() {
               <Badge tom="sucesso">Chave ativa</Badge>
               <span className="text-xs text-tinta-2">{ROTULO_TIPO_CHAVE[pix.tipo]}</span>
             </div>
-            <div className="flex items-center gap-2 rounded-input border border-linha bg-papel-2 px-3 py-2.5">
-              <Lock strokeWidth={1.75} className="size-4 flex-none text-salvia" aria-hidden />
-              <span
-                className="tabular text-tinta"
-                aria-label={pix.ultimos4 ? `Chave terminada em ${pix.ultimos4}` : 'Chave cadastrada'}
-              >
-                {pix.ultimos4 ? `•••• ${pix.ultimos4}` : 'Cadastrada'}
-              </span>
-              <span className="ml-auto text-xs text-tinta-2">Protegida</span>
-            </div>
+            <SecretField ultimos4={pix.ultimos4} className="flex w-full py-2.5" />
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
               <dt className="text-tinta-2">Titular</dt>
               <dd className="text-tinta">{pix.titular}</dd>

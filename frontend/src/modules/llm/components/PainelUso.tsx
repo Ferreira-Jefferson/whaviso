@@ -24,7 +24,7 @@ export function PainelUso({ uso }: { uso: Uso }) {
   return (
     <div className="flex flex-col gap-4">
       {uso.pico && (
-        <Banner tom="erro">O consumo de hoje está acima do habitual. Vale conferir as conversas recentes.</Banner>
+        <Banner tom="atencao">O consumo de hoje está acima do habitual. Vale conferir as conversas recentes.</Banner>
       )}
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard rotulo="Gasto estimado no mês" centavos={uso.total_mes_centavos} tom="salvia" />

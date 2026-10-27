@@ -1,6 +1,6 @@
 // Formas de pagamento: caixa (vendas por forma) + Pix online conciliado, sem dupla contagem.
 import { CreditCard } from 'lucide-react'
-import { Card, EmptyState, Skeleton } from '@/shared/ui'
+import { Card, EmptyState, MeterBar, SectionHeader, Skeleton } from '@/shared/ui'
 import { formatarCentavos } from '@/shared/format'
 import { useFormasPagamento } from '../api'
 import type { Periodo } from '../periodo'
@@ -22,7 +22,7 @@ export function SecaoPagamentos({ periodo }: { periodo: Periodo }) {
         <Tile rotulo="Transações" carregando={q.isPending} valor={d ? String(d.linhas.reduce((s, l) => s + l.transacoes, 0)) : null} />
       </div>
       <Card>
-        <h2 className="text-lg text-salvia">Formas de pagamento</h2>
+        <SectionHeader titulo="Formas de pagamento" />
         <div className="mt-3">
         {q.isPending ? (
           <div className="grid gap-3" aria-busy="true"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-2/3" /></div>
@@ -40,9 +40,7 @@ export function SecaoPagamentos({ periodo }: { periodo: Periodo }) {
                       {formatarCentavos(l.valor_centavos)} · {l.transacoes} {l.transacoes === 1 ? 'transação' : 'transações'} · {l.participacao === null ? '-' : `${p}%`}
                     </span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-pill bg-papel-2" role="img" aria-label={`${ROTULO_FORMA[l.forma]}: ${formatarCentavos(l.valor_centavos)} (${p}%)`}>
-                    <div className="h-full rounded-pill bg-salvia" style={{ width: `${p}%` }} />
-                  </div>
+                  <MeterBar valor={p} className="h-2" rotulo={`${ROTULO_FORMA[l.forma]}: ${formatarCentavos(l.valor_centavos)} (${p}%)`} />
                 </li>
               )
             })}

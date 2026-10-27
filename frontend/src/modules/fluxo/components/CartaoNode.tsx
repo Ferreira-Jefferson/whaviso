@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Badge, Select, cn } from '@/shared/ui'
+import { Badge, IconChip, Select, cn } from '@/shared/ui'
 import type { FluxoGrafo, FluxoNode, FluxoProblema } from '@/shared/contracts/_generated/fluxo'
 import type { ItemCatalogo } from '../api'
 import { arestaDe } from '../grafo'
@@ -95,24 +95,19 @@ export function CartaoNode({
         onClick={() => setAberto((a) => !a)}
         className="flex min-h-14 w-full items-center gap-3 rounded-card p-4 text-left hover:bg-papel-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
       >
-        <span
-          aria-hidden
-          className={cn(
-            'relative flex size-10 flex-none items-center justify-center rounded-full',
-            erros > 0
-              ? 'bg-barro/10 text-barro'
-              : inicial
-                ? 'bg-salvia-claro text-salvia'
-                : item?.irreversivel
-                  ? 'bg-ambar-claro text-ambar'
-                  : 'bg-papel-2 text-tinta-2',
-          )}
+        <IconChip
+          tom={erros > 0 ? 'barro' : inicial ? 'salvia' : item?.irreversivel ? 'ambar' : 'neutro'}
+          tamanho="md"
+          className="relative"
         >
-          <Icone strokeWidth={1.75} className="size-5" />
-          <span className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full bg-cartao text-[10px] font-bold leading-none text-tinta-2 ring-1 ring-linha">
+          <Icone strokeWidth={1.75} className="size-5" aria-hidden />
+          <span
+            aria-hidden
+            className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full bg-cartao text-[10px] font-bold leading-none text-tinta-2 ring-1 ring-linha"
+          >
             {indice}
           </span>
-        </span>
+        </IconChip>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-display text-base font-semibold text-tinta">
             {rotuloNode(node.tipo, item?.rotulo)}

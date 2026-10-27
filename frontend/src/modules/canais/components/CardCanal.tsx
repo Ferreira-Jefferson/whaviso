@@ -2,7 +2,7 @@
 // e ativar/desativar. Sincronizar pode responder 501 (provedor ainda nao integrado): vira aviso.
 import { Link2, RefreshCw, Store, UtensilsCrossed } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Button, Card, Banner, cn, useToast } from '@/shared/ui'
+import { Badge, Button, Card, Banner, IconChip, cn, useToast } from '@/shared/ui'
 import { formatarDataHora } from '@/shared/format'
 import type { CanalEstado } from '@/shared/contracts/_generated/canais'
 import { useAjustarCanal, useSincronizarCanal } from '../api'
@@ -51,22 +51,15 @@ export function CardCanal({ info, estado, aoConectar }: Props) {
 
   // Avatar da marca do canal, tingido pelo estado: reforca conectado/ativo/desativado de relance.
   const Icone = info.canal === 'ifood' ? UtensilsCrossed : Store
-  const tomAvatar = !estado
-    ? 'bg-papel-2 text-tinta-2'
-    : estado.ativo
-      ? 'bg-salvia-claro text-salvia'
-      : 'bg-ambar-claro text-ambar'
+  const tomAvatar = !estado ? 'neutro' : estado.ativo ? 'salvia' : 'ambar'
 
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span
-            aria-hidden
-            className={cn('mt-0.5 flex size-10 flex-none items-center justify-center rounded-full', tomAvatar)}
-          >
-            <Icone strokeWidth={1.75} className="size-5" />
-          </span>
+          <IconChip tom={tomAvatar} className="mt-0.5">
+            <Icone strokeWidth={1.75} className="size-5" aria-hidden />
+          </IconChip>
           <div className="min-w-0">
             <h2 className="truncate text-lg text-salvia">{estado?.config.rotulo ?? info.nome}</h2>
             <p className="mt-0.5 text-sm text-tinta-2">{info.descricao}</p>

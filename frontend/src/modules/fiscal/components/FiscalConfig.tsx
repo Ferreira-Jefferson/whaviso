@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { ReceiptText, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Banner, Button, Card, cn, ErrorState, Field, Input, Select, Skeleton, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, ErrorState, Field, IconChip, Input, Select, Skeleton, useToast } from '@/shared/ui'
 import { formatarDataHora } from '@/shared/format'
 import {
   CredencialFiscal,
@@ -40,12 +40,8 @@ export function FiscalConfig() {
 
   const estado = config.data
   const configurada = Boolean(estado?.configurada)
-  // Tom do avatar pelo estado: reforça a situação de relance (sem depender só do selo).
-  const avatarTom = !estado?.configurada
-    ? 'bg-papel-2 text-tinta-2'
-    : estado.ativo
-      ? 'bg-salvia-claro text-salvia'
-      : 'bg-ambar-claro text-ambar'
+  // Tom do chip pelo estado: reforça a situação de relance (sem depender só do selo).
+  const avatarTom = !estado?.configurada ? 'neutro' : estado.ativo ? 'salvia' : 'ambar'
 
   // Carrega o formulario com o que ja esta salvo (so campos nao secretos).
   useEffect(() => {
@@ -120,12 +116,9 @@ export function FiscalConfig() {
     <div className="grid items-start gap-4 lg:grid-cols-2">
       <Card className="flex flex-col gap-4">
         <div className="flex items-start gap-3">
-          <span
-            aria-hidden
-            className={cn('flex size-10 flex-none items-center justify-center rounded-full', avatarTom)}
-          >
-            <ReceiptText strokeWidth={1.75} className="size-5" />
-          </span>
+          <IconChip tom={avatarTom} tamanho="md">
+            <ReceiptText strokeWidth={1.75} className="size-5" aria-hidden />
+          </IconChip>
           <div className="min-w-0">
             <h2 className="text-lg text-salvia">Situação do emissor</h2>
             <p className="mt-0.5 text-xs text-tinta-2">Emissão de NFC-e e NFS-e dos pedidos.</p>

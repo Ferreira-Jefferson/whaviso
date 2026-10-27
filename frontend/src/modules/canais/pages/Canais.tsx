@@ -10,6 +10,7 @@ import {
   ErrorState,
   MoneyText,
   PageHeader,
+  SectionHeader,
   Skeleton,
   TableResponsive,
   type ColunaTabela,
@@ -78,10 +79,13 @@ export default function Canais() {
       )}
 
       <section className="mt-10">
-        <div className="mb-4 flex items-center justify-between gap-3 border-b border-linha pb-2">
-          <h2 className="text-lg text-salvia">Pedidos importados</h2>
-          {pedidos.isSuccess && pedidos.data.length > 0 && <Badge tom="neutro">{pedidos.data.length}</Badge>}
-        </div>
+        <SectionHeader
+          titulo="Pedidos importados"
+          meta={
+            pedidos.isSuccess && pedidos.data.length > 0 ? <Badge tom="neutro">{pedidos.data.length}</Badge> : undefined
+          }
+          className="mb-4 border-b border-linha pb-2"
+        />
         {pedidos.isPending && <Skeleton className="h-24 w-full" />}
         {pedidos.isError && <ErrorState aoTentarDeNovo={() => void pedidos.refetch()} />}
         {pedidos.isSuccess && pedidos.data.length === 0 && (
