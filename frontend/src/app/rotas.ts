@@ -2,7 +2,7 @@
 // Cada FR-* troca `pagina` pelo seu slice: `pagina: lazy(() => import('@/modules/pedidos'))`.
 // Enquanto o modulo nao existe, a rota mostra o slot vazio do shell. Nav (sidebar e bottom
 // bar) e rotas saem DAQUI: adicionar um modulo = 1 linha.
-import type { ComponentType, LazyExoticComponent } from 'react'
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import {
   BarChart3,
   Bike,
@@ -33,7 +33,7 @@ export interface RotaModulo {
 }
 
 export const ROTAS: readonly RotaModulo[] = [
-  { caminho: 'pedidos', rotulo: 'Pedidos', descricao: 'Acompanhe os pedidos ao vivo.', icone: ClipboardList, grupo: 'painel', fixoNoMobile: true },
+  { caminho: 'pedidos', rotulo: 'Pedidos', descricao: 'Acompanhe os pedidos ao vivo.', icone: ClipboardList, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/pedidos')) },
   { caminho: 'conversas', rotulo: 'Conversas', descricao: 'Atendimento pelo WhatsApp.', icone: MessageCircle, grupo: 'painel', fixoNoMobile: true },
   { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'painel', fixoNoMobile: true },
   { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'painel', fixoNoMobile: true },

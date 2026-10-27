@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mock do kanban de pedidos</title>
+<!--
+  Mock do kanban de pedidos. Autocontido, mesma linguagem do shell (F6): papel/creme, verde da loja,
+  Lora + Karla. Estados via hash: #normal (padrao) | #vazio | #carregando | #erro | #problema-dialogo
+  Desktop: 5 colunas com rolagem horizontal propria do quadro. Mobile: abas por coluna, 1 coluna por vez.
+-->
+<style>
+@font-face{font-family:Karla;font-weight:400;src:url("../../../../frontend/node_modules/@fontsource/karla/files/karla-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:Karla;font-weight:500;src:url("../../../../frontend/node_modules/@fontsource/karla/files/karla-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:Karla;font-weight:700;src:url("../../../../frontend/node_modules/@fontsource/karla/files/karla-latin-700-normal.woff2") format("woff2")}
+@font-face{font-family:Lora;font-weight:400 700;src:url("../../../../frontend/node_modules/@fontsource-variable/lora/files/lora-latin-wght-normal.woff2") format("woff2")}
+:root{
+  --papel:#faf7f0; --papel-2:#f3eee3; --cartao:#fff; --linha:#e5decf;
+  --tinta:#20322a; --tinta-2:#5c6b62;
+  --cor-primaria:#1e4d3b; --cor-primaria-suave:#dceae0; --cor-sobre-primaria:#faf7f0;
+  --ambar:#b97e22; --ambar-claro:#f6ebd7; --barro:#a4543f; --barro-claro:#f5e3dd; --folha:#3e7c5b;
+  --revisao:#2f6f7a; --revisao-claro:#d9eaed;
+  --raio:12px; --sidebar:248px; --topo:60px; --bottom:64px;
+  --display:Lora,Georgia,serif; --sans:Karla,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--papel);color:var(--tinta);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.2;margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.s{width:15px;height:15px}
+:focus-visible{outline:2px solid var(--cor-primaria);outline-offset:2px}
+
+/* ---------- shell (copia do F6) ---------- */
+.app{display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr);grid-template-rows:var(--topo) 1fr;min-height:100vh}
+.side{grid-row:1/3;background:var(--papel-2);border-right:1px solid var(--linha);display:flex;flex-direction:column;padding:16px 12px;position:sticky;top:0;height:100vh}
+.marca{display:flex;align-items:center;gap:10px;padding:4px 10px 18px;font-family:var(--display);font-weight:700;font-size:20px}
+.marca .sino{width:30px;height:30px;border-radius:9px;background:var(--cor-primaria);color:var(--cor-sobre-primaria);display:grid;place-items:center}
+.grupo{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-2);padding:16px 12px 6px;font-weight:700}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--tinta);text-decoration:none;font-weight:500;min-height:44px}
+.nav a[aria-current=page]{background:var(--cartao);box-shadow:inset 0 0 0 1px var(--linha);color:var(--cor-primaria);font-weight:700}
+.nav .badge{margin-left:auto;background:var(--cor-primaria);color:var(--cor-sobre-primaria);font-size:12px;font-weight:700;border-radius:999px;padding:1px 8px;min-width:22px;text-align:center}
+.side .rodape{margin-top:auto;padding:12px;font-size:13px;color:var(--tinta-2);border-top:1px solid var(--linha)}
+.topo{grid-column:2;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--linha);background:rgba(250,247,240,.9);position:sticky;top:0;z-index:5}
+.loja{display:flex;align-items:center;gap:10px;background:var(--cartao);border:1px solid var(--linha);border-radius:999px;padding:5px 12px 5px 6px;min-height:44px;max-width:340px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--cor-primaria);color:var(--cor-sobre-primaria);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.loja .nome{display:block;font-weight:700}.loja .sub{display:block;font-size:12px;color:var(--tinta-2);line-height:1.1}
+.espaco{flex:1}
+.ao-vivo{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--tinta-2);padding:6px 12px;border-radius:999px;background:var(--cartao);border:1px solid var(--linha)}
+.ponto{width:8px;height:8px;border-radius:50%;background:var(--folha);box-shadow:0 0 0 3px rgba(62,124,91,.18)}
+.usuario{width:40px;height:40px;border-radius:50%;border:1px solid var(--linha);background:var(--cartao);display:grid;place-items:center;font-weight:700;color:var(--tinta-2)}
+main{grid-column:2;padding:28px 32px 40px;min-width:0}
+
+/* ---------- cabecalho da tela ---------- */
+.cab{display:flex;align-items:end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--linha)}
+.cab h1{font-size:30px;color:var(--cor-primaria)}
+.cab p{margin:4px 0 0;color:var(--tinta-2);font-size:14px}
+.resumo{display:flex;gap:22px}
+.resumo div{display:grid;text-align:right}
+.resumo b{font-family:var(--display);font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.resumo span{font-size:12px;color:var(--tinta-2);letter-spacing:.04em;text-transform:uppercase;font-weight:700}
+.filtros{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 18px}
+.seg{display:inline-flex;background:var(--papel-2);border:1px solid var(--linha);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;border-radius:999px;min-height:38px;padding:0 14px;font-size:14px;font-weight:500;color:var(--tinta-2)}
+.seg button[aria-pressed=true]{background:var(--cartao);color:var(--cor-primaria);font-weight:700;box-shadow:0 0 0 1px var(--linha)}
+
+/* ---------- quadro ---------- */
+.abas{display:none}
+.quadro{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(284px,1fr);gap:14px;overflow-x:auto;padding-bottom:12px;align-items:start}
+.col{background:var(--papel-2);border:1px solid var(--linha);border-radius:14px;display:flex;flex-direction:column;min-height:200px}
+.col-cab{display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px solid var(--linha);position:relative}
+.col-cab::before{content:"";position:absolute;left:14px;top:-1px;width:36px;height:3px;border-radius:0 0 3px 3px;background:var(--c)}
+.col-cab h2{font-size:15px;font-family:var(--sans);font-weight:700}
+.col-cab .n{margin-left:auto;font-weight:700;font-size:13px;min-width:26px;text-align:center;padding:1px 8px;border-radius:999px;background:var(--cartao);border:1px solid var(--linha);font-variant-numeric:tabular-nums}
+.col[data-c=novo]{--c:var(--cor-primaria)}
+.col[data-c=em_preparo]{--c:var(--ambar)}
+.col[data-c=saiu_entrega]{--c:var(--revisao)}
+.col[data-c=entregue]{--c:var(--folha)}
+.col[data-c=problema]{--c:var(--barro);background:#f8ece7;border-color:#e8cfc5}
+.col-corpo{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:10px}.col{min-width:0}
+.col-vazia{color:var(--tinta-2);font-size:14px;text-align:center;padding:14px 8px;border:1px dashed #d8d0bd;border-radius:10px}
+
+/* ---------- comanda (card) ---------- */
+.card{background:var(--cartao);border:1px solid var(--linha);border-radius:12px;position:relative;box-shadow:0 1px 0 rgba(32,50,42,.04)}
+.card.novo-agora{box-shadow:0 0 0 2px var(--cor-primaria),0 6px 18px rgba(30,77,59,.14)}
+.card-topo{display:flex;align-items:baseline;gap:8px;padding:12px 14px 0}
+.cod{font-family:var(--display);font-weight:700;font-size:19px;font-variant-numeric:tabular-nums}
+.tempo{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--tinta-2);font-variant-numeric:tabular-nums}
+.tempo.atencao{color:#8a5d14}.tempo.urgente{color:var(--barro)}
+.cli{padding:2px 14px 0;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{padding:4px 14px 12px;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:13px;color:var(--tinta-2)}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px 2px 7px;font-size:12px;font-weight:700;background:var(--papel-2);color:var(--tinta)}
+.chip.ent{background:var(--revisao-claro);color:var(--revisao)}
+.chip.ret{background:var(--ambar-claro);color:#8a5d14}
+.motivo{margin:0 14px 12px;padding:8px 10px;border-radius:8px;background:var(--barro-claro);color:#7c3a29;font-size:13px;display:flex;gap:8px}
+.pic{position:relative;border-top:1.5px dashed var(--linha)}
+.pic::before,.pic::after{content:"";position:absolute;top:-8px;width:14px;height:14px;border-radius:50%;background:var(--papel-2);border:1px solid var(--linha)}
+.pic::before{left:-8px;clip-path:inset(0 0 0 50%)}
+.pic::after{right:-8px;clip-path:inset(0 50% 0 0)}
+.col[data-c=problema] .pic::before,.col[data-c=problema] .pic::after{background:#f8ece7}
+.rodape-card{display:flex;align-items:center;gap:8px;padding:10px 10px 12px 14px}
+.total{font-weight:700;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.acoes{margin-left:auto;display:flex;gap:6px;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;border:1px solid var(--linha);background:var(--cartao);border-radius:999px;padding:0 12px;min-height:44px;font-weight:700;font-size:14px}
+.btn.p{background:var(--cor-primaria);border-color:var(--cor-primaria);color:var(--cor-sobre-primaria)}
+.btn.q{width:44px;padding:0;color:var(--barro);border-color:#e4c4ba}
+
+/* estados */
+.estado{display:none}
+body.vazio .e-vazio{display:grid}
+body.carregando .e-carregando{display:grid}
+body.erro .e-erro{display:flex}
+body.vazio #quadro,body.carregando #quadro,body.erro #quadro,body.vazio .filtros,body.vazio .abas,body.carregando .abas,body.erro .abas{display:none}
+.cartao{background:var(--cartao);border:1px solid var(--linha);border-radius:var(--raio)}
+.slot{padding:56px 24px;text-align:center;justify-items:center;gap:12px;border-style:dashed}
+.slot .ic{width:56px;height:56px;border-radius:16px;background:var(--cor-primaria-suave);color:var(--cor-primaria);display:grid;place-items:center}
+.slot h2{font-size:20px}.slot p{margin:0;color:var(--tinta-2);max-width:46ch}
+.skel-cols{grid-auto-flow:column;grid-auto-columns:minmax(262px,1fr);gap:14px;overflow:hidden}
+.skel-c{background:var(--papel-2);border:1px solid var(--linha);border-radius:14px;padding:12px;display:grid;gap:10px;align-content:start}
+.skel-c div{height:104px;border-radius:12px;background:linear-gradient(90deg,#fff,#fbf9f4,#fff);background-size:200% 100%;animation:b 1.4s infinite}
+.skel-c div:first-child{height:20px;width:50%;background:var(--linha);animation:none}
+@keyframes b{to{background-position:-200% 0}}
+.erro-box{border-color:#e4c4ba;background:var(--barro-claro);padding:24px;gap:16px;align-items:flex-start}
+.erro-box h2{font-size:18px;color:var(--barro)}.erro-box p{margin:4px 0 12px}
+
+/* dialogo de problema */
+.veu{display:none;position:fixed;inset:0;background:rgba(32,50,42,.3);z-index:30;align-items:center;justify-content:center;padding:16px}
+body.dlg .veu{display:flex}
+.dlg-box{background:var(--cartao);border:1px solid var(--linha);border-radius:12px;max-width:380px;width:100%;padding:24px;box-shadow:0 12px 40px rgba(32,50,42,.18)}
+.dlg-box h2{font-size:20px;color:var(--cor-primaria)}
+.dlg-box p{color:var(--tinta-2);font-size:14px;margin:8px 0 12px}
+.dlg-box textarea{width:100%;min-height:84px;border:1px solid var(--linha);border-radius:8px;padding:10px;font:inherit;background:var(--papel)}
+.dlg-box .linha{display:grid;gap:8px;margin-top:16px}
+
+.bottom{display:none}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:var(--topo) 1fr}
+  .side{display:none}
+  .topo{grid-column:1;padding:0 16px}
+  main{grid-column:1;padding:18px 16px calc(var(--bottom) + 28px)}
+  .loja{flex:1;min-width:0}.espaco{display:none}.ao-vivo span.t{display:none}.ao-vivo{padding:10px}
+  .cab h1{font-size:24px}
+  .resumo{gap:16px;width:100%;justify-content:space-between}.resumo div{text-align:left}
+  .filtros{margin:12px -16px 4px;padding:0 16px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.seg{flex:none}
+  .seg button{min-height:44px}
+  .abas{display:flex;gap:6px;overflow-x:auto;position:sticky;top:var(--topo);z-index:4;background:var(--papel);padding:8px 16px 10px;margin:0 -16px 6px;scrollbar-width:none}
+  .aba{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--linha);background:var(--cartao);font-weight:500;font-size:14px;color:var(--tinta-2)}
+  .aba b{font-variant-numeric:tabular-nums;font-size:12px;background:var(--papel-2);border-radius:999px;padding:0 7px}
+  .aba[aria-selected=true]{background:var(--cor-primaria);border-color:var(--cor-primaria);color:var(--cor-sobre-primaria);font-weight:700}
+  .aba[aria-selected=true] b{background:rgba(255,255,255,.2);color:#fff}
+  .aba.prob b{background:var(--barro-claro);color:var(--barro)}
+  .quadro{display:block;overflow:visible}
+  .col{display:none;background:transparent;border:0;min-height:0}
+  .col.on{display:flex}
+  .col-cab{display:none}
+  .col-corpo{padding:0}
+  .col .pic::before,.col .pic::after{background:var(--papel)}
+  .bottom{display:flex;position:fixed;left:0;right:0;bottom:0;height:var(--bottom);background:rgba(250,247,240,.96);border-top:1px solid var(--linha);z-index:10}
+  .bottom a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:500;color:var(--tinta-2);text-decoration:none;position:relative}
+  .bottom a[aria-current=page]{color:var(--cor-primaria);font-weight:700}
+  .bottom a[aria-current=page]::before{content:"";position:absolute;top:0;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--cor-primaria)}
+}
+@media (prefers-reduced-motion:reduce){.skel-c div{animation:none}}
+</style>
+</head>
+<body class="normal">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+  <symbol id="pedidos" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></symbol>
+  <symbol id="chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z"/></symbol>
+  <symbol id="menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="1"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="moto" viewBox="0 0 24 24"><circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M8.5 17h5l3-7h-4M12 6h3"/></symbol>
+  <symbol id="bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6Z"/><path d="M9 8a3 3 0 0 1 6 0"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side" aria-label="Navegação principal">
+    <div class="marca"><span class="sino"><svg class="i"><use href="#bell"/></svg></span>Whaviso</div>
+    <nav class="nav">
+      <a href="#"><svg class="i"><use href="#chart"/></svg>Dashboard</a>
+      <a href="#" aria-current="page"><svg class="i"><use href="#pedidos"/></svg>Pedidos<span class="badge">3</span></a>
+      <a href="#"><svg class="i"><use href="#chat"/></svg>Conversas<span class="badge">2</span></a>
+      <a href="#"><svg class="i"><use href="#menu"/></svg>Cardápio</a>
+      <a href="#"><svg class="i"><use href="#users"/></svg>Clientes</a>
+    </nav>
+    <div class="grupo">Entrega</div>
+    <nav class="nav"><a href="#"><svg class="i"><use href="#moto"/></svg>Despacho</a></nav>
+    <div class="rodape">Sessão de Ana Souza<br />Papel: dono</div>
+  </aside>
+
+  <header class="topo">
+    <button class="loja"><span class="avatar">CZ</span><span style="flex:1;text-align:left"><span class="nome">Cantina do Zé</span><span class="sub">Trocar de loja</span></span><svg class="i"><use href="#chev"/></svg></button>
+    <span class="espaco"></span>
+    <span class="ao-vivo"><span class="ponto"></span><span class="t">Ao vivo</span></span>
+    <span class="usuario">AS</span>
+  </header>
+
+  <main>
+    <div class="cab">
+      <div><h1>Pedidos</h1><p>Hoje, terça-feira, 27/10. Atualiza sozinho quando um pedido muda.</p></div>
+      <div class="resumo" aria-label="Resumo do dia">
+        <div><b>14</b><span>Pedidos</span></div>
+        <div><b>7</b><span>Abertos</span></div>
+        <div><b style="color:var(--barro)">1</b><span>Problemas</span></div>
+      </div>
+    </div>
+
+    <div class="filtros">
+      <div class="seg" role="group" aria-label="Modalidade"><button aria-pressed="true">Todos</button><button aria-pressed="false">Entrega</button><button aria-pressed="false">Retirada</button></div>
+      <div class="seg" role="group" aria-label="Origem"><button aria-pressed="true">Toda origem</button><button aria-pressed="false">WhatsApp</button><button aria-pressed="false">iFood</button><button aria-pressed="false">Manual</button></div>
+    </div>
+
+    <div class="abas" role="tablist" aria-label="Colunas do quadro">
+      <button class="aba" role="tab" aria-selected="true" data-t="novo">Novo <b>3</b></button>
+      <button class="aba" role="tab" aria-selected="false" data-t="em_preparo">Em preparo <b>2</b></button>
+      <button class="aba" role="tab" aria-selected="false" data-t="saiu_entrega">Saiu <b>2</b></button>
+      <button class="aba" role="tab" aria-selected="false" data-t="entregue">Entregue <b>6</b></button>
+      <button class="aba prob" role="tab" aria-selected="false" data-t="problema">Problema <b>1</b></button>
+    </div>
+
+    <div class="quadro" id="quadro">
+      <section class="col on" data-c="novo" aria-label="Novo">
+        <div class="col-cab"><h2>Novo</h2><span class="n">3</span></div>
+        <div class="col-corpo">
+          <article class="card novo-agora">
+            <div class="card-topo"><span class="cod">#1042</span><span class="tempo"><svg class="i s"><use href="#clock"/></svg>agora</span></div>
+            <div class="cli">Marcos Teixeira</div>
+            <div class="meta"><span class="chip ent"><svg class="i s"><use href="#moto"/></svg>Entrega</span><span>3 itens</span><span>WhatsApp</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 87,50</span><div class="acoes"><button class="btn q" aria-label="Marcar #1042 como problema"><svg class="i"><use href="#alert"/></svg></button><button class="btn p">Preparar<svg class="i s"><use href="#arrow"/></svg></button></div></div>
+          </article>
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1041</span><span class="tempo atencao"><svg class="i s"><use href="#clock"/></svg>11 min</span></div>
+            <div class="cli">Luciana Prado</div>
+            <div class="meta"><span class="chip ret"><svg class="i s"><use href="#bag"/></svg>Retirada</span><span>1 item</span><span>WhatsApp</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 34,00</span><div class="acoes"><button class="btn q" aria-label="Marcar #1041 como problema"><svg class="i"><use href="#alert"/></svg></button><button class="btn p">Preparar<svg class="i s"><use href="#arrow"/></svg></button></div></div>
+          </article>
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1039</span><span class="tempo urgente"><svg class="i s"><use href="#clock"/></svg>27 min</span></div>
+            <div class="cli">Cliente sem nome</div>
+            <div class="meta"><span class="chip ent"><svg class="i s"><use href="#moto"/></svg>Entrega</span><span>5 itens</span><span>iFood</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 142,90</span><div class="acoes"><button class="btn q" aria-label="Marcar #1039 como problema"><svg class="i"><use href="#alert"/></svg></button><button class="btn p">Preparar<svg class="i s"><use href="#arrow"/></svg></button></div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="col" data-c="em_preparo" aria-label="Em preparo">
+        <div class="col-cab"><h2>Em preparo</h2><span class="n">2</span></div>
+        <div class="col-corpo">
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1038</span><span class="tempo atencao"><svg class="i s"><use href="#clock"/></svg>18 min</span></div>
+            <div class="cli">Beatriz Nogueira</div>
+            <div class="meta"><span class="chip ent"><svg class="i s"><use href="#moto"/></svg>Entrega</span><span>2 itens</span><span>WhatsApp</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 61,00</span><div class="acoes"><button class="btn q" aria-label="Marcar #1038 como problema"><svg class="i"><use href="#alert"/></svg></button><button class="btn p">Saiu<svg class="i s"><use href="#arrow"/></svg></button></div></div>
+          </article>
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1037</span><span class="tempo"><svg class="i s"><use href="#clock"/></svg>6 min</span></div>
+            <div class="cli">Rafael Duarte</div>
+            <div class="meta"><span class="chip ret"><svg class="i s"><use href="#bag"/></svg>Retirada</span><span>4 itens</span><span>Manual</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 96,80</span><div class="acoes"><button class="btn q" aria-label="Marcar #1037 como problema"><svg class="i"><use href="#alert"/></svg></button><button class="btn p">Entregue<svg class="i s"><use href="#check"/></svg></button></div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="col" data-c="saiu_entrega" aria-label="Saiu para entrega">
+        <div class="col-cab"><h2>Saiu para entrega</h2><span class="n">2</span></div>
+        <div class="col-corpo">
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1035</span><span class="tempo"><svg class="i s"><use href="#clock"/></svg>34 min</span></div>
+            <div class="cli">Helena Castro</div>
+            <div class="meta"><span class="chip ent"><svg class="i s"><use href="#moto"/></svg>Carlos</span><span>2 itens</span><span>WhatsApp</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 58,00</span><div class="acoes"><button class="btn q" aria-label="Marcar #1035 como problema"><svg class="i"><use href="#alert"/></svg></button><button class="btn p">Entregue<svg class="i s"><use href="#check"/></svg></button></div></div>
+          </article>
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1034</span><span class="tempo"><svg class="i s"><use href="#clock"/></svg>41 min</span></div>
+            <div class="cli">Paulo Menezes</div>
+            <div class="meta"><span class="chip ent"><svg class="i s"><use href="#moto"/></svg>Carlos</span><span>3 itens</span><span>WhatsApp</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 74,50</span><div class="acoes"><button class="btn q" aria-label="Marcar #1034 como problema"><svg class="i"><use href="#alert"/></svg></button><button class="btn p">Entregue<svg class="i s"><use href="#check"/></svg></button></div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="col" data-c="entregue" aria-label="Entregue">
+        <div class="col-cab"><h2>Entregue</h2><span class="n">6</span></div>
+        <div class="col-corpo">
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1033</span><span class="tempo"><svg class="i s"><use href="#check"/></svg>há 1 h</span></div>
+            <div class="cli">Aline Fonseca</div>
+            <div class="meta"><span class="chip ent"><svg class="i s"><use href="#moto"/></svg>Entrega</span><span>2 itens</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 49,90</span></div>
+          </article>
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1032</span><span class="tempo"><svg class="i s"><use href="#check"/></svg>há 1 h</span></div>
+            <div class="cli">Diego Ramos</div>
+            <div class="meta"><span class="chip ret"><svg class="i s"><use href="#bag"/></svg>Retirada</span><span>1 item</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 28,00</span></div>
+          </article>
+          <div class="col-vazia">Mais 4 pedidos entregues hoje</div>
+        </div>
+      </section>
+
+      <section class="col" data-c="problema" aria-label="Problema">
+        <div class="col-cab"><h2>Problema</h2><span class="n">1</span></div>
+        <div class="col-corpo">
+          <article class="card">
+            <div class="card-topo"><span class="cod">#1036</span><span class="tempo urgente"><svg class="i s"><use href="#clock"/></svg>52 min</span></div>
+            <div class="cli">Gustavo Lima</div>
+            <div class="meta"><span class="chip ent"><svg class="i s"><use href="#moto"/></svg>Entrega</span><span>2 itens</span><span>WhatsApp</span></div>
+            <div class="motivo"><svg class="i s" style="margin-top:3px"><use href="#alert"/></svg><span><b>Motivo:</b> endereço não localizado, cliente não atende.</span></div>
+            <div class="pic"></div>
+            <div class="rodape-card"><span class="total">R$ 66,00</span><div class="acoes"><button class="btn">Retomar</button><button class="btn p">Entregue<svg class="i s"><use href="#check"/></svg></button></div></div>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <section class="cartao slot estado e-vazio">
+      <span class="ic"><svg class="i" style="width:26px;height:26px"><use href="#pedidos"/></svg></span>
+      <h2>Nenhum pedido por enquanto</h2>
+      <p>Quando um cliente pedir pelo WhatsApp, o pedido aparece aqui sozinho.</p>
+    </section>
+    <div class="skel-cols estado e-carregando" id="skel" aria-busy="true"></div>
+    <section class="cartao erro-box estado e-erro" role="alert">
+      <svg class="i" style="width:28px;height:28px;color:var(--barro)"><use href="#alert"/></svg>
+      <div><h2>Não foi possível carregar</h2><p>O servidor não respondeu. Seus dados estão a salvo. Tente de novo em instantes.</p><button class="btn">Tentar de novo</button></div>
+    </section>
+  </main>
+
+  <nav class="bottom" aria-label="Navegação principal">
+    <a href="#" aria-current="page"><svg class="i"><use href="#pedidos"/></svg>Pedidos</a>
+    <a href="#"><svg class="i"><use href="#chat"/></svg>Conversas</a>
+    <a href="#"><svg class="i"><use href="#menu"/></svg>Cardápio</a>
+    <a href="#"><svg class="i"><use href="#users"/></svg>Clientes</a>
+    <a href="#"><svg class="i"><use href="#menu"/></svg>Mais</a>
+  </nav>
+</div>
+
+<div class="veu" role="presentation">
+  <div class="dlg-box" role="dialog" aria-labelledby="dt">
+    <h2 id="dt">Marcar #1042 como problema</h2>
+    <p>Conte o que aconteceu. O motivo fica visível para quem cuida do pedido.</p>
+    <textarea aria-label="Motivo">Cliente pediu para esperar</textarea>
+    <div class="linha"><button class="btn p" style="background:var(--barro);border-color:var(--barro)">Marcar como problema</button><button class="btn">Voltar</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var b=document.body,h=(location.hash||'#normal').slice(1);
+  b.className=h==='problema-dialogo'?'normal dlg':h;
+  if(h==='carregando'){
+    var s=document.getElementById('skel');
+    for(var i=0;i<5;i++){var c=document.createElement('div');c.className='skel-c';c.innerHTML='<div></div><div></div><div></div>';s.appendChild(c)}
+  }
+  var abas=document.querySelectorAll('.aba'),cols=document.querySelectorAll('.col');
+  abas.forEach(function(a){a.addEventListener('click',function(){
+    abas.forEach(function(x){x.setAttribute('aria-selected',String(x===a))});
+    cols.forEach(function(c){c.classList.toggle('on',c.dataset.c===a.dataset.t)});
+  })});
+})();
+</script>
+<style>@media (min-width:861px){.col{display:flex!important}}</style>
+</body>
+</html>
