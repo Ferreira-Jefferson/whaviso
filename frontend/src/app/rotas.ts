@@ -34,16 +34,16 @@ export interface RotaModulo {
 
 export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'pedidos', rotulo: 'Pedidos', descricao: 'Acompanhe os pedidos ao vivo.', icone: ClipboardList, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/pedidos')) },
-  { caminho: 'conversas', rotulo: 'Conversas', descricao: 'Atendimento pelo WhatsApp.', icone: MessageCircle, grupo: 'painel', fixoNoMobile: true },
-  { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'painel', fixoNoMobile: true },
-  { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'painel', fixoNoMobile: true },
+  { caminho: 'conversas', rotulo: 'Conversas', descricao: 'Atendimento pelo WhatsApp.', icone: MessageCircle, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/conversas')) },
+  { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/cardapio')) },
+  { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/clientes')) },
   { caminho: 'dashboard', rotulo: 'Dashboard', descricao: 'Números do dia e do período.', icone: BarChart3, grupo: 'painel' },
   { caminho: 'despacho', rotulo: 'Despacho', descricao: 'Pedidos prontos para sair.', icone: Bike, grupo: 'entrega' },
   { caminho: 'motoboys', rotulo: 'Motoboys', descricao: 'Cadastro de entregadores.', icone: Users, grupo: 'entrega' },
   { caminho: 'zonas', rotulo: 'Zonas', descricao: 'Áreas e taxas de entrega.', icone: MapPinned, grupo: 'entrega' },
   { caminho: 'fechamento', rotulo: 'Fechamento', descricao: 'Resumo do dia por entregador.', icone: CalendarCheck, grupo: 'entrega' },
-  { caminho: 'lojas', rotulo: 'Lojas', descricao: 'Perfil, horários e área da loja.', icone: Store, grupo: 'config' },
-  { caminho: 'numeros', rotulo: 'Números', descricao: 'Números de WhatsApp conectados.', icone: Smartphone, grupo: 'config' },
+  { caminho: 'lojas', rotulo: 'Lojas', descricao: 'Perfil, horários e área da loja.', icone: Store, grupo: 'config', pagina: lazy(() => import('@/modules/lojas')) },
+  { caminho: 'numeros', rotulo: 'Números', descricao: 'Números de WhatsApp conectados.', icone: Smartphone, grupo: 'config', pagina: lazy(() => import('@/modules/numeros')) },
 ]
 
 export const ROTULO_GRUPO: Record<GrupoNav, string> = {
