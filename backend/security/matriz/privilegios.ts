@@ -38,6 +38,7 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   clientes: { apiDelete: 'negado' },
   contas: { apiDelete: 'negado' },
   conversas: { apiDelete: 'negado' },
+  convites: { apiDelete: 'negado' },
   corridas: { apiDelete: 'negado' },
   credenciais_llm: { apiDelete: 'negado' },
   enderecos: { apiDelete: 'negado' },
@@ -152,6 +153,14 @@ export const CASOS_ESPECIFICOS: readonly LinhaMatriz[] = [
 
   // SEC-030 espelho: um role sem o grant de delete em templates e negado.
   { role: 'whaviso_zap', tabela: 'templates', operacao: 'delete', esperado: 'negado', sec: 'SEC-030' },
+
+  // convites (API-conta, migration 0013): whaviso_api so grava estado; papel/token imutaveis apos
+  // criado; zap/atendente sem grant algum. (UPDATE por coluna: so aceito_em/aceito_por_user_id/revogado_em.)
+  { role: 'whaviso_api', tabela: 'convites', operacao: 'insert', esperado: 'permitido', sec: 'SEC-041' },
+  { role: 'whaviso_api', tabela: 'convites', coluna: 'aceito_em', operacao: 'update', esperado: 'permitido', sec: 'SEC-041', nota: 'estado do convite' },
+  { role: 'whaviso_api', tabela: 'convites', coluna: 'papel', operacao: 'update', esperado: 'negado', sec: 'SEC-041', nota: 'convite imutavel apos criado' },
+  { role: 'whaviso_zap', tabela: 'convites', operacao: 'select', esperado: 'negado', sec: 'SEC-041', nota: 'zap nao toca convites' },
+  { role: 'whaviso_atendente', tabela: 'convites', operacao: 'select', esperado: 'negado', sec: 'SEC-041', nota: 'atendente nao toca convites' },
 ] as const
 
 /** Tabelas (append-only) cujo UPDATE deve ser barrado pelo TRIGGER mesmo para o dono da tabela. */
