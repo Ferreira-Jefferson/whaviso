@@ -117,6 +117,18 @@ jobs:
           PGDATABASE: whaviso_dev
         run: npm test
 
+      # Gate de seguranca (F7): matriz de privilegio por role (SET ROLE), redaction de log, dump
+      # sem segredo em claro, varredura de respostas e rastreabilidade do catalogo SEC. O reporter
+      # do vitest lista os ids SEC-### que falharem. Step OBRIGATORIO: um PR com SEC vermelho nao
+      # entra. check_rls_coverage.sh (SEC-011) ja roda no step "Cobertura de RLS" acima.
+      - name: Backend, suite de seguranca (test:security)
+        working-directory: backend
+        env:
+          POSTGRES_PASSWORD: postgres
+          PGHOST: 127.0.0.1
+          PGDATABASE: whaviso_dev
+        run: npm run test:security
+
       - name: Frontend, instalar dependencias
         working-directory: frontend
         run: npm ci
