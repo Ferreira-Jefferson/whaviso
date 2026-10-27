@@ -17,6 +17,7 @@ import {
   type ComandaSaida as Comanda,
   type MesaSaida as Mesa,
 } from '@/shared/contracts/_generated/salao'
+import { CardapioResolvidoSaida } from '@/shared/contracts/_generated/cardapio'
 
 export const RAIZ = 'salao'
 
@@ -51,6 +52,41 @@ export function useComanda(id: string | null) {
     enabled: id != null,
     queryFn: ({ signal }) =>
       apiClient.get<Comanda>(`/salao/comandas/${id}`, { schema: ComandaSaida, signal }),
+  })
+}
+
+/** Item do cardapio achatado para o seletor de lancamento (so os campos que a UI usa). */
+export interface ItemCardapioResumo {
+  id: string
+  nome: string
+  preco_centavos: number
+  categoria: string
+}
+
+/**
+ * GET /v1/cardapio: le a arvore do cardapio (chamada HTTP, nao import de modulo) e achata
+ * categorias -> itens numa lista dos itens DISPONIVEIS, para o seletor do LancarItemDialog.
+ * O preco segue vindo do servidor no lancamento; aqui o preco e so apresentacao no seletor.
+ */
+export function useItensCardapio() {
+  return useQuery({
+    queryKey: ['cardapio', 'arvore'],
+    queryFn: ({ signal }) =>
+      apiClient.get<z.infer<typeof CardapioResolvidoSaida>>('/cardapio', {
+        schema: CardapioResolvidoSaida,
+        signal,
+      }),
+    select: (d): ItemCardapioResumo[] =>
+      d.categorias.flatMap((cat) =>
+        cat.itens
+          .filter((item) => item.disponivel)
+          .map((item) => ({
+            id: item.id,
+            nome: item.nome,
+            preco_centavos: item.preco_centavos,
+            categoria: cat.nome,
+          })),
+      ),
   })
 }
 
