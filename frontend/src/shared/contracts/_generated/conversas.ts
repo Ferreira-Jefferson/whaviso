@@ -130,4 +130,11 @@ export const ConversaEncerradaSaida = z.strictObject({
   status: z.literal('encerrada'),
 })
 
+/** Handoff manual: resultado de assumir (status 'humano') ou devolver (status 'ia'). */
+export const ConversaHandoffSaida = z.strictObject({
+  id: Uuid,
+  status: statusConversa,
+})
+export type ConversaHandoffSaida = z.infer<typeof ConversaHandoffSaida>
+
 export const LidaSaida = z.strictObject({ ok: z.literal(true) })

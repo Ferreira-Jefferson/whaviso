@@ -111,6 +111,26 @@ export async function pedidoDaConversa(
   )
 }
 
+/**
+ * Resolve o membro do usuario que cobre a loja ativa (para gravar quem assumiu).
+ * Vinculo direto a loja tem precedencia sobre o vinculo "todas as lojas" (loja_id NULL).
+ */
+export async function membroDoUsuarioNaLoja(
+  exec: Executor,
+  userId: string,
+  lojaId: string,
+): Promise<string | null> {
+  const linha = await consultarUm<{ id: string }>(
+    exec,
+    sql`select m.id from public.membros m
+          join public.lojas l on l.conta_id = m.conta_id and l.id = ${lojaId}
+         where m.user_id = ${userId} and m.ativo and (m.loja_id = ${lojaId} or m.loja_id is null)
+         order by (m.loja_id is not null) desc
+         limit 1`,
+  )
+  return linha?.id ?? null
+}
+
 export interface LinhaMensagem {
   id: string
   conversa_id: string

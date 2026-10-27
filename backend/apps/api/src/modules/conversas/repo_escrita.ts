@@ -83,6 +83,31 @@ export async function tocarConversa(exec: Executor, lojaId: string, conversaId: 
   )
 }
 
+/** Handoff manual ia->humano: marca quem assumiu e desde quando (dispara atualizado_em). */
+export async function assumirConversa(
+  exec: Executor,
+  lojaId: string,
+  conversaId: string,
+  membroId: string | null,
+): Promise<void> {
+  await consultar(
+    exec,
+    sql`update public.conversas
+           set status = 'humano', atendido_por_membro_id = ${membroId}, humano_desde = now()
+         where loja_id = ${lojaId} and id = ${conversaId}`,
+  )
+}
+
+/** Handoff manual humano->ia: devolve para a automacao e limpa quem atendia. */
+export async function devolverConversa(exec: Executor, lojaId: string, conversaId: string): Promise<void> {
+  await consultar(
+    exec,
+    sql`update public.conversas
+           set status = 'ia', atendido_por_membro_id = null, humano_desde = null
+         where loja_id = ${lojaId} and id = ${conversaId}`,
+  )
+}
+
 export async function encerrarConversa(exec: Executor, lojaId: string, conversaId: string): Promise<void> {
   await consultar(
     exec,

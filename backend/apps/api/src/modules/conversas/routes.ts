@@ -5,6 +5,7 @@ import {
   ConversaDetalheSaida,
   ConversaEncerrarEntrada,
   ConversaEncerradaSaida,
+  ConversaHandoffSaida,
   ConversaListaEntrada,
   ConversaListaSaida,
   LidaSaida,
@@ -15,6 +16,7 @@ import {
   ParamConversa,
 } from './schemas'
 import { abrir, encerrar, historico, listar, marcarLida, responder, type Relogio } from './service'
+import { assumir, devolver } from './handoff'
 
 export interface OpcoesConversas {
   /** Relogio injetavel (testes de borda da janela). Padrao: agora. */
@@ -36,6 +38,12 @@ function lojaDaRequisicao(req: FastifyRequest): string {
   const loja = req.escopo?.loja_ativa
   if (!loja) throw new HttpError(400, 'loja_ativa_obrigatoria', 'Informe a loja ativa no header x-loja-id')
   return loja
+}
+
+function usuarioDaRequisicao(req: FastifyRequest): string {
+  const u = req.escopo?.user_id
+  if (!u) throw new HttpError(401, 'nao_autorizado', 'Autenticacao necessaria')
+  return u
 }
 
 export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPluginAsync {
@@ -102,6 +110,19 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
         const saida = await responder(app.pool, lojaDaRequisicao(req), req.params.id, req.body.texto, agora())
         return reply.status(201).send(saida)
       },
+    )
+
+    // Handoff manual (human-in-the-loop): assumir (ia->humano) e devolver (humano->ia).
+    app.post(
+      '/:id/assumir',
+      { config: acesso, preHandler: guardas, schema: { params: ParamConversa, response: { 200: ConversaHandoffSaida } } },
+      async (req) => assumir(app.pool, lojaDaRequisicao(req), req.params.id, usuarioDaRequisicao(req)),
+    )
+
+    app.post(
+      '/:id/devolver',
+      { config: acesso, preHandler: guardas, schema: { params: ParamConversa, response: { 200: ConversaHandoffSaida } } },
+      async (req) => devolver(app.pool, lojaDaRequisicao(req), req.params.id),
     )
 
     app.post(

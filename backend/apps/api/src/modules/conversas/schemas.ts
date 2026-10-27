@@ -21,6 +21,7 @@ export {
   MensagensSaida,
   MensagemEnviadaSaida,
   ConversaEncerradaSaida,
+  ConversaHandoffSaida,
   LidaSaida,
 } from '@whaviso/shared/contracts'
 
