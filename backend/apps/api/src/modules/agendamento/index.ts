@@ -1,0 +1,1 @@
+export { agendamentoRoutes } from './routes'
