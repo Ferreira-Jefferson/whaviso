@@ -155,8 +155,9 @@ uma impondo escopo de loja e privilégio mínimo: a autorização mora na tool, 
 num contexto selado pelo servidor que o modelo nunca vê. Novo em `atendente/`: `shared/harness`,
 `shared/prompts` (base + guardrails em arquivo versionado, persona por loja em tabela) e `tools/<nome>`.
 
-**Resiliência (não cair durante um atendimento):** todo `Cliente*` (LLM, Whats, Mapas, e o futuro
-`ClienteCanal` para iFood e outros canais) tem **timeout + circuit breaker**, e a falha degrada para o
+**Resiliência (não cair durante um atendimento):** todo `Cliente*` (LLM, Whats, Mapas, e os provedores atrás de
+interface `ClienteCanal` (iFood e outros canais), `ClienteFiscal` (nota via terceiro) e
+`ClienteImpressora` (ESC-POS/KDS)) tem **timeout + circuit breaker**, e a falha degrada para o
 fluxo por botões, nunca erro cru. O estado da conversa é durável no Postgres (um crash retoma), o
 webhook persiste o inbound **antes** de responder 200 à Meta, e tudo é idempotente. Falta montar a
 observabilidade com **alerta de queda** e os testes de **carga, caos e idempotência sob crash**

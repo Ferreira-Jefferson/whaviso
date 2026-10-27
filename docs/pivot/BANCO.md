@@ -134,8 +134,10 @@ pelo kernel da api por role de aplicação, não por RLS.
   leva da revisão de produto acrescenta (reserva 0023+): `campanhas`, `campanha_envios`,
   `cliente_consentimento` (opt-out/LGPD), a view `clientes_metricas` (RFM: recência, frequência, valor,
   o que compra), `pedidos.forma_pagamento`/`troco_para`, `zonas.pedido_minimo`/`frete_gratis`,
-  `lojas.pausada`, `avaliacoes`, e colunas de anonimização LGPD. Estoque por produto e canais (iFood)
-  são ondas posteriores; fiscal/NFC-e fica fora (integração com terceiro).
+  `lojas.pausada`, `avaliacoes`, e colunas de anonimização LGPD. E, como ondas posteriores (tudo em
+  escopo, não é MVP): `estoque`/movimentos (baixa por produto, ficha técnica por ingrediente),
+  `promocoes`/`cupons`, `fidelidade`, `agendamento` (em pedidos), referências de emissão em `API-fiscal`
+  (via `ClienteFiscal` de terceiro, sem motor fiscal por UF) e os pedidos de canais (`ClienteCanal`).
 
 ### DDL esboçada das tabelas centrais
 

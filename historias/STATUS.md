@@ -191,8 +191,14 @@ remoção do resto é um commit coordenado à parte, nunca no meio de uma onda.
 | API-pedidos/AT (+) | troco, forma de pagamento carimbada, repetir pedido inteiro | 1 | erro operacional real |
 | API-lojas (+) | pausar a loja no pico; capacidade por janela | 1 | `lojas.pausada` |
 | API-avaliacoes | avaliação/pós-venda do consumidor | 4 | tabela `avaliacoes` |
-| estoque-produto | baixa automática por pedido (produto, não ingrediente) | 5 | ver decisão do dono |
-| API-canais | integração iFood/outros atrás de `ClienteCanal` | futura | origem `ifood` já no schema |
+| API-estoque | baixa automática por pedido (produto; ficha técnica por ingrediente como fatia seguinte) | 5 | em escopo |
+| API-canais | integração iFood/outros atrás de `ClienteCanal` (unificar pedidos) | 5 | origem `ifood` já no schema |
+| API-fiscal | emissão NFC-e/NFS-e via `ClienteFiscal` (emissor de terceiro, não motor por UF) | 5 | dono = qual provedor |
+| API-promocoes | cupons, combos e promoções (camada de preço promocional) | 4 | retenção/conversão |
+| API-fidelidade | fidelidade/cashback do consumidor final | 5 | retenção |
+| API-agendamento | pedido agendado (data/hora futura) | 3 | amplia pedidos |
+| FR-kds + ClienteImpressora | tela de cozinha (KDS) e impressão ESC-POS da comanda | 3 | hardware atrás de interface |
+| API-relatorios | BI/relatórios de fundo além do dashboard | 4 | read-model |
 
 ### Resiliência ("não cair durante um atendimento") -> categoria de teste RES-###
 
@@ -204,16 +210,17 @@ remoção do resto é um commit coordenado à parte, nunca no meio de uma onda.
 - Testes de **carga** do caminho de pedido + **caos** + **idempotência sob crash**. Nova categoria
   `RES-###` no catálogo do SEGURANCA.md.
 
-### Decisões do dono (adotadas pelo recomendado da revisão; dizer se quiser diferente)
+### Decisões do dono (default INCLUIR; não é corte de escopo)
 
-- **Fiscal/NFC-e: fica de fora** (integrar com terceiro depois). É o que viraria o whaviso num ERP;
-  mantém a aposta "canal próprio + retenção".
-- **Estoque:** por produto com baixa automática entra (onda 5); por ingrediente/ficha técnica, fora.
-- **iFood/canais:** entra como provedor `ClienteCanal` em onda futura, não agora.
-- **Billing da plataforma:** a assinatura fixa expõe a margem com o novo preço por mensagem da Meta
-  (out/2026); modelar **franquia + excedente** (revisar `P-cobranca`).
+Com o reenquadramento "não é MVP", tudo entra; o que resta pro dono é escopo de negócio, não cortar:
+- **Fiscal (NFC-e/NFS-e):** entra via `API-fiscal` + `ClienteFiscal` integrando **emissor de terceiro**
+  (não reconstruímos motor fiscal por UF, para não virar ERP). Decisão: **qual provedor**.
+- **Estoque:** `API-estoque` por produto com baixa automática entra; **incluir também ficha técnica por
+  ingrediente** (default incluir, fatia seguinte).
+- **Billing da plataforma:** modelar **franquia + excedente** por mensagem (novo preço da Meta,
+  out/2026), em vez da assinatura fixa que expõe a margem (revisar `P-cobranca`).
 - **Compliance Meta (jan/2026):** o número é atendimento/vendas da loja, **nunca** chatbot de IA
-  genérico; vira requisito (templates, persona de atendimento).
+  genérico. Requisito, não opção.
 
 ### Segurança desta leva (vai pro catálogo)
 
