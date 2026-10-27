@@ -9,6 +9,7 @@ import { numerosRoutes } from './modules/numeros_whatsapp'
 import { cardapioRoutes } from './modules/cardapio'
 import { clientesRoutes } from './modules/clientes'
 import { conversasRoutes } from './modules/conversas'
+import { pedidosRoutes } from './modules/pedidos'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -24,6 +25,7 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'cardapio', plugin: cardapioRoutes },
   { prefixo: 'clientes', plugin: clientesRoutes },
   { prefixo: 'conversas', plugin: conversasRoutes },
+  { prefixo: 'pedidos', plugin: pedidosRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/
