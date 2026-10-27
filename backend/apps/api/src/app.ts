@@ -8,46 +8,57 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod'
 import type { Pool } from '@whaviso/shared/db'
+import { consultar, sqlBruto } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
-import { tratadorDeErros } from './shared/http_errors'
-import { registrarModulos } from './routes'
+import { tratadorDeErros, tratadorNaoEncontrado } from './shared/http_errors'
+import { registrarModulos, type ModuloRota } from './routes'
 import { criarAdminSupabase, type AdminSupabase } from './shared/supabase_admin'
+import { autenticarPlugin, criarVerificadorSupabase, type Verificador } from './shared/auth'
+import { escopoLojaPlugin, criarLeitorEscopoSql } from './shared/tenant'
+import { escopoOperadorPlugin } from './shared/operador'
 import type { EnvApi } from './env'
 
 declare module 'fastify' {
   interface FastifyInstance {
     pool: Pool
     env: EnvApi
-    /**
-     * Admin API do Supabase (conta-no-aceite, H1.4). null quando a SERVICE ROLE KEY
-     * não está configurada: o aceite cai no comportamento anterior (só vincula por
-     * telefone), sem criar conta. Injetável nos testes.
-     */
+    /** Admin API do Supabase; null quando a SERVICE ROLE KEY nao esta configurada. */
     adminSupabase: AdminSupabase | null
   }
 }
 
 export interface DepsApi {
   env: EnvApi
+  /** Pool conectado como role `whaviso_api` (privilegio minimo). */
   pool: Pool
-  logger: Logger
+  logger: Logger | false
+  /** Injetavel p/ testes (sem rede/JWKS). Padrao: JWKS do Supabase. */
+  verificador?: Verificador
+  /** Registry de modulos; padrao = MODULOS de routes.ts. Injetavel p/ testes. */
+  modulos?: readonly ModuloRota[]
 }
 
-export async function criarApp(deps: DepsApi) {
+/** Contrato do GET /healthz. */
+export interface HealthDto {
+  ok: boolean
+  servico: 'api'
+}
+
+export async function construirApp(deps: DepsApi) {
   const app = Fastify({
-    loggerInstance: deps.logger,
-    // Só confia no proxy do loopback: a api binda em 127.0.0.1 e o nginx (mesmo host)
-    // faz o proxy pelo loopback, anexando o IP real do cliente ao final do X-Forwarded-For
-    // (via $proxy_add_x_forwarded_for; o IP real já vem do CF-Connecting-IP resolvido pelo
-    // real_ip do nginx). Com 'loopback', req.ip volta a ser esse IP real (último hop não
-    // confiável do XFF), restaurando o rate-limit por IP. 'true' confiaria na cadeia toda,
-    // deixando o cliente forjar o IP e burlar o limite.
+    loggerInstance: deps.logger === false ? undefined : deps.logger,
+    logger: deps.logger === false ? false : undefined,
+    // Ver nota original: so confia no proxy do loopback (nginx no mesmo host), para que
+    // req.ip seja o IP real do cliente e o rate limit por IP nao seja burlavel via XFF.
     trustProxy: 'loopback',
+    // Corpo pequeno por padrao (API JSON); rota que precisar de mais declara bodyLimit.
+    bodyLimit: 256 * 1024,
   }).withTypeProvider<ZodTypeProvider>()
 
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
   app.setErrorHandler(tratadorDeErros)
+  app.setNotFoundHandler(tratadorNaoEncontrado)
 
   app.decorate('pool', deps.pool)
   app.decorate('env', deps.env)
@@ -58,27 +69,56 @@ export async function criarApp(deps: DepsApi) {
       : null,
   )
 
-  // Cabeçalhos de segurança mínimos p/ API JSON: nosniff, frameguard DENY, no-referrer.
-  // Sem CSP aqui (a api só devolve JSON; a CSP da SPA vive no nginx). COEP/CORP desligados
-  // p/ não interferir no consumo por XHR/fetch da SPA.
+  // SEC-090: API JSON pura. CSP fechada (nada carrega nem emoldura), HSTS, nosniff,
+  // frameguard DENY, no-referrer. COEP/CORP desligados p/ nao atrapalhar XHR da SPA.
   await app.register(helmet, {
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
-    // HSTS é do edge (nginx/Cloudflare já mandam em api.whaviso.com); não duplicar aqui.
-    hsts: false,
+    hsts: { maxAge: 31_536_000, includeSubDomains: true },
     frameguard: { action: 'deny' },
     referrerPolicy: { policy: 'no-referrer' },
   })
-  // Auth é 100% via header Authorization: Bearer (não cookie), então CSRF não se aplica
-  // e credentials seria inútil. origin restrito à origem única do APP_URL.
-  await app.register(cors, { origin: deps.env.APP_URL })
-  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
-  // Autenticação (JWKS/tenant) entra em F3 (tenant-auth); o esqueleto sobe sem auth.
+  // Auth via header Authorization: Bearer (nao cookie): sem credentials. Origem unica = APP_URL.
+  await app.register(cors, {
+    // Funcao (nao string): origem estranha NAO recebe Access-Control-Allow-Origin.
+    origin: (origem, cb) => cb(null, origem === undefined || origem === deps.env.APP_URL),
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['authorization', 'content-type', 'x-loja-id'],
+  })
+  // SEC-101: limite global por IP configuravel por env; por rota via
+  // `config: { rateLimit: { max, timeWindow } }` (ver AGENTS.md).
+  await app.register(rateLimit, {
+    global: !deps.env.RATE_LIMIT_DESLIGADO,
+    max: deps.env.RATE_LIMIT_MAX,
+    timeWindow: deps.env.RATE_LIMIT_JANELA,
+  })
 
-  app.get('/healthz', async () => ({ ok: true, servico: 'api' }))
+  // F3: autenticacao primeiro; os dois escopos dependem de 'whaviso-autenticar'.
+  const verificador =
+    deps.verificador ?? criarVerificadorSupabase({ supabaseUrl: deps.env.SUPABASE_URL })
+  const leitor = criarLeitorEscopoSql(deps.pool)
+  await app.register(autenticarPlugin, { verificador })
+  await app.register(escopoLojaPlugin, { leitor, auditoria: deps.pool })
+  await app.register(escopoOperadorPlugin, { leitor })
 
-  await app.register(registrarModulos, { prefix: '/v1' })
+  app.get('/healthz', async (_req, reply): Promise<HealthDto> => {
+    try {
+      await consultar(deps.pool, sqlBruto('select 1'))
+      return { ok: true, servico: 'api' }
+    } catch {
+      void reply.status(503)
+      return { ok: false, servico: 'api' }
+    }
+  })
+
+  await app.register(registrarModulos(deps.modulos), { prefix: '/v1' })
 
   return app
 }
+
+/** Alias legado. */
+export const criarApp = construirApp

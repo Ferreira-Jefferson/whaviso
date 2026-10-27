@@ -45,6 +45,34 @@ const linguagem = {
   },
 }
 
+
+// SEC-080: SQL nunca por interpolacao/concatenacao. 1o argumento de `.query(` e o 2o de
+// `consultar(`/`consultarUm(` nao pode ser template com ${} nem concatenacao (+).
+const sqlGuard = {
+  rules: {
+    'sem-sql-interpolado': {
+      meta: { type: 'problem', docs: { description: 'Barra SQL montado por interpolacao ou concatenacao.' } },
+      create(context) {
+        const ruim = (n) =>
+          n &&
+          ((n.type === 'TemplateLiteral' && n.expressions.length > 0) ||
+            (n.type === 'BinaryExpression' && n.operator === '+'))
+        return {
+          CallExpression(node) {
+            const c = node.callee
+            let alvo = null
+            if (c.type === 'MemberExpression' && c.property.name === 'query') alvo = node.arguments[0]
+            else if (c.type === 'Identifier' && (c.name === 'consultar' || c.name === 'consultarUm')) alvo = node.arguments[1]
+            if (ruim(alvo)) {
+              context.report({ node: alvo, message: 'SQL por interpolacao/concatenacao proibido (SEC-080): use sql`...` com parametros.' })
+            }
+          },
+        }
+      },
+    },
+  },
+}
+
 export default tseslint.config(
   {
     ignores: ['**/node_modules/**', '**/dist/**', 'supabase/**'],
@@ -138,6 +166,12 @@ export default tseslint.config(
     },
   },
   {
+    // SEC-080: SQL parametrizado (vale tambem em testes: nao ensinar o anti-padrao).
+    files: ['apps/*/src/**/*.ts', 'apps/*/test/**/*.ts', 'packages/*/src/**/*.ts'],
+    plugins: { whaviso: sqlGuard },
+    rules: { 'whaviso/sem-sql-interpolado': 'error' },
+  },
+  {
     // F2: modulos nunca falam com provedor externo (WhatsApp, LLM, mapas) por SDK ou HTTP direto:
     // usam a interface (ClienteWhats/ClienteLLM/ClienteMapas de @whaviso/shared/clientes), cuja
     // implementacao vive em shared/ do app e sai por fetchSeguro.
@@ -147,6 +181,11 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
+          // Dados so via @whaviso/shared/db (SEC-080): nenhum modulo importa pg nem @supabase/*.
+          patterns: [
+            { group: ['@supabase/*'], message: 'Modulo nao usa Supabase no caminho de dados: use @whaviso/shared/db.' },
+            { group: ['pg', 'pg/*', 'pg-*'], message: 'Modulo acessa dados so via @whaviso/shared/db.' },
+          ],
           paths: ['axios', 'node-fetch', 'undici', 'got', 'openai', '@anthropic-ai/sdk', '@google/generative-ai', '@whiskeysockets/baileys', 'node:http', 'node:https', 'http', 'https'].map((name) => ({
             name,
             message: 'Modulo nao fala com provedor/HTTP direto: use a interface em @whaviso/shared/clientes.',

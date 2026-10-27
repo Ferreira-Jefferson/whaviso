@@ -36,6 +36,24 @@ Cada app segue: `src/server.ts` (boot) · `src/app.ts` (monta Fastify) · `src/r
 | `apps/api/src/shared/http_errors` | erros HTTP | envelope `{error:{code,message}}` + handler global |
 | `apps/zap/src/shared/meta_client` | Meta API | `enviarTemplate()`, `enviarTexto()`, `verificarAssinatura(rawBody)` |
 
+## Fiacao do core da api (F4)
+
+**Criar modulo:** `./scripts/scaffold_module.sh api <nome>` gera `modules/<nome>/{index,routes,service,repo,schemas}.ts` + `MODULE.md` + teste e imprime a linha do registry. Registrar = **1 linha** em `apps/api/src/routes.ts`: `{ prefixo: '<nome>', plugin: <nome>Routes }` dentro de `MODULOS` (rota final `/v1/<nome>/*`; prefixo duplicado ou malformado derruba o boot).
+
+**Auth e escopo (opt-in por rota, F3):** loja = `config: { acesso: 'conteudo_de_loja' }` + `preHandler: [app.autenticar, app.escopoLoja]` (`req.escopo`); plataforma = `config: { acesso: 'plataforma' }` + `[app.autenticar, app.escopoOperador]` (`req.operador`). Rota sem `preHandler` e publica. Nunca ler `loja_id` do corpo/query.
+
+**Validacao (SEC-081):** `app.withTypeProvider<ZodTypeProvider>()` e `schema: { body/querystring/params/response }` com `z.strictObject`, tamanhos e enums fechados. Falha vira 400 `entrada_invalida` no envelope, sem eco de valores.
+
+**Rate limit (SEC-101):** global por IP via env (`RATE_LIMIT_MAX`, `RATE_LIMIT_JANELA`); por rota: `config: { rateLimit: { max: 5, timeWindow: '1 minute' } }` (use em login/OTP/webhooks).
+
+**Dados (SEC-080):** so `@whaviso/shared/db`: ``consultar(exec, sql`... ${valor}`)``, `consultarUm`, `comTransacao(pool, fn, { aoIniciar })`. O `sql` transforma cada `${}` em parametro; fragmento dinamico fixo do codigo = `sqlBruto('...')`. Modulo nao importa `pg` nem `@supabase/*` (lint) e interpolar/concatenar SQL em `.query(`/`consultar(` falha no lint (`whaviso/sem-sql-interpolado`) e no teste `apps/api/test/sec080.test.ts`. Erros do pg viram `ErroBanco` (unique 409, fk 409, check 422) sem detalhe. Supabase = Auth/JWKS apenas; o banco e trocavel por connection string. A api conecta como `whaviso_api`; em producao recusa subir como superusuario.
+
+**Erros:** lance `NaoEncontrado | Proibido | Invalido | Conflito | Interno` (ou `HttpError`, `naoAutorizado()`...) de `shared/http_errors`; o handler global emite `{ error: { code, message } }`, nunca stack nem mensagem do pg. 404 de rota tambem sai no envelope.
+
+**Logs (SEC-024):** `req.log`/`criarLogger`. Redaction recursiva por nome de campo (`authorization, cookie, token, chave, chave_cifrada, senha, telefone*, numero, pix*, titular, *_hash`, inclusive em `err`/`req`). Prefira logar so ids e codigos. Nunca interpolar segredo na string da mensagem.
+
+**Config:** schemas tipados em `@whaviso/shared/config` (`envApiSchema`, `envZapSchema`, `envAtendenteSchema`); `parseEnv` falha no boot listando so os NOMES invalidos. Teste de app: `construirApp({ env, pool, logger: false, verificador, modulos })` (sem rede).
+
 ## Comandos
 
 ```bash

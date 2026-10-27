@@ -1,8 +1,8 @@
 # F4 api-core
 
 - **ID:** F4  ·  **Área:** F  ·  **Onda:** 0
-- **Modelo sugerido:** Sonnet  ·  **Status:** `A FAZER`
-- **Reivindicado por:** (livre)
+- **Modelo sugerido:** Sonnet  ·  **Status:** `FEITO (verde, aguarda revisao)`
+- **Reivindicado por:** F4-agent
 
 ## Objetivo
 
@@ -42,55 +42,55 @@ precisa de cliente Supabase/PostgREST para falar com o banco.
 
 ## Etapas
 
-- [ ] 1. Inventário do `apps/api` atual (app/routes/env/server): o que reaproveitar, o que apagar quando
+- [x] 1. Inventário do `apps/api` atual (app/routes/env/server): o que reaproveitar, o que apagar quando
   os módulos legados de cobrança forem removidos. Registrar em Notas.
   (commit: `chore(api): inventario do esqueleto atual`)
-- [ ] 2. `shared/config`: loader Zod com tipos para api (`API_*`), zap e atendente; falha no boot com
+- [x] 2. `shared/config`: loader Zod com tipos para api (`API_*`), zap e atendente; falha no boot com
   mensagem clara listando as variáveis ausentes (sem ecoar valores). Inclui `DATABASE_URL`, `APP_URL`,
   `SUPABASE_JWKS_URL`, `SUPABASE_ISSUER`, `MASTER_KEY` (referência, uso em módulos de segredo).
   (commit: `feat(shared): config tipado e validado por zod`)
-- [ ] 3. `shared/logger` (pino) com **redaction** por caminho e por nome de campo, recursiva em objetos
+- [x] 3. `shared/logger` (pino) com **redaction** por caminho e por nome de campo, recursiva em objetos
   aninhados: `authorization`, `cookie`, `token`, `chave`, `chave_cifrada`, `senha`, `telefone`,
   `numero`, `pix`, `titular`, `*_hash` onde sensível. Serializers de `req`/`res` sem headers sensíveis.
   (commit: `feat(shared): logger com redaction de dados sensiveis`)
-- [ ] 4. Testes do logger: injeta segredo conhecido em níveis diferentes de aninhamento e em
+- [x] 4. Testes do logger: injeta segredo conhecido em níveis diferentes de aninhamento e em
   `err.config`/`req.headers`; afirma que a saída não contém o valor. (SEC-024)
   (commit: `test(shared): redaction do logger (SEC-024)`)
-- [ ] 5. `shared/db`: pool `pg` único por processo (tamanho e timeouts por config), `consultar(sql,
+- [x] 5. `shared/db`: pool `pg` único por processo (tamanho e timeouts por config), `consultar(sql,
   params)`, `transacao(fn)` com rollback garantido, tipagem de linha por Zod opcional, tradução de
   erros `pg` (unique/fk/check) para erros de domínio. **Somente `pg`**; nenhum import de `@supabase/*`.
   (commit: `feat(shared): fronteira unica de dados shared/db`)
-- [ ] 6. Guarda de parametrização: helper `sql` (tagged template que só aceita valores como parâmetros)
+- [x] 6. Guarda de parametrização: helper `sql` (tagged template que só aceita valores como parâmetros)
   e regra de lint/teste que falha ao achar concatenação de string em `consultar(`. (SEC-080)
   (commit: `feat(shared): sql parametrizado por construcao e lint de interpolacao`)
-- [ ] 7. `http_errors`: classes de erro de domínio (`NaoEncontrado`, `Proibido`, `Invalido`,
+- [x] 7. `http_errors`: classes de erro de domínio (`NaoEncontrado`, `Proibido`, `Invalido`,
   `Conflito`, `Interno`) e `errorHandler` do Fastify que converte para `{ error: { code, message } }`,
   traduz erro Zod (422/400 sem vazar o schema interno), nunca devolve stack nem mensagem de `pg`.
   (commit: `feat(api): envelope de erro padrao e error handler`)
-- [ ] 8. `app.ts`: factory `construirApp(deps)` (testável sem rede): Fastify + `fastify-type-provider-zod`
+- [x] 8. `app.ts`: factory `construirApp(deps)` (testável sem rede): Fastify + `fastify-type-provider-zod`
   (validação na borda, SEC-081), logger, `helmet` e CORS restrito a `APP_URL`, `rate-limit` base,
   `errorHandler`, plugins de F3, `/healthz` (verifica `select 1`). (commit: `feat(api): app factory com seguranca de borda`)
-- [ ] 9. `routes.ts` como registry: array de módulos `{ prefixo, plugin }`, **1 linha por módulo**; teste
+- [x] 9. `routes.ts` como registry: array de módulos `{ prefixo, plugin }`, **1 linha por módulo**; teste
   que falha se o registry tiver rota duplicada de prefixo. Módulo de exemplo `exemplo` só em teste.
   (commit: `feat(api): registry de rotas, uma linha por modulo`)
-- [ ] 10. `server.ts`: boot, graceful shutdown (fecha pool e servidor), tratamento de `unhandledRejection`
+- [x] 10. `server.ts`: boot, graceful shutdown (fecha pool e servidor), tratamento de `unhandledRejection`
   sem vazar dado. (commit: `feat(api): server com graceful shutdown`)
-- [ ] 11. Cabeçalhos de segurança e CORS: testes (HSTS, CSP adequada a API JSON, `X-Content-Type-Options`,
+- [x] 11. Cabeçalhos de segurança e CORS: testes (HSTS, CSP adequada a API JSON, `X-Content-Type-Options`,
   origem estranha negada). (SEC-090)
   (commit: `test(api): headers e cors (SEC-090)`)
-- [ ] 12. Rate limit nos endpoints sensíveis (parametrizável por rota) + teste. (SEC-101, base)
+- [x] 12. Rate limit nos endpoints sensíveis (parametrizável por rota) + teste. (SEC-101, base)
   (commit: `feat(api): rate limit configuravel por rota`)
-- [ ] 13. Atualizar `scaffold_module.sh api <nome>`: gera `modules/<nome>/{routes,service,repo,schemas,
+- [x] 13. Atualizar `scaffold_module.sh api <nome>`: gera `modules/<nome>/{routes,service,repo,schemas,
   MODULE.md,*.test.ts}` e imprime a linha para `routes.ts`; usa o layout novo. Teste de fumaça do script.
   (commit: `chore(scripts): scaffold de modulo api no layout novo`)
-- [ ] 14. Lint de fronteiras: módulo não importa módulo; módulo só acessa dados via `shared/db`; nada
+- [x] 14. Lint de fronteiras: módulo não importa módulo; módulo só acessa dados via `shared/db`; nada
   importa `@supabase/*` em `modules/**`. (commit: `chore(backend): lint de fronteiras da api`)
-- [ ] 15. Testes de integração: sobe o app contra `whaviso_dev`, `/healthz` 200, erro 404 no envelope,
+- [x] 15. Testes de integração: sobe o app contra `whaviso_dev`, `/healthz` 200, erro 404 no envelope,
   payload inválido 4xx no envelope, rota protegida 401 sem token.
   (commit: `test(api): integracao do esqueleto`)
-- [ ] 16. Documentar em AGENTS.md: como criar módulo, regra de db, regra de erro, regra de log.
+- [x] 16. Documentar em AGENTS.md: como criar módulo, regra de db, regra de erro, regra de log.
   (commit: `docs(api): guia de fiacao do core`)
-- [ ] 17. `npm run lint`, `typecheck`, `test` verdes; `curl 127.0.0.1:3001/healthz`.
+- [x] 17. `npm run lint`, `typecheck`, `test` verdes; `curl 127.0.0.1:3001/healthz`.
 
 ## Testes e segurança exigidos
 
@@ -117,3 +117,13 @@ precisa de cliente Supabase/PostgREST para falar com o banco.
 - Hardening opcional por GUC (RLS real por loja) fica fora do escopo; o `transacao` já aceita um gancho
   de `SET LOCAL` para adotar depois sem mudar consumidores.
 - Escopo de loja chega de F3; o core não implementa política de papel.
+
+- **Execucao (F4-agent):** nao havia modulos legados de cobranca (ja removidos); `criarApp` virou `construirApp`
+  (alias mantido). Registry em `routes.ts`: `MODULOS: {prefixo, plugin}[]`, montado sob `/v1/<prefixo>`.
+- Decisoes: HSTS e CSP (`default-src 'none'`) agora ligados no helmet (SEC-090); CORS por funcao (origem estranha
+  nao recebe `Access-Control-Allow-Origin`); validacao Zod falha em 400 `entrada_invalida` (so caminhos dos campos);
+  `HealthDto` e local ao `app.ts` (nao existe em contracts, F1 pode promover); redaction recursiva por nome de campo
+  via `formatters.log` + serializers (o `redact` por path do pino nao e recursivo); api recusa subir como
+  superusuario em `NODE_ENV=production`; `MASTER_KEY`, `SUPABASE_JWKS_URL`, `SUPABASE_ISSUER` opcionais no schema.
+- SEC-080 por 3 camadas: `sql` tagged template, regra ESLint `whaviso/sem-sql-interpolado` e teste
+  `apps/api/test/sec080.test.ts`. Teste de fumaça do scaffold feito manualmente (gerar, lint, tsc, vitest, remover).
