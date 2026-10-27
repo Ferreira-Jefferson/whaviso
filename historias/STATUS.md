@@ -150,6 +150,11 @@ migration usa o número reservado; se precisar de uma não listada, pega o próx
 | 0020 | cobranca_suspensao (lojas.suspensa por trigger) | P-cobranca |
 | 0021 | despacho_config_geocode (despacho_config + dono de geocode) | API-roteiriza |
 | 0022 | fluxos (fluxos/versoes) | API-fluxo |
+| 0023 | itens_quantidade_disponivel (contador por item + decremento na venda) | API-cardapio (+) / API-pedidos |
+| 0024 | lojas_disponibilidade (feriados/excecoes + janela do atendente LLM) | API-lojas (+) |
+| 0025 | funcionarios (funcionarios, cargos, escalas; vincula motoboy) | API-funcionarios |
+| 0026 | estoque_insumos (insumos, unidades, minimos, movimentos) | API-estoque-insumos |
+| 0027 | ficha_tecnica (receita item -> insumos; baixa na venda) | API-ficha-tecnica |
 
 ### Donos de escrita a combinar (um dono por coluna/tabela)
 
@@ -230,6 +235,34 @@ Com o reenquadramento "não é MVP", tudo entra; o que resta pro dono é escopo 
   `eventos_custo` (`API-custos`): o excedente sai do custo real medido, não de estimativa.
 - **Compliance Meta (jan/2026):** o número é atendimento/vendas da loja, **nunca** chatbot de IA
   genérico. Requisito, não opção.
+
+### Lacunas da pesquisa de dominio (2026-10-27)
+
+Pesquisa de mercado (iFood, Saipos, Anota AI, Goomer, Colibri, Food Sistemas) em
+[../docs/pivot/PESQUISA-funcionalidades-restaurante.md](../docs/pivot/PESQUISA-funcionalidades-restaurante.md).
+Veredito: o plano já cobre a maior parte do mercado; as features que eram só "linha de tabela" (CRM,
+campanhas, avaliacoes, promocoes, fidelidade, KDS, canais, agendamento, relatorios) continuam onde
+estao e ganham arquivo de modulo ao chegar a sua onda. O que faltava de verdade (o schema baseline nao
+contempla) e abaixo.
+
+| Lacuna nova | Prioridade | Modulo | Onda | Nota |
+|---|---|---|---|---|
+| Quantidade numerica por item do cardapio ("15 marmitas", baixa na venda) | imprescindivel | coluna `itens.quantidade_disponivel` (null = ilimitado) + decremento em API-pedidos | 1 | migration 0023; distinto de insumo |
+| Funcionarios + Cargos (motoboy cargo fixo de sistema) + Escala (dias/turnos/diaria, sem folha) | importante | API-funcionarios (cargos, escalas) | 3 | migration 0025; some o cadastro isolado de motoboy |
+| Estoque de insumos (materia-prima) primeira classe + ficha tecnica que baixa insumo na venda (base do CMV) | importante | API-estoque-insumos + API-ficha-tecnica | 5 | migrations 0026/0027; separa do estoque por item; amplia o "API-estoque" |
+| Calendario de feriados/excecoes por loja + janela do atendente LLM | importante | amplia API-lojas (dado) + enforcement em AT-motor/API-pedidos | 1 (dado) / 2 (enforce) | migration 0024; horarios semanais ja estao em API-lojas |
+
+Decisoes tomadas (default, sem travar o dono):
+- **Motoboy = funcionario de cargo fixo "motoboy"** (cadastro unico): o cargo habilita os campos de
+  entrega (veiculo, placa, Pix) e o fechamento do dia. `API-motoboys` passa a ler `funcionarios`.
+- **Dois estoques distintos:** quantidade por item do cardapio (contador direto, onda 1) e estoque de
+  insumo (baixado por ficha tecnica, onda 5). Complementares, nao excludentes.
+- **Escala** registra turnos e diaria e soma por periodo, cruzando com o fechamento do motoboy; sem folha.
+- **Suposicao de posicionamento (o dono corrige se quiser):** publico = delivery por WhatsApp. Por isso
+  **PDV/caixa** e **salao (mesas/comandas)** ficam `futuro`/opcional (decisoes em aberto no doc). Se o
+  alvo incluir salao com dinheiro no balcao, abrir `API-caixa` e `API-mesas`.
+
+Fora de escopo confirmado: folha de pagamento/RH; nota fiscal/fiscal (so via `ClienteFiscal` de terceiro).
 
 ### Segurança desta leva (vai pro catálogo)
 
