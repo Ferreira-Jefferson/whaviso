@@ -4,7 +4,7 @@
 // mostra carregando, erro ou o estado "sem loja".
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
-import { LogOut, MoreHorizontal, Plus, Store } from 'lucide-react'
+import { LogOut, MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
 import { useSessao } from '@/shared/auth'
 import { SeletorLoja, useTenant } from '@/shared/tenant'
 import { useEstadoRealtime } from '@/shared/realtime'
@@ -37,7 +37,7 @@ function ItemNav({ rota, onNavegar }: { rota: RotaModulo; onNavegar?: () => void
   )
 }
 
-function Sidebar() {
+function Sidebar({ onRecolher }: { onRecolher: () => void }) {
   return (
     <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-linha bg-papel-2 px-3 py-4 md:flex">
       <div className="flex items-center gap-2.5 px-2.5 pb-4 font-display text-xl font-bold">
@@ -45,6 +45,14 @@ function Sidebar() {
           <BellLogo className="size-5" />
         </span>
         Whaviso
+        <button
+          type="button"
+          onClick={onRecolher}
+          aria-label="Ocultar menu lateral"
+          className={cn('ml-auto flex size-8 items-center justify-center rounded-lg text-tinta-2 hover:bg-black/5 hover:text-tinta', FOCO)}
+        >
+          <PanelLeftClose className="size-5" strokeWidth={1.75} aria-hidden />
+        </button>
       </div>
       {GRUPOS.map((g) => (
         <nav key={g} aria-label={ROTULO_GRUPO[g]} className="flex flex-col gap-0.5">
@@ -190,13 +198,50 @@ function ConteudoComLoja() {
   return <Outlet />
 }
 
+/** Preferencia por-visitante da barra lateral (so conveniencia visual; tolera storage bloqueado). */
+function useLateralAberta() {
+  const [aberta, setAberta] = useState(() => {
+    try {
+      return localStorage.getItem('whaviso:lateral') !== 'fechada'
+    } catch {
+      return true
+    }
+  })
+  function alternar() {
+    setAberta((v) => {
+      const nova = !v
+      try {
+        localStorage.setItem('whaviso:lateral', nova ? 'aberta' : 'fechada')
+      } catch {
+        /* storage indisponivel: so nao persiste */
+      }
+      return nova
+    })
+  }
+  return { aberta, alternar }
+}
+
 export function AppShell() {
   const { signOut } = useSessao()
+  const lateral = useLateralAberta()
   return (
-    <div className="grid min-h-dvh md:grid-cols-[248px_1fr]">
-      <Sidebar />
+    <div className={cn('grid min-h-dvh', lateral.aberta ? 'md:grid-cols-[248px_1fr]' : 'md:grid-cols-1')}>
+      {lateral.aberta && <Sidebar onRecolher={lateral.alternar} />}
       <div className="flex min-w-0 flex-col">
         <header className="sticky top-0 z-20 flex h-[60px] items-center gap-3 border-b border-linha bg-papel/90 px-4 backdrop-blur md:px-6">
+          {/* Com a lateral oculta, o botao de mostrar vive no header (desktop); quando aberta,
+              o botao de recolher fica dentro da propria lateral, junto da marca. */}
+          {!lateral.aberta && (
+            <button
+              type="button"
+              onClick={lateral.alternar}
+              aria-label="Mostrar menu lateral"
+              aria-expanded={false}
+              className={cn('hidden size-11 flex-none items-center justify-center rounded-full border border-linha bg-cartao text-tinta-2 hover:text-tinta md:inline-flex', FOCO)}
+            >
+              <PanelLeft className="size-5" strokeWidth={1.75} aria-hidden />
+            </button>
+          )}
           <div className="min-w-0 max-md:flex-1">
             <SeletorLoja />
           </div>
@@ -206,12 +251,14 @@ export function AppShell() {
             type="button"
             onClick={() => void signOut()}
             aria-label="Sair"
-            className={cn('flex size-11 items-center justify-center rounded-full border border-linha bg-cartao text-tinta-2 hover:text-tinta', FOCO)}
+            className={cn('flex size-11 flex-none items-center justify-center rounded-full border border-linha bg-cartao text-tinta-2 hover:text-tinta', FOCO)}
           >
             <LogOut className="size-5" strokeWidth={1.75} aria-hidden />
           </button>
         </header>
-        <main className="w-full max-w-[1180px] px-4 pb-[calc(64px+32px)] pt-5 md:px-8 md:pb-12 md:pt-7">
+        {/* Conteudo ocupa ~90% da largura util, com ~5% de respiro de cada lado no desktop
+            (no mobile mantem a goteira de 16px). As margens iguais ja centralizam. */}
+        <main className="w-full px-4 pb-[calc(64px+32px)] pt-5 md:px-[5%] md:pb-12 md:pt-7">
           <ConteudoComLoja />
         </main>
       </div>

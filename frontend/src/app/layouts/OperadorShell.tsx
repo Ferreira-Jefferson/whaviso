@@ -97,7 +97,7 @@ export function OperadorShell() {
             </NavLink>
           ))}
         </nav>
-        <main className="w-full max-w-[1180px] px-4 pb-12 pt-5 md:px-8 md:pt-7">
+        <main className="w-full px-4 pb-12 pt-5 md:px-[5%] md:pt-7">
           <Outlet />
         </main>
       </div>
