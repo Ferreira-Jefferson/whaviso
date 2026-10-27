@@ -23,9 +23,9 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | ID | Módulo | Objetivo | Depende de | Modelo | Arquivo | Status |
 |---|---|---|---|---|---|---|
 | F0  | db-baseline | Schema multi-tenant, roles, RLS, grants por coluna | — | — | 00-fundacao/db-baseline.md | CONCLUIDO |
-| F1  | kernel-contratos | Zod fonte única + NodeContract + eventos + codegen `gen_contracts` | F0 | Sonnet | 00-fundacao/kernel-contratos.md | A FAZER |
-| F2  | clientes-externos | Interfaces `ClienteWhats`/`ClienteLLM`/`ClienteMapas` (contratos + stubs) | F1 | Sonnet | 00-fundacao/clientes-externos.md | A FAZER |
-| F3  | tenant-auth | JWT/JWKS local, escopo de loja (membros) e de operador | F0, F1 | Opus | 00-fundacao/tenant-auth.md | A FAZER |
+| F1  | kernel-contratos | Zod fonte única + NodeContract + eventos + codegen `gen_contracts` | F0 | Sonnet | 00-fundacao/kernel-contratos.md | EM ANDAMENTO (kernel enums/primitivos/pix feito e verde; falta NodeContract/eventos/codegen) |
+| F2  | clientes-externos | Interfaces `ClienteWhats`/`ClienteLLM`/`ClienteMapas` (contratos + stubs) | F1 | Sonnet | 00-fundacao/clientes-externos.md | EM ANDAMENTO (agente) |
+| F3  | tenant-auth | JWT/JWKS local, escopo de loja (membros) e de operador | F0, F1 | Opus | 00-fundacao/tenant-auth.md | EM ANDAMENTO (agente) |
 | F4  | api-core | server/app/routes registry, http_errors, config, logger, fronteira `shared/db` | F0, F1, F3 | Sonnet | 00-fundacao/api-core.md | A FAZER |
 | F5  | realtime-sse | SSE na api sobre `LISTEN/NOTIFY` do Postgres | F4 | Sonnet | 00-fundacao/realtime-sse.md | A FAZER |
 | F6  | front-shell | SPA shell, api_client, auth (login), `_generated`, ui kit, tenant/branding, realtime client | F1, F4 | Sonnet | 00-fundacao/front-shell.md | A FAZER |
