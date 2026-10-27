@@ -39,18 +39,36 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 
 | ID | Módulo | Objetivo | Depende de | Modelo | Arquivo | Status |
 |---|---|---|---|---|---|---|
-| API-conta | conta | Conta + membros + papéis (convite/aceite) | F4 | Sonnet | backend-api/conta.md | A FAZER |
-| API-lojas | lojas | Perfil da loja, branding, horários, área | F4 | Sonnet | backend-api/lojas.md | A FAZER |
-| API-numeros | numeros_whatsapp | Cadastro do número (Embedded Signup), token cifrado | F4 | Opus | backend-api/numeros_whatsapp.md | A FAZER |
-| API-cardapio | cardapio | Grupos de opções, categorias, itens (herança + exceção) | F4 | Sonnet | backend-api/cardapio.md | A FAZER |
-| API-clientes | clientes | Clientes por loja (hash+cifra), endereços | F4 | Sonnet | backend-api/clientes.md | A FAZER |
-| API-conversas | conversas | Conversas e mensagens, janela 24h, handoff | F4, F5 | Sonnet | backend-api/conversas.md | A FAZER |
+| API-conta | conta | Conta + membros + papéis (convite/aceite) | F4 | Sonnet | backend-api/conta.md | CONCLUIDO |
+| API-lojas | lojas | Perfil da loja, branding, horários, área | F4 | Sonnet | backend-api/lojas.md | CONCLUIDO |
+| API-numeros | numeros_whatsapp | Cadastro do número (Embedded Signup), token cifrado | F4 | Opus | backend-api/numeros_whatsapp.md | CONCLUIDO |
+| API-cardapio | cardapio | Grupos de opções, categorias, itens (herança + exceção) | F4 | Sonnet | backend-api/cardapio.md | CONCLUIDO |
+| API-clientes | clientes | Clientes por loja (hash+cifra), endereços | F4 | Sonnet | backend-api/clientes.md | CONCLUIDO |
+| API-conversas | conversas | Conversas e mensagens, janela 24h, handoff | F4, F5 | Sonnet | backend-api/conversas.md | CONCLUIDO |
 | API-pedidos | pedidos | Pedidos (kanban), itens com snapshot, impressão | F4, API-cardapio, API-clientes | Sonnet | backend-api/pedidos.md | A FAZER |
-| ZAP-meta | shared/meta_client | Implementação `ClienteWhats` (Meta Cloud API, multi-WABA) | F2 | Opus | backend-zap/meta_client.md | A FAZER |
+| ZAP-meta | shared/meta_client | Implementação `ClienteWhats` (Meta Cloud API, multi-WABA) | F2 | Opus | backend-zap/meta_client.md | CONCLUIDO (transporte pronto; falta fiar no boot via ZAP-enviar) |
 | ZAP-webhook | webhook_whatsapp | Inbound -> enfileira; recibos; idempotência `wamid` | F4, API-conversas, API-clientes, ZAP-meta | Opus | backend-zap/webhook_whatsapp.md | A FAZER |
 | ZAP-enviar | enviar | Drena outbox `envios` -> Meta, claim SKIP LOCKED | ZAP-meta | Sonnet | backend-zap/enviar.md | A FAZER |
 | AT-motor-min | motor_fluxo (hardcoded) | Grafo fixo do pedido por botões/regras, sem LLM | API-pedidos, API-cardapio, API-conversas, ZAP-enviar | Opus | backend-atendente/motor_fluxo.md | A FAZER |
 | FR-nucleo | telas do núcleo | Lojas, números, cardápio, pedidos (kanban), clientes, conversas | F6 + cada API-* da tela; **mock HTML + autoverificação visual** | Sonnet | frontend/nucleo.md | A FAZER |
+
+> **Onda 1, camada 1 integrada e no git (2026-10-27).** 7 modulos construidos em paralelo (cada um no
+> seu banco de teste), integrados com commits atomicos: matriz de seguranca (0013 convites), kernel
+> unico de cifra (@whaviso/shared/cifra), redaction (SEC-024), fiacao do registry, transporte Meta.
+> **Gate completo verde:** api 247 testes, zap 47, shared 140, atendente 5, seguranca 111; lint,
+> typecheck, check:contracts limpos. **Revisao independente (Opus, autor != revisor): APROVADA**, sem
+> achado CRITICO/ALTO. Follow-ups rastreados (nao bloqueiam):
+> - [MEDIO, -> ZAP-enviar] o transporte Meta vivo ainda e o cliente legado (fetch cru, sem SSRF). Fiar
+>   `criarClienteWhatsMeta` (fetchSeguro/SSRF, multi-numero, credencial por chamada) no boot do zap e
+>   remover o legado (graph.ts/criarClienteMeta). **Requisito #1 do ZAP-enviar.**
+> - [BAIXO] `numeros.numero_hash` usa sha256 puro (hoje dado morto, nunca lido). Quando virar
+>   load-bearing, usar hash CHAVEADO agnostico de pais (nao `hashTelefone`, que forca BR).
+> - Promover os contratos Zod dos modulos para `packages/shared/contracts` + `gen:contracts` quando o
+>   `FR-nucleo` (camada 4) for construido.
+> - Push das migrations novas (0013+) no Supabase cloud ao deployar (perguntar antes, regra da casa).
+> - `0014_cardapio_vinculos_ativo` opcional (cardapio funciona com neutralizacao por flag).
+> - `.env.test` local com senha de superuser desatualizada: so afeta rodar testes da raiz de backend/
+>   (usar `npm test` que roda por workspace); o CI usa o env do workflow e esta ok.
 
 ## Onda 2: IA no atendimento
 
