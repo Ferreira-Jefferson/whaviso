@@ -28,6 +28,113 @@ O **builder de fluxo (tipo n8n)** começa **hardcoded** (um grafo de nodes em c�
 spec diz que as etapas fixas (confirmação, endereço, pagamento, repetir) usam botões e regras
 sem LLM.
 
+## Dois planos: a plataforma opera, a loja usa
+
+O produto tem **duas audiências**, e o esqueleto anterior só enxergava uma. É uma distinção de
+kernel, não detalhe de tela:
+
+- **Plano da loja (o restaurante usa):** cardápio, pedidos, conversas, clientes, entrega. Tudo
+  escopado por `loja_id`, acessado por quem é **membro** da loja (dono/gerente/atendente).
+- **Plano da plataforma (a Whaviso opera):** o restaurante **é o cliente** da Whaviso. Aqui vive o
+  console do operador: ver as contas/lojas cadastradas, a **cobrança restaurante -> Whaviso**
+  (assinatura mensal, faturas, inadimplência, suspensão), o **funil de aquisição** (prospecto ->
+  ativo, follow-ups) e o **painel de crescimento** da base (MRR, churn, lojas ativas). É acessado
+  só pela **equipe Whaviso** (tabela `operadores`, papel de operador), nunca por um membro de loja.
+
+As duas são features feature-first no mesmo `api`, separadas por **escopo de auth**, não por
+projeto: o kernel resolve ou um `loja_id` (membro) ou um escopo de operador (equipe). O painel de
+plataforma e o dashboard da loja são **read-models** (leem muitos domínios por leitura cruzada
+read-only, nunca pelo interno de outro módulo). Nenhum dado de conteúdo de cliente final vaza para
+o operador: o operador vê **métricas e faturamento das lojas**, não as conversas nem os pedidos
+delas.
+
+## Entrega: zona, despacho e roteirização
+
+A operação de entrega tem três camadas distintas, hoje achatadas num só `rotas`:
+
+- **Zona de entrega (`zonas_entrega`):** configuração estável, bairro/polígono -> taxa cobrada do
+  cliente + valor pago ao motoboy. É o que precifica a entrega no pedido.
+- **Motoboy + fechamento:** cadastro completo do entregador (veículo, placa, Pix, ativo), atribuição
+  do motoboy **no pedido** (nome fica registrado para responsabilização de qualquer ocorrência), e o
+  **fechamento do dia**: soma automática do que cada motoboy tem a receber (derivada das entregas),
+  com **lançamento manual** por cima para quando o restaurante não destina um motoboy fixo por
+  entrega. Fecha o dia marcável como pago.
+- **Despacho / roteirização (`despacho` + `corridas`):** a camada complexa e de maior valor. Agrupa
+  pedidos que devem **sair juntos** por tempo de preparo + proximidade geográfica, sugere a `corrida`
+  (um lote: 1 motoboy, N pedidos, ordem de parada) e deixa o operador aceitar ou ajustar à mão. Exige
+  **geocodificação** dos endereços (`lat/lng` em `enderecos`) e matriz de distância/tempo.
+
+O provedor de mapas fica **isolado atrás de uma interface `ClienteMapas`** (geocode + matriz +
+rota), do mesmo jeito que o WhatsApp vive atrás de `ClienteWhats`. Começa com opção **gratuita**
+(Nominatim para geocode, OSRM/OpenRouteService para matriz e rota) e deixa o Google Maps como
+implementação alternativa plugável, sem espalhar a escolha pelo código. A roteirização é a última
+onda: o cadastro de motoboy, a atribuição no pedido e o fechamento (as camadas que já resolvem o
+grosso da dor) vêm antes e não dependem de mapas.
+
+## A API é a única porta; o banco é trocável
+
+Princípio não-negociável, pensado desde o schema: **o front nunca fala com o banco.** A SPA só
+consome REST + SSE da `api`; o `supabase-js` no front serve **apenas** para o login (JWT). Nenhuma
+query, nenhuma tabela, nenhum RLS-como-regra-de-negócio no cliente. Isso já é verdade hoje (RLS
+deny-all para anon/authenticated) e vira requisito de design do rebuild, não acaso.
+
+O ganho real que você quer é **portabilidade do banco**: sair do Supabase, trocar de host ou de
+Postgres gerenciado deve ser mudança **pontual**, não reescrita. Para isso:
+
+- **Uma única fronteira de dados:** todo acesso passa por `packages/shared/db` (pool `pg`, SQL
+  padrão). Os módulos chamam essa fronteira, nunca um cliente Supabase nem PostgREST. Trocar o host
+  do Postgres = trocar a connection string num lugar.
+- **Nada específico de Supabase no caminho de dados:** sem Edge Functions, sem PostgREST, sem
+  Realtime do Supabase (o nosso realtime é SSE sobre `LISTEN/NOTIFY`, padrão Postgres). O que usamos
+  do Supabase é Postgres (portável) + Auth (JWT validado localmente por JWKS, que qualquer emissor
+  OIDC pode substituir).
+- **Contratos na borda da api, não o shape do banco:** o front recebe os DTOs do contrato (Zod
+  gerado), nunca linhas cruas. Mudar uma coluna não vaza para o cliente; mudar de banco não muda o
+  contrato.
+- **Portável por padrão:** SQL ANSI sempre que der, `pgcrypto`/`vector` são as únicas extensões e
+  ambas existem em qualquer Postgres; migrations em SQL puro (não no CLI proprietário). Supabase é
+  **detalhe de infra**, não dependência de arquitetura.
+
+Resultado: a `api` é o produto durável; o banco por baixo é substituível. É o mesmo movimento do
+`ClienteWhats` e do `ClienteMapas` (provedor atrás de interface), aplicado à persistência.
+
+## LLM por loja: provedor modular e a chave do próprio cliente
+
+A IA aparece em vários pontos (importar cardápio por foto/PDF, entender áudio e texto do cliente,
+montar pedido, resumos e gestões pro dono). **Nada disso pode estar escrito direto no código.** Dois
+movimentos:
+
+- **Provedor atrás de `ClienteLLM`** (mesma família de `ClienteWhats`/`ClienteMapas`): a escolha de
+  provedor (OpenRouter recomendado, Anthropic, ou outro), modelo e parâmetros é **configuração**, não
+  código de módulo. Cada ponto que usa IA consome a interface; trocar provedor ou modelo é mudança
+  pontual. Vive em `atendente/shared/llm_client`.
+- **Chave do próprio cliente (BYO key):** cada loja configura a **própria** credencial (provedor +
+  chave + modelo preferido) numa área do painel. Módulo `configuracoes_llm` na api + tela no front. Em
+  runtime, o `atendente` resolve a credencial **daquela loja**, decifra na hora da chamada e chama o
+  provedor com a chave dela. Sem credencial configurada, as features de IA da loja ficam desligadas
+  (degrada para o fluxo sem LLM), nunca caem na chave de outra loja nem numa chave global.
+
+**Esta é a informação mais perigosa do sistema:** uma chave vazada vira custo imediato pro cliente e
+pra nós. O tratamento é de nível máximo e está especificado em [SEGURANCA.md](SEGURANCA.md); em resumo:
+
+- **Cifrada em repouso com envelope encryption**, a master key **fora do banco** (env/secret manager):
+  um dump do banco sozinho não revela chave nenhuma.
+- **Texto claro nunca volta pro cliente:** o campo é write-only; a tela mostra só provedor, últimos 4
+  dígitos e "configurada". Nenhum endpoint devolve a chave.
+- **Privilégio mínimo por coluna:** a `api` escreve (set/rotate) e lê só os metadados; **só o worker
+  `atendente` lê o texto cifrado** para decifrar no momento do uso. A chave nunca entra em log (a
+  redaction cobre o campo) nem no prompt enviado ao provedor.
+- **Consumo contabilizado** (`uso_llm`) com alerta de gasto anômalo, para pegar abuso/vazamento cedo.
+
+## Segurança como disciplina, não etapa final
+
+Com chave de LLM, token da Meta, Pix e PII de clientes finais no mesmo banco multi-tenant, segurança é
+requisito de arquitetura. O projeto ganha um documento vivo, [SEGURANCA.md](SEGURANCA.md), que é ao
+mesmo tempo **modelo de ameaças** (o que proteger, de quem, por quais vetores) e **catálogo de testes
+automatizados** (cada ameaça vira um teste com id, verde ou vermelho no CI). Uma suíte `security/`
+roda no gate, a cobertura de RLS continua obrigatória, e **subagents especializados** fazem o papel de
+red team periódico contra o catálogo. Toda feature nova atualiza o catálogo antes de entrar.
+
 ## Insights da pesquisa (fundamentam as decisões)
 
 Ressalva honesta: é convergência de praticantes, não benchmark controlado. O ganho é mecânico
@@ -62,10 +169,14 @@ backend/
     api/        REST para o painel SPA (:3001)
       src/
         server.ts · app.ts · routes.ts   (registry: 1 linha por módulo)
-        shared/   auth, tokens, http_errors, realtime (SSE), tenant (escopo loja + papéis)
-        modules/  conta, lojas, numeros_whatsapp, cardapio, cardapio_importacao,
-                  pedidos, conversas, clientes, rotas, motoboys, pagamentos,
-                  dashboard, fluxo, billing, perfil, admin
+        shared/   auth, tokens, http_errors, realtime (SSE), tenant (escopo loja + papéis),
+                  operador (escopo plataforma), mapas_client (geocode + matriz; OSRM/ORS, Google opcional)
+        modules/
+          (loja)        conta, lojas, numeros_whatsapp, cardapio, cardapio_importacao,
+                        pedidos, conversas, clientes, zonas_entrega, motoboys, despacho,
+                        pagamentos, dashboard_loja, fluxo, perfil, configuracoes_llm (BYO key)
+          (plataforma)  plataforma_clientes (restaurantes), plataforma_cobranca (restaurante->Whaviso),
+                        plataforma_funil (CRM de aquisição), plataforma_painel (crescimento/MRR)
     zap/        transporte WhatsApp (:3002), fino
       src/
         shared/meta_client/  multi-WABA (credencial por loja, roteia inbound por phone_number_id)
@@ -73,7 +184,8 @@ backend/
                   enviar (drena outbox -> Meta), sincronizar_templates
     atendente/  worker de conversa (async, centro de custo de IA)
       src/
-        shared/   llm_client (OpenRouter + reserva + no-train), rag, stt, media_storage
+        shared/   llm_client (ClienteLLM: provedor plugável OpenRouter/Anthropic, credencial por loja,
+                  reserva + no-train), rag, stt, media_storage
         nodes/<tipo>/  plugins do grafo (saudacao, pedir_categoria, montar_pedido,
                        confirmar, endereco, pix, acompanhar) atrás de NodeContract, num registry
         modules/  motor_fluxo, entender_mensagem (STT+intenção), retroalimentar_base (RAG)
@@ -85,15 +197,19 @@ frontend/     SPA React/Vite standalone (:5173)
   src/
     shared/   ui, api_client, auth, realtime (SSE), format, tenant (seletor de loja + branding)
     shared/contracts/_generated/   GERADO do backend, commitado, não editar à mão
-    modules/  espelham o painel: lojas, numeros, cardapio, pedidos (kanban), conversas,
-              clientes, rotas, motoboys, dashboard, fluxo, billing, admin
+    modules/  painel da loja: lojas, numeros, cardapio, pedidos (kanban), conversas,
+              clientes, zonas_entrega, motoboys, despacho (mapa), dashboard, fluxo,
+              configuracoes_llm (chave do cliente, write-only)
+              console da plataforma (equipe Whaviso): plataforma/clientes, cobranca, funil, painel
 ```
 
-**Orquestrador e dashboard** (as features que leem muitos domínios): são **read-models**, leem
-por leitura cruzada read-only via `shared/db` documentada no MODULE.md (já permitido no AGENTS.md
-atual), nunca importam o interno de outra feature; escrita é só do módulo dono da tabela;
-coordenação de escrita cross-feature por outbox/evento. Dados sempre-ao-vivo (preço,
-disponibilidade, status) vêm do sistema, nunca do cache.
+**Orquestrador, dashboard da loja e painel da plataforma** (as features que leem muitos domínios):
+são **read-models**, leem por leitura cruzada read-only via `shared/db` documentada no MODULE.md (já
+permitido no AGENTS.md atual), nunca importam o interno de outra feature; escrita é só do módulo dono
+da tabela; coordenação de escrita cross-feature por outbox/evento. Dados sempre-ao-vivo (preço,
+disponibilidade, status) vêm do sistema, nunca do cache. O **painel da plataforma** agrega por conta
+(lojas ativas, MRR, inadimplência, funil), nunca o conteúdo das lojas; o **despacho** é read-model
+sobre pedidos + endereços geocodificados + zonas, e só escreve na própria `corridas`.
 
 **Contratos front/back (decisão-chave):** fonte única em `@whaviso/shared/contracts`; um script
 `gen_contracts` emite `frontend/src/shared/contracts/_generated/` (commitado). O front **não**
@@ -111,9 +227,14 @@ módulo" (consomem contrato, não um ao outro). Adicionar um passo = adição lo
    `clientes` + motor de conversa mínimo com **fluxo hardcoded** (sem builder, sem LLM nas
    etapas fixas). Entrega o loop ponta a ponta.
 2. **IA no atendimento:** `entender_mensagem` (STT + intenção), `rag` + cache, `cardapio_importacao`.
-3. **Operação:** `rotas` + `motoboys` + fechamento do dia + `pagamentos` (Pix).
-4. **Visão e negócio:** `dashboard`, `billing`, `conversas` (handoff humano), multi-loja consolidado.
-5. **Depois:** `fluxo` builder visual (contrato já reservado desde o passo 1).
+3. **Operação de entrega:** `zonas_entrega` + `motoboys` (cadastro completo) + atribuição no pedido +
+   fechamento do dia (automático + manual) + `pagamentos` (Pix).
+4. **Negócio da loja e da plataforma:** `dashboard` da loja, `conversas` (handoff humano), multi-loja
+   consolidado; **console da plataforma**: `plataforma_clientes` + `plataforma_cobranca`
+   (assinatura restaurante -> Whaviso) + `plataforma_funil` + `plataforma_painel` (crescimento).
+5. **Roteirização e builder:** `despacho` com `ClienteMapas` (geocode + agrupar pedidos por preparo +
+   proximidade) e o `fluxo` builder visual (NodeContract reservado desde a onda 1). As duas peças
+   caras e complexas, por último, sobre um núcleo já em produção.
 
 ## Proposta de melhoria da skill feature-first (rascunho; a skill é global, não sobrescrita)
 

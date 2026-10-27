@@ -63,8 +63,14 @@ e o **escopo por loja é imposto pelo kernel de tenant da api** (resolve o membe
 `WHERE loja_id = ANY(lojas_do_usuario)`). Hardening opcional: RLS real por loja via GUC
 (`SET LOCAL app.loja_id` + policy), como defesa em profundidade.
 
-**Terceiro role de serviço `whaviso_atendente`** (worker de IA): lê cardápio/clientes/rotas/base,
-insere `mensagens` e rascunho de `pedidos`, enfileira em `envios`; não toca billing nem credenciais Meta.
+**Terceiro role de serviço `whaviso_atendente`** (worker de IA): lê cardápio/clientes/zonas/base e a
+`chave_cifrada` da `credenciais_llm` da loja (para decifrar no uso), insere `mensagens` e rascunho de
+`pedidos`, enfileira em `envios` e grava `uso_llm`; não toca billing/plataforma nem credenciais Meta.
+
+**Dois escopos de auth no mesmo banco:** o **membro de loja** (via `membros`, injeta
+`WHERE loja_id = ANY(...)`) e o **operador da plataforma** (via `operadores`, enxerga todas as contas,
+mas só métricas/billing, nunca conteúdo de loja). O operador não é um `membro`; o escopo é resolvido
+pelo kernel da api por role de aplicação, não por RLS.
 
 **Tabelas (resumo):**
 - **Núcleo:** `contas`, `lojas` (branding/horários/área), `membros` (papel dono/gerente/atendente,
@@ -84,17 +90,41 @@ insere `mensagens` e rascunho de `pedidos`, enfileira em `envios`; não toca bil
   tipo texto/áudio/imagem, transcrição, wamid).
 - **Clientes:** `clientes` (por loja, telefone só hash, unique `(loja_id, telefone_hash)`),
   `enderecos` (base do "repetir último / sugerir último endereço").
-- **Entrega:** `rotas` (bairro/distância/área, taxa do cliente e valor do motoboy), `motoboys`,
-  `fechamentos` (dia marcável como pago), `motoboy_lancamentos` (append-only).
+- **Entrega:** `zonas_entrega` (bairro/polígono/área, taxa do cliente e valor do motoboy; o que
+  precifica a entrega), `motoboys` (cadastro completo: veículo, placa, Pix só hash, `ativo`),
+  `fechamentos` (dia por motoboy marcável como pago), `motoboy_lancamentos` (append-only: linha
+  automática por entrega + linha manual por ajuste). O motoboy do pedido fica em `pedidos.motoboy_id`,
+  com o nome registrado para responsabilização.
+- **Despacho / roteirização:** `corridas` (lote de despacho: 1 motoboy, N pedidos, ordem de parada,
+  status montando/despachada/concluída) + `pedidos.corrida_id`. Depende de `enderecos.lat/lng`
+  (geocodificação) e da matriz de distância/tempo do `ClienteMapas` (Nominatim + OSRM/ORS grátis,
+  Google opcional, isolado atrás da interface como o `ClienteWhats`).
+- **Plataforma (Whaviso operadora; separado do plano da loja):** `operadores` (equipe Whaviso, papel
+  operador/admin; distinto de `membros`, que é da loja), `prospectos` (restaurantes no funil de
+  aquisição, com `estagio`: novo/contato/proposta/ativo/perdido) + `prospecto_atividades` (follow-ups,
+  append-only). A cobrança restaurante -> Whaviso são `assinaturas` + `faturas` (abaixo), lidas por este
+  plano; o operador vê métricas e faturamento das lojas, **nunca** conversas nem pedidos delas.
 - **Pagamentos:** `pagamentos` (Pix na conversa, BR Code/txid, status). Pix por loja.
 - **Templates:** `templates` com `loja_id` NULL = padrão da plataforma (herdado), preenchido =
   sobrescrita da loja (branding). Mantém jsonb estruturado e check de linguagem.
 - **Outbox genérica:** `envios` **desacoplada** (referências opcionais a pedido/conversa, roteada por
   `numero_whatsapp_id`), `webhook_eventos_processados` (idempotência, reaproveitada).
 - **Eventos:** `eventos` (append-only genérico, sem PII), `eventos_auth` (mantido como hoje).
-- **Billing:** `assinaturas` (por loja, ~R$700/mês, status ativa/suspensa/cancelada/trial), `faturas`.
+- **Billing (restaurante -> Whaviso, do plano da plataforma):** `assinaturas` (por conta/loja,
+  ~R$700/mês, status trial/ativa/suspensa/cancelada), `faturas` (emitidas, vencimento, pagas/em atraso).
+  Dono: o console da plataforma; a loja só enxerga a própria fatura.
 - **RAG:** `base_conhecimento` (embedding `pgvector`, aprovado pelo dono) + `cache_semantico`; dados
   sempre-ao-vivo (preço/disponibilidade/status) nunca saem do cache.
+- **Credenciais de IA (o segredo mais caro do banco):** `credenciais_llm` (por loja: `provedor`
+  enum openrouter/anthropic/outro, `chave_cifrada bytea` com **envelope encryption** e master key
+  **fora do banco**, `ultimos4` só para exibir, `modelo_preferido`, `ativo`, `validada_em`),
+  `uso_llm` (append-only: tokens in/out e custo estimado por loja/módulo, para o painel de consumo e
+  **alerta de gasto anômalo**). Grants por coluna: `whaviso_api` escreve (set/rotate) e lê **só os
+  metadados**, nunca `chave_cifrada`; **só `whaviso_atendente` lê `chave_cifrada`** para decifrar na
+  hora da chamada; texto claro nunca volta pro cliente (campo write-only) nem entra em log. Entra como
+  migration dedicada **`0012_credenciais_llm`**, acrescentada depois do baseline (o reset em andamento
+  escreve 0001..0011), pelo peso de segurança que a tabela carrega. Plano de teste em
+  [SEGURANCA.md](SEGURANCA.md).
 
 ### DDL esboçada das tabelas centrais
 
@@ -155,8 +185,9 @@ create table public.pedidos (
   subtotal_centavos integer not null,
   taxa_entrega_centavos integer not null default 0,
   total_centavos integer not null,
-  rota_id uuid references public.rotas (id),
-  motoboy_id uuid references public.motoboys (id),
+  zona_id uuid references public.zonas_entrega (id),   -- precifica a entrega
+  corrida_id uuid references public.corridas (id),     -- lote de despacho (roteirização)
+  motoboy_id uuid references public.motoboys (id),     -- nome registrado p/ responsabilização
   endereco_id uuid references public.enderecos (id),
   problema_motivo text,
   criado_em timestamptz not null default now(),
@@ -203,8 +234,11 @@ auditoria = só `select, insert` + trigger que rejeita UPDATE, zero DELETE.
 1. Apagar as 103 migrations e reescrever o `seed.sql`.
 2. Baseline novo em poucas migrations temáticas: `0001_roles_rls` (com `REVOKE anon/authenticated` +
    `ALTER DEFAULT PRIVILEGES` cedo), `0002_contas_lojas_membros`, `0003_numeros_whatsapp`,
-   `0004_cardapio`, `0005_pedidos`, `0006_conversas_clientes`, `0007_rotas_motoboys`,
-   `0008_pagamentos_billing`, `0009_templates_envios_outbox`, `0010_eventos_auth`.
+   `0004_cardapio`, `0005_pedidos`, `0006_conversas_clientes`, `0007_zonas_motoboys_despacho`
+   (zonas_entrega, motoboys, fechamentos, corridas, geocode em enderecos), `0008_pagamentos`,
+   `0009_plataforma` (operadores, prospectos, assinaturas, faturas), `0010_templates_envios_outbox`,
+   `0011_eventos_auth`, `0012_credenciais_llm` (credenciais_llm + uso_llm; cifrado, grants por coluna,
+   acrescentada depois do baseline pelo peso de segurança).
 3. Validar com `bash scripts/validate_migrations.sh whaviso_dev` (recria de banco vazio, sem teardown)
    e `check_rls_coverage.sh`. `supabase db reset` mexe **só no local**, nunca no cloud.
 
