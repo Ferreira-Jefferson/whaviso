@@ -209,6 +209,11 @@ migration usa o número reservado; se precisar de uma não listada, pega o próx
 | 0025 | pessoas (pessoas, cargos, escalas; motoboy cargo fixo) | API-pessoas |
 | 0026 | estoque_insumos (insumos, unidades, minimos, movimentos) | API-estoque-insumos |
 | 0027 | ficha_tecnica (receita item -> insumos; baixa na venda) | API-ficha-tecnica |
+| 0052 | documentos_rascunho_atendente (trava SEC-032: atendente so insere documentos status='rascunho') | AT-realimentar |
+| 0053 | lojas_pausa_capacidade (pausada/pausada_motivo/pausada_ate + capacidade por janela) | API-lojas (+) |
+| 0054 | conversas_aguardando (status_conversa += 'aguardando' para o handoff humano) | API-handoff (conversas) |
+| 0055 | baixa_estoque_na_efetivacao (trigger DEFERRED: baixa item+insumo ao efetivar o pedido) | API-pedidos (+) |
+| 0056 | pedidos_forma_pagamento_troco (forma_pagamento + troco_para_centavos no pedido) | API-pedidos (+) |
 
 ### Donos de escrita a combinar (um dono por coluna/tabela)
 
