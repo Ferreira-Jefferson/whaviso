@@ -1,0 +1,17 @@
+// Contratos de borda do modulo fiscal. Fonte unica: @whaviso/shared/contracts/fiscal (o codegen
+// reemite para o front). Nenhum schema de SAIDA carrega a credencial do emissor (write-only).
+export {
+  FiscalConfigEntrada,
+  FiscalConfigPatch,
+  FiscalConfigEstado,
+  DocumentoFiscalEmitirEntrada,
+  DocumentoFiscalSaida,
+  DocumentosFiscaisEntrada,
+  DocumentosFiscaisSaida,
+  DocumentoFiscalIdParams,
+  type DocumentoFiscalDto,
+  type DocumentosFiscaisBusca,
+  type RegimeFiscalDto,
+  type StatusDocumentoFiscal,
+  type TipoDocumentoFiscal,
+} from '@whaviso/shared/contracts'
