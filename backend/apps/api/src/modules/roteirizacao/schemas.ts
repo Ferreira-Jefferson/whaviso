@@ -1,0 +1,22 @@
+// Contratos de borda da roteirizacao. Fonte unica: @whaviso/shared/contracts (o codegen reemite para o
+// front). Aqui ficam apenas os reexports e os parametros de rota.
+export {
+  DespachoConfigEntrada,
+  DespachoConfigSaida,
+  GeocodificarPendentesEntrada,
+  GeocodificarPendentesSaida,
+  RoteirizacaoSugerirEntrada,
+  RoteirizacaoSugerirSaida,
+  RoteirizacaoAceitarEntrada,
+  RoteirizacaoAceitarSaida,
+  RoteirizacaoReordenarEntrada,
+  RoteirizacaoReordenarSaida,
+  type CorridaSugerida,
+  type DespachoConfigSaida as DespachoConfigDto,
+  type GeocodificarPendentesSaida as GeocodificarPendentesDto,
+  type RoteirizacaoAceitarSaida as CorridaDto,
+  type RoteirizacaoReordenarSaida as ReordenarDto,
+  type RoteirizacaoSugerirSaida as SugerirDto,
+  type SemLocalizacao,
+  type MotivoSemLocalizacao,
+} from '@whaviso/shared/contracts'
