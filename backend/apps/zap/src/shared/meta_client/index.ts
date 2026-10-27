@@ -23,6 +23,10 @@ import type { OpcoesMeta, PayloadWebhook } from './tipos'
 
 export type { OpcoesMeta } from './tipos'
 
+// Implementacao F2 do contrato ClienteWhats (@whaviso/shared/clientes) sobre a Meta Cloud
+// API, multi-numero (credencial por chamada). ZAP-enviar/ZAP-webhook consomem por aqui.
+export { criarClienteWhatsMeta, type OpcoesClienteMeta } from './cliente_meta'
+
 export interface ClienteWhatsMeta extends ClienteWhats {
   /** registra GET/POST /webhook/whatsapp no app (handshake + eventos). */
   montarRotaWebhook(app: FastifyInstance): void
