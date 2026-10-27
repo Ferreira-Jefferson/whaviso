@@ -1,0 +1,1 @@
+export { fidelidadeRoutes } from './routes'
