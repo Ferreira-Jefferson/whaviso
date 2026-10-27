@@ -10,6 +10,27 @@ export const horaSp = (iso: string): string => hora.format(new Date(iso))
 
 const ativos = (p: PedidoDetalheSaida) => p.itens.filter((i) => !i.cancelado)
 
+const ROTULO_PAGAMENTO: Record<NonNullable<PedidoDetalheSaida['forma_pagamento']>, string> = {
+  dinheiro: 'Dinheiro',
+  credito: 'Cartao credito',
+  debito: 'Cartao debito',
+  pix: 'Pix',
+  outro: 'Outro',
+}
+
+/** Linhas de carimbo do pagamento para o motoboy: forma e, no dinheiro, o troco a levar. */
+function pagamentoLinhas(p: PedidoDetalheSaida): { rotulo: string; trocoPara?: string; troco?: string } | null {
+  if (!p.forma_pagamento) return null
+  const base = { rotulo: ROTULO_PAGAMENTO[p.forma_pagamento] }
+  if (p.forma_pagamento !== 'dinheiro' || p.troco_para_centavos == null) return base
+  const diff = p.troco_para_centavos - p.total_centavos
+  return {
+    ...base,
+    trocoPara: formatarValorBr(p.troco_para_centavos),
+    troco: diff > 0 ? formatarValorBr(diff) : 'sem troco',
+  }
+}
+
 function enderecoLinha(p: PedidoDetalheSaida): string[] {
   const e = p.endereco
   if (!e) return []
@@ -58,6 +79,12 @@ export function comandaTexto(p: PedidoDetalheSaida, largura: number): string {
   L.push(tracos, duasColunas('Subtotal', formatarValorBr(p.subtotal_centavos), largura))
   if (p.modalidade === 'entrega') L.push(duasColunas('Entrega', formatarValorBr(p.taxa_entrega_centavos), largura))
   L.push(duasColunas('TOTAL', formatarValorBr(p.total_centavos), largura))
+  const pag = pagamentoLinhas(p)
+  if (pag) {
+    L.push(tracos, `Pagamento: ${pag.rotulo}`)
+    if (pag.trocoPara) L.push(duasColunas('Troco para', pag.trocoPara, largura))
+    if (pag.troco) L.push(duasColunas('Troco', pag.troco, largura))
+  }
   if (p.observacao) L.push(tracos, ...quebrar(`Obs: ${p.observacao}`, largura))
   return L.join('\n')
 }
@@ -83,5 +110,15 @@ ${p.cliente?.nome ? `<div>Cliente: ${esc(p.cliente.nome)}</div>` : ''}${end}<hr>
 <div class="l"><span>Subtotal</span><span>${esc(formatarValorBr(p.subtotal_centavos))}</span></div>
 ${p.modalidade === 'entrega' ? `<div class="l"><span>Entrega</span><span>${esc(formatarValorBr(p.taxa_entrega_centavos))}</span></div>` : ''}
 <div class="l tot"><span>TOTAL</span><span>${esc(formatarValorBr(p.total_centavos))}</span></div>
-${p.observacao ? `<hr><div>Obs: ${esc(p.observacao)}</div>` : ''}</body></html>`
+${pagamentoHtml(p)}${p.observacao ? `<hr><div>Obs: ${esc(p.observacao)}</div>` : ''}</body></html>`
+}
+
+function pagamentoHtml(p: PedidoDetalheSaida): string {
+  const pag = pagamentoLinhas(p)
+  if (!pag) return ''
+  const troco = pag.trocoPara
+    ? `<div class="l"><span>Troco para</span><span>${esc(pag.trocoPara)}</span></div>
+<div class="l"><span>Troco</span><span>${esc(pag.troco ?? '')}</span></div>`
+    : ''
+  return `<hr><div>Pagamento: ${esc(pag.rotulo)}</div>${troco}`
 }

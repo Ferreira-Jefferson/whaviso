@@ -46,6 +46,18 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
       payload: { pedido_id: pedidoId, loja_id: lojaId, status },
     })
 
+  /** Barra o aceite de pedido novo quando a loja esta pausada agora ou lotou a janela. */
+  async function exigirAceiteDaLoja(lojaId: string): Promise<void> {
+    const estado = await repo.estadoAceiteLoja(pool, lojaId)
+    if (!estado) return // loja fora do escopo ja e tratada pelos demais guards
+    if (estado.pausada_agora) {
+      throw conflito('loja_pausada', 'A loja esta pausada e nao aceita novos pedidos agora')
+    }
+    if (estado.capacidade_por_janela !== null && estado.pedidos_na_janela >= estado.capacidade_por_janela) {
+      throw conflito('capacidade_excedida', 'Capacidade de pedidos da janela atingida, tente mais tarde')
+    }
+  }
+
   async function detalhe(a: Ator, id: string): Promise<PedidoDetalheSaida> {
     const p = await repo.obterPedido(pool, a.lojaId, id)
     if (!p) throw naoEncontrado('Pedido nao encontrado')
@@ -59,6 +71,12 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     if (b.modalidade === 'retirada' && (b.endereco_id || b.taxa_entrega_centavos > 0)) {
       throw regraNegocio('retirada_sem_entrega', 'Retirada nao tem endereco nem taxa de entrega')
     }
+    // Troco so acompanha pagamento em dinheiro (o banco tambem barra via check).
+    if (b.troco_para_centavos != null && b.forma_pagamento !== 'dinheiro') {
+      throw regraNegocio('troco_so_dinheiro', 'Troco so se aplica a pagamento em dinheiro')
+    }
+    // G7: recusa aceitar pedido novo com a loja pausada ou acima da capacidade da janela.
+    await exigirAceiteDaLoja(a.lojaId)
     if (!(await repo.clienteDaLoja(pool, a.lojaId, b.cliente_id))) throw naoEncontrado('Cliente nao encontrado')
     if (b.endereco_id && !(await repo.enderecoAtivoDoCliente(pool, a.lojaId, b.cliente_id, b.endereco_id))) {
       throw naoEncontrado('Endereco nao encontrado')
@@ -76,7 +94,8 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
           const pedidoId = await escrita.inserirPedido(tx, {
             lojaId: a.lojaId, clienteId: b.cliente_id, enderecoId: b.endereco_id ?? null,
             modalidade: b.modalidade, codigo, subtotal: m.subtotal_centavos, taxa: m.taxa_entrega_centavos,
-            total: m.total_centavos, observacao: b.observacao ?? null,
+            total: m.total_centavos, formaPagamento: b.forma_pagamento ?? null,
+            trocoPara: b.troco_para_centavos ?? null, observacao: b.observacao ?? null,
           })
           for (const l of m.linhas) await escrita.inserirLinha(tx, a.lojaId, pedidoId, l)
           if (b.endereco_id) await escrita.marcarUsoEndereco(tx, a.lojaId, b.endereco_id)

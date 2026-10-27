@@ -3,6 +3,8 @@
 import { z } from 'zod'
 import { Centavos, DataHoraIso, UuidSchema } from './primitivos'
 import { modalidadePedido, origemPedido, statusPedido } from './enums'
+// Mesma lista de formas do caixa (TEXT+CHECK no banco, nao pg_enum): fonte unica no produto.
+import { formaPagamento } from './caixa'
 
 const texto = (max: number) => z.string().trim().min(1).max(max)
 
@@ -19,6 +21,10 @@ export const PedidoCriarManualEntrada = z.strictObject({
   endereco_id: UuidSchema.optional(),
   taxa_entrega_centavos: Centavos.default(0),
   observacao: texto(500).nullable().optional(),
+  // Forma de pagamento e troco opcionais no cadastro manual (troco so com 'dinheiro', validado no
+  // servidor e no banco). O carimbo sai na comanda e no despacho para o motoboy.
+  forma_pagamento: formaPagamento.optional(),
+  troco_para_centavos: Centavos.optional(),
   itens: z.array(PedidoItemEntrada).min(1).max(60),
 })
 export type PedidoCriarManualEntrada = z.infer<typeof PedidoCriarManualEntrada>
@@ -129,6 +135,8 @@ export const PedidoDetalheSaida = z.strictObject({
   subtotal_centavos: Centavos,
   taxa_entrega_centavos: Centavos,
   total_centavos: Centavos,
+  forma_pagamento: formaPagamento.nullable(),
+  troco_para_centavos: Centavos.nullable(),
   observacao: z.string().nullable(),
   problema_motivo: z.string().nullable(),
   entregue_em: DataHoraIso.nullable(),

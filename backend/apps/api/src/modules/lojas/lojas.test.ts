@@ -342,6 +342,49 @@ d('lojas (integracao)', () => {
     expect((await req(dono, 'GET', '/nao-e-uuid')).statusCode).toBe(400)
   })
 
+  it('G7: pausar/despausar a loja (gestor) reflete no LojaSaida e audita', async () => {
+    const semPausa = (await req(dono, 'GET', `/${lojaA}`)).json()
+    expect(semPausa.pausada).toBe(false)
+    expect(semPausa.capacidade_janela_minutos).toBe(30)
+
+    const p = await req(dono, 'POST', `/${lojaA}/pausar`, { motivo: 'cozinha cheia' }, lojaA)
+    expect(p.statusCode, p.body).toBe(200)
+    expect(p.json().pausada).toBe(true)
+    expect(p.json().pausada_motivo).toBe('cozinha cheia')
+
+    const d2 = await req(dono, 'POST', `/${lojaA}/despausar`, undefined, lojaA)
+    expect(d2.statusCode).toBe(200)
+    expect(d2.json().pausada).toBe(false)
+    expect(d2.json().pausada_motivo).toBeNull()
+
+    // atendente nao pode pausar (403); loja de outra conta = 404 (SEC-001/002)
+    expect((await req(atendente, 'POST', `/${lojaA}/pausar`, {}, lojaA)).statusCode).toBe(403)
+    expect((await req(dono, 'POST', `/${lojaB}/pausar`, {}, lojaB)).statusCode).toBe(404)
+
+    const tipos = await poolSuper.query(
+      `select tipo from public.eventos where entidade_id = $1 and tipo like 'loja.%paus%' order by id`,
+      [lojaA],
+    )
+    expect(tipos.rows.map((t) => t.tipo)).toEqual(['loja.pausada', 'loja.despausada'])
+  })
+
+  it('G7: capacidade por janela (gestor); por_janela null remove o limite', async () => {
+    const c1 = await req(gerente, 'PATCH', `/${lojaA}/capacidade`, { por_janela: 5, janela_minutos: 15 }, lojaA)
+    expect(c1.statusCode, c1.body).toBe(200)
+    expect(c1.json().capacidade_por_janela).toBe(5)
+    expect(c1.json().capacidade_janela_minutos).toBe(15)
+
+    // janela_minutos ausente preserva o valor atual; so muda o teto
+    const c2 = await req(gerente, 'PATCH', `/${lojaA}/capacidade`, { por_janela: null }, lojaA)
+    expect(c2.statusCode).toBe(200)
+    expect(c2.json().capacidade_por_janela).toBeNull()
+    expect(c2.json().capacidade_janela_minutos).toBe(15)
+
+    // validacao de borda: teto zero e negativo recusados (400)
+    expect((await req(gerente, 'PATCH', `/${lojaA}/capacidade`, { por_janela: 0 }, lojaA)).statusCode).toBe(400)
+    expect((await req(atendente, 'PATCH', `/${lojaA}/capacidade`, { por_janela: 3 }, lojaA)).statusCode).toBe(403)
+  })
+
   it('SEC-030: whaviso_api nao tem DELETE em lojas; whaviso_atendente le mas nao escreve', async () => {
     await expect(poolApi.query('delete from public.lojas where id = $1', [lojaA])).rejects.toThrow(/permission denied|permiss.o negada/)
     const cli = await poolSuper.connect()

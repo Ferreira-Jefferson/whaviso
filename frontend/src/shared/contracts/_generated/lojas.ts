@@ -153,6 +153,12 @@ export const LojaSaida = z.strictObject({
   horarios: Horarios.nullable(),
   area_entrega: AreaEntrega.nullable(),
   ativo: z.boolean(),
+  // G7: pausa operacional (nao confundir com `ativo` nem com `suspensa` da cobranca) e capacidade.
+  pausada: z.boolean(),
+  pausada_motivo: z.string().nullable(),
+  pausada_ate: DataHoraIso.nullable(),
+  capacidade_por_janela: z.number().int().nullable(),
+  capacidade_janela_minutos: z.number().int(),
   papel: papelMembro, // papel do usuario nesta loja (dono, ao ver loja inativa da propria conta)
   aberta_agora: z.boolean().nullable(), // null sem horarios; calculado no servidor
   numeros_whatsapp: NumerosResumo,
@@ -160,6 +166,20 @@ export const LojaSaida = z.strictObject({
   atualizado_em: DataHoraIso,
 })
 export type LojaSaida = z.infer<typeof LojaSaida>
+
+/** Pausar a loja agora: motivo opcional e prazo opcional (pausa que expira sozinha). */
+export const LojaPausarEntrada = z.strictObject({
+  motivo: z.string().trim().min(1).max(200).nullable().optional(),
+  ate: DataHoraIso.nullable().optional(),
+})
+export type LojaPausarEntrada = z.infer<typeof LojaPausarEntrada>
+
+/** Capacidade por janela: teto de pedidos (null = sem limite) numa faixa movel de M minutos. */
+export const LojaCapacidadeEntrada = z.strictObject({
+  por_janela: z.number().int().positive().nullable(),
+  janela_minutos: z.number().int().min(1).max(1440).optional(),
+})
+export type LojaCapacidadeEntrada = z.infer<typeof LojaCapacidadeEntrada>
 
 export const LojaListaSaida = z.strictObject({ itens: z.array(LojaSaida) })
 export const LojaListaQuery = z.strictObject({

@@ -9,7 +9,8 @@ evento ao vivo. Fonte: `historias/backend-api/pedidos.md`.
 - `index.ts`: `pedidosRoutes` (registry) e `criarPedidosRoutes(cifra?)` (cifra injetavel em teste).
 - Rotas finais (`/v1/pedidos`, todas `conteudo_de_loja` + permissao `pedidos:gerir`):
   `GET /` (kanban; `coluna`, `cursor`, `limite`, `modalidade`, `origem`, `data`),
-  `POST /` (criacao manual, status inicial `novo`, origem `manual`), `GET /:id`,
+  `POST /` (criacao manual, status inicial `novo`, origem `manual`; aceita `forma_pagamento` e
+  `troco_para_centavos` opcionais), `GET /:id`,
   `POST /:id/status` (`{ para, motivo? }`), `POST /:id/itens/:itemId/cancelar`,
   `GET /:id/impressao?formato=html|texto&largura=32|48`.
 
@@ -44,7 +45,18 @@ evento ao vivo. Fonte: `historias/backend-api/pedidos.md`.
 - **Cancelar linha:** so em novo/em_preparo, trava o pedido (`FOR UPDATE`), nao deixa zerar as linhas (422
   `ultima_linha`; cancelar o pedido inteiro = `problema`), recalcula totais na mesma transacao.
 - **Impressao:** so do snapshot, sem telefone, `Cache-Control: no-store`, auditoria `pedido.impresso`. Resposta JSON
-  `{ formato, conteudo }`.
+  `{ formato, conteudo }`. Carimba o pagamento (G9): `Pagamento: <forma>` e, no dinheiro, `Troco para` e o troco a
+  devolver (`troco_para - total`, "sem troco" se nao sobra).
+- **Pagamento (G9):** `forma_pagamento` (dinheiro/credito/debito/pix/outro) e `troco_para_centavos` (so com dinheiro;
+  o servidor recusa `troco_so_dinheiro` 422, o banco tem o mesmo check) carimbados no pedido (migration 0056).
+- **Guarda de aceite (G7):** criar pedido novo e recusado com a loja pausada agora (409 `loja_pausada`) ou com a
+  janela de capacidade cheia (409 `capacidade_excedida`). Le `lojas` (pausa/capacidade) e conta os pedidos nao-rascunho
+  da janela movel por read-model (`repo.estadoAceiteLoja`), sem importar o modulo lojas.
+- **Baixa de estoque na efetivacao (G2):** disparada por TRIGGER no banco (migration 0055), nao pelo modulo. Ao entrar
+  em `novo` (criacao manual OU confirmacao `rascunho -> novo` do atendente), decrementa na mesma transacao a contagem
+  por item (`itens.quantidade_disponivel`) e os insumos da ficha tecnica, nunca negativo, idempotente por pedido.
+  Por isso nao ha chamada TS do modulo pedidos aos modulos `estoque_*` (fronteira preservada; o trigger serve os dois
+  caminhos de efetivacao).
 - **Rascunho:** nao aparece no kanban; `GET /:id` o devolve; `rascunho -> novo` pode ser feito por `POST /:id/status`.
 
 ## Realtime
@@ -57,4 +69,4 @@ evento ao vivo. Fonte: `historias/backend-api/pedidos.md`.
 endereco, `destinos`), `PedidoImpressaoSaida`.
 
 ## Fora de escopo
-Quantidade numerica por item (migration 0023), pagamento, despacho, precificacao por zona, envio a impressora (ESC/POS).
+Despacho, precificacao por zona, envio a impressora (ESC/POS), conciliacao automatica de Pix (PSP/webhook).

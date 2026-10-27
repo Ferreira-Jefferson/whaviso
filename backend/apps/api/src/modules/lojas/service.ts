@@ -11,7 +11,9 @@ import {
   Horarios,
   type LojaAtualizarEntrada,
   type LojaBrandingEntrada,
+  type LojaCapacidadeEntrada,
   type LojaCriarEntrada,
+  type LojaPausarEntrada,
   type LojaSaida,
 } from './schemas'
 
@@ -40,6 +42,11 @@ export function paraSaida(l: repo.LojaLinha, papel: PapelMembro, agora = new Dat
     horarios,
     area_entrega: l.area_entrega ? ler<AreaEntrega>(AreaEntrega, l.area_entrega) : null,
     ativo: l.ativo,
+    pausada: l.pausada,
+    pausada_motivo: l.pausada_motivo,
+    pausada_ate: l.pausada_ate ? l.pausada_ate.toISOString() : null,
+    capacidade_por_janela: l.capacidade_por_janela,
+    capacidade_janela_minutos: l.capacidade_janela_minutos,
     papel,
     aberta_agora: lojaAbertaAgora(horarios, agora),
     numeros_whatsapp: { total: l.numeros_total, conectados: l.numeros_conectados },
@@ -124,6 +131,55 @@ async function aplicar(
 
 export function atualizar(pool: Pool, escopo: EscopoLoja, id: string, e: LojaAtualizarEntrada) {
   return aplicar(pool, escopo, id, e)
+}
+
+/** G7: pausar a loja agora (nao aceita pedido novo enquanto pausada). So gestor. */
+export async function pausar(
+  pool: Pool,
+  escopo: EscopoLoja,
+  id: string,
+  e: LojaPausarEntrada,
+): Promise<LojaSaida> {
+  const papel = exigirGestor(escopo, id)
+  await comTransacao(pool, async (tx) => {
+    await repo.pausar(tx, id, escopo.conta_id, { motivo: e.motivo ?? null, ate: e.ate ?? null })
+    await repo.registrarEvento(tx, id, 'loja.pausada', Object.keys(e))
+  })
+  const l = await repo.buscar(pool, id, escopo.conta_id)
+  if (!l) throw new NaoEncontrado()
+  return paraSaida(l, papel)
+}
+
+/** G7: despausar a loja. So gestor. */
+export async function despausar(pool: Pool, escopo: EscopoLoja, id: string): Promise<LojaSaida> {
+  const papel = exigirGestor(escopo, id)
+  await comTransacao(pool, async (tx) => {
+    await repo.despausar(tx, id, escopo.conta_id)
+    await repo.registrarEvento(tx, id, 'loja.despausada', [])
+  })
+  const l = await repo.buscar(pool, id, escopo.conta_id)
+  if (!l) throw new NaoEncontrado()
+  return paraSaida(l, papel)
+}
+
+/** G7: define a capacidade de pedidos por janela (null = sem limite). So gestor. */
+export async function definirCapacidade(
+  pool: Pool,
+  escopo: EscopoLoja,
+  id: string,
+  e: LojaCapacidadeEntrada,
+): Promise<LojaSaida> {
+  const papel = exigirGestor(escopo, id)
+  await comTransacao(pool, async (tx) => {
+    await repo.definirCapacidade(tx, id, escopo.conta_id, {
+      porJanela: e.por_janela,
+      janelaMinutos: e.janela_minutos,
+    })
+    await repo.registrarEvento(tx, id, 'loja.capacidade_definida', Object.keys(e))
+  })
+  const l = await repo.buscar(pool, id, escopo.conta_id)
+  if (!l) throw new NaoEncontrado()
+  return paraSaida(l, papel)
 }
 
 /** Allowlist de host do logo: exatamente o host (ou subdominio) de algum permitido. */

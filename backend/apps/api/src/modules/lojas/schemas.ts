@@ -14,6 +14,8 @@ export {
   LojaCriarEntrada,
   LojaAtualizarEntrada,
   LojaBrandingEntrada,
+  LojaPausarEntrada,
+  LojaCapacidadeEntrada,
   NumerosResumo,
   LojaSaida,
   LojaListaSaida,

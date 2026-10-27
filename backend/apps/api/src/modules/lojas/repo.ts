@@ -14,6 +14,11 @@ export interface LojaLinha {
   horarios: Horarios | null
   area_entrega: AreaEntrega | null
   ativo: boolean
+  pausada: boolean
+  pausada_motivo: string | null
+  pausada_ate: Date | null
+  capacidade_por_janela: number | null
+  capacidade_janela_minutos: number
   criado_em: Date
   atualizado_em: Date
   numeros_total: number
@@ -22,7 +27,8 @@ export interface LojaLinha {
 
 const COLUNAS = sql`
   l.id, l.conta_id, l.nome, l.logo_url, l.cores, l.endereco, l.horarios, l.area_entrega,
-  l.ativo, l.criado_em, l.atualizado_em,
+  l.ativo, l.pausada, l.pausada_motivo, l.pausada_ate,
+  l.capacidade_por_janela, l.capacidade_janela_minutos, l.criado_em, l.atualizado_em,
   coalesce(n.total, 0)::int as numeros_total, coalesce(n.conectados, 0)::int as numeros_conectados
   from public.lojas l
   left join lateral (
@@ -110,6 +116,50 @@ export async function definirAtivo(ex: Executor, id: string, contaId: string, at
   )
 }
 
+/** Pausa a loja agora (G7): motivo e prazo opcionais. Escopada por conta. */
+export async function pausar(
+  ex: Executor,
+  id: string,
+  contaId: string,
+  p: { motivo: string | null; ate: string | null },
+) {
+  await consultar(
+    ex,
+    sql`update public.lojas
+          set pausada = true, pausada_motivo = ${p.motivo}, pausada_ate = ${p.ate}::timestamptz
+        where id = ${id} and conta_id = ${contaId}`,
+  )
+}
+
+/** Despausa a loja e limpa motivo/prazo. Escopada por conta. */
+export async function despausar(ex: Executor, id: string, contaId: string) {
+  await consultar(
+    ex,
+    sql`update public.lojas set pausada = false, pausada_motivo = null, pausada_ate = null
+        where id = ${id} and conta_id = ${contaId}`,
+  )
+}
+
+/** Define a capacidade por janela (NULL = sem limite) e, se informado, o tamanho da janela. */
+export async function definirCapacidade(
+  ex: Executor,
+  id: string,
+  contaId: string,
+  c: { porJanela: number | null; janelaMinutos: number | undefined },
+) {
+  const janela =
+    c.janelaMinutos === undefined
+      ? sql`capacidade_janela_minutos`
+      : sql`${c.janelaMinutos}::int`
+  await consultar(
+    ex,
+    sql`update public.lojas
+          set capacidade_por_janela = ${c.porJanela},
+              capacidade_janela_minutos = ${janela}
+        where id = ${id} and conta_id = ${contaId}`,
+  )
+}
+
 /** Trava as lojas ativas da conta (serializa desativacoes concorrentes) e devolve os ids. */
 export async function travarAtivas(ex: Executor, contaId: string): Promise<string[]> {
   const rows = await consultar<{ id: string }>(
@@ -123,7 +173,14 @@ export async function travarAtivas(ex: Executor, contaId: string): Promise<strin
 export async function registrarEvento(
   ex: Executor,
   lojaId: string,
-  tipo: 'loja.criada' | 'loja.atualizada' | 'loja.desativada' | 'loja.reativada',
+  tipo:
+    | 'loja.criada'
+    | 'loja.atualizada'
+    | 'loja.desativada'
+    | 'loja.reativada'
+    | 'loja.pausada'
+    | 'loja.despausada'
+    | 'loja.capacidade_definida',
   campos: string[],
 ) {
   await consultar(

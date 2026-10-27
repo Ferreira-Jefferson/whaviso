@@ -4,10 +4,12 @@ import { Proibido } from '../../shared/http_errors'
 import {
   LojaAtualizarEntrada,
   LojaBrandingEntrada,
+  LojaCapacidadeEntrada,
   LojaCriarEntrada,
   LojaListaQuery,
   LojaListaSaida,
   LojaParams,
+  LojaPausarEntrada,
   LojaSaida,
 } from './schemas'
 import * as service from './service'
@@ -83,6 +85,25 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
       '/:id/reativar',
       { ...soAuth, schema: { params: LojaParams, response: { 200: LojaSaida } } },
       async (req) => service.alterarAtivo(app.pool, usuario(req), req.params.id, true),
+    )
+
+    // G7: pausar/despausar a loja agora e configurar capacidade por janela (gestor da loja).
+    app.post(
+      '/:id/pausar',
+      { ...comEscopo, schema: { params: LojaParams, body: LojaPausarEntrada, response: { 200: LojaSaida } } },
+      async (req) => service.pausar(app.pool, req.escopo!, req.params.id, req.body),
+    )
+
+    app.post(
+      '/:id/despausar',
+      { ...comEscopo, schema: { params: LojaParams, response: { 200: LojaSaida } } },
+      async (req) => service.despausar(app.pool, req.escopo!, req.params.id),
+    )
+
+    app.patch(
+      '/:id/capacidade',
+      { ...comEscopo, schema: { params: LojaParams, body: LojaCapacidadeEntrada, response: { 200: LojaSaida } } },
+      async (req) => service.definirCapacidade(app.pool, req.escopo!, req.params.id, req.body),
     )
   }
 }

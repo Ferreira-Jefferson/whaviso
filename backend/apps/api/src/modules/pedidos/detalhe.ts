@@ -32,6 +32,8 @@ export async function carregarDetalhe(
     subtotal_centavos: p.subtotal_centavos,
     taxa_entrega_centavos: p.taxa_entrega_centavos,
     total_centavos: p.total_centavos,
+    forma_pagamento: p.forma_pagamento,
+    troco_para_centavos: p.troco_para_centavos,
     observacao: p.observacao,
     problema_motivo: p.problema_motivo,
     entregue_em: p.entregue_em,

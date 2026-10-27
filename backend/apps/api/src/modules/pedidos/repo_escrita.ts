@@ -1,7 +1,7 @@
 // Escrita do modulo (dono de pedidos, itens_pedido, itens_pedido_opcoes), SQL parametrizado.
 // Sem DELETE (nao ha grant): linha removida = itens_pedido.cancelado = true.
 import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
-import type { ModalidadePedido, StatusPedido } from '@whaviso/shared/contracts'
+import type { FormaPagamento, ModalidadePedido, StatusPedido } from '@whaviso/shared/contracts'
 import type { LinhaMontada } from './montador'
 
 /** Proximo codigo `AAMMDD-NNN` do dia (sequencia diaria por loja). Conflito = retry no chamador. */
@@ -24,6 +24,8 @@ export interface PedidoNovo {
   subtotal: number
   taxa: number
   total: number
+  formaPagamento: FormaPagamento | null
+  trocoPara: number | null
   observacao: string | null
 }
 
@@ -32,9 +34,11 @@ export async function inserirPedido(exec: Executor, p: PedidoNovo): Promise<stri
     exec,
     sql`insert into public.pedidos
           (loja_id, cliente_id, endereco_id, codigo, status, origem, modalidade,
-           subtotal_centavos, taxa_entrega_centavos, total_centavos, observacao)
+           subtotal_centavos, taxa_entrega_centavos, total_centavos,
+           forma_pagamento, troco_para_centavos, observacao)
         values (${p.lojaId}, ${p.clienteId}, ${p.enderecoId}, ${p.codigo}, 'novo', 'manual',
-                ${p.modalidade}::modalidade_pedido, ${p.subtotal}, ${p.taxa}, ${p.total}, ${p.observacao})
+                ${p.modalidade}::modalidade_pedido, ${p.subtotal}, ${p.taxa}, ${p.total},
+                ${p.formaPagamento}, ${p.trocoPara}, ${p.observacao})
         returning id`,
   )
   if (!r) throw new Error('insert de pedido sem retorno')

@@ -2,7 +2,7 @@
 // @whaviso/shared/db com sql`...` parametrizado. Toda consulta filtra por loja_id.
 import { consultar, consultarUm, sql, sqlBruto, type Consulta, type Executor } from '@whaviso/shared/db'
 import { TZ } from '@whaviso/shared/datas'
-import type { ModalidadePedido, OrigemPedido, StatusPedido } from '@whaviso/shared/contracts'
+import type { FormaPagamento, ModalidadePedido, OrigemPedido, StatusPedido } from '@whaviso/shared/contracts'
 import type {
   CategoriaRow, GrupoRow, ItemRow, OpcaoRow, VinculoItemRow, VinculoRow,
 } from './cardapio_leitura'
@@ -79,6 +79,37 @@ export async function enderecoAtivoDoCliente(exec: Executor, lojaId: string, cli
   )
 }
 
+// ------------------------------------------------------------ loja (read-model p/ guarda de aceite)
+export interface EstadoAceiteLoja {
+  /** Pausa em vigor agora: pausada e (sem prazo ou prazo ainda no futuro). */
+  pausada_agora: boolean
+  pausada_motivo: string | null
+  /** Teto de pedidos por janela (NULL = sem limite). */
+  capacidade_por_janela: number | null
+  /** Pedidos nao-rascunho criados na janela movel (ja descontado o teto). */
+  pedidos_na_janela: number
+}
+
+/**
+ * Estado da loja para decidir se aceita um pedido novo: pausa em vigor e ocupacao da janela movel.
+ * Leitura cruzada do modulo pedidos sobre `lojas`/`pedidos` (sem importar o modulo lojas), sempre
+ * escopada por loja. O rascunho nao conta para a capacidade (so pedido efetivado ocupa a janela).
+ */
+export async function estadoAceiteLoja(exec: Executor, lojaId: string): Promise<EstadoAceiteLoja | null> {
+  return consultarUm<EstadoAceiteLoja>(
+    exec,
+    sql`select
+           (l.pausada and (l.pausada_ate is null or l.pausada_ate > now())) as pausada_agora,
+           l.pausada_motivo,
+           l.capacidade_por_janela,
+           (select count(*)::int from public.pedidos p
+             where p.loja_id = l.id and p.status <> 'rascunho'
+               and p.criado_em > now() - make_interval(mins => l.capacidade_janela_minutos)) as pedidos_na_janela
+         from public.lojas l
+        where l.id = ${lojaId}`,
+  )
+}
+
 // ------------------------------------------------------------ pedidos
 export interface CardLinha {
   id: string
@@ -143,6 +174,8 @@ export interface PedidoLinha {
   subtotal_centavos: number
   taxa_entrega_centavos: number
   total_centavos: number
+  forma_pagamento: FormaPagamento | null
+  troco_para_centavos: number | null
   observacao: string | null
   problema_motivo: string | null
   entregue_em: string | null
@@ -164,7 +197,8 @@ export async function obterPedido(exec: Executor, lojaId: string, id: string) {
   return consultarUm<PedidoLinha>(
     exec,
     sql`select p.id, p.codigo, p.status, p.origem, p.modalidade, p.subtotal_centavos,
-               p.taxa_entrega_centavos, p.total_centavos, p.observacao, p.problema_motivo,
+               p.taxa_entrega_centavos, p.total_centavos, p.forma_pagamento, p.troco_para_centavos,
+               p.observacao, p.problema_motivo,
                ${TS('p.entregue_em')} as entregue_em, ${TS('p.criado_em')} as criado_em,
                ${TS('p.atualizado_em')} as atualizado_em, p.conversa_id, p.zona_id, p.corrida_id,
                p.ordem_parada::int as ordem_parada, p.motoboy_id, p.motoboy_nome,
