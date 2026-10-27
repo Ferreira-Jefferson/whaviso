@@ -282,12 +282,112 @@ export function buscarConhecimentoTool(
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// cliente_cadastrar (proposta): NAO grava em clientes/enderecos. PROPOE, como EventoProposto, o cadastro
+// de dado novo que o cliente INFORMOU (nome e/ou endereco) para o cliente DA conversa (ctx.cliente_id);
+// o motor valida e efetiva uma vez. Nome e endereco sao ENTRADA NAO CONFIAVEL: Zod estrito, tamanho
+// limitado, e seguem apenas como DADO da proposta (nunca comando, SEC-061). Sem loja_id/cliente_id (SEC-063).
+const EnderecoArgs = z
+  .object({
+    logradouro: Texto(120).describe('Rua/avenida, como o cliente informou.'),
+    numero: Texto(20).optional(),
+    complemento: Texto(60).optional().describe('Apartamento, bloco, etc.'),
+    bairro: Texto(80).optional(),
+    cidade: Texto(80).optional(),
+    uf: z.string().trim().length(2).optional().describe('Sigla do estado, 2 letras (ex.: SP).'),
+    cep: Texto(9).optional(),
+    referencia: Texto(160).optional().describe('Ponto de referencia para achar o endereco.'),
+    apelido: Texto(40).optional().describe('Como o cliente chama este endereco (ex.: casa, trabalho).'),
+  })
+  .strict()
+const CadastrarArgs = z
+  .object({
+    nome: Texto(80).optional().describe('Nome do cliente, como ele informou.'),
+    endereco: EnderecoArgs.optional().describe('Endereco de entrega novo que o cliente informou.'),
+  })
+  .strict()
+  .refine((a) => a.nome !== undefined || a.endereco !== undefined, { message: 'informe nome e/ou endereco' })
+const CadastrarResultado = z.object({ evento: EventoSchema, aviso: z.string() }).strict()
+export function clienteCadastrar(): ToolContract<z.infer<typeof CadastrarArgs>, z.infer<typeof CadastrarResultado>> {
+  return {
+    name: 'cliente_cadastrar',
+    description:
+      'Propoe cadastrar dado novo que o cliente INFORMOU (nome e/ou endereco de entrega) para o cliente desta conversa. NAO confirma nem grava: o sistema valida e confirma antes de salvar. Use quando for um cliente novo, ou quando ele der um endereco que ainda nao esta cadastrado, para que o atendimento nao fique sem saida.',
+    efeito: 'proposta',
+    args: CadastrarArgs,
+    result: CadastrarResultado,
+    async executar(ctx, a) {
+      // So os campos informados viram DADO da proposta; a ordem canonica garante a idempotencia (SEC-066).
+      const dados: Record<string, unknown> = {}
+      if (a.nome) dados.nome = a.nome
+      if (a.endereco) {
+        const e = a.endereco
+        dados.endereco = {
+          logradouro: e.logradouro,
+          ...(e.numero ? { numero: e.numero } : {}),
+          ...(e.complemento ? { complemento: e.complemento } : {}),
+          ...(e.bairro ? { bairro: e.bairro } : {}),
+          ...(e.cidade ? { cidade: e.cidade } : {}),
+          ...(e.uf ? { uf: e.uf.toUpperCase() } : {}),
+          ...(e.cep ? { cep: e.cep } : {}),
+          ...(e.referencia ? { referencia: e.referencia } : {}),
+          ...(e.apelido ? { apelido: e.apelido } : {}),
+        }
+      }
+      const evento: EventoProposto = {
+        tipo: 'cadastro_cliente',
+        dados,
+        chave_idempotencia: chaveIdempotencia(ctx, 'cadastro_cliente', dados),
+      }
+      return { evento, aviso: 'Dados do cliente registrados como proposta; o sistema confirma antes de salvar.' }
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// tempo_de_entrega (leitura): estimativa AO VIVO a partir da fila da cozinha da loja do ctx. NAO promete
+// horario: devolve uma FAIXA em minutos (duracao, nao relogio, portanto sem fuso) e um aviso. Nao escreve.
+const PREPARO_BASE_MIN = 20 // preparo tipico de uma loja sem fila
+const ENTREGA_BASE_MIN = 15 // trajeto tipico ate o cliente
+const POR_PEDIDO_FILA_MIN = 5 // cada pedido na frente pesa na cozinha
+const BANDA_MIN = 15 // largura da faixa (o motor nao garante o minuto exato)
+const TempoResultado = z
+  .object({
+    minutos_min: z.number().int().min(0),
+    minutos_max: z.number().int().min(0),
+    pedidos_na_frente: z.number().int().min(0),
+    aviso: z.string(),
+  })
+  .strict()
+export function tempoDeEntrega(d: DepsTools): ToolContract<z.infer<typeof Vazio>, z.infer<typeof TempoResultado>> {
+  return {
+    name: 'tempo_de_entrega',
+    description:
+      'Estima o tempo de entrega AO VIVO da loja desta conversa, considerando a fila atual de pedidos. Devolve uma FAIXA em minutos (minimo e maximo), nunca uma promessa de horario. Nao recebe argumentos.',
+    efeito: 'leitura',
+    args: Vazio,
+    result: TempoResultado,
+    async executar(ctx) {
+      const fila = await repo.contarFilaAtiva(d.exec, ctx.loja_id) // sempre escopado por ctx.loja_id (SEC-063)
+      const base = PREPARO_BASE_MIN + ENTREGA_BASE_MIN + fila * POR_PEDIDO_FILA_MIN
+      return {
+        minutos_min: base,
+        minutos_max: base + BANDA_MIN,
+        pedidos_na_frente: fila,
+        aviso: 'Estimativa, nao um horario garantido; a loja confirma o prazo ao aceitar o pedido.',
+      }
+    },
+  }
+}
+
 /** Conjunto padrao do atendente. */
 export function ferramentasPadrao(d: DepsTools): ToolContract<never, unknown>[] {
   return [
     cardapioBuscar(d),
     montarRascunhoPedido(d),
     clienteReconhecer(d),
+    clienteCadastrar(),
+    tempoDeEntrega(d),
     statusPedido(d),
     escalarHumano(),
     buscarConhecimentoTool(d),

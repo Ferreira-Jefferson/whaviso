@@ -11,12 +11,19 @@ Fronteira de AUTORIZACAO do agente: tools so LEEM e PROPOEM; o motor determinist
 - Ids opacos (item, opcao) sao revalidados com `where loja_id = ctx.loja_id`; id alheio e id inexistente
   dao a mesma resposta (`referencia_invalida`).
 - Texto livre vai so como parametro SQL (LIKE escapado); resultado de tool e DADO.
-- Propostas (`rascunho_pedido`, `escalar_humano`) trazem `chave_idempotencia` deterministica.
+- Propostas (`rascunho_pedido`, `cadastro_cliente`, `escalar_humano`) trazem `chave_idempotencia` deterministica.
+- `cliente_cadastrar` e a UNICA tool de escrita-como-rascunho: PROPOE (nome/endereco que o cliente informou)
+  como `EventoProposto` para o motor efetivar em `ctx.cliente_id`; nunca grava em `clientes`/`enderecos`.
+  Nome e endereco sao ENTRADA NAO CONFIAVEL (Zod `.strict()`, tamanho limitado) e seguem so como DADO.
 
 ## Entry points
 `criarRegistroTools(ferramentasPadrao({ exec, rag }))` -> `specs()` (ao ServicoLlm) e `executar(chamada, ctx)`.
-Tools: cardapio_buscar, montar_rascunho_pedido, cliente_reconhecer, status_pedido, escalar_humano, buscar_conhecimento.
+Tools: cardapio_buscar, montar_rascunho_pedido, cliente_reconhecer, cliente_cadastrar, tempo_de_entrega,
+status_pedido, escalar_humano, buscar_conhecimento.
 
 ## Fora de escopo
-Nenhuma escrita em banco. Visao (ler_foto_cardapio, identificar_prato), calcular_total e tempo_de_entrega
-ficam para tarefas proprias. Sem migration.
+Visao (ler_foto_cardapio, identificar_prato) e calcular_total (ja coberto pelo `subtotal_previa_centavos`
+de montar_rascunho_pedido) ficam para tarefas proprias. Unica escrita = proposta de cliente_cadastrar
+(rascunho; o motor efetiva). Sem migration. `tempo_de_entrega` estima pela fila de pedidos (readonly);
+o preparo configurado da loja (`despacho_config`) nao e legivel pelo role `whaviso_atendente` hoje: ligar
+isso exige um grant em migration propria (fora deste modulo).

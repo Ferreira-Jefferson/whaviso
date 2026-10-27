@@ -87,6 +87,15 @@ export function lerUltimoEnderecoAtivo(
   )
 }
 
+/** Fila ativa da COZINHA da loja: pedidos ainda em producao (novo + em_preparo), nunca rascunho. */
+export function contarFilaAtiva(exec: Executor, lojaId: string): Promise<number> {
+  return consultarUm<{ n: number }>(
+    exec,
+    sql`select count(*)::int as n from public.pedidos
+         where loja_id = ${lojaId} and status in ('novo', 'em_preparo')`,
+  ).then((r) => r?.n ?? 0)
+}
+
 export interface PedidoLinha {
   codigo: string
   status: string

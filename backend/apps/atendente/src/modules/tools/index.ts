@@ -7,5 +7,5 @@ export {
   type ResultadoTool,
 } from './registry'
 export { selarConversaCtx, selarCtxDaConversa } from './ctx'
-export { ferramentasPadrao, chaveIdempotencia, type DepsTools } from './ferramentas'
+export { ferramentasPadrao, clienteCadastrar, tempoDeEntrega, chaveIdempotencia, type DepsTools } from './ferramentas'
 export { ErroTool } from './erros'
