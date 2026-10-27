@@ -1,34 +1,23 @@
 // AppShell: layout autenticado. lg+: sidebar fixa editorial. <lg: topbar + bottom nav.
-// A navegação é escolhida pela SEÇÃO da URL (/app, /meus, /admin), não pela role:
-// o mesmo `user` transita entre as áreas. Um cross-link conecta /app↔/meus quando
-// o usuário tem vínculo de devedor. Logout na sidebar (lg+) e na topbar (<lg).
+// A navegação é escolhida pela SEÇÃO da URL (/app, /admin). Logout na sidebar (lg+) e na topbar (<lg).
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router'
-import { LogOut, Inbox, LayoutDashboard, MoreHorizontal, X } from 'lucide-react'
-import { useAuth, useRole, useTemVinculoDevedor } from '@/shared/auth'
+import { LogOut, MoreHorizontal, X } from 'lucide-react'
+import { useAuth, useRole } from '@/shared/auth'
 import { cn, BellLogo } from '@/shared/ui'
 import { SyncVersaoWatcher } from '@/shared/sync'
 import { SinoNotificacoes } from '@/modules/notificacoes'
 import { NAV_POR_SECAO, NAV_OWNER, secaoDaRota, rotaAtiva, type NavItem } from './nav'
-import { AssinaturaBanner } from '../AssinaturaBanner'
 
 export function AppShell() {
   const { signOut } = useAuth()
   const role = useRole()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { temVinculo } = useTemVinculoDevedor()
 
   const secao = secaoDaRota(pathname)
   const base = NAV_POR_SECAO[secao]
-  // Cross-link entre as duas áreas do usuário: de /app mostra "Recebidos" só se
-  // houver vínculo de devedor; de /meus sempre oferece voltar ao "Painel".
-  const itens: NavItem[] =
-    secao === 'app' && temVinculo
-      ? [...base, { to: '/meus', label: 'Recebidos', icon: Inbox }]
-      : secao === 'meus'
-        ? [...base, { to: '/app', label: 'Painel', icon: LayoutDashboard }]
-        : base
+  const itens: NavItem[] = base
 
   // O owner enxerga a sidebar inteira (área de usuário + área admin), separadas
   // por uma divisória, em qualquer seção. Demais usuários veem só `itens`.
@@ -131,9 +120,6 @@ export function AppShell() {
             </button>
           </span>
         </header>
-
-        {/* Banner discreto de status da assinatura do cobrador (Fase 7). */}
-        <AssinaturaBanner />
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24 lg:pb-6">
           <Outlet />

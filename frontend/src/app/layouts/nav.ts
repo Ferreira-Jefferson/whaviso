@@ -1,9 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
-  PlusCircle,
   UserCircle,
-  History,
   BarChart3,
   Bell,
   Send,
@@ -21,23 +19,18 @@ export interface NavItem {
   end?: boolean
 }
 
-// A navegação é escolhida pela SEÇÃO da URL, não pela role: o mesmo `user`
-// transita entre /app (avisos que gerencia) e /meus (avisos em que foi convidado
-// a pagar). owner usa /admin. O cross-link entre /app e /meus é montado no
-// AppShell conforme o vínculo de devedor (useTemVinculoDevedor).
-export type Secao = 'app' | 'meus' | 'admin'
+// A navegação é escolhida pela SEÇÃO da URL: /app (usuário) ou /admin (owner).
+export type Secao = 'app' | 'admin'
 
 export function secaoDaRota(pathname: string): Secao {
   if (pathname.startsWith('/admin')) return 'admin'
-  if (pathname.startsWith('/meus')) return 'meus'
   return 'app'
 }
 
 // Qual item do menu fica marcado para a rota atual. O `isActive` do NavLink marca
 // por prefixo, então sem cuidado um pai acenderia junto com o filho. Regra: entre os
 // itens que casam (exato, ou prefixo com borda de segmento), só o MAIS específico
-// (maior `to`) fica ativo. `end` prende o item ao match exato (ex.: Painel em /app, que
-// não acende em /app/avisos/novo). O detalhe /app/avisos/:id não casa nenhum item.
+// (maior `to`) fica ativo. `end` prende o item ao match exato 
 export function rotaAtiva(pathname: string, itens: NavItem[]): string | null {
   let melhor: string | null = null
   for (const { to, end } of itens) {
@@ -51,22 +44,10 @@ export function rotaAtiva(pathname: string, itens: NavItem[]): string | null {
 
 export const NAV_POR_SECAO: Record<Secao, NavItem[]> = {
   app: [
-    // O Painel (/app) agora reúne totais + a lista de combinados (a antiga aba
-    // "Avisos" saiu; /app/avisos redireciona para cá).
-    { to: '/app', label: 'Painel', icon: LayoutDashboard, end: true },
-    { to: '/app/avisos/novo', label: 'Novo', icon: PlusCircle },
-    // E18: "Resultado" virou a área "Gestão" (abas Resultados/Clientes/Produtos/Categorias).
-    // Sem `end`: acende também nas sub-rotas (/app/gestao/clientes etc.).
-    { to: '/app/gestao', label: 'Gestão', icon: BarChart3 },
-    // H10.10: "precisa de você" (H9.2) + histórico da central, numa página própria.
+    // TODO(pivo): itens do app do restaurante (pedidos, cardápio...) ainda não existem.
+    { to: '/app/categorias', label: 'Categorias', icon: LayoutDashboard },
     { to: '/app/notificacoes', label: 'Notificações', icon: Bell },
-    { to: '/app/creditos', label: 'Créditos', icon: CreditCard },
     { to: '/app/conta', label: 'Conta', icon: UserCircle },
-  ],
-  meus: [
-    { to: '/meus', label: 'Combinados', icon: LayoutDashboard, end: true },
-    { to: '/meus/historico', label: 'Histórico', icon: History },
-    { to: '/meus/conta', label: 'Conta', icon: UserCircle },
   ],
   admin: [
     { to: '/admin', label: 'Métricas', icon: BarChart3, end: true },

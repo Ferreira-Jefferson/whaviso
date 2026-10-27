@@ -28,7 +28,6 @@ import {
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
 import {
-  lintLinguagem,
   type AcaoBotaoTemplate,
   type BotaoTemplate,
   type CategoriaTemplate,
@@ -614,8 +613,7 @@ function NovaProposta({
   )
 
   // Lint no cliente do texto E dos rótulos de botão (o backend também valida).
-  const textoLint = [corpo, ...botoesConteudo.map((b) => b.rotulo)].join(' ')
-  const palavraProibida = textoLint.trim() ? lintLinguagem(textoLint) : null
+  const palavraProibida = null as string | null // TODO(pivo): lintLinguagem (shared/contracts/linguagem) removido; reconstruir lint de linguagem
   const rotulosOk = botoesConteudo.every((b) => b.rotulo.length > 0)
   const podeEnviar = corpoIndexado.trim().length > 0 && rotulosOk && !palavraProibida
 

@@ -1,22 +1,14 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
-  atualizarChavePixBody,
   atualizarPerfilBody,
-  criarChavePixBody,
-  listaChavesPixResposta,
-  chavePixSchema,
   perfilSchema,
 } from '@whaviso/shared/contracts'
 import { comTransacao, type PoolClient } from '@whaviso/shared/db'
-import { z } from 'zod'
-import { conflito, naoEncontrado } from '../../shared/http_errors'
 
 const COLS_PERFIL = 'id, nome, telefone, role, criado_em, atualizado_em'
-const COLS_CHAVE =
-  'id, tipo, chave, rotulo, titular, banco, padrao, arquivada, criado_em, atualizado_em'
-const idParam = z.object({ id: z.uuid() })
 
+// TODO(pivo): vincularAvisosPorTelefone referencia public.avisos (cobrança); remover/trocar.
 /**
  * Backfill por telefone: ao definir o telefone do perfil, "puxa" para esta conta os
  * avisos abertos por esse número (vínculo por telefone, criados sem conta), nos dois papéis:
@@ -106,108 +98,6 @@ export const perfilRoutes: FastifyPluginAsync = async (raiz) => {
         }
         return perfil
       })
-    },
-  )
-
-  // ---- Chaves Pix do usuário (N por perfil; 1 padrão). Escopo: profile_id = userId. ----
-
-  app.get(
-    '/perfil/chaves-pix',
-    { preHandler: app.autenticar, schema: { response: { 200: listaChavesPixResposta } } },
-    async (req) => {
-      const { rows } = await app.pool.query(
-        `select ${COLS_CHAVE} from public.chaves_pix
-         where profile_id = $1 and not arquivada
-         order by padrao desc, criado_em desc`,
-        [req.userId],
-      )
-      return rows
-    },
-  )
-
-  app.post(
-    '/perfil/chaves-pix',
-    { preHandler: app.autenticar, schema: { body: criarChavePixBody, response: { 201: chavePixSchema } } },
-    async (req, reply) => {
-      const { tipo, chave, rotulo, titular, banco, padrao } = req.body
-      try {
-        const linha = await comTransacao(app.pool, async (cli) => {
-          if (padrao) {
-            await cli.query(
-              `update public.chaves_pix set padrao = false
-               where profile_id = $1 and padrao and not arquivada`,
-              [req.userId],
-            )
-          }
-          const { rows } = await cli.query(
-            `insert into public.chaves_pix (profile_id, tipo, chave, rotulo, titular, banco, padrao)
-             values ($1, $2, $3, $4, $5, $6, $7) returning ${COLS_CHAVE}`,
-            [req.userId, tipo, chave, rotulo ?? null, titular, banco, padrao ?? false],
-          )
-          return rows[0]
-        })
-        return reply.status(201).send(linha)
-      } catch (e) {
-        // unique parcial chaves_pix_unq (mesma chave ativa do usuário).
-        if (e instanceof Error && 'code' in e && e.code === '23505') {
-          throw conflito('chave_pix_duplicada', 'Você já tem essa chave Pix cadastrada.')
-        }
-        throw e
-      }
-    },
-  )
-
-  app.patch(
-    '/perfil/chaves-pix/:id',
-    {
-      preHandler: app.autenticar,
-      schema: { params: idParam, body: atualizarChavePixBody, response: { 200: chavePixSchema } },
-    },
-    async (req) => {
-      const { rotulo, titular, banco, padrao, arquivada } = req.body
-      // Arquivar (soft-delete) também tira o status de padrão.
-      const padraoFinal = arquivada === true ? false : padrao
-
-      const linha = await comTransacao(app.pool, async (cli) => {
-        if (padraoFinal === true) {
-          await cli.query(
-            `update public.chaves_pix set padrao = false
-             where profile_id = $1 and padrao and not arquivada and id <> $2`,
-            [req.userId, req.params.id],
-          )
-        }
-        const sets: string[] = []
-        const valores: unknown[] = [req.params.id, req.userId]
-        if (rotulo !== undefined) {
-          valores.push(rotulo)
-          sets.push(`rotulo = $${valores.length}`)
-        }
-        if (titular !== undefined) {
-          valores.push(titular)
-          sets.push(`titular = $${valores.length}`)
-        }
-        if (banco !== undefined) {
-          valores.push(banco)
-          sets.push(`banco = $${valores.length}`)
-        }
-        if (arquivada !== undefined) {
-          valores.push(arquivada)
-          sets.push(`arquivada = $${valores.length}`)
-        }
-        if (padraoFinal !== undefined) {
-          valores.push(padraoFinal)
-          sets.push(`padrao = $${valores.length}`)
-        }
-        const { rows } = await cli.query(
-          `update public.chaves_pix set ${sets.join(', ')}
-           where id = $1 and profile_id = $2 returning ${COLS_CHAVE}`,
-          valores,
-        )
-        return rows[0]
-      })
-
-      if (!linha) throw naoEncontrado('Chave Pix não encontrada.')
-      return linha
     },
   )
 }

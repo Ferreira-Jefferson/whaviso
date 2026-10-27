@@ -16,7 +16,6 @@ import {
   Skeleton,
 } from '@/shared/ui'
 import {
-  ROTULO_ETAPA,
   ROTULO_STATUS_ENVIO,
   dataHoraPtBR,
 } from '@/shared/format'
@@ -24,7 +23,6 @@ import {
   etapaEnvio,
   statusEnvio,
   type StatusEnvio,
-  type EtapaEnvio,
 } from '@/shared/contracts'
 import { useAdminEnvios, type EnvioAuditoria } from '../api'
 import { Indisponivel } from '../components/Indisponivel'
@@ -99,7 +97,7 @@ export default function EnviosPage() {
               <option value="">Todas</option>
               {etapaEnvio.options.map((e) => (
                 <option key={e} value={e}>
-                  {ROTULO_ETAPA[e as EtapaEnvio]}
+                  {e}
                 </option>
               ))}
             </select>
@@ -165,7 +163,7 @@ function LinhaEnvio({ envio }: { envio: EnvioAuditoria }) {
         <Icone strokeWidth={1.75} className="size-4 shrink-0 text-tinta-2" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-tinta">
-            {envio.nome_devedor ?? 'Destinatário'} · {ROTULO_ETAPA[envio.etapa]}
+            {envio.nome_devedor ?? 'Destinatário'} · {envio.etapa}
           </p>
           <p className="text-xs text-tinta-2">{dataHoraPtBR(envio.agendado_para)}</p>
         </div>

@@ -6,7 +6,6 @@ import { envSchema } from './env'
 import { criarApp } from './app'
 import { criarClienteMeta } from './shared/meta_client'
 import { registrarInboundWhats } from './modules/webhook_whatsapp'
-import { registrarInboundTeste } from './modules/testar_envio'
 import { processarStatusTemplate } from './modules/sincronizar_templates'
 import { criarAdminSupabase } from './shared/supabase_admin'
 import { iniciarScheduler } from './scheduler'
@@ -17,9 +16,6 @@ if (process.env.ZAP_PORT && !process.env.PORT) process.env.PORT = process.env.ZA
 if (process.env.ZAP_HOST && !process.env.HOST) process.env.HOST = process.env.ZAP_HOST
 if (process.env.ZAP_DATABASE_URL && !process.env.DATABASE_URL)
   process.env.DATABASE_URL = process.env.ZAP_DATABASE_URL
-// O .env único traz APP_URL (origem do SPA, sem prefixo): reaproveita para a CTA de
-// cadastro ao cobrador sem conta (H10.7), sem duplicar a var.
-if (process.env.APP_URL && !process.env.ZAP_APP_URL) process.env.ZAP_APP_URL = process.env.APP_URL
 
 const env = parseEnv(envSchema)
 const logger = criarLogger('zap', env.LOG_LEVEL)
@@ -51,18 +47,16 @@ const metaOpcoes = {
 
 const whats = criarClienteMeta(metaOpcoes, { logger, pool })
 
-// Conta-no-aceite (H5.3): Admin API do Supabase, só se a service role key estiver
-// configurada (senão o aceite só vincula por telefone, degrada sem quebrar).
+// Admin API do Supabase, só se a service role key estiver
+// configurada (senão fica desligada).
 const admin =
   env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
     ? criarAdminSupabase(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
     : null
 
-// Inbound (botões/texto/status) pelo webhook (app-root liga o módulo; módulo não importa
+// Inbound (status e, no futuro, texto/audio) pelo webhook (app-root liga o módulo; módulo não importa
 // módulo). Os handlers ficam guardados no cliente Meta e a rota do webhook os chama.
 registrarInboundWhats({ pool, logger, whats, admin })
-// Captura as respostas do número de teste no mini-chat de diagnóstico (sandbox).
-registrarInboundTeste({ pool, logger, whats })
 // Aprovação/recusa de template pela Meta (webhook message_template_status_update) reflete
 // no status_meta em tempo real (sincronizar_templates); o reconcile periódico é a rede de
 // segurança. App-root cruza a fronteira ligando o handler ao provider.
@@ -78,7 +72,6 @@ const scheduler = iniciarScheduler({
   logger,
   whats,
   intervaloMs: env.SCHEDULER_INTERVAL_MS,
-  appUrl: env.ZAP_APP_URL,
   // Submissão/reconcile de templates só com WABA id (precisa dele nas chamadas Graph).
   metaOpcoes: metaOpcoes.wabaId ? metaOpcoes : undefined,
 })

@@ -2,24 +2,8 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { comTransacao } from '@whaviso/shared/db'
-import { ATIVOS_NAO_PAGOS } from '../../shared/estados'
 import {
-  adminAtualizarConfigPlataformaBody,
-  type AdminAtualizarConfigPlataformaBody,
-  configPlataformaSchema,
-  adminAtualizarCreditosCatalogoBody,
-  type AdminAtualizarCreditosCatalogoBody,
-  type CurvaPonto,
   adminAtualizarUsuarioBody,
-  adminAvisosQuery,
-  adminAvisosResposta,
-  adminCreditarBody,
-  adminEnviosQuery,
-  adminEnviosResposta,
-  adminMetricasQuery,
-  adminMetricasResposta,
-  adminNotificacoesQuery,
-  adminNotificacoesResposta,
   adminUsuariosQuery,
   adminUsuariosResposta,
   lintLinguagem,
@@ -30,22 +14,9 @@ import {
   renderizarTexto,
 } from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
-import { creditarEnvios } from '../../shared/planos'
-import { lerConfigPlataforma } from '../../shared/config_plataforma'
 import * as repo from './repo'
 
 const idParam = z.object({ id: z.uuid() })
-
-// Item 18: lista de estados "ativos não pagos" como literais SQL (mesma fonte única de
-// backend/apps/api/src/shared/estados.ts usada pelo painel do usuário, H9.2/H18.2), para
-// o resumo financeiro AGREGADO do sistema (owner) contar "a receber" com o mesmo critério.
-const ATIVOS_SQL = ATIVOS_NAO_PAGOS.map((s) => `'${s}'`).join(',')
-
-// Colunas retornadas do catálogo de créditos (GET e PATCH devolvem o catálogo inteiro).
-// O owner edita VALORES em runtime; nunca cria nem apaga (1 linha, id=1). envios_min/max
-// derivam dos marcos da curva (primeiro/último), não são editados direto.
-const COLS_CATALOGO_RETORNO =
-  'envios_min, envios_max, curva, cortesia_inicial, agenda_teto_free, agenda_teto_pago'
 
 // Lint de linguagem do conteúdo estruturado: texto + rótulos dos botões.
 // Concatena tudo que é texto editável (texto + rótulos) e aplica as três regras:
@@ -69,85 +40,6 @@ function lintConteudo(c: { texto?: string; botoes?: { rotulo: string }[] }): {
 export const adminRoutes: FastifyPluginAsync = async (raiz) => {
   const app = raiz.withTypeProvider<ZodTypeProvider>()
   const owner = app.requireRole('owner')
-
-  // Métricas globais. Período opcional (de/ate, datas de negócio em America/Sao_Paulo)
-  // filtra por data_combinada dos avisos e agendado_para dos envios. Inclui opt-out.
-  app.get(
-    '/admin/metricas',
-    { preHandler: owner, schema: { querystring: adminMetricasQuery, response: { 200: adminMetricasResposta } } },
-    async (req) => {
-      const { de, ate } = req.query
-      // Filtros por período (parametrizados; mesmas datas para avisos e envios).
-      const avisoCond: string[] = []
-      const avisoParams: unknown[] = []
-      if (de) {
-        avisoParams.push(de)
-        avisoCond.push(`data_combinada >= $${avisoParams.length}`)
-      }
-      if (ate) {
-        avisoParams.push(ate)
-        avisoCond.push(`data_combinada <= $${avisoParams.length}`)
-      }
-      const avisoWhere = avisoCond.length ? `where ${avisoCond.join(' and ')}` : ''
-
-      const envioCond: string[] = []
-      const envioParams: unknown[] = []
-      if (de) {
-        envioParams.push(de)
-        envioCond.push(`(agendado_para at time zone 'America/Sao_Paulo')::date >= $${envioParams.length}`)
-      }
-      if (ate) {
-        envioParams.push(ate)
-        envioCond.push(`(agendado_para at time zone 'America/Sao_Paulo')::date <= $${envioParams.length}`)
-      }
-      const envioWhere = envioCond.length ? `where ${envioCond.join(' and ')}` : ''
-
-      // Opt-out: avisos no período (mesmo filtro) que têm pelo menos um evento 'optout'.
-      const optoutSql = `
-        select count(*)::int as n from public.avisos a
-        ${avisoWhere}${avisoWhere ? ' and' : ' where'}
-          exists (select 1 from public.eventos_aviso e
-                  where e.aviso_id = a.id and e.tipo = 'optout')`
-
-      // Item 18: resumo financeiro AGREGADO do sistema inteiro (recebido/a receber/ticket
-      // médio), mesmo critério de estado do painel do usuário (H9.2). Só números agregados
-      // (sem nome/telefone/combinado individual): mesma régua do owner-só-vê-config, não
-      // conteúdo de cliente.
-      const resumoSql = `
-        select
-          coalesce(sum(valor_centavos) filter (where status='pago'),0)::bigint as recebido_c,
-          count(*) filter (where status='pago')::int as recebido_q,
-          coalesce(sum(valor_centavos) filter (where status in (${ATIVOS_SQL})),0)::bigint as a_receber_c,
-          count(*) filter (where status in (${ATIVOS_SQL}))::int as a_receber_q
-        from public.avisos ${avisoWhere}`
-
-      const [avisos, envios, usuarios, optout, resumo] = await Promise.all([
-        app.pool.query(`select status, count(*)::int as n from public.avisos ${avisoWhere} group by status`, avisoParams),
-        app.pool.query(`select status, count(*)::int as n from public.envios ${envioWhere} group by status`, envioParams),
-        app.pool.query(`select count(*)::int as n from public.profiles`),
-        app.pool.query(optoutSql, avisoParams),
-        app.pool.query(resumoSql, avisoParams),
-      ])
-      const porStatus = (rows: { status: string; n: number }[]) =>
-        Object.fromEntries(rows.map((r) => [r.status, r.n]))
-      const totalAvisos = avisos.rows.reduce((s, r) => s + r.n, 0)
-      const optoutTotal = optout.rows[0].n
-      const recebidoSistema = Number(resumo.rows[0].recebido_c)
-      const recebidoSistemaQ = resumo.rows[0].recebido_q as number
-      return {
-        avisos_por_status: porStatus(avisos.rows),
-        envios_por_status: porStatus(envios.rows),
-        total_usuarios: usuarios.rows[0].n,
-        optout_total: optoutTotal,
-        optout_taxa: totalAvisos > 0 ? optoutTotal / totalAvisos : 0,
-        recebido_centavos: recebidoSistema,
-        recebido_qtd: recebidoSistemaQ,
-        a_receber_centavos: Number(resumo.rows[0].a_receber_c),
-        a_receber_qtd: resumo.rows[0].a_receber_q,
-        ticket_medio_centavos: recebidoSistemaQ > 0 ? Math.round(recebidoSistema / recebidoSistemaQ) : 0,
-      }
-    },
-  )
 
   // ---- Templates UNIFICADOS por chave (tabela `templates`) ------------------
   // Mesma maquinaria do ciclo (propor versão -> aprovar -> ativar -> apagar), mas
@@ -321,7 +213,7 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
 
   // ---- Auditoria (read-only) -----------------------------------------------
 
-  // Usuários (profiles + plano via assinaturas), paginado e com busca por nome/telefone.
+  // Usuários (profiles), paginado e com busca por nome/telefone.
   app.get(
     '/admin/usuarios',
     { preHandler: owner, schema: { querystring: adminUsuariosQuery, response: { 200: adminUsuariosResposta } } },
@@ -332,8 +224,7 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
   )
 
   // Suspensão/reativação da conta. Suspenso = bloqueado na api (403 em toda rota
-  // autenticada; ver shared/auth). Não apaga dados; reativar volta ao normal. E11: a troca
-  // de plano saiu (não há planos); creditar envios é endpoint próprio (POST .../creditar).
+  // autenticada; ver shared/auth). Não apaga dados; reativar volta ao normal.
   app.patch(
     '/admin/usuarios/:id',
     { preHandler: owner, schema: { params: idParam, body: adminAtualizarUsuarioBody } },
@@ -347,185 +238,6 @@ export const adminRoutes: FastifyPluginAsync = async (raiz) => {
       }
       await repo.definirSuspenso(app.pool, req.params.id, req.body.suspenso)
       return { id: req.params.id, suspenso: req.body.suspenso }
-    },
-  )
-
-  // E11 H11.11: o owner CREDITA envios numa conta (ativação manual pós-pagamento via
-  // WhatsApp). Aditivo, lançamento 'credito_owner' (append-only), marca ja_comprou=true
-  // (libera a agenda generosa). Owner-only; o usuário NUNCA se credita. Cada crédito é uma
-  // transação com lock na carteira. Devolve o saldo atualizado.
-  app.post(
-    '/admin/usuarios/:id/creditar',
-    { preHandler: owner, schema: { params: idParam, body: adminCreditarBody } },
-    async (req) => {
-      if (!(await repo.usuarioExiste(app.pool, req.params.id))) {
-        throw naoEncontrado('Usuário não encontrado')
-      }
-      const carteira = await comTransacao(app.pool, (cli) =>
-        creditarEnvios(cli, req.params.id, req.body.quantidade, 'credito_owner', {
-          ator: 'owner',
-          atorId: req.userId,
-        }),
-      )
-      return { id: req.params.id, ...carteira }
-    },
-  )
-
-  // Edição da CURVA de créditos (H11.11): a tabela de MARCOS (envios -> R$/envio), a
-  // cortesia inicial e os tetos de agenda (free/após compra). Atualização PARCIAL: o que não
-  // veio fica como está. 1 linha só (id=1); o owner não cria nem apaga. envios_min/max NÃO
-  // são editados direto, derivam do primeiro/último marco da curva. As CHECKs da migration
-  // (curva com >= 2 marcos crescentes; agenda free <= pago) são espelhadas no contrato e
-  // revalidadas aqui contra o estado MERGEADO (defesa em profundidade), para erro limpo.
-  app.patch(
-    '/admin/creditos-catalogo',
-    { preHandler: owner, schema: { body: adminAtualizarCreditosCatalogoBody } },
-    async (req) => {
-      const body = req.body as AdminAtualizarCreditosCatalogoBody
-      return await comTransacao(app.pool, async (cli) => {
-        // 1) Estado atual (lock por linha).
-        const { rows: atualRows } = await cli.query<{
-          curva: CurvaPonto[]
-          cortesia_inicial: number
-          agenda_teto_free: number
-          agenda_teto_pago: number
-        }>(
-          `select curva, cortesia_inicial, agenda_teto_free, agenda_teto_pago
-             from public.creditos_catalogo where id = 1 for update`,
-        )
-        const atual = atualRows[0]
-        if (!atual) throw naoEncontrado('Catálogo de créditos não encontrado')
-
-        // 2) Merge: o body sobrescreve só o que veio; o resto fica.
-        const curva = body.curva ?? atual.curva
-        const cortesia = body.cortesia_inicial ?? atual.cortesia_inicial
-        const agendaFree = body.agenda_teto_free ?? atual.agenda_teto_free
-        const agendaPago = body.agenda_teto_pago ?? atual.agenda_teto_pago
-
-        // 3) Revalida o estado mergeado (defesa antes da constraint).
-        if (curva.length < 2) {
-          throw regraNegocio('catalogo_invalido', 'A curva precisa de ao menos 2 marcos.')
-        }
-        if (
-          curva.some((p, i) => {
-            const ant = curva[i - 1]
-            return ant !== undefined && p.envios <= ant.envios
-          })
-        ) {
-          throw regraNegocio('catalogo_invalido', 'Os marcos da curva devem ter envios crescentes.')
-        }
-        if (agendaPago < agendaFree) {
-          throw regraNegocio(
-            'catalogo_invalido',
-            'O teto de agenda após a compra não pode ser menor que o do free.',
-          )
-        }
-
-        // envios_min/max derivam dos marcos (primeiro/último), bounds do slider.
-        const primeiro = curva[0]
-        const ultimo = curva[curva.length - 1]
-        if (!primeiro || !ultimo) {
-          throw regraNegocio('catalogo_invalido', 'A curva precisa de ao menos 2 marcos.')
-        }
-        const enviosMin = primeiro.envios
-        const enviosMax = ultimo.envios
-
-        // 4) Atualiza a linha única e devolve o catálogo corrente.
-        const { rows } = await cli.query(
-          `update public.creditos_catalogo
-              set envios_min = $1, envios_max = $2, curva = $3::jsonb,
-                  cortesia_inicial = $4, agenda_teto_free = $5, agenda_teto_pago = $6
-            where id = 1
-          returning ${COLS_CATALOGO_RETORNO}`,
-          [enviosMin, enviosMax, JSON.stringify(curva), cortesia, agendaFree, agendaPago],
-        )
-        return rows[0]
-      })
-    },
-  )
-
-  // Chave Pix DA PLATAFORMA (config singleton 0059): a chave que vai na mensagem de compra
-  // de crédito empurrada ao WhatsApp do usuário (template billing.recarga). Mesmo formato da
-  // chave do cobrador (tipo/chave/titular/banco) + comentário livre. Só o owner lê/edita; a
-  // chave nunca volta para o usuário final (vai só na mensagem do WhatsApp, via zap).
-  app.get(
-    '/admin/config-plataforma',
-    { preHandler: owner, schema: { response: { 200: configPlataformaSchema } } },
-    async () => lerConfigPlataforma(app.pool),
-  )
-
-  // PATCH parcial: o que não veio fica como está; `null` LIMPA o campo. 1 linha só (id=1);
-  // o owner não cria nem apaga. Nunca loga a chave.
-  app.patch(
-    '/admin/config-plataforma',
-    { preHandler: owner, schema: { body: adminAtualizarConfigPlataformaBody, response: { 200: configPlataformaSchema } } },
-    async (req) => {
-      const body = req.body as AdminAtualizarConfigPlataformaBody
-      return await comTransacao(app.pool, async (cli) => {
-        const { rows: atualRows } = await cli.query<{
-          pix_tipo: string | null
-          pix_chave: string | null
-          pix_titular: string | null
-          pix_banco: string | null
-          pix_comentario: string | null
-        }>(
-          `select pix_tipo, pix_chave, pix_titular, pix_banco, pix_comentario
-             from public.config_plataforma where id = 1 for update`,
-        )
-        const atual = atualRows[0]
-        if (!atual) throw naoEncontrado('Configuração da plataforma não encontrada')
-
-        // Merge: undefined = mantém; null = limpa; string = substitui. (Não usar ?? aqui:
-        // null é "limpar", não "manter".)
-        const merge = <T,>(novo: T | null | undefined, velho: T | null): T | null =>
-          novo === undefined ? velho : novo
-        const tipo = merge(body.pix_tipo, atual.pix_tipo)
-        const chave = merge(body.pix_chave, atual.pix_chave)
-        const titular = merge(body.pix_titular, atual.pix_titular)
-        const banco = merge(body.pix_banco, atual.pix_banco)
-        const comentario = merge(body.pix_comentario, atual.pix_comentario)
-
-        const { rows } = await cli.query(
-          `update public.config_plataforma
-              set pix_tipo = $1::tipo_chave_pix, pix_chave = $2, pix_titular = $3,
-                  pix_banco = $4, pix_comentario = $5
-            where id = 1
-          returning pix_tipo, pix_chave, pix_titular, pix_banco, pix_comentario`,
-          [tipo, chave, titular, banco, comentario],
-        )
-        return rows[0]
-      })
-    },
-  )
-
-  // Auditoria de envios (período/status/etapa), com nome do destinatário.
-  app.get(
-    '/admin/envios',
-    { preHandler: owner, schema: { querystring: adminEnviosQuery, response: { 200: adminEnviosResposta } } },
-    async (req) => {
-      const { itens, total } = await repo.listarEnvios(app.pool, req.query)
-      return { itens, total, page: req.query.page, per_page: req.query.per_page }
-    },
-  )
-
-  // Outbox de notificações ao cobrador (estado da fila + motivo recuperável,
-  // ex.: 'sem_template_ativo' quando falta ativar o template, H12.8). Sem PII.
-  app.get(
-    '/admin/notificacoes',
-    { preHandler: owner, schema: { querystring: adminNotificacoesQuery, response: { 200: adminNotificacoesResposta } } },
-    async (req) => {
-      const { itens, total } = await repo.listarNotificacoes(app.pool, req.query)
-      return { itens, total, page: req.query.page, per_page: req.query.per_page }
-    },
-  )
-
-  // Visão global de avisos (todos os cobradores) para auditoria.
-  app.get(
-    '/admin/avisos',
-    { preHandler: owner, schema: { querystring: adminAvisosQuery, response: { 200: adminAvisosResposta } } },
-    async (req) => {
-      const { itens, total } = await repo.listarAvisos(app.pool, req.query)
-      return { itens, total, page: req.query.page, per_page: req.query.per_page }
     },
   )
 

@@ -1,22 +1,8 @@
-// Formatação e rótulos: ÚNICA FONTE da linguagem da UI.
-// Regra de Ouro (PROJETO.md): só linguagem permitida, "aviso/lembrete/
-// combinado/acordo"; a lista de termos proibidos vive em contracts/linguagem.ts.
-// Os rótulos abaixo são auditados pelo teste de linguagem (linguagem.test.ts).
+// Formatação e rótulos da UI.
 import { TZDate } from '@date-fns/tz'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type {
-  StatusAviso,
-  StatusEnvio,
-  EtapaEnvio,
-  DirecaoAviso,
-  PapelAviso,
-  TipoEvento,
-  AtorEvento,
-  TipoChavePix,
-  Envio,
-  Aviso,
-} from '../contracts'
+import type { StatusEnvio, TipoChavePix, Envio } from '../contracts'
 
 const FUSO = 'America/Sao_Paulo'
 
@@ -67,58 +53,6 @@ export function telefone(e164: string | null | undefined): string {
   return `+${pais} (${ddd}) ${parte1}-${parte2}`
 }
 
-// ---- Rótulos de status do aviso (cores definidas em StatusBadge) ----
-// Rótulos canônicos da H9.3. `informado_pago` tem variante por papel: para o COBRADOR
-// é "Aguardando sua confirmação" (rotuloStatusAviso(status, papel)); o mapa fixo é a
-// versão neutra ("Pagamento informado"). Sem termos proibidos, gênero neutro.
-export const ROTULO_STATUS_AVISO: Record<StatusAviso, string> = {
-  sem_aviso: 'Sem aviso',
-  aguardando_aceite: 'Aguardando aceite',
-  programado: 'Programado',
-  aguardando_aprovacao_aviso_editado: 'Aguardando aprovação da edição',
-  aguardando_aprovacao_dado_incorreto: 'Aguardando aprovação de dado reportado',
-  pausado: 'Pausado',
-  informado_pago: 'Pagamento informado',
-  desregistrado: 'Lembretes desativados',
-  pago: 'Recebido',
-  cancelado: 'Cancelado',
-  recusado: 'Recusado',
-  expirado: 'Encerrado sem confirmação',
-}
-
-/**
- * Rótulo do estado SENSÍVEL AO PAPEL (H9.3): para o cobrador, `informado_pago` aparece
- * como "Aguardando sua confirmação" (a ação é dele). Demais estados usam o mapa fixo.
- */
-export function rotuloStatusAviso(status: StatusAviso, papelDoUsuario?: PapelAviso): string {
-  if (status === 'informado_pago' && papelDoUsuario === 'cobrador') {
-    return 'Aguardando sua confirmação'
-  }
-  return ROTULO_STATUS_AVISO[status]
-}
-
-// Rótulo CURTO (uma palavra) para contextos densos, ex.: badge em tabela/lista. Mantém
-// a linguagem das Regras de Ouro (sem termos proibidos, gênero neutro). Não substitui o
-// mapa completo (fonte da verdade nos detalhes); é só a versão compacta.
-export const ROTULO_STATUS_AVISO_CURTO: Record<StatusAviso, string> = {
-  sem_aviso: 'Anotação',
-  aguardando_aceite: 'Aguardando',
-  programado: 'Programado',
-  aguardando_aprovacao_aviso_editado: 'Revisão',
-  aguardando_aprovacao_dado_incorreto: 'Revisão',
-  pausado: 'Pausado',
-  informado_pago: 'Informado',
-  desregistrado: 'Desativado',
-  pago: 'Recebido',
-  cancelado: 'Cancelado',
-  recusado: 'Recusado',
-  expirado: 'Encerrado',
-}
-
-export function rotuloStatusAvisoCurto(status: StatusAviso): string {
-  return ROTULO_STATUS_AVISO_CURTO[status]
-}
-
 // ---- Rótulos de status do envio (processando é exibido como agendado) ----
 export const ROTULO_STATUS_ENVIO: Record<StatusEnvio, string> = {
   agendado: 'Agendado',
@@ -152,44 +86,6 @@ export const ROTULO_SITUACAO_ENVIO: Record<SituacaoEnvio, string> = {
   cancelado: 'Cancelado',
 }
 
-// ---- Rótulos das etapas do ciclo de lembretes ----
-export const ROTULO_ETAPA: Record<EtapaEnvio, string> = {
-  d_menos_2: 'D-2 · aviso antecipado',
-  d_menos_1: 'D-1 · organização',
-  d: 'D · no dia',
-  d_mais_1: 'D+1 · último lembrete',
-}
-
-// ---- Rótulos de direção ----
-export const ROTULO_DIRECAO: Record<DirecaoAviso, string> = {
-  receber: 'A receber',
-  pagar: 'A pagar',
-}
-
-/**
- * Papel do USUÁRIO logado NAQUELE combinado (H9.1/H9.4): cobrador se o cobrador_id é
- * dele, devedor se o devedor_profile_id é dele. null se não consegue determinar (sem
- * perfil carregado, ou vínculo só por telefone ainda não materializado). Deriva do
- * banco (ids), nunca recalcula regra de negócio.
- */
-export function papelDoUsuario(
-  aviso: Pick<Aviso, 'cobrador_id' | 'devedor_profile_id'>,
-  profileId: string | null | undefined,
-): PapelAviso | null {
-  if (!profileId) return null
-  if (aviso.cobrador_id === profileId) return 'cobrador'
-  if (aviso.devedor_profile_id === profileId) return 'devedor'
-  return null
-}
-
-// ---- Rótulos de PAPEL (visão do painel, H9.1) ----
-// O painel é por PAPEL, não por direção: "A receber" = sou cobrador; "A pagar" = sou
-// devedor. Cobre os dois fluxos (receber e pagar invertido).
-export const ROTULO_PAPEL: Record<PapelAviso, string> = {
-  cobrador: 'A receber',
-  devedor: 'A pagar',
-}
-
 // ---- Rótulos do tipo de chave Pix ----
 export const ROTULO_TIPO_CHAVE: Record<TipoChavePix, string> = {
   cpf: 'CPF',
@@ -197,62 +93,4 @@ export const ROTULO_TIPO_CHAVE: Record<TipoChavePix, string> = {
   email: 'E-mail',
   telefone: 'Telefone',
   aleatoria: 'Chave aleatória',
-}
-
-// ---- Rótulos dos eventos do aviso (notificações in-app, risco nº 10) ----
-// Linguagem das Regras de Ouro: só "aviso/lembrete/combinado" (ver linguagem.ts).
-export const ROTULO_EVENTO: Record<TipoEvento, string> = {
-  criado: 'Combinado criado',
-  combinado_gerado: 'Combinado gerado',
-  aceite: 'Combinado aceito',
-  ativado: 'Lembretes ativados',
-  editado: 'Combinado editado',
-  editado_aprovado: 'Edição aprovada',
-  editado_recusado: 'Edição recusada',
-  pausado: 'Lembretes pausados',
-  reativado: 'Lembretes retomados',
-  desregistrado: 'Lembretes desativados',
-  reregistrado: 'Lembretes reativados',
-  ja_paguei_devedor: 'Informou que pagou',
-  confirmado_cobrador: 'Recebimento confirmado',
-  marcado_pago_cobrador: 'Marcado como recebido',
-  rejeitado_cobrador: 'Recebimento ainda não confirmado',
-  desmarcado_cobrador: 'Combinado reaberto',
-  reaberto_cobrador: 'Combinado reaberto',
-  reengajamento_cobrador: 'Reengajamento enviado',
-  pago_manual: 'Marcado como recebido',
-  optout: 'Saiu dos lembretes',
-  cancelado_cobrador: 'Combinado cancelado',
-  cancelado_criador: 'Combinado cancelado',
-  expirado: 'Encerrado sem confirmação',
-  solicitou_pix: 'Pediu a chave Pix',
-  recusado: 'Combinado recusado',
-  dado_incorreto_reportado: 'Reportou um dado incorreto',
-  dado_incorreto_aprovado: 'Correção aprovada',
-  dado_incorreto_recusado: 'Correção recusada',
-}
-
-// ---- Rótulos do ator de um evento ----
-// Mapa absoluto (papel do ator, sem perspectiva). Mantido para usos que não conhecem o
-// papel do usuário; o painel usa `rotuloAtor` (relativo) para não inverter "Você".
-export const ROTULO_ATOR: Record<AtorEvento, string> = {
-  cobrador: 'Quem recebe',
-  devedor: 'Quem paga',
-  sistema: 'Sistema',
-  admin: 'Administração',
-}
-
-/**
- * Rótulo do ator RELATIVO ao papel do usuário NAQUELE combinado (H9.4). O `ator` do
- * evento é sempre o PAPEL concreto (cobrador/devedor/sistema/admin). Se o usuário é o
- * cobrador, um evento com ator 'cobrador' é "Você" e 'devedor' é "A outra pessoa"; se o
- * usuário é o devedor (visão "A pagar"), inverte. Assim a linha do tempo distingue
- * "pagamento informado pela outra pessoa" de "confirmado por você" nos DOIS lados, sem
- * assumir que o usuário logado é sempre o cobrador. Gênero neutro.
- */
-export function rotuloAtor(ator: AtorEvento, papelDoUsuario: PapelAviso | null): string {
-  if (ator === 'sistema') return 'Sistema'
-  if (ator === 'admin') return 'Administração'
-  if (!papelDoUsuario) return ROTULO_ATOR[ator]
-  return ator === papelDoUsuario ? 'Você' : 'A outra pessoa'
 }

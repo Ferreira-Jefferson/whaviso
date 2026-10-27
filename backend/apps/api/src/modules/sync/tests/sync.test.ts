@@ -1,3 +1,4 @@
+// TODO(pivo): testes cobrem rotas/tabelas de cobrança removidas; reescrever/apagar.
 // Detecção de mudança por versão (plano de cache do front): GET /sync/versao devolve um
 // carimbo barato que só avança quando algo muda de verdade no escopo do usuário (avisos
 // ou aviso_ocorrencias dele), isolado por profile.

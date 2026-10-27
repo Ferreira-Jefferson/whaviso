@@ -5,7 +5,7 @@
 //   owner acessa tudo; perfil incompleto → /onboarding.
 import type { ReactNode } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router'
-import { useAuth, homeDoPapel, nextSeguro, useTemVinculoDevedor } from '@/shared/auth'
+import { useAuth, homeDoPapel, nextSeguro } from '@/shared/auth'
 import { Spinner } from '@/shared/ui'
 import type { RoleUsuario } from '@/shared/contracts'
 
@@ -82,30 +82,4 @@ export function RequireRole({
 
   // papel errado → home do papel real (owner já retornou acima).
   return <Navigate to={homeDoPapel(roleAtual)} replace />
-}
-
-/**
- * RequireVinculoDevedor: guarda a área /meus por EXISTÊNCIA DE VÍNCULO de devedor,
- * nunca por role: "ser devedor" é relacional (avisos.devedor_profile_id == o
- * usuário), não identidade. owner acessa tudo; qualquer `user` entra se for devedor
- * em algum aviso. Guard é UX; a segurança real é RLS + autorização na `api`.
- */
-export function RequireVinculoDevedor({ children }: { children: ReactNode }) {
-  const { status, role, precisaOnboarding } = useAuth()
-  const { isLoading, temVinculo } = useTemVinculoDevedor()
-  const location = useLocation()
-
-  if (status === 'carregando') return <Splash />
-  if (status === 'deslogado') return paraLogin(location.pathname, location.search)
-  if (precisaOnboarding) return <Navigate to="/onboarding" replace />
-
-  // owner acessa tudo, sem checar vínculo.
-  if (role === 'owner') return <>{children}</>
-
-  // Demais (user): aguarda a checagem de vínculo.
-  if (isLoading) return <Splash />
-  if (temVinculo) return <>{children}</>
-
-  // Sem vínculo de devedor → home do papel (nunca "acesso negado" cru).
-  return <Navigate to={homeDoPapel(role)} replace />
 }

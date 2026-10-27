@@ -1,20 +1,12 @@
-import { processarBotao, processarStatus, processarTexto, type DepsInbound } from './service'
-
-// E14: expiração das sessões de wizard de chave (abandono). Re-exportada para o
-// app-root (scheduler) chamar pela fronteira do módulo (não por arquivo interno).
-export { expirarSessoesPix } from './wizard_pix'
+import { processarStatus, type DepsInbound } from './service'
 
 /**
- * Liga o inbound do WhatsApp: o transporte (Meta Cloud API) entrega, pelo webhook HTTP,
- * cliques de botão, mensagens de texto e recibos de entrega (status). Botões = ações do
- * convite/devedor; texto = a 1ª mensagem do convite (número de 6 dígitos) e o fallback
- * numerado (E5); status = sent/delivered/read/failed -> envios.entrega_status. Chamado
- * pelo server.ts (app-root), que pode cruzar a fronteira para os módulos; o módulo não
- * importa outro módulo.
+ * Liga o inbound do WhatsApp (Meta Cloud API, via webhook HTTP). Hoje só os recibos de
+ * status (sent/delivered/read/failed -> envios.entrega_status) estão ligados. Chamado pelo
+ * server.ts (app-root); o módulo não importa outro módulo.
  */
 export function registrarInboundWhats(deps: DepsInbound): void {
-  deps.whats.onBotao((evento) => processarBotao(deps, evento))
-  deps.whats.onTexto((evento) => processarTexto(deps, evento))
+  // TODO(pivo): reescrever inbound (rotear por phone_number_id, texto/audio/STT) no index.ts
   deps.whats.onStatus((evento) => processarStatus(deps, evento))
 }
 

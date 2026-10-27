@@ -28,8 +28,6 @@ import {
   TableResponsive,
   type ColunaTabela,
   StatCard,
-  Recibo,
-  CycleTimeline,
   WhatsAppPreview,
   GraficoBarras,
   PageHeader,
@@ -41,7 +39,6 @@ import {
   statusAviso,
   type StatusAviso,
   type TipoChavePix,
-  type Envio,
 } from '@/shared/contracts'
 
 // --- Tokens (espelham frontend/src/index.css) ------------------------------
@@ -139,14 +136,6 @@ const COLUNAS_TABELA: ReadonlyArray<ColunaTabela<LinhaDemo>> = [
     ocultarRotuloMobile: true,
     render: (l) => <StatusBadge status={l.status} />,
   },
-]
-
-// Envios fictícios para o CycleTimeline (a etapa/estado viriam do backend).
-const ENVIOS_DEMO: Envio[] = [
-  { id: 'env-1', aviso_id: 'av-1', etapa: 'd_menos_2', status: 'enviado', agendado_para: new Date('2026-06-08T12:00:00'), enviado_em: new Date('2026-06-08T12:00:03'), tentativas: 1, proxima_tentativa_em: null, wamid: 'wamid.1', entrega_status: 'delivered', erro: null },
-  { id: 'env-2', aviso_id: 'av-1', etapa: 'd_menos_1', status: 'enviado', agendado_para: new Date('2026-06-09T12:00:00'), enviado_em: new Date('2026-06-09T12:00:02'), tentativas: 1, proxima_tentativa_em: null, wamid: 'wamid.2', entrega_status: 'read', erro: null },
-  { id: 'env-3', aviso_id: 'av-1', etapa: 'd', status: 'agendado', agendado_para: new Date('2026-06-10T12:00:00'), enviado_em: null, tentativas: 0, proxima_tentativa_em: null, wamid: null, entrega_status: null, erro: null },
-  { id: 'env-4', aviso_id: 'av-1', etapa: 'd_mais_1', status: 'agendado', agendado_para: new Date('2026-06-11T12:00:00'), enviado_em: null, tentativas: 0, proxima_tentativa_em: null, wamid: null, entrega_status: null, erro: null },
 ]
 
 export default function DesignSystemPage() {
@@ -498,12 +487,6 @@ export default function DesignSystemPage() {
         />
       </Secao>
 
-      <Secao titulo="CycleTimeline">
-        <Card>
-          <CycleTimeline envios={ENVIOS_DEMO} />
-        </Card>
-      </Secao>
-
       <Secao titulo="WhatsAppPreview">
         <div className="sm:w-96">
           <WhatsAppPreview
@@ -511,16 +494,6 @@ export default function DesignSystemPage() {
             botoes={['Já paguei', 'Sair dos lembretes']}
           />
         </div>
-      </Secao>
-
-      <Secao titulo="Recibo">
-        <Recibo
-          tom="sucesso"
-          titulo="Combinado confirmado"
-          acoes={<Button>Voltar ao início</Button>}
-        >
-          Tudo certo, o combinado foi confirmado.
-        </Recibo>
       </Secao>
 
       <Secao titulo="AlternarVisaoOwner">

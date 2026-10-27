@@ -13,7 +13,7 @@
 // Linguagem das Regras de Ouro em toda string (aviso/lembrete/combinado).
 
 import { etapaEnvio, type AcaoBotaoTemplate, type EtapaEnvio, type Template } from '@/shared/contracts'
-import { ROTULO_ETAPA } from '@/shared/format'
+// TODO(pivo): ROTULO_ETAPA (ciclo de lembretes legado) foi removido de shared/format; exibe a chave crua até reconstruir.
 
 export type EstadoMensagem = 'em_breve' | 'fixo' | 'planejado'
 
@@ -53,7 +53,7 @@ const VARIAVEIS_CICLO: Record<EtapaEnvio, string[]> = {
   d_mais_1: ['nome_devedor', 'motivo', 'valor'],
 }
 const MENSAGENS_CICLO: MensagemItem[] = etapaEnvio.options.map((etapa) => ({
-  nome: ROTULO_ETAPA[etapa],
+  nome: etapa,
   destinatario: 'Devedor',
   quando: 'Lembrete automático do combinado',
   estado: 'fixo',

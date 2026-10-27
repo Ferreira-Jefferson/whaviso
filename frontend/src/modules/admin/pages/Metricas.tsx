@@ -15,8 +15,8 @@ import {
   StatCard,
   type BarraGrafico,
 } from '@/shared/ui'
-import { ROTULO_STATUS_AVISO, ROTULO_STATUS_ENVIO } from '@/shared/format'
-import type { StatusAviso, StatusEnvio } from '@/shared/contracts'
+import { ROTULO_STATUS_ENVIO } from '@/shared/format'
+import type { StatusEnvio } from '@/shared/contracts'
 import { useAdminMetricas } from '../api'
 
 // StatCard só fala em centavos; aqui as métricas são CONTAGENS. Card próprio.
@@ -179,7 +179,7 @@ export default function MetricasPage() {
         <Distribuicao
           titulo="Combinados por status"
           dados={avisos}
-          rotulos={ROTULO_STATUS_AVISO as Record<StatusAviso, string>}
+          rotulos={{}} // TODO(pivo): rótulos de status de aviso removidos
           cor="var(--color-salvia)"
         />
         <Distribuicao

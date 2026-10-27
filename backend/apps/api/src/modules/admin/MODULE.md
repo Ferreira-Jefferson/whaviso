@@ -1,32 +1,17 @@
 # admin
 
 ## Propósito
-Métricas (com período + opt-out) e mensagens/templates UNIFICADOS por chave em
-`/admin/mensagens` (listar + preview/lint + propor versão + SUBMETER à Meta + ativar +
-apagar; ativação só com status_meta=aprovado; lint cobre texto e rótulos de botão).
-`POST /admin/mensagens/:id/submeter` enfileira (meta_acao='criar'); a api NÃO fala com a
-Meta, quem cria o template na WABA e reflete o status real é o zap (sincronizar_templates).
-Auditoria global read-only: usuários (com saldo da carteira), envios, avisos. E11: o
-owner CREDITA envios numa conta (ativação manual pós-pagamento via WhatsApp) e edita a
-CURVA de créditos. Restrito a owner.
+Mensagens/templates UNIFICADOS por chave em `/admin/mensagens` (listar + preview/lint +
+propor versão + SUBMETER à Meta + ativar + apagar). A api NÃO fala com a Meta; o zap
+reflete o status real. Também: `/admin/usuarios` (listar/suspender) e `/admin/whatsapp*`
+(status + mini-chat de teste). Restrito a owner.
+TODO(pivo): listagem de usuários ainda traz saldo da carteira (contrato em shared).
 
 ## Entry points
-- `index.ts`: plugin Fastify registrado em `src/routes.ts` sob `/v1`
-- `repo.ts`: consultas read-only de auditoria + suspensão
-
-## Rotas de créditos (E11)
-- `POST  /admin/usuarios/:id/creditar` credita N envios (lançamento 'credito_owner', aditivo)
-- `PATCH /admin/creditos-catalogo`     edita a curva de marcos (tabela envios -> R$/envio; cortesia; tetos de agenda; min/max derivam dos marcos)
-
-## Especialistas consumidos
-- `@whaviso/shared/contracts`, `@whaviso/shared/db`
-- `shared/auth`, `shared/http_errors`, `shared/planos` (creditarEnvios)
+- `index.ts`: plugin Fastify; `repo.ts`: usuários + suspensão
 
 ## Tabelas
-- dono de: templates (unificada por chave; conteúdo estruturado em jsonb)
-- escreve em: profiles (suspenso), creditos_carteira + creditos_lancamentos (crédito do
-  owner, via shared/planos), creditos_catalogo (curva de preço)
-- lê de: avisos, envios, profiles, eventos_aviso (métricas/opt-out), creditos_carteira
+- dono de: templates; escreve em profiles (suspenso); whats_teste_*
 
 ## Suspensão de conta
 - `PATCH /admin/usuarios/:id` aceita `{ suspenso }`. Suspender grava

@@ -1,3 +1,4 @@
+// TODO(pivo): testes cobrem rotas/tabelas de cobrança removidas; reescrever/apagar.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   criarAppTeste,

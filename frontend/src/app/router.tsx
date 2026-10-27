@@ -6,40 +6,24 @@ import {
   RouterProvider,
   Outlet,
   Navigate,
-  useSearchParams,
 } from 'react-router'
 import { Spinner } from '@/shared/ui'
 import { PublicLayout } from './layouts/PublicLayout'
 import { LegalLayout } from './layouts/LegalLayout'
 import { AppShell } from './layouts/AppShell'
-import { GestaoLayout } from './layouts/GestaoLayout'
 import { ErrorBoundary } from './ErrorBoundary'
 import { AppError } from './AppError'
 import {
   RequireAuth,
   RequireRole,
-  RequireVinculoDevedor,
   RedirectSeLogado,
 } from './guards'
 
-import { LandingPage } from '@/modules/landing'
 import { PoliticaPrivacidadePage, TermosUsoPage } from '@/modules/legal'
 import { LoginPage, OnboardingPage } from '@/modules/auth'
-import { AcaoAvisoPage, SairLembretesPage } from '@/modules/aceite'
-import { PainelPage, MetricasNegocioPage } from '@/modules/painel'
 import { NotificacoesPage } from '@/modules/notificacoes'
-import { PessoaPage, ClientesPage } from '@/modules/pessoas'
-import { NovoAvisoPage, DetalheAvisoPage } from '@/modules/avisos'
-import { CreditosPage } from '@/modules/billing'
 import { CategoriasPage } from '@/modules/categorias'
-import { ProdutosPage } from '@/modules/produtos'
 import { ContaPage } from '@/modules/conta'
-import {
-  MeusCombinadosPage,
-  DetalheCombinadoPage,
-  HistoricoPage,
-  ContaDevedorPage,
-} from '@/modules/devedor'
 import {
   MetricasPage,
   UsuariosPage,
@@ -68,29 +52,13 @@ function ComSuspense() {
   )
 }
 
-// A lista de avisos foi consolidada no Painel (/app). A rota antiga /app/avisos vira
-// um redirect que PRESERVA a query (papel/grupo/status/busca espelham os filtros do
-// Painel), para não quebrar links e favoritos. /app/avisos/novo e /:id continuam.
-function RedirectAvisos() {
-  const [params] = useSearchParams()
-  return <Navigate to={{ pathname: '/app', search: params.toString() }} replace />
-}
-
 const router = createBrowserRouter([
   {
     element: <ComSuspense />,
     errorElement: <AppError />,
     children: [
-      // ---- LANDING (layout próprio de marketing, largo) ----
-      // Logado: vai direto para a home do papel (cobre clique no logo, que aponta p/ "/").
-      {
-        path: '/',
-        element: (
-          <RedirectSeLogado>
-            <LandingPage />
-          </RedirectSeLogado>
-        ),
-      },
+      // TODO(pivo): rota '/' (landing) removida; reconstruir a landing do produto novo.
+      { path: '/', element: <RedirectSeLogado><Navigate to="/entrar" replace /></RedirectSeLogado> },
 
       // ---- LEGAL (LegalLayout: coluna de leitura larga) ----
       {
@@ -114,10 +82,6 @@ const router = createBrowserRouter([
               </RedirectSeLogado>
             ),
           },
-          // E5: a página pública /aceite/:token saiu; o aceite é 100% pelo WhatsApp.
-          // /aviso/:token e /sair-lembretes/:token são de E7 (ações do devedor por link).
-          { path: '/aviso/:token', element: <AcaoAvisoPage /> },
-          { path: '/sair-lembretes/:token', element: <SairLembretesPage /> },
           // Onboarding: exige sessão, mas não um papel específico (e não força
           // o próprio redirect de onboarding, evita loop). Layout público.
           {
@@ -131,7 +95,8 @@ const router = createBrowserRouter([
         ],
       },
 
-      // ---- ÁREA DO USUÁRIO: avisos que ele gerencia (é cobrador_id) ----
+      // ---- ÁREA DO USUÁRIO ----
+      // TODO(pivo): rotas do app do restaurante (pedidos, cardápio, etc.) ainda não existem.
       {
         path: '/app',
         element: (
@@ -140,48 +105,10 @@ const router = createBrowserRouter([
           </RequireRole>
         ),
         children: [
-          { index: true, element: <PainelPage /> },
-          // E18: área "Gestão" com abas (Resultados/Clientes/Produtos/Categorias). A aba
-          // Resultados é o index; as demais são filhas. Cada uma tem deep-link próprio.
-          {
-            path: 'gestao',
-            element: <GestaoLayout />,
-            children: [
-              { index: true, element: <MetricasNegocioPage /> },
-              { path: 'clientes', element: <ClientesPage /> },
-              { path: 'produtos', element: <ProdutosPage /> },
-              { path: 'categorias', element: <CategoriasPage /> },
-            ],
-          },
-          // Rotas antigas redirecionam para as abas de Gestão (nenhum link antigo quebra).
-          { path: 'metricas', element: <Navigate to="/app/gestao" replace /> },
-          { path: 'categorias', element: <Navigate to="/app/gestao/categorias" replace /> },
-          { path: 'avisos', element: <RedirectAvisos /> },
-          { path: 'avisos/novo', element: <NovoAvisoPage /> },
-          { path: 'avisos/:id', element: <DetalheAvisoPage /> },
-          // H10.10: "precisa de você" (H9.2) + histórico da central de notificações.
+          { index: true, element: <NotificacoesPage /> },
+          { path: 'categorias', element: <CategoriasPage /> },
           { path: 'notificacoes', element: <NotificacoesPage /> },
-          // E15: visão por pessoa/contato. `:avisoId` = um combinado do usuário; a api
-          // resolve o telefone da outra ponta no servidor (telefone nunca em rota, H15.7).
-          { path: 'pessoa/:avisoId', element: <PessoaPage /> },
-          { path: 'creditos', element: <CreditosPage /> },
           { path: 'conta', element: <ContaPage /> },
-        ],
-      },
-
-      // ---- ÁREA DO USUÁRIO: avisos em que foi convidado a pagar (é devedor_profile_id) ----
-      {
-        path: '/meus',
-        element: (
-          <RequireVinculoDevedor>
-            <AppShell />
-          </RequireVinculoDevedor>
-        ),
-        children: [
-          { index: true, element: <MeusCombinadosPage /> },
-          { path: 'combinados/:id', element: <DetalheCombinadoPage /> },
-          { path: 'historico', element: <HistoricoPage /> },
-          { path: 'conta', element: <ContaDevedorPage /> },
         ],
       },
 

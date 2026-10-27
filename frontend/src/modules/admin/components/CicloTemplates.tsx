@@ -12,7 +12,7 @@
 // linguagem; o trecho descritivo fica embaixo. Linguagem das Regras de Ouro.
 import { Link } from 'react-router'
 import { ArrowRight } from 'lucide-react'
-import { ROTULO_ETAPA } from '@/shared/format'
+// TODO(pivo): ROTULO_ETAPA (ciclo de lembretes legado) foi removido de shared/format; exibe a chave crua até reconstruir.
 import { etapaEnvio, type EtapaEnvio, type Template } from '@/shared/contracts'
 import { cn } from '@/shared/ui'
 import { situacaoTemplate } from '../situacao_template'
@@ -60,8 +60,8 @@ const COR_TEXTO: Record<Situacao, string> = {
 
 // Código curto (D-2) + descrição (aviso antecipado) da MESMA fonte de rótulos.
 function partesEtapa(etapa: EtapaEnvio): { codigo: string; descricao: string } {
-  const [codigo, descricao] = ROTULO_ETAPA[etapa].split(' · ')
-  return { codigo: codigo ?? ROTULO_ETAPA[etapa], descricao: descricao ?? '' }
+  const [codigo, descricao] = etapa.split(' · ')
+  return { codigo: codigo ?? etapa, descricao: descricao ?? '' }
 }
 
 interface InfoEtapa {
@@ -114,7 +114,7 @@ function textoStatus(info: InfoEtapa): string {
 }
 
 function rotuloAria(info: InfoEtapa, descricao: string): string {
-  return `${ROTULO_ETAPA[info.etapa]}, ${descricao}. ${textoStatus(info)}. Configurar esta etapa.`
+  return `${info.etapa}, ${descricao}. ${textoStatus(info)}. Configurar esta etapa.`
 }
 
 interface CicloTemplatesProps {
