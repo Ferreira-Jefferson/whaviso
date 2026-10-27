@@ -37,6 +37,7 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   cargos: { apiDelete: 'negado' },
   categoria_grupos: { apiDelete: 'negado' },
   categorias: { apiDelete: 'negado' },
+  cliente_consentimento: { apiDelete: 'negado' },
   clientes: { apiDelete: 'negado' },
   comanda_itens: { apiDelete: 'negado' },
   comandas: { apiDelete: 'negado' },
