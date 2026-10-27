@@ -14,6 +14,17 @@ interface SegmentedControlProps<T extends string> {
   options: ReadonlyArray<SegmentOption<T>>
   /** Rótulo acessível do grupo. */
   ariaLabel: string
+  /**
+   * Mantém os segmentos numa única linha (sem quebrar). Use dentro de um
+   * container com `overflow-x-auto` em espaços estreitos: em vez de empilhar,
+   * os segmentos rolam na horizontal.
+   */
+  semQuebra?: boolean
+  /**
+   * Ocupa a largura toda, dividindo os segmentos por igual (estilo iOS). Bom em
+   * colunas estreitas: todos aparecem, sem quebra nem corte. Padding menor.
+   */
+  preencher?: boolean
   className?: string
 }
 
@@ -22,6 +33,8 @@ export function SegmentedControl<T extends string>({
   onChange,
   options,
   ariaLabel,
+  semQuebra = false,
+  preencher = false,
   className,
 }: SegmentedControlProps<T>) {
   return (
@@ -30,9 +43,12 @@ export function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       className={cn(
         // w-fit: num container flex-col (align-items: stretch) o inline-flex
-        // esticaria; fit-content trava na largura do conteúdo (e ainda quebra
-        // linha quando não cabe).
-        'inline-flex w-fit flex-wrap gap-1 rounded-pill border border-linha bg-papel-2 p-1',
+        // esticaria; fit-content trava na largura do conteúdo. Por padrão quebra
+        // linha quando não cabe; `semQuebra` fica numa linha só (o container de
+        // fora rola na horizontal); `preencher` estica e divide por igual.
+        'gap-1 rounded-pill border border-linha bg-papel-2 p-1',
+        preencher ? 'flex w-full' : 'inline-flex w-fit',
+        preencher || semQuebra ? 'flex-nowrap' : 'flex-wrap',
         className,
       )}
     >
@@ -46,7 +62,9 @@ export function SegmentedControl<T extends string>({
             aria-checked={ativo}
             onClick={() => onChange(op.value)}
             className={cn(
-              'rounded-pill px-4 py-1.5 text-sm transition-colors',
+              'whitespace-nowrap rounded-pill py-1.5 text-center transition-colors',
+              preencher ? 'min-w-0 flex-1 px-2 text-[13px]' : 'px-4 text-sm',
+              !preencher && semQuebra && 'flex-none',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia',
               ativo
                 ? 'bg-salvia text-papel'

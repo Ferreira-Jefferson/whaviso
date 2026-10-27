@@ -37,7 +37,7 @@ export default function Conversas() {
           query={conversas}
           selecionadaId={selecionadaId}
           aoSelecionar={setSelecionadaId}
-          className={cn('w-full md:w-[340px] md:flex-none md:border-r md:border-linha', selecionadaId && 'hidden md:flex')}
+          className={cn('w-full md:w-[380px] md:flex-none md:border-r md:border-linha', selecionadaId && 'hidden md:flex')}
         />
 
         {selecionadaId ? (

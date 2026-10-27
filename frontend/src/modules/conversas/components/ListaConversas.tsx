@@ -44,13 +44,13 @@ export function ListaConversas({
             className="pl-9"
           />
         </label>
-        <div className="-mx-4 mt-3 overflow-x-auto px-4">
+        <div className="mt-3">
           <SegmentedControl
             ariaLabel="Filtrar por estado"
             value={status}
             onChange={aoMudarStatus}
             options={FILTROS_STATUS}
-            className="flex-nowrap"
+            preencher
           />
         </div>
       </div>
