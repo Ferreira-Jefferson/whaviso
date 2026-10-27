@@ -1,7 +1,8 @@
-// Termos de Uso do Whaviso. Conteudo juridico adaptado ao produto real: o Whaviso
-// avisa e organiza pagamentos combinados, nao transaciona dinheiro nem confirma
-// pagamento sozinho (Epico 13). Pre-pago por credito de envio, recarga por Pix.
-// Linguagem das Regras de Ouro: vocabulario aprovado, sem travessao, neutro.
+// Termos de Uso do Whaviso. Conteudo juridico adaptado ao produto real: automacao de
+// pedidos e gestao do restaurante por WhatsApp. O Whaviso nao cozinha, nao entrega e nao
+// transaciona dinheiro: o cliente paga o restaurante direto (Pix). A loja paga a Whaviso
+// por assinatura mensal. Linguagem das Regras de Ouro: vocabulario aprovado, sem
+// travessao, neutro quanto a genero.
 import { Link } from 'react-router'
 import { DocumentoLegal, Secao, P, Lista, Email } from '../components/legal-ui'
 
@@ -11,28 +12,32 @@ export default function TermosUsoPage() {
   return (
     <DocumentoLegal
       titulo="Termos de Uso"
-      atualizadoEm="5 de julho de 2026"
+      atualizadoEm="27 de outubro de 2026"
       tituloAba="Whaviso | Termos de Uso"
     >
       <Secao n={1} titulo="Aceitação dos termos">
         <P>
           Ao acessar ou usar o Whaviso, você concorda com estes Termos de Uso. O serviço é operado
           por 56.883.976 Jefferson Cristian Tertuliano Cavalcante Ferreira (MEI), CNPJ
-          56.883.976/0001-04 (<Email endereco={CONTATO} />). Se você não concordar com qualquer
-          parte destes termos, não utilize o serviço.
+          56.883.976/0001-04 (<Email endereco={CONTATO} />). Estes termos valem para o restaurante
+          que assina o Whaviso e para as pessoas da sua equipe que acessam o painel. Se você não
+          concordar com qualquer parte destes termos, não utilize o serviço.
         </P>
       </Secao>
 
       <Secao n={2} titulo="O que o Whaviso faz">
         <P>
-          O Whaviso automatiza avisos de pagamento por WhatsApp e organiza, num painel, o que está
-          combinado, o que já foi recebido e o que ainda vai ser pago.
+          O Whaviso automatiza o atendimento de pedidos do seu restaurante pelo WhatsApp e organiza,
+          num painel, a operação: cardápio, pedidos, conversas, caixa, salão, entrega, clientes e
+          relatórios. Um atendente automático recebe os pedidos dos seus clientes no WhatsApp e você
+          acompanha e gerencia tudo pelo painel.
         </P>
         <P>
-          O Whaviso apenas avisa e organiza: não movimenta dinheiro, não dá baixa em pagamento e não
-          confirma pagamento sozinho. Quem confirma que um pagamento chegou é sempre a pessoa que
-          criou o combinado; o botão "Já paguei" é apenas um aviso, não uma transação. O Whaviso
-          também não é um canal de conversa: a pessoa avisada interage por botões, sem chat.
+          O Whaviso é uma ferramenta de software: ele não prepara alimentos, não faz a entrega e não
+          movimenta dinheiro. O preparo, a qualidade, a entrega e o cumprimento de cada pedido são de
+          responsabilidade do restaurante. O pagamento acontece diretamente entre o seu cliente e
+          você: quando usa Pix, o valor vai direto para a sua chave; o Whaviso apenas organiza a
+          cobrança, não recebe nem repassa o dinheiro dos seus pedidos.
         </P>
       </Secao>
 
@@ -42,57 +47,68 @@ export default function TermosUsoPage() {
             O acesso é sem senha: por conta Google ou por código enviado ao seu WhatsApp. O número
             de WhatsApp é a sua identidade.
           </li>
-          <li>Você é responsável pela veracidade dos dados que cadastra.</li>
+          <li>Você é responsável pela veracidade dos dados que cadastra, incluindo cardápio, preços e dados da loja.</li>
           <li>
-            Você deve ter uma relação legítima com as pessoas que decide avisar e autorização para
-            contatá-las por WhatsApp.
-          </li>
-          <li>
-            É proibido usar o Whaviso para assédio, ameaça, mensagem não solicitada em massa ou
-            qualquer contato hostil.
+            Você é responsável pelos acessos da sua equipe e pelo uso que fizerem do painel em nome
+            do restaurante.
           </li>
           <li>Podemos suspender contas que violem estes termos.</li>
         </Lista>
       </Secao>
 
-      <Secao n={4} titulo="Uso responsável e conteúdo">
+      <Secao n={4} titulo="Uso responsável e seus clientes">
         <P>
-          Ao criar um combinado, você declara ter um acordo real de pagamento com a pessoa avisada e
-          o direito de contatá-la. É proibido enviar conteúdo ofensivo, enganoso, ilegal ou que
-          viole direitos de terceiros. Toda mensagem enviada pelo Whaviso traz a opção de sair dos
-          lembretes em um toque; quando alguém pede para parar, insistir por fora, contra a vontade
-          da pessoa, é proibido. Podemos remover conteúdo e interromper envios em caso de violação.
+          Você declara ter uma relação legítima com os clientes que atende pelo Whaviso e autorização
+          para contatá-los por WhatsApp. É proibido usar o Whaviso para mensagem não solicitada em
+          massa, assédio, ameaça ou qualquer contato hostil. Toda campanha e todo contato ativo devem
+          respeitar quem pede para não receber mais mensagens. É proibido enviar conteúdo ofensivo,
+          enganoso, ilegal ou que viole direitos de terceiros. Podemos remover conteúdo e interromper
+          envios em caso de violação.
         </P>
       </Secao>
 
-      <Secao n={5} titulo="Créditos de envio e pagamento">
+      <Secao n={5} titulo="Atendente automático">
         <P>
-          O Whaviso é pré-pago por crédito de envio: cada lembrete enviado usa um crédito. A conta
-          começa com um saldo de cortesia e você recarrega quando quiser, na quantidade que precisar.
+          O atendente automático funciona com um provedor de inteligência artificial configurado por
+          você, com a sua própria chave. O atendente ajuda a receber e montar pedidos, mas pode
+          errar: a confirmação do pedido, do preço e dos dados de entrega é sempre sua. Os custos de
+          uso da sua chave de provedor são de sua responsabilidade e cobrados pelo provedor que você
+          escolher, não pelo Whaviso. Você é responsável por manter o cardápio e as informações que o
+          atendente usa corretos e atualizados.
+        </P>
+      </Secao>
+
+      <Secao n={6} titulo="Assinatura e pagamento">
+        <P>
+          O uso do Whaviso pelo restaurante é cobrado por assinatura. O valor, o período e as
+          condições vigentes são apresentados no painel, na sua fatura.
         </P>
         <Lista>
+          <li>A cobrança da assinatura é recorrente enquanto a conta estiver ativa.</li>
           <li>
-            No momento, a recarga é feita por Pix, direto para a chave da plataforma, com liberação
-            manual do crédito. Meios automáticos de pagamento podem ser adicionados no futuro.
+            O não pagamento de uma fatura pode levar à suspensão do acesso ao painel e à interrupção
+            do atendimento automático, após aviso.
           </li>
-          <li>O saldo comprado não expira.</li>
           <li>
-            O crédito só é consumido quando o lembrete de fato é enviado. Um combinado não aceito
-            devolve o crédito ao seu saldo.
+            A assinatura do Whaviso é separada do pagamento dos seus pedidos: o que seus clientes
+            pagam a você não passa pelo Whaviso.
           </li>
         </Lista>
       </Secao>
 
-      <Secao n={6} titulo="Limitação de responsabilidade">
+      <Secao n={7} titulo="Limitação de responsabilidade">
         <P>
           O Whaviso é fornecido "como está". Não nos responsabilizamos por indisponibilidade ou
-          demora na entrega de mensagens que dependam de terceiros (WhatsApp/Meta e operadoras), por
-          decisões de pagamento tomadas entre as partes de um combinado, nem por interrupções do
-          serviço. O Whaviso não é parte do acordo de pagamento entre você e a pessoa avisada.
+          demora na entrega de mensagens que dependam de terceiros (WhatsApp/Meta, operadoras, o
+          provedor de inteligência artificial que você configura e provedores de mapa), por respostas
+          imprecisas do atendente automático, por decisões comerciais, de preparo ou de entrega
+          tomadas pelo restaurante, pelo pagamento acordado entre você e o seu cliente, nem por
+          interrupções do serviço. O Whaviso não é parte da relação de consumo entre o restaurante e
+          o cliente final.
         </P>
       </Secao>
 
-      <Secao n={7} titulo="Privacidade">
+      <Secao n={8} titulo="Privacidade">
         <P>
           O tratamento de dados pessoais é descrito na nossa{' '}
           <Link
@@ -105,14 +121,14 @@ export default function TermosUsoPage() {
         </P>
       </Secao>
 
-      <Secao n={8} titulo="Alterações">
+      <Secao n={9} titulo="Alterações">
         <P>
           Podemos atualizar estes termos a qualquer momento. O uso continuado do serviço após
           alterações constitui aceite dos novos termos.
         </P>
       </Secao>
 
-      <Secao n={9} titulo="Lei aplicável">
+      <Secao n={10} titulo="Lei aplicável">
         <P>
           Estes termos são regidos pela legislação brasileira. Fica eleito o foro da comarca de
           Caçapava/SP para dirimir controvérsias, sem prejuízo do direito do consumidor de acionar o
@@ -120,7 +136,7 @@ export default function TermosUsoPage() {
         </P>
       </Secao>
 
-      <Secao n={10} titulo="Contato">
+      <Secao n={11} titulo="Contato">
         <P>
           <strong className="text-tinta">
             56.883.976 Jefferson Cristian Tertuliano Cavalcante Ferreira (MEI)
