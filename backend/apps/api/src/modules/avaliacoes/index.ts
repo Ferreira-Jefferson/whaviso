@@ -1,0 +1,1 @@
+export { avaliacoesRoutes } from './routes'
