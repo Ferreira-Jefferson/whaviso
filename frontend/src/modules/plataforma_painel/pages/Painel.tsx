@@ -3,6 +3,20 @@
 // (cache de 60 s); `calculado_em` mostra a idade do dado.
 import { useState } from 'react'
 import {
+  Banknote,
+  BarChart3,
+  Clock,
+  Filter,
+  Hourglass,
+  Receipt,
+  Store,
+  Target,
+  TrendingDown,
+  UserMinus,
+  UserPlus,
+  Wallet,
+} from 'lucide-react'
+import {
   Banner,
   Card,
   MoneyText,
@@ -10,9 +24,10 @@ import {
   SegmentedControl,
   Skeleton,
   TableResponsive,
+  cn,
   type ColunaTabela,
 } from '@/shared/ui'
-import { brl, formatarDataHora } from '@/shared/format'
+import { brl, formatarDataHora, formatarHora } from '@/shared/format'
 import type { PainelSerieMes } from '@/shared/contracts/_generated/plataforma_painel'
 import { usePainelResumo, usePainelSerie } from '../api'
 import { mesCurto, mesLongo, percentual } from '../formato'
@@ -43,67 +58,87 @@ export default function Painel() {
   const r = resumo.data
 
   return (
-    <div>
+    <div className="animate-rise">
       <PageHeader
         titulo="Crescimento"
-        descricao={
-          r
-            ? `Base de clientes em ${mesLongo(r.mes)}. Atualizado em ${formatarDataHora(r.calculado_em)}.`
-            : 'Base de clientes da Whaviso.'
+        descricao={r ? `Base de clientes em ${mesLongo(r.mes)}.` : 'Base de clientes da Whaviso.'}
+        acoes={
+          r ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-pill bg-papel-2 px-2.5 py-1 text-xs font-medium text-tinta-2"
+              title={`Atualizado em ${formatarDataHora(r.calculado_em)}`}
+            >
+              <Clock className="size-3.5" aria-hidden />
+              Atualizado às {formatarHora(r.calculado_em)}
+            </span>
+          ) : undefined
         }
       />
 
       {resumo.isError ? (
         <AreaErro erro={resumo.error} aoTentarDeNovo={() => void resumo.refetch()} />
       ) : (
-        <div className="flex flex-col gap-6">
-          <section aria-label="Indicadores do mês" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi rotulo="MRR" tom="salvia" carregando={resumo.isPending} valor={r && brl(r.mrr_centavos)} detalhe="Assinaturas ativas (trial e suspensas ficam de fora)" />
-            <Kpi rotulo="Ticket médio (ARPA)" carregando={resumo.isPending} valor={r && (r.arpa_centavos === null ? 'Sem base' : brl(r.arpa_centavos))} detalhe="MRR por conta ativa" />
-            <Kpi rotulo="Lojas ativas" tom="folha" carregando={resumo.isPending} valor={r?.lojas_ativas} detalhe={r ? `${r.contas_ativas} contas ativas` : undefined} />
-            <Kpi rotulo="Novas contas no mês" carregando={resumo.isPending} valor={r?.novas_contas_mes} />
-            <Kpi rotulo="Churn de contas" tom="ambar" carregando={resumo.isPending} valor={r && percentual(r.churn_contas)} detalhe="Cancelamentos do mês sobre a base inicial" />
-            <Kpi rotulo="Churn de MRR" tom="ambar" carregando={resumo.isPending} valor={r && percentual(r.churn_mrr)} detalhe="Mesma conta, em valor" />
-            <Kpi rotulo="Conversão do funil" carregando={resumo.isPending} valor={r && percentual(r.conversao_funil)} detalhe="Prospectos do mês que viraram clientes" />
-            <Kpi rotulo="Conversão do trial" carregando={resumo.isPending} valor={r && percentual(r.conversao_trial)} detalhe="Trials do mês que começaram a pagar" />
+        <div className="flex flex-col gap-8">
+          <section aria-labelledby="sec-indicadores" className="flex flex-col gap-3">
+            <h2 id="sec-indicadores" className="text-lg text-salvia">Indicadores do mês</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Kpi rotulo="MRR" tom="salvia" destaque icone={<Wallet className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r && brl(r.mrr_centavos)} detalhe="Assinaturas ativas (trial e suspensas ficam de fora)" />
+              <Kpi rotulo="Ticket médio (ARPA)" icone={<Receipt className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r && (r.arpa_centavos === null ? 'Sem base' : brl(r.arpa_centavos))} detalhe="MRR por conta ativa" />
+              <Kpi rotulo="Lojas ativas" tom="folha" icone={<Store className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r?.lojas_ativas} detalhe={r ? `${r.contas_ativas} contas ativas` : undefined} />
+              <Kpi rotulo="Novas contas no mês" icone={<UserPlus className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r?.novas_contas_mes} />
+              <Kpi rotulo="Churn de contas" tom="ambar" icone={<UserMinus className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r && percentual(r.churn_contas)} detalhe="Cancelamentos do mês sobre a base inicial" />
+              <Kpi rotulo="Churn de MRR" tom="ambar" icone={<TrendingDown className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r && percentual(r.churn_mrr)} detalhe="Mesma conta, em valor" />
+              <Kpi rotulo="Conversão do funil" icone={<Filter className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r && percentual(r.conversao_funil)} detalhe="Prospectos do mês que viraram clientes" />
+              <Kpi rotulo="Conversão do trial" icone={<Target className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r && percentual(r.conversao_trial)} detalhe="Trials do mês que começaram a pagar" />
+            </div>
           </section>
 
-          <section aria-label="Receita e inadimplência" className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <Kpi rotulo="Receita realizada no mês" tom="folha" carregando={resumo.isPending} valor={r && brl(r.receita_realizada_centavos)} detalhe="Faturas baixadas como pagas no mês" />
-            <Kpi
-              rotulo="Inadimplência"
-              tom={r && r.inadimplencia.valor_centavos > 0 ? 'barro' : 'neutro'}
-              carregando={resumo.isPending}
-              valor={r && brl(r.inadimplencia.valor_centavos)}
-              detalhe={r ? `${r.inadimplencia.contas} ${r.inadimplencia.contas === 1 ? 'conta' : 'contas'} com fatura atrasada` : undefined}
-            />
-            <Card>
-              <h2 className="text-sm text-tinta-2">Assinaturas por situação</h2>
-              {resumo.isPending || !r ? (
-                <Skeleton className="mt-3 h-16 w-full" />
-              ) : (
-                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  {(
-                    [
-                      ['Ativas', r.assinaturas.ativa],
-                      ['Em trial', r.assinaturas.trial],
-                      ['Suspensas', r.assinaturas.suspensa],
-                      ['Canceladas', r.assinaturas.cancelada],
-                    ] as const
-                  ).map(([rotulo, n]) => (
-                    <div key={rotulo} className="flex items-baseline justify-between gap-2">
-                      <dt className="text-tinta-2">{rotulo}</dt>
-                      <dd className="tabular font-semibold">{n}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </Card>
+          <section aria-labelledby="sec-receita" className="flex flex-col gap-3">
+            <h2 id="sec-receita" className="text-lg text-salvia">Receita e inadimplência</h2>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              <Kpi rotulo="Receita realizada no mês" tom="folha" icone={<Banknote className="size-4" aria-hidden />} carregando={resumo.isPending} valor={r && brl(r.receita_realizada_centavos)} detalhe="Faturas baixadas como pagas no mês" />
+              <Kpi
+                rotulo="Inadimplência"
+                tom={r && r.inadimplencia.valor_centavos > 0 ? 'barro' : 'neutro'}
+                icone={<Hourglass className="size-4" aria-hidden />}
+                carregando={resumo.isPending}
+                valor={r && brl(r.inadimplencia.valor_centavos)}
+                detalhe={r ? `${r.inadimplencia.contas} ${r.inadimplencia.contas === 1 ? 'conta' : 'contas'} com fatura atrasada` : undefined}
+              />
+              <Card className="flex flex-col gap-3">
+                <h3 className="text-sm text-tinta-2">Assinaturas por situação</h3>
+                {resumo.isPending || !r ? (
+                  <Skeleton className="h-20 w-full" />
+                ) : (
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
+                    {(
+                      [
+                        ['Ativas', r.assinaturas.ativa, 'bg-folha'],
+                        ['Em trial', r.assinaturas.trial, 'bg-salvia'],
+                        ['Suspensas', r.assinaturas.suspensa, 'bg-ambar'],
+                        ['Canceladas', r.assinaturas.cancelada, 'bg-cinza-expirado'],
+                      ] as const
+                    ).map(([rotulo, n, ponto]) => (
+                      <div key={rotulo} className="flex items-baseline justify-between gap-2">
+                        <dt className="flex items-center gap-1.5 text-tinta-2">
+                          <span className={cn('size-2 flex-none rounded-full', ponto)} aria-hidden />
+                          {rotulo}
+                        </dt>
+                        <dd className="tabular font-semibold text-tinta">{n}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </Card>
+            </div>
           </section>
 
-          <section aria-label="Série mensal" className="flex flex-col gap-4">
+          <section aria-labelledby="sec-serie" className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl text-salvia">Evolução mensal</h2>
+              <h2 id="sec-serie" className="flex items-center gap-2 text-lg text-salvia">
+                <BarChart3 className="size-5 text-tinta-2" aria-hidden />
+                Evolução mensal
+              </h2>
               <SegmentedControl ariaLabel="Período da série" value={meses} onChange={setMeses} options={PERIODOS} />
             </div>
 
@@ -118,7 +153,17 @@ export default function Painel() {
                   </Banner>
                 )}
                 <Card>
-                  <h3 className="mb-3 text-sm text-tinta-2">MRR por mês</h3>
+                  <div className="mb-4 flex items-baseline justify-between gap-3">
+                    <h3 className="text-sm text-tinta-2">MRR por mês</h3>
+                    {(() => {
+                      const atual = serie.data.meses[serie.data.meses.length - 1]
+                      return atual ? (
+                        <span className="text-xs text-tinta-2">
+                          Atual <span className="tabular text-salvia">{brl(atual.mrr_centavos)}</span>
+                        </span>
+                      ) : null
+                    })()}
+                  </div>
                   <GraficoSerie
                     pontos={serie.data.meses.map((m) => ({
                       rotulo: mesCurto(m.mes),

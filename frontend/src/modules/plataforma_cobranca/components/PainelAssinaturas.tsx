@@ -2,7 +2,7 @@
 // reativar, cancelar, valor e vencimento). Valor/vencimento valem so para faturas FUTURAS. A
 // suspensao da loja deriva do status da assinatura (trigger no banco); aqui so mudamos o status.
 import { useState } from 'react'
-import { CreditCard, Plus } from 'lucide-react'
+import { CreditCard, Plus, Repeat } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import {
   Badge,
@@ -72,6 +72,12 @@ export function PainelAssinaturas() {
   const itens = lista.data ?? []
   const nomeConta = (id: string) => nomes.data?.get(id) ?? `Conta ${idCurto(id)}`
 
+  // Receita mensal recorrente das assinaturas ativas visiveis e quantas estao suspensas: a leitura
+  // de saude que o operador quer antes de abrir uma linha. So apresentacao (deriva da lista).
+  const ativas = itens.filter((a) => a.status === 'ativa')
+  const mrrCentavos = ativas.reduce((soma, a) => soma + a.valor_mensal_centavos, 0)
+  const qtdSuspensas = itens.filter((a) => a.status === 'suspensa').length
+
   const colunas: ReadonlyArray<ColunaTabela<AssinaturaDTO>> = [
       { chave: 'conta', titulo: 'Conta', principal: true, render: (a) => <span className="font-medium">{nomeConta(a.conta_id)}</span> },
       {
@@ -90,12 +96,28 @@ export function PainelAssinaturas() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Select ariaLabel="Filtrar por situação" value={status} onChange={setStatus} options={OPCOES_STATUS} className="w-full sm:w-52" />
-        <Button onClick={() => setCriando(true)}>
-          <Plus className="size-4" aria-hidden />
-          Nova assinatura
-        </Button>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Select ariaLabel="Filtrar por situação" value={status} onChange={setStatus} options={OPCOES_STATUS} className="w-full sm:w-52" />
+          <Button className="max-sm:w-full" onClick={() => setCriando(true)}>
+            <Plus className="size-4" aria-hidden />
+            Nova assinatura
+          </Button>
+        </div>
+        {lista.isSuccess && (ativas.length > 0 || qtdSuspensas > 0) && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-tinta-2">
+            <Repeat className="size-4 flex-none text-salvia" strokeWidth={1.75} aria-hidden />
+            <MoneyText centavos={mrrCentavos} className="text-salvia" />
+            <span>
+              por mês em {ativas.length} {ativas.length === 1 ? 'assinatura ativa' : 'assinaturas ativas'}
+            </span>
+            {qtdSuspensas > 0 && (
+              <span className="inline-flex items-center rounded-pill bg-ambar-claro px-2.5 py-0.5 text-xs font-bold text-ambar">
+                {qtdSuspensas} {qtdSuspensas === 1 ? 'suspensa' : 'suspensas'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {lista.isPending && (

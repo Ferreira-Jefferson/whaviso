@@ -25,6 +25,7 @@ import { papelOperador, type PapelOperador } from '@/shared/contracts/_generated
 import { useAtualizarOperador, useConvidarOperador, useOperadores } from '../api'
 import { ROTULO_PAPEL_OPERADOR } from '../rotulos'
 import { AreaErro } from './AreaErro'
+import { Monograma } from './Monograma'
 
 const OPCOES_PAPEL = papelOperador.options.map((p) => ({ value: p, label: ROTULO_PAPEL_OPERADOR[p] }))
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -46,9 +47,12 @@ export function PainelEquipe() {
       titulo: 'Pessoa',
       principal: true,
       render: (o) => (
-        <span className="flex items-center gap-2 font-medium">
-          {o.nome}
-          {!o.ativo && <Badge tom="neutro">Desativado</Badge>}
+        <span className="flex items-center gap-3">
+          <Monograma nome={o.nome} forma="redondo" inativo={!o.ativo} />
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+            <span className="truncate text-tinta">{o.nome}</span>
+            {!o.ativo && <Badge tom="neutro">Desativado</Badge>}
+          </span>
         </span>
       ),
     },
@@ -83,7 +87,12 @@ export function PainelEquipe() {
         <EmptyState icone={<UserCog className="size-7" aria-hidden />} titulo="Equipe vazia" descricao="Adicione quem vai operar o console." />
       )}
       {lista.isSuccess && itens.length > 0 && (
-        <TableResponsive colunas={colunas} linhas={itens} chaveLinha={(o) => o.id} onRowClick={setAlvo} legenda="Equipe Whaviso" />
+        <>
+          <p className="text-sm text-tinta-2" aria-live="polite">
+            {itens.length === 1 ? '1 pessoa na equipe' : `${itens.length} pessoas na equipe`}
+          </p>
+          <TableResponsive colunas={colunas} linhas={itens} chaveLinha={(o) => o.id} onRowClick={setAlvo} legenda="Equipe Whaviso" />
+        </>
       )}
 
       <ConviteDialog aberto={convidando} aoFechar={() => setConvidando(false)} />

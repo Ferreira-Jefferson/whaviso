@@ -5,8 +5,9 @@
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Pencil, Star, Trash2 } from 'lucide-react'
+import { KeyRound, Pencil, Star, Trash2 } from 'lucide-react'
 import {
+  Badge,
   Banner,
   Button,
   Card,
@@ -21,7 +22,7 @@ import {
   Spinner,
 } from '@/shared/ui'
 import { ROTULO_TIPO_CHAVE } from '@/shared/format'
-import type { TipoChavePix } from '@/shared/contracts'
+import type { RoleUsuario, TipoChavePix } from '@/shared/contracts'
 import { useAuth, usePerfil, atualizarPerfil, mensagemDeErroAuth } from '@/shared/auth'
 import { atualizarTelefone, verificarNovoTelefone } from '@/shared/supabase'
 import {
@@ -47,8 +48,8 @@ export default function ContaPage() {
 
   return (
     <div className="animate-rise">
-      <PageHeader titulo="Minha conta" descricao="Seus dados e acesso." />
-      <div className="grid gap-6">
+      <PageHeader titulo="Minha conta" descricao="Seu perfil e as chaves Pix da sua conta." />
+      <div className="grid items-start gap-6 lg:grid-cols-2">
         <FormularioPerfil
           key={perfil?.id ?? 'sem-perfil'}
           onSalvo={recarregarPerfil}
@@ -57,6 +58,29 @@ export default function ContaPage() {
       </div>
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+
+/** Monograma com as iniciais: dá rosto e hierarquia ao topo da conta sem exigir foto. */
+function Monograma({ nome }: { nome: string }) {
+  const partes = nome.trim().split(/\s+/).filter(Boolean)
+  const iniciais =
+    ((partes[0]?.[0] ?? '') + (partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? '') : ''))
+      .toUpperCase() || '?'
+  return (
+    <span
+      aria-hidden
+      className="flex size-14 flex-none items-center justify-center rounded-full bg-salvia-claro font-display text-xl font-bold text-salvia"
+    >
+      {iniciais}
+    </span>
+  )
+}
+
+const ROTULO_ROLE: Record<RoleUsuario, string> = {
+  owner: 'Dono da conta',
+  user: 'Membro da equipe',
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +163,23 @@ function FormularioPerfil({ onSalvo }: { onSalvo: () => Promise<void> }) {
 
   return (
     <Card>
-      <h2 className="mb-1 text-lg text-salvia">Perfil</h2>
+      <div className="flex items-center gap-4">
+        <Monograma nome={perfil?.nome || ''} />
+        <div className="min-w-0">
+          <h2 className="truncate font-display text-xl font-bold text-tinta">
+            {perfil?.nome || 'Sem nome ainda'}
+          </h2>
+          {perfil?.role && (
+            <span className="mt-1 inline-flex">
+              <Badge tom="marca">{ROTULO_ROLE[perfil.role]}</Badge>
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="my-5 h-px w-full bg-linha" />
+
+      <h3 className="mb-1 text-sm font-medium text-tinta">Dados do perfil</h3>
       <p className="mb-4 text-sm text-tinta-2">Seu nome aparece nos combinados a receber.</p>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         {feedback && <Banner tom="sucesso">{feedback}</Banner>}
@@ -165,28 +205,30 @@ function FormularioPerfil({ onSalvo }: { onSalvo: () => Promise<void> }) {
         </Field>
 
         {verificandoPhone && dadosParaSalvar?.telefone && (
-          <Field label="Código recebido no WhatsApp">
-            <div className="flex gap-2">
-              <Input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                placeholder="000000"
-                value={codigoPhone}
-                onChange={(e) => setCodigoPhone(e.target.value)}
-              />
-              <Button
-                type="button"
-                loading={salvandoCodigo}
-                onClick={confirmarCodigo}
-              >
-                Confirmar
-              </Button>
-            </div>
-            <p className="mt-1 text-xs text-tinta-2">
-              Enviamos um código para {dadosParaSalvar.telefone} para confirmar a troca.
-            </p>
-          </Field>
+          <div className="rounded-input border border-salvia/20 bg-salvia-claro/50 p-4">
+            <Field label="Código recebido no WhatsApp">
+              <div className="flex gap-2">
+                <Input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={codigoPhone}
+                  onChange={(e) => setCodigoPhone(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  loading={salvandoCodigo}
+                  onClick={confirmarCodigo}
+                >
+                  Confirmar
+                </Button>
+              </div>
+              <p className="mt-1 text-xs text-tinta-2">
+                Enviamos um código para confirmar a troca. Digite-o para concluir.
+              </p>
+            </Field>
+          </div>
         )}
 
         {!verificandoPhone && (
@@ -270,7 +312,10 @@ function GerenciadorChavesPix() {
 
   return (
     <Card>
-      <h2 className="mb-1 text-lg text-salvia">Minhas chaves Pix</h2>
+      <h2 className="mb-1 flex items-center gap-2 text-lg text-salvia">
+        <KeyRound strokeWidth={1.75} className="size-5" aria-hidden />
+        Minhas chaves Pix
+      </h2>
       <p className="mb-4 text-sm text-tinta-2">
         Cadastre suas chaves para escolhê-las ao criar um combinado a receber. A padrão
         vem pré-selecionada.
@@ -350,32 +395,42 @@ function GerenciadorChavesPix() {
           <Spinner className="size-5" />
         </div>
       ) : lista.length === 0 ? (
-        <p className="py-4 text-center text-sm text-tinta-2">Nenhuma chave registrada.</p>
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-linha bg-papel-2/60 px-4 py-8 text-center">
+          <KeyRound strokeWidth={1.75} className="size-6 text-salvia" aria-hidden />
+          <p className="text-sm text-tinta-2">Nenhuma chave registrada ainda.</p>
+          <Button type="button" variante="ghost" onClick={() => setAba('cadastrar')}>
+            Cadastrar a primeira
+          </Button>
+        </div>
       ) : (
         <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
           {lista.map((c) => (
             <li
               key={c.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-linha px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-xl border border-linha bg-papel-2/40 px-3.5 py-3"
             >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm text-tinta">
-                    {[c.banco, ROTULO_TIPO_CHAVE[c.tipo]].filter(Boolean).join(' · ')}
-                  </span>
-                  {c.padrao && (
-                    <span className="shrink-0 rounded-full bg-salvia/10 px-2 py-0.5 text-xs text-salvia">
-                      padrão
-                    </span>
-                  )}
-                </div>
-                {c.titular && (
-                  <span className="block truncate text-xs text-tinta-2">{c.titular}</span>
-                )}
-                <span className="block truncate text-xs text-tinta-2">
-                  {c.chave}
-                  {c.rotulo ? ` · ${c.rotulo}` : ''}
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  aria-hidden
+                  className="flex size-9 flex-none items-center justify-center rounded-lg bg-salvia-claro text-salvia"
+                >
+                  <KeyRound strokeWidth={1.75} className="size-4" />
                 </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-tinta">
+                      {[c.banco, ROTULO_TIPO_CHAVE[c.tipo]].filter(Boolean).join(' · ')}
+                    </span>
+                    {c.padrao && <Badge tom="marca">Padrão</Badge>}
+                  </div>
+                  {c.titular && (
+                    <span className="block truncate text-xs text-tinta-2">{c.titular}</span>
+                  )}
+                  <span className="mt-0.5 block truncate text-xs text-tinta-2">
+                    {c.chave}
+                    {c.rotulo ? ` · ${c.rotulo}` : ''}
+                  </span>
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 {!c.padrao && (
@@ -384,9 +439,10 @@ function GerenciadorChavesPix() {
                     variante="ghost"
                     onClick={() => tornarPadrao(c)}
                     disabled={atualizar.isPending}
+                    aria-label="Tornar padrão"
                   >
                     <Star strokeWidth={1.75} className="size-4" />
-                    Tornar padrão
+                    <span className="max-sm:sr-only">Tornar padrão</span>
                   </Button>
                 )}
                 <Button

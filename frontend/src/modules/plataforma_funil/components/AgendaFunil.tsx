@@ -1,8 +1,8 @@
 // Agenda de follow-ups: atrasados primeiro (sempre entram), depois os proximos N dias agrupados por
 // dia (America/Sao_Paulo). Por padrao so os do operador logado; "Equipe toda" mostra todos.
 import { useMemo, useState } from 'react'
-import { CalendarCheck } from 'lucide-react'
-import { Badge, Button, EmptyState, SegmentedControl, Skeleton } from '@/shared/ui'
+import { AlertTriangle, CalendarCheck, Clock } from 'lucide-react'
+import { Badge, Button, EmptyState, SegmentedControl, Skeleton, cn } from '@/shared/ui'
 import { diaSaoPaulo, formatarData, formatarHora } from '@/shared/format'
 import type { AgendaFollowUpDto } from '@/shared/contracts/_generated/plataforma_funil'
 import { useAgenda } from '../api'
@@ -29,6 +29,14 @@ function dia(iso: string): string {
   }
 }
 
+/** Rotulo relativo do dia (Hoje/Amanha) ou a data formatada. */
+function rotuloDia(chave: string, iso: string): string {
+  const agora = Date.now()
+  if (chave === dia(new Date(agora).toISOString())) return 'Hoje'
+  if (chave === dia(new Date(agora + 86_400_000).toISOString())) return 'Amanhã'
+  return formatarData(iso)
+}
+
 export function AgendaFunil({ aoAbrir }: { aoAbrir: (id: string) => void }) {
   const [dias, setDias] = useState('7')
   const [escopo, setEscopo] = useState<'meus' | 'todos'>('meus')
@@ -49,7 +57,13 @@ export function AgendaFunil({ aoAbrir }: { aoAbrir: (id: string) => void }) {
   }, [agenda.data])
 
   const linha = (f: AgendaFollowUpDto) => (
-    <li key={f.atividade_id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-linha bg-cartao p-4">
+    <li
+      key={f.atividade_id}
+      className={cn(
+        'flex flex-wrap items-center justify-between gap-3 rounded-card border bg-cartao p-4',
+        f.atrasado ? 'border-linha border-l-2 border-l-barro' : 'border-linha',
+      )}
+    >
       <button
         type="button"
         onClick={() => aoAbrir(f.prospecto_id)}
@@ -60,9 +74,12 @@ export function AgendaFunil({ aoAbrir }: { aoAbrir: (id: string) => void }) {
           <Badge tom={TOM_ESTAGIO[f.estagio]}>{ROTULO_ESTAGIO[f.estagio]}</Badge>
           {f.atrasado && <Badge tom="erro">Atrasado</Badge>}
         </span>
-        <span className="mt-0.5 block text-xs text-tinta-2">
-          {formatarData(f.agendada_para)} às {formatarHora(f.agendada_para)}
-          {f.descricao ? ` · ${f.descricao}` : ''}
+        <span className="mt-1 flex items-center gap-1.5 text-xs text-tinta-2">
+          <Clock className="size-3.5 flex-none" aria-hidden />
+          <span>
+            {formatarData(f.agendada_para)} às {formatarHora(f.agendada_para)}
+            {f.descricao ? ` · ${f.descricao}` : ''}
+          </span>
         </span>
       </button>
       <Button
@@ -101,13 +118,22 @@ export function AgendaFunil({ aoAbrir }: { aoAbrir: (id: string) => void }) {
 
       {atrasados.length > 0 && (
         <section aria-label="Follow-ups atrasados" className="flex flex-col gap-2">
-          <h3 className="text-sm font-bold text-barro">Atrasados ({atrasados.length})</h3>
+          <h3 className="flex items-center gap-2 text-sm font-bold text-barro">
+            <AlertTriangle className="size-4 flex-none" aria-hidden />
+            Atrasados
+            <Badge tom="erro">{atrasados.length}</Badge>
+          </h3>
           <ul className="flex flex-col gap-2">{atrasados.map(linha)}</ul>
         </section>
       )}
       {porDia.map(([d, itens]) => (
         <section key={d} aria-label={`Follow-ups de ${formatarData(itens[0]!.agendada_para)}`} className="flex flex-col gap-2">
-          <h3 className="text-sm font-bold text-tinta-2">{formatarData(itens[0]!.agendada_para)}</h3>
+          <h3 className="flex items-baseline gap-2 text-sm font-bold text-tinta">
+            {rotuloDia(d, itens[0]!.agendada_para)}
+            <span className="text-xs font-normal text-tinta-2">
+              {itens.length} {itens.length === 1 ? 'follow-up' : 'follow-ups'}
+            </span>
+          </h3>
           <ul className="flex flex-col gap-2">{itens.map(linha)}</ul>
         </section>
       ))}

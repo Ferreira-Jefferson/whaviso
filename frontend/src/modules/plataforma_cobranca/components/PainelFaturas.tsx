@@ -1,7 +1,7 @@
 // Faturas (operador): filtros por situacao e competencia, baixa manual (conferencia do Pix) e
 // cancelamento. Baixa com `reativar` so reativa se nao restam faturas atrasadas (decide o servidor).
 import { useMemo, useState } from 'react'
-import { Receipt } from 'lucide-react'
+import { AlertTriangle, Receipt, Wallet } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import {
   Badge,
@@ -65,6 +65,12 @@ export function PainelFaturas() {
   const itens = lista.data ?? []
   const nomeConta = (id: string) => nomes.data?.get(id) ?? `Conta ${idCurto(id)}`
 
+  // Resumo da lista visivel (o filtro define o que entra). O que ainda aguarda baixa e o dinheiro
+  // acionavel do operador, por isso ganha destaque acima da tabela. So apresentacao.
+  const pendentes = itens.filter((f) => faturaPendente(f.status))
+  const totalPendente = pendentes.reduce((soma, f) => soma + f.valor_centavos, 0)
+  const qtdAtrasadas = pendentes.filter((f) => f.status === 'atrasada').length
+
   const colunas: ReadonlyArray<ColunaTabela<FaturaDTO>> = [
     { chave: 'conta', titulo: 'Conta', principal: true, render: (f) => <span className="font-medium">{nomeConta(f.conta_id)}</span> },
     { chave: 'competencia', titulo: 'Competência', render: (f) => <span className="text-tinta-2">{competenciaLonga(f.competencia)}</span> },
@@ -87,11 +93,11 @@ export function PainelFaturas() {
       alinhar: 'direita',
       render: (f) =>
         faturaPendente(f.status) ? (
-          <span className="flex flex-wrap justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-            <Button variante="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setPagando(f)}>
+          <span className="flex flex-wrap justify-end gap-2 max-md:w-full" onClick={(e) => e.stopPropagation()}>
+            <Button variante="secondary" className="min-h-9 px-3 py-1.5 max-md:flex-1" onClick={() => setPagando(f)}>
               Dar baixa
             </Button>
-            <Button variante="ghost" className="min-h-9 px-3 py-1.5" onClick={() => setCancelando(f)}>
+            <Button variante="ghost" className="min-h-9 px-3 py-1.5 max-md:flex-1" onClick={() => setCancelando(f)}>
               Cancelar
             </Button>
           </span>
@@ -101,9 +107,26 @@ export function PainelFaturas() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Select ariaLabel="Filtrar por situação" value={status} onChange={setStatus} options={OPCOES_STATUS} className="w-full sm:w-52" />
-        <Select ariaLabel="Filtrar por competência" value={competencia} onChange={setCompetencia} options={opcoesCompetencia} className="w-full sm:w-56" />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select ariaLabel="Filtrar por situação" value={status} onChange={setStatus} options={OPCOES_STATUS} className="w-full sm:w-52" />
+          <Select ariaLabel="Filtrar por competência" value={competencia} onChange={setCompetencia} options={opcoesCompetencia} className="w-full sm:w-56" />
+        </div>
+        {lista.isSuccess && pendentes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-tinta-2">
+            <Wallet className="size-4 flex-none text-ambar" strokeWidth={1.75} aria-hidden />
+            <MoneyText centavos={totalPendente} className="text-ambar" />
+            <span>
+              a receber em {pendentes.length} {pendentes.length === 1 ? 'fatura' : 'faturas'}
+            </span>
+            {qtdAtrasadas > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-pill bg-barro/10 px-2.5 py-0.5 text-xs font-bold text-barro">
+                <AlertTriangle className="size-3.5" strokeWidth={2} aria-hidden />
+                {qtdAtrasadas} {qtdAtrasadas === 1 ? 'atrasada' : 'atrasadas'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {lista.isPending && (

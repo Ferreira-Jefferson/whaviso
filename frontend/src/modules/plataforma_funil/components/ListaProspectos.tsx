@@ -103,6 +103,11 @@ export function ListaProspectos({ aoAbrir }: { aoAbrir: (id: string) => void }) 
       )}
       {lista.isSuccess && itens.length > 0 && (
         <>
+          <p className="text-xs text-tinta-2" aria-live="polite">
+            {itens.length} {itens.length === 1 ? 'prospecto' : 'prospectos'}
+            {lista.hasNextPage ? ' carregados' : ''}
+            {filtrando ? ' no filtro atual' : ''}
+          </p>
           <TableResponsive colunas={COLUNAS} linhas={itens} chaveLinha={(p) => p.id} onRowClick={(p) => aoAbrir(p.id)} legenda="Prospectos" />
           {lista.hasNextPage && (
             <div className="flex justify-center">

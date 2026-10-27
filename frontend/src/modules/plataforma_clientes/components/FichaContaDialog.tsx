@@ -4,7 +4,11 @@
 import type { ReactNode } from 'react'
 import { Badge, Dialog, Button, Skeleton } from '@/shared/ui'
 import { brl, formatarData, formatarDataHora } from '@/shared/format'
-import type { PlataformaContaFicha } from '@/shared/contracts/_generated/plataforma_clientes'
+import type {
+  PlataformaContaFicha,
+  PlataformaLojaResumo,
+} from '@/shared/contracts/_generated/plataforma_clientes'
+import type { StatusNumero } from '@/shared/contracts/_generated/enums'
 import { useFichaConta } from '../api'
 import {
   ROTULO_PAPEL_MEMBRO,
@@ -13,9 +17,18 @@ import {
   ROTULO_STATUS_NUMERO,
   TOM_SAUDE,
   TOM_SITUACAO,
+  type TomBadge,
   idCurto,
 } from '../rotulos'
 import { AreaErro } from './AreaErro'
+import { Monograma } from './Monograma'
+
+/** Tom do selo de status do numero (apresentacao; nunca expoe o numero em si). */
+const TOM_STATUS_NUMERO: Record<StatusNumero, TomBadge> = {
+  conectado: 'sucesso',
+  pausado: 'atencao',
+  removido: 'neutro',
+}
 
 interface Props {
   contaId: string | null
@@ -65,15 +78,20 @@ function Conteudo({ ficha }: { ficha: PlataformaContaFicha }) {
 
   return (
     <div className="text-tinta">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge tom={TOM_SITUACAO[ficha.situacao]}>{ROTULO_SITUACAO[ficha.situacao]}</Badge>
-        <Badge tom={TOM_SAUDE[ficha.saude_whatsapp]}>{ROTULO_SAUDE[ficha.saude_whatsapp]}</Badge>
-        <span className="text-xs text-tinta-2">Cliente desde {formatarData(ficha.criado_em)}</span>
+      <div className="flex items-center gap-3">
+        <Monograma nome={ficha.nome} className="size-11" />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tom={TOM_SITUACAO[ficha.situacao]}>{ROTULO_SITUACAO[ficha.situacao]}</Badge>
+            <Badge tom={TOM_SAUDE[ficha.saude_whatsapp]}>{ROTULO_SAUDE[ficha.saude_whatsapp]}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-tinta-2">Cliente desde {formatarData(ficha.criado_em)}</p>
+        </div>
       </div>
 
       <Secao titulo="Assinatura">
         {a ? (
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 rounded-input border border-linha bg-papel-2 p-4 text-sm sm:grid-cols-2">
             <Linha rotulo="Situação" valor={ROTULO_SITUACAO[a.status]} />
             <Linha rotulo="Valor mensal" valor={brl(a.valor_mensal_centavos)} />
             <Linha rotulo="Vencimento" valor={`Todo dia ${a.dia_vencimento}`} />
@@ -93,17 +111,7 @@ function Conteudo({ ficha }: { ficha: PlataformaContaFicha }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {ficha.lojas.map((l) => (
-              <li key={l.id} className="rounded-input border border-linha p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{l.nome}</span>
-                  {!l.ativo && <Badge tom="neutro">Desativada pela loja</Badge>}
-                </div>
-                <p className="mt-1 text-xs text-tinta-2">
-                  {l.numero
-                    ? `WhatsApp: ${ROTULO_STATUS_NUMERO[l.numero.status]}, ${l.numero.verificado ? 'verificado' : 'não verificado'}, cadastrado em ${formatarData(l.numero.criado_em)}`
-                    : 'Sem número de WhatsApp'}
-                </p>
-              </li>
+              <LojaItem key={l.id} loja={l} />
             ))}
           </ul>
         )}
@@ -131,6 +139,29 @@ function Conteudo({ ficha }: { ficha: PlataformaContaFicha }) {
         <p className="mt-2 text-xs text-tinta-2">Por privacidade, o console não mostra contato nem dados de uso da loja.</p>
       </Secao>
     </div>
+  )
+}
+
+function LojaItem({ loja }: { loja: PlataformaLojaResumo }) {
+  return (
+    <li className="rounded-input border border-linha p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{loja.nome}</span>
+        {!loja.ativo && <Badge tom="neutro">Desativada pela loja</Badge>}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tinta-2">
+        {loja.numero ? (
+          <>
+            <Badge tom={TOM_STATUS_NUMERO[loja.numero.status]}>{ROTULO_STATUS_NUMERO[loja.numero.status]}</Badge>
+            <span>{loja.numero.verificado ? 'Verificado' : 'Não verificado'}</span>
+            <span aria-hidden>·</span>
+            <span>desde {formatarData(loja.numero.criado_em)}</span>
+          </>
+        ) : (
+          <span>Sem número de WhatsApp</span>
+        )}
+      </div>
+    </li>
   )
 }
 

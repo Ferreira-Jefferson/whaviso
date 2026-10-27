@@ -2,7 +2,7 @@
 // (soft-delete). Categoria é organização interna do dono; nunca vai para o devedor.
 // TODO(pivo): vira categoria de cardápio; o modal "ver combinados" (legado) foi removido.
 import { useState } from 'react'
-import { Archive, Check, Pencil, X } from 'lucide-react'
+import { Archive, Check, Pencil, Tags, X } from 'lucide-react'
 import {
   Banner,
   Button,
@@ -10,6 +10,7 @@ import {
   EmptyState,
   Field,
   Input,
+  PageHeader,
   Spinner,
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
@@ -82,9 +83,10 @@ export default function CategoriasPage() {
 
   return (
     <div>
-      <p className="mb-4 text-sm text-tinta-2">
-        Organize seus combinados por marca ou linha. Só você vê; nunca aparece para a outra pessoa.
-      </p>
+      <PageHeader
+        titulo="Categorias"
+        descricao="Organize seus combinados por marca ou linha. Só você vê; nunca aparece para a outra pessoa."
+      />
 
       {erro && (
         <Banner tom="erro" className="mb-4">
@@ -123,6 +125,7 @@ export default function CategoriasPage() {
           onClick={criarCategoria}
           loading={criar.isPending}
           disabled={!nome.trim()}
+          className="w-full sm:w-auto"
         >
           Criar
         </Button>
@@ -135,11 +138,16 @@ export default function CategoriasPage() {
         </div>
       ) : categorias.length === 0 ? (
         <EmptyState
+          icone={<Tags className="size-7" aria-hidden />}
           titulo="Nenhuma categoria ainda"
           descricao="Crie a primeira acima (ex.: uma para cada marca que você revende)."
         />
       ) : (
-        <Card className="flex flex-col divide-y divide-linha p-0">
+        <>
+          <p className="mb-3 text-sm text-tinta-2">
+            {categorias.length} {categorias.length === 1 ? 'categoria' : 'categorias'}
+          </p>
+          <Card className="flex flex-col divide-y divide-linha p-0">
           {categorias.map((c) => (
             <div key={c.id} className="flex items-center gap-3 px-4 py-3">
               {editId === c.id ? (
@@ -203,7 +211,8 @@ export default function CategoriasPage() {
               )}
             </div>
           ))}
-        </Card>
+          </Card>
+        </>
       )}
 
       <p className="mt-4 text-xs text-tinta-2">

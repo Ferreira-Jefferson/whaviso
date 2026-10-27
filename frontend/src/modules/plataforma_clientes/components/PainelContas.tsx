@@ -23,6 +23,7 @@ import { useContas } from '../api'
 import { ROTULO_SAUDE, ROTULO_SITUACAO, TOM_SAUDE, TOM_SITUACAO } from '../rotulos'
 import { AreaErro } from './AreaErro'
 import { FichaContaDialog } from './FichaContaDialog'
+import { Monograma } from './Monograma'
 
 type FiltroSituacao = PlataformaSituacaoConta | 'todas'
 
@@ -32,7 +33,17 @@ const OPCOES_SITUACAO: ReadonlyArray<SelectOption<FiltroSituacao>> = [
 ]
 
 const COLUNAS: ReadonlyArray<ColunaTabela<PlataformaContaResumo>> = [
-  { chave: 'nome', titulo: 'Conta', principal: true, render: (c) => <span className="font-medium">{c.nome}</span> },
+  {
+    chave: 'nome',
+    titulo: 'Conta',
+    principal: true,
+    render: (c) => (
+      <span className="flex items-center gap-3">
+        <Monograma nome={c.nome} />
+        <span className="min-w-0 truncate font-medium text-tinta">{c.nome}</span>
+      </span>
+    ),
+  },
   {
     chave: 'situacao',
     titulo: 'Situação',
@@ -43,7 +54,7 @@ const COLUNAS: ReadonlyArray<ColunaTabela<PlataformaContaResumo>> = [
     titulo: 'Lojas ativas',
     render: (c) => (
       <span className="tabular text-tinta-2">
-        {c.qtd_lojas_ativas} de {c.qtd_lojas}
+        <span className="font-medium text-tinta">{c.qtd_lojas_ativas}</span> de {c.qtd_lojas}
       </span>
     ),
   },
@@ -116,6 +127,11 @@ export function PainelContas() {
 
       {lista.isSuccess && itens.length > 0 && (
         <>
+          <p className="text-sm text-tinta-2" aria-live="polite">
+            {`${itens.length} ${itens.length === 1 ? 'conta' : 'contas'}`}
+            {lista.hasNextPage ? (itens.length === 1 ? ' carregada' : ' carregadas') : ''}
+            {filtrando ? ' no filtro atual' : ''}
+          </p>
           <TableResponsive colunas={COLUNAS} linhas={itens} chaveLinha={(c) => c.id} onRowClick={(c) => setAberta(c.id)} legenda="Contas clientes" />
           {lista.hasNextPage && (
             <div className="flex justify-center">

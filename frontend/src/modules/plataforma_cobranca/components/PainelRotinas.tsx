@@ -1,6 +1,7 @@
 // Rotinas de cobranca (execucao manual pelo operador). Ambas sao idempotentes no servidor e tem
 // limite de uso por minuto; o agendamento automatico e infraestrutura, fora desta tela.
 import { useMemo, useState } from 'react'
+import { AlarmClock, ReceiptText } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { Banner, Button, Card, ConfirmDialog, Field, Select, useToast, type SelectOption } from '@/shared/ui'
 import { useApurarAtrasos, useGerarFaturas } from '../api'
@@ -48,11 +49,16 @@ function CartaoGerar() {
 
   return (
     <Card className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg text-salvia">Gerar faturas do mês</h2>
-        <p className="mt-1 text-sm text-tinta-2">
-          Cria a fatura de cada assinatura ativa na competência escolhida. Quem está em teste não é cobrado. Rodar de novo não duplica nada.
-        </p>
+      <div className="flex items-start gap-3">
+        <span className="inline-flex size-10 flex-none items-center justify-center rounded-full bg-salvia/10 text-salvia">
+          <ReceiptText className="size-5" strokeWidth={1.75} aria-hidden />
+        </span>
+        <div>
+          <h2 className="text-lg text-salvia">Gerar faturas do mês</h2>
+          <p className="mt-1 text-sm text-tinta-2">
+            Cria a fatura de cada assinatura ativa na competência escolhida. Quem está em teste não é cobrado. Rodar de novo não duplica nada.
+          </p>
+        </div>
       </div>
       <Field label="Competência">
         <Select ariaLabel="Competência" value={competencia} onChange={setCompetencia} options={opcoes} />
@@ -101,12 +107,17 @@ function CartaoApurar() {
 
   return (
     <Card className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg text-salvia">Apurar atrasos</h2>
-        <p className="mt-1 text-sm text-tinta-2">
-          Marca como atrasadas as faturas vencidas e suspende a assinatura que passou da carência (7 dias). Uma assinatura suspensa
-          faz a loja parar de atender até ser reativada.
-        </p>
+      <div className="flex items-start gap-3">
+        <span className="inline-flex size-10 flex-none items-center justify-center rounded-full bg-ambar/10 text-ambar">
+          <AlarmClock className="size-5" strokeWidth={1.75} aria-hidden />
+        </span>
+        <div>
+          <h2 className="text-lg text-salvia">Apurar atrasos</h2>
+          <p className="mt-1 text-sm text-tinta-2">
+            Marca como atrasadas as faturas vencidas e suspende a assinatura que passou da carência (7 dias). Uma assinatura suspensa
+            faz a loja parar de atender até ser reativada.
+          </p>
+        </div>
       </div>
       {erro && <Banner tom="erro">{erro}</Banner>}
       {r && (

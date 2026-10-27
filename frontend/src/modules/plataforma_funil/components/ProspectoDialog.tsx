@@ -1,7 +1,7 @@
 // Detalhe do prospecto (operador): contato (telefone em claro so aqui, para ligar), estagio com
 // historico, vinculo com a conta e linha do tempo de atividades (append-only) com follow-ups.
 import { useMemo, useState, type ReactNode } from 'react'
-import { Pencil, Phone } from 'lucide-react'
+import { Pencil, Phone, UserRound } from 'lucide-react'
 import {
   Badge,
   Banner,
@@ -110,7 +110,10 @@ function Conteudo({ prospecto: p, aoFechar }: { prospecto: ProspectoDetalhe; aoF
       <div className="flex flex-wrap items-center gap-2">
         <Badge tom={TOM_ESTAGIO[p.estagio]}>{ROTULO_ESTAGIO[p.estagio]}</Badge>
         {p.conta_nome && <Badge tom="sucesso">Conta: {p.conta_nome}</Badge>}
-        <span className="text-xs text-tinta-2">Responsável: {p.responsavel_nome ?? 'sem responsável'}</span>
+        <span className="flex items-center gap-1.5 text-xs text-tinta-2">
+          <UserRound className="size-3.5 flex-none" aria-hidden />
+          {p.responsavel_nome ?? 'sem responsável'}
+        </span>
         <Button variante="ghost" className="ml-auto min-h-9 px-3 py-1.5" onClick={() => setEditando(true)}>
           <Pencil className="size-4" aria-hidden />
           Editar
@@ -345,9 +348,14 @@ function LinhaDoTempo({
       <ol className="flex flex-col gap-3 border-l border-linha pl-4">
         {itens.map((a) => {
           const emAberto = a.tipo === 'follow_up' && !concluidos.has(a.id)
+          const corPonto = emAberto
+            ? 'border-ambar bg-ambar'
+            : a.conclui_atividade_id != null
+              ? 'border-folha bg-folha'
+              : 'border-salvia bg-salvia'
           return (
             <li key={a.id} className="relative">
-              <span className="absolute -left-[21px] top-1.5 size-2.5 rounded-full border border-linha bg-cartao" aria-hidden />
+              <span className={`absolute -left-[21px] top-1.5 size-2.5 rounded-full border ${corPonto}`} aria-hidden />
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium">{ROTULO_ATIVIDADE[a.tipo]}</span>
                 {a.tipo === 'follow_up' && (
