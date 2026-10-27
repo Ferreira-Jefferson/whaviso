@@ -13,8 +13,14 @@ export const REDACT = {
 }
 
 // Headers de request so passam pela lista de sensiveis; res nao loga body.
-const reqSerializer = (req: Parameters<typeof stdSerializers.req>[0]) =>
-  redigir(stdSerializers.req(req))
+// O `url` do pino inclui a query string, que nao e nome de campo e pode carregar PII
+// (ex.: GET /v1/clientes?q=<telefone>). Logamos so o path; a query inteira e descartada (SEC-024).
+const reqSerializer = (req: Parameters<typeof stdSerializers.req>[0]) => {
+  const s = stdSerializers.req(req) as unknown as Record<string, unknown>
+  if (typeof s['url'] === 'string') s['url'] = (s['url'] as string).split('?')[0]
+  if ('query' in s) delete s['query']
+  return redigir(s)
+}
 
 export function criarLogger(
   nome: string,

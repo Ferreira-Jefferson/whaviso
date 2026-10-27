@@ -9,9 +9,13 @@ const NOMES_SENSIVEIS = new Set([
   'chave', 'chave_cifrada', 'master_key', 'secret', 'segredo',
   'senha', 'password', 'otp', 'codigo',
   'telefone', 'numero', 'pix', 'titular', 'banco',
+  // Convite de membro: o numero/token do convite nunca vai a log (SEC-024, F7).
+  'convite', 'numero_convite', 'token_convite',
+  // Conteudo de conversa com o cliente: texto/transcricao de mensagem nunca vai a log.
+  'conteudo', 'transcricao', 'texto',
 ])
 
-/** Nome sensivel: exato, `*_hash`, ou derivado de telefone/pix/token (ex.: pix_chave). */
+/** Nome sensivel: exato, `*_hash`, ou derivado de telefone/pix/token/convite (ex.: pix_chave). */
 export function campoSensivel(nome: string): boolean {
   const n = nome.toLowerCase()
   return (
@@ -21,7 +25,8 @@ export function campoSensivel(nome: string): boolean {
     n.startsWith('pix') ||
     n.endsWith('_token') ||
     n.endsWith('_secret') ||
-    n.endsWith('_cifrada')
+    n.endsWith('_cifrada') ||
+    n.endsWith('_convite')
   )
 }
 
