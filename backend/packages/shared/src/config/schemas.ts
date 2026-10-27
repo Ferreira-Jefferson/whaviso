@@ -23,6 +23,8 @@ export const envApiSchema = envBaseSchema.extend({
   DATABASE_URL: z.string().min(1, 'string de conexao do pooler (user whaviso_api)'),
   SUPABASE_URL: z.url(),
   APP_URL: z.url().describe('origem do SPA (usada pelo CORS)'),
+  /** Conexao DIRETA/session p/ LISTEN do realtime (pooler em modo transacao nao suporta LISTEN). Default: DATABASE_URL. */
+  DATABASE_URL_LISTEN: z.string().min(1).optional(),
   /** Opcionais: por padrao derivados de SUPABASE_URL pelo verificador de F3. */
   SUPABASE_JWKS_URL: z.url().optional(),
   SUPABASE_ISSUER: z.url().optional(),

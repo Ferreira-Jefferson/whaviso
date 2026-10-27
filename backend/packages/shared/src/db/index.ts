@@ -7,6 +7,15 @@ import { traduzirErroPg } from './erros'
 
 export { sql, sqlBruto, ehConsulta, type Consulta } from './sql'
 export { ErroBanco, traduzirErroPg, type TipoErroBanco } from './erros'
+export {
+  notificar,
+  serializarEvento,
+  ErroNotificar,
+  CANAL_EVENTOS,
+  LIMITE_NOTIFY_BYTES,
+  type EventoParaNotificar,
+} from './notify'
+export { criarEscuta, type Escuta, type OpcoesEscuta } from './listen'
 
 export type Pool = pg.Pool
 export type PoolClient = pg.PoolClient

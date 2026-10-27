@@ -1,8 +1,8 @@
 # F5 realtime-sse
 
 - **ID:** F5  ·  **Área:** F  ·  **Onda:** 0
-- **Modelo sugerido:** Sonnet  ·  **Status:** `A FAZER`
-- **Reivindicado por:** (livre)
+- **Modelo sugerido:** Sonnet  ·  **Status:** `CONCLUIDO (aguardando revisao)`
+- **Reivindicado por:** F5-agent
 
 ## Objetivo
 
@@ -37,37 +37,37 @@ instância compartilham **uma** conexão `LISTEN`.
 
 ## Etapas
 
-- [ ] 1. Helper de publicação `notificar(canal, payload)` em `shared/db`: valida payload contra
+- [x] 1. Helper de publicação `notificar(canal, payload)` em `shared/db`: valida payload contra
   `EventoDominio` (strict, sem PII), serializa, garante `< 8000 bytes`, executa `pg_notify`.
   (commit: `feat(shared): publicador pg_notify validado por contrato`)
-- [ ] 2. Conexão dedicada de LISTEN (fora do pool de requisições) com **reconexão** e backoff, reinscrição
+- [x] 2. Conexão dedicada de LISTEN (fora do pool de requisições) com **reconexão** e backoff, reinscrição
   em `LISTEN` após queda, e evento interno "reconectou" para os clientes saberem que podem ter perdido
   eventos. (commit: `feat(shared): conexao LISTEN dedicada com reconexao`)
-- [ ] 3. Hub em memória: um `EventEmitter` por instância que recebe cada notificação, e roteia por
+- [x] 3. Hub em memória: um `EventEmitter` por instância que recebe cada notificação, e roteia por
   `loja_id` para os assinantes; limites de assinantes por loja e por usuário (anti-abuso, SEC-101).
   (commit: `feat(api): hub de realtime por loja`)
-- [ ] 4. Plugin SSE `GET /realtime/stream`: autenticado e com escopo de loja de F3; o `loja_id` ativo é
+- [x] 4. Plugin SSE `GET /realtime/stream`: autenticado e com escopo de loja de F3; o `loja_id` ativo é
   validado contra o conjunto do usuário; headers corretos (`text/event-stream`, `no-cache`, `X-Accel-
   Buffering: no` para nginx), **heartbeat** a cada ~25s (comentário SSE), `id:` por evento e suporte a
   `Last-Event-ID` (descarta se muito antigo e emite `evento: resync`).
   (commit: `feat(api): endpoint SSE por loja`)
-- [ ] 5. Filtro de autorização por evento: só entrega se `evento.loja_id` estiver no escopo do cliente
+- [x] 5. Filtro de autorização por evento: só entrega se `evento.loja_id` estiver no escopo do cliente
   **e** o papel do usuário puder ver aquele tipo (ex.: atendente não recebe evento de cobrança). Operador
   nunca recebe eventos de conteúdo de loja. (commit: `feat(api): autorizacao por evento no realtime`)
-- [ ] 6. Ciclo de vida: remover assinante ao fechar a conexão (`close`/`error`), limpar timers, graceful
+- [x] 6. Ciclo de vida: remover assinante ao fechar a conexão (`close`/`error`), limpar timers, graceful
   shutdown envia evento de fim e fecha. Sem vazamento de listeners.
   (commit: `feat(api): ciclo de vida e shutdown das conexoes SSE`)
-- [ ] 7. Teste de unidade do hub (roteamento, limites, remoção) e do publicador (rejeita PII, tamanho).
+- [x] 7. Teste de unidade do hub (roteamento, limites, remoção) e do publicador (rejeita PII, tamanho).
   (commit: `test(api): hub e publicador de realtime`)
-- [ ] 8. Teste de integração contra `whaviso_dev`: duas lojas, dois clientes SSE, `NOTIFY` da loja A chega
+- [x] 8. Teste de integração contra `whaviso_dev`: duas lojas, dois clientes SSE, `NOTIFY` da loja A chega
   só ao cliente A; derrubar a conexão LISTEN e ver reconexão + evento `resync`.
   (commit: `test(api): isolamento e reconexao do realtime (SEC-001)`)
-- [ ] 9. Teste de carga leve: 200 conexões simuladas usam 1 conexão LISTEN e memória estável.
+- [x] 9. Teste de carga leve: 200 conexões simuladas usam 1 conexão LISTEN e memória estável.
   (commit: `test(api): carga leve do realtime`)
-- [ ] 10. Documentar em AGENTS.md/MODULE.md: como um módulo publica (`notificar`), contrato do evento,
+- [x] 10. Documentar em AGENTS.md/MODULE.md: como um módulo publica (`notificar`), contrato do evento,
   regra "evento carrega referência, não dado". Configuração nginx de SSE anotada para a VPS.
   (commit: `docs(api): guia de realtime`)
-- [ ] 11. `npm run lint`, `typecheck`, `test` verdes.
+- [x] 11. `npm run lint`, `typecheck`, `test` verdes.
 
 ## Testes e segurança exigidos
 
@@ -81,6 +81,12 @@ instância compartilham **uma** conexão `LISTEN`.
 - **SEC-024**: payloads do NOTIFY e logs do hub não contêm telefone, token ou chave.
 
 ## Notas e decisões
+
+- **Implementacao (F5-agent):** `notificar(exec, evento)` e a conexao LISTEN (`criarEscuta`) vivem em `packages/shared/src/db/{notify,listen}.ts` (reexportados por `@whaviso/shared/db`); hub, permissoes por tipo e plugin SSE em `apps/api/src/shared/realtime/`; registrado em `app.ts` (nao em `routes.ts`, pois nao e modulo `/v1`). `DATABASE_URL_LISTEN` (opcional) adicionada a `envApiSchema`. Contratos de F1 reusados sem alteracao (o envelope nao tem `id`/`ref`: o id monotonico `<epoca>-<seq>` e atribuido pelo hub no SSE).
+- Loja ativa: header `x-loja-id` validado pelo F3 (fora do escopo = 404); sem header, o stream cobre todas as lojas do usuario.
+- `exp` do token e lido do JWT ja verificado por `autenticar` (o `Verificador` devolve so `sub`); sem `exp` = 401 (fail closed). Timer unico ate o `exp` encerra o stream com `fim`.
+- LISTEN abre sob demanda no 1o cliente SSE (testes e instancias sem clientes nao tocam o banco).
+- Resposta SSE usa `Connection: close` para nao deixar socket ocioso pendurado no shutdown.
 
 - Token do EventSource: `EventSource` do browser não envia header `Authorization`. Decisão: o front usa
   `fetch` com stream (biblioteca leve) para enviar o Bearer, em vez de colocar JWT em query string (que

@@ -16,6 +16,7 @@ import { criarAdminSupabase, type AdminSupabase } from './shared/supabase_admin'
 import { autenticarPlugin, criarVerificadorSupabase, type Verificador } from './shared/auth'
 import { escopoLojaPlugin, criarLeitorEscopoSql } from './shared/tenant'
 import { escopoOperadorPlugin } from './shared/operador'
+import { realtimePlugin } from './shared/realtime'
 import type { EnvApi } from './env'
 
 declare module 'fastify' {
@@ -87,7 +88,7 @@ export async function construirApp(deps: DepsApi) {
     // Funcao (nao string): origem estranha NAO recebe Access-Control-Allow-Origin.
     origin: (origem, cb) => cb(null, origem === undefined || origem === deps.env.APP_URL),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['authorization', 'content-type', 'x-loja-id'],
+    allowedHeaders: ['authorization', 'content-type', 'x-loja-id', 'last-event-id'],
   })
   // SEC-101: limite global por IP configuravel por env; por rota via
   // `config: { rateLimit: { max, timeWindow } }` (ver AGENTS.md).
@@ -104,6 +105,11 @@ export async function construirApp(deps: DepsApi) {
   await app.register(autenticarPlugin, { verificador })
   await app.register(escopoLojaPlugin, { leitor, auditoria: deps.pool })
   await app.register(escopoOperadorPlugin, { leitor })
+
+  // F5: SSE (GET /realtime/stream). LISTEN dedicado (conexao direta), aberto no 1o cliente.
+  await app.register(realtimePlugin, {
+    connectionString: deps.env.DATABASE_URL_LISTEN ?? deps.env.DATABASE_URL,
+  })
 
   app.get('/healthz', async (_req, reply): Promise<HealthDto> => {
     try {
