@@ -25,22 +25,9 @@ function intervalo(f: FaixaBase): [number, number] {
   const c = paraMinutos(f.fecha)
   return [a, c > a ? c : c + 1440]
 }
-
-/** true se faixas do mesmo dia se sobrepoem, ou se a virada de um dia invade o dia seguinte. */
-export function faixasSobrepostas(dias: readonly DiaBase[]): boolean {
-  const porDia = new Map<number, [number, number][]>()
-  for (const d of dias) porDia.set(d.dia, d.faixas.map(intervalo))
-  for (const [dia, ivs] of porDia) {
-    const ord = [...ivs].sort((x, y) => x[0] - y[0])
-    for (let i = 1; i < ord.length; i++) if (ord[i]![0] < ord[i - 1]![1]) return true
-    const resto = Math.max(0, ...ivs.map(([, f]) => f - 1440))
-    if (resto > 0) {
-      const prox = porDia.get((dia + 1) % 7) ?? []
-      if (prox.some(([a]) => a < resto)) return true
-    }
-  }
-  return false
-}
+// A deteccao de sobreposicao de faixas (`faixasSobrepostas`) vive no contrato
+// @whaviso/shared/contracts (lojas.ts), onde alimenta o refinement de `Horarios` e e
+// reemitida para o front. Aqui ficam so os calculos que dependem do fuso (aberta agora).
 
 const FMT = new Intl.DateTimeFormat('en-US', {
   timeZone: TZ,

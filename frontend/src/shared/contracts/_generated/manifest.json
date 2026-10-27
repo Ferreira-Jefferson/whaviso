@@ -1,13 +1,20 @@
 {
   "gerado_de": "backend/packages/shared/src/contracts",
   "arquivos": [
+    "cardapio.ts",
+    "clientes.ts",
+    "conta.ts",
+    "conversas.ts",
     "enums.ts",
     "eventos.ts",
     "index.ts",
+    "lojas.ts",
     "node.ts",
+    "numeros_whatsapp.ts",
+    "pedidos.ts",
     "pix.ts",
     "primitivos.ts",
     "sessao.ts"
   ],
-  "hash": "8e9907a676e7b31c63f6a67f7f1c8a802fefe731097e0d6323e0fc2370104932"
+  "hash": "45e662bffaf750eea0efec41c233565c7fad6ad2acc844f9822962d78fa3a4bf"
 }
