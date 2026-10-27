@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { BellLogo, Banner, Button, Field, Input } from '@/shared/ui'
 import { enviarCodigoWhatsapp, verificarCodigoWhatsapp } from '@/shared/supabase'
 import { mensagemDeErroAuth } from '@/shared/auth'
+import { GoogleLoginButton } from '@/modules/auth'
 import { telefoneBrParaE164 } from '@/shared/format'
 
 export default function Entrar() {
@@ -44,7 +45,9 @@ export default function Entrar() {
         </span>
         <h1 className="font-display text-3xl text-salvia">Entrar no Whaviso</h1>
         <p className="text-sm text-tinta-2">
-          {enviadoPara ? 'Digite o código que enviamos no seu WhatsApp.' : 'Enviamos um código pelo WhatsApp para você entrar.'}
+          {enviadoPara
+            ? 'Digite o código que enviamos no seu WhatsApp.'
+            : 'Entre com o Google ou receba um código no WhatsApp. O primeiro acesso já cria sua conta.'}
         </p>
       </div>
 
@@ -55,14 +58,22 @@ export default function Entrar() {
           </Banner>
         )}
         {!enviadoPara ? (
-          <form onSubmit={pedirCodigo} className="flex flex-col gap-4" noValidate>
-            <Field label="Seu WhatsApp" >
-              <Input id="telefone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(12) 99999-8888" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
-            </Field>
-            <Button type="submit" loading={ocupado}>
-              Enviar código
-            </Button>
-          </form>
+          <div className="flex flex-col gap-4">
+            <GoogleLoginButton onErro={setErro} />
+            <div className="flex items-center gap-3 text-xs text-tinta-2">
+              <span className="h-px flex-1 bg-linha" />
+              ou
+              <span className="h-px flex-1 bg-linha" />
+            </div>
+            <form onSubmit={pedirCodigo} className="flex flex-col gap-4" noValidate>
+              <Field label="Seu WhatsApp" >
+                <Input id="telefone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(12) 99999-8888" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+              </Field>
+              <Button type="submit" loading={ocupado}>
+                Enviar código
+              </Button>
+            </form>
+          </div>
         ) : (
           <form onSubmit={confirmar} className="flex flex-col gap-4" noValidate>
             <Field label="Código de 6 dígitos" >

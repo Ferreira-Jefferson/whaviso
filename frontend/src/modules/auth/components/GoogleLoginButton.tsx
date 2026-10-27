@@ -143,8 +143,9 @@ export function GoogleLoginButton({ onErro }: { onErro: (msg: string) => void })
               acaoLogin.onErro(mensagemDeErroAuth(error))
               return
             }
-            // O AuthProvider resolve o perfil; os guards levam à home/onboarding.
-            acaoLogin.navigate?.(acaoLogin.next ?? '/app', { replace: true })
+            // O AuthProvider resolve o perfil; '/' redireciona para a rota inicial
+            // (o RedirectSeLogado/registry decide a home), ou segue o next seguro.
+            acaoLogin.navigate?.(acaoLogin.next ?? '/', { replace: true })
           },
         })
         gisInicializado = true
