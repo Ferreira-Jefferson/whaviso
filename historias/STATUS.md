@@ -49,7 +49,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | ZAP-meta | shared/meta_client | Implementação `ClienteWhats` (Meta Cloud API, multi-WABA) | F2 | Opus | backend-zap/meta_client.md | CONCLUIDO (transporte endurecido vivo no envio e no webhook) |
 | ZAP-webhook | webhook_whatsapp | Inbound -> enfileira; recibos; idempotência `wamid` | F4, API-conversas, API-clientes, ZAP-meta | Opus | backend-zap/webhook_whatsapp.md | CONCLUIDO |
 | ZAP-enviar | enviar | Drena outbox `envios` -> Meta, claim SKIP LOCKED | ZAP-meta | Sonnet | backend-zap/enviar.md | CONCLUIDO |
-| AT-motor-min | motor_fluxo (hardcoded) | Grafo fixo do pedido por botões/regras, sem LLM | API-pedidos, API-cardapio, API-conversas, ZAP-enviar | Opus | backend-atendente/motor_fluxo.md | A FAZER |
+| AT-motor-min | motor_fluxo (hardcoded) | Grafo fixo do pedido por botões/regras, sem LLM | API-pedidos, API-cardapio, API-conversas, ZAP-enviar | Opus | backend-atendente/motor_fluxo.md | CONCLUIDO (revisao Opus: 1 critico + achados corrigidos e reverificados) |
 | FR-nucleo | telas do núcleo | Lojas, números, cardápio, pedidos (kanban), clientes, conversas | F6 + cada API-* da tela; **mock HTML + autoverificação visual** | Sonnet | frontend/nucleo.md | A FAZER |
 
 > **Onda 1, camada 1 integrada e no git (2026-10-27).** 7 modulos construidos em paralelo (cada um no
@@ -77,6 +77,16 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 > cardapio e a maquina de estados ao kernel e eliminar as copias em `pedidos` (BAIXO 2); a coluna de
 > claim do inbound (`0015_mensagens_processamento`) sera criada pelo `AT-motor-min` para o atendente
 > reivindicar mensagens com SKIP LOCKED.
+>
+> **Onda 1 BACKEND COMPLETO (2026-10-27):** AT-motor-min (motor determinístico do pedido) integrado,
+> migration `0015` criada e na matriz. Revisao independente achou 1 CRITICO (mensagem-veneno que
+> travaria a fila global) + 1 ALTO + 3 MEDIO; TODOS corrigidos e reverificados (anti-poison com
+> savepoint por turno; coleta de grupos min/max/dependente/opcional; frete do endereco novo; gate de
+> area). O laco do pedido anda ponta a ponta no backend: inbound -> motor -> pedido no kanban -> outbox
+> -> envio. Limitacoes documentadas do motor-min (nao-bloqueantes): sem 2o pedido na mesma conversa sem
+> handoff; `sugerivel` a nivel de item (cross-sell) adiado; gate de area so bloqueia bairro conhecido.
+> **Falta da Onda 1 so o FR-nucleo (telas).** Antes dele: promover os contratos Zod dos modulos para
+> `packages/shared/contracts` + `gen:contracts` (hoje cada modulo os tem locais em `schemas.ts`).
 
 ## Onda 2: IA no atendimento
 
