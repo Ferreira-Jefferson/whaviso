@@ -1,0 +1,1 @@
+export { canaisRoutes } from './routes'
