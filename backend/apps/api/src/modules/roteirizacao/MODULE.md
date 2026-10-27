@@ -33,7 +33,14 @@ Fonte de regra: `historias/backend-api/roteirizacao.md`.
   80 km da origem da loja vira falha; falha permanente grava `geocode_falha_em` (nova tentativa em 24h);
   erro retentavel (rate limit/transitorio) interrompe o lote sem marcar falha. Serial, com pausa (~1 req/s).
 - **ClienteMapas**: unica saida de rede (SEC-070). `criarRoteirizacaoRoutes(mapas)` recebe a implementacao;
-  o plugin padrao `roteirizacaoRoutes` usa `mapas_indisponivel` (nunca inventa coordenada): matriz cai em
-  linha reta (`estimado = true`) e geocode fica `pendente`.
+  o plugin padrao `roteirizacaoRoutes` injeta o provedor REAL `criarMapasOsm` (Nominatim p/ geocode + OSRM
+  p/ matriz/rota, em `@whaviso/shared/clientes`, via `fetchSeguro`) quando as vars `API_MAPAS_*` estao
+  configuradas; sem elas (dev/offline/testes) cai em `mapas_indisponivel` (nunca inventa coordenada): matriz
+  vira linha reta (`estimado = true`) e geocode fica `pendente`. Resiliencia na impl: limitador ~1 req/s no
+  Nominatim, teto de tempo por chamada e disjuntor por provedor (RES-001..003).
+  - Vars (convencao `API_*`, lidas no boot): `API_MAPAS_NOMINATIM_URL` (base HTTPS do Nominatim),
+    `API_MAPAS_OSRM_URL` (base HTTPS do OSRM), `API_MAPAS_CONTATO` (contato exigido pela politica do
+    Nominatim, compoe o User-Agent), `API_MAPAS_USER_AGENT` (opcional, User-Agent completo),
+    `API_MAPAS_TIMEOUT_MS` (opcional, default 8000), `API_MAPAS_INTERVALO_MS` (opcional, default 1000).
 - Sem origem configurada, a origem e o centroide das paradas (`origem_configurada = false`).
 - Pedidos ja com motoboy individual nao entram (mesmo criterio do painel do despacho).

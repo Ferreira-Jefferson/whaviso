@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import type { ClienteMapas } from '@whaviso/shared/clientes'
+import { criarMapasOsmDoAmbiente, type ClienteMapas } from '@whaviso/shared/clientes'
 import { HttpError } from '../../shared/http_errors'
 import { criarMapasIndisponivel } from './mapas_indisponivel'
 import {
@@ -64,5 +64,11 @@ export function criarRoteirizacaoRoutes(mapas: ClienteMapas, op: OpcoesServico =
   }
 }
 
-/** Plugin padrao do registry: sem provedor real injetado, degrada (linha reta; geocode pendente). */
-export const roteirizacaoRoutes: FastifyPluginAsync = criarRoteirizacaoRoutes(criarMapasIndisponivel())
+/**
+ * Plugin padrao do registry: injeta o ClienteMapas real (Nominatim + OSRM) quando as vars
+ * API_MAPAS_* estao configuradas; sem elas (dev/offline/testes), cai em `mapas_indisponivel`,
+ * que degrada para linha reta (haversine) e deixa o geocode pendente, sem inventar coordenada.
+ */
+export const roteirizacaoRoutes: FastifyPluginAsync = criarRoteirizacaoRoutes(
+  criarMapasOsmDoAmbiente() ?? criarMapasIndisponivel(),
+)
