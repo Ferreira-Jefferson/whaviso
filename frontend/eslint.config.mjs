@@ -51,7 +51,9 @@ const linguagem = {
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/dist/**', 'vite.config.ts', 'src/shared/contracts/_generated/**'],
+    // src/qa: harness de QA visual (dev-only, fora do build de producao). Nao segue as
+    // fronteiras feature-first (monta o shell real com providers fakes de proposito).
+    ignores: ['**/node_modules/**', '**/dist/**', 'vite.config.ts', 'src/shared/contracts/_generated/**', 'src/qa/**'],
   },
   ...tseslint.configs.recommended,
   {
