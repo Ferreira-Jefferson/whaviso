@@ -6,14 +6,20 @@ Unificar pedidos de canais externos (iFood e outros) no modelo `pedidos`, marcad
 loja (credencial cifrada, write-only) e, em `sincronizar`, puxa pedidos por trás da interface
 `ClienteCanal` (shared/clientes/canais.ts), revalida cada um e cria o pedido de forma idempotente.
 
-## DECISAO DO DONO PENDENTE
-O provedor real (iFood Merchant API direta ou agregador) NAO esta definido e a documentacao nao
-estava disponivel. Producao usa `StubClienteCanal`: `sincronizar` responde 501 `canal_nao_integrado`.
-Para integrar: implementar `ClienteCanal` (traduzir payload do provedor para `PedidoExterno`, usar
-`fetchSeguro` com `HOSTS_CANAL`, que e placeholder nao verificado) e trocar o stub em `config.ts`.
-Tambem decidir: (1) a api decifrar a credencial para o pull (como esta) ou mover o pull para um
-worker (mantendo a credencial write-only na api); (2) status do pedido do canal (hoje entra `novo`,
-sem cliente/PII); (3) tratamento de cancelamento/atualizacao de status no canal (fora do escopo).
+## Provedor de canal (default: iFood)
+Provedor padrao escolhido (decisao de engenharia, 2026-10-27): **iFood** (API oficial de parceiro),
+o canal pedido pela especificacao (G4) e o de maior adocao. A impl real (`criarCanalIfoodDoAmbiente`,
+em `@whaviso/shared/clientes`, arquivo `canais_ifood.ts`) entra atras de `ClienteCanal` via
+`config.ts` para o canal `ifood`, GATED por credencial de app: so com o par
+`API_CANAL_IFOOD_CLIENT_ID`/`API_CANAL_IFOOD_CLIENT_SECRET` (OAuth client_credentials, nivel app). Sem
+isso, `ifood` cai no `StubClienteCanal` (501 `canal_nao_integrado`); o canal generico `outro` segue
+sempre no stub. Fluxo: OAuth (token cacheado) -> polling de eventos escopado pelo `merchantId` (a
+credencial por loja, write-only, cifrada) -> eventos PLC viram `PedidoExterno` (detalhe do pedido,
+totais reconciliados) -> `confirmar` da o acknowledgment. Saida do iFood e revalidada por
+`PedidoExterno` (Zod estrito). **Go-live (honesto):** exige conta de parceiro iFood homologada;
+a mecanica esta verificada so por mock. Decisoes ainda abertas (nao bloqueiam): (1) mover o pull para
+um worker mantendo a credencial write-only; (2) status inicial do pedido do canal (hoje `novo`, sem
+PII); (3) cancelamento/atualizacao de status no canal (fora do escopo).
 
 ## Entry points (`canaisRoutes`, prefixo `canais`, `/v1/canais/*`)
 - `GET /` estado dos canais (sem credencial) · `GET /pedidos` mapa canal -> pedido

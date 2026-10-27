@@ -5,11 +5,18 @@ Emissao de NFC-e/NFS-e por um EMISSOR DE TERCEIRO (`ClienteFiscal`), sem motor f
 A loja cadastra o emissor (credencial cifrada, CNPJ, regime, series, ambiente); um pedido pede
 um documento; o emissor emite; guardamos status, chave e link.
 
-## DECISAO PENDENTE DO DONO
-Qual provedor de emissor usar ainda NAO foi escolhido. Hoje `config.ts` liga o stub
-`emissorNaoConfigurado` (erro Permanente `emissor_nao_configurado`: o documento fica `erro`).
-Escolhido o provedor, implementar `ClienteFiscal` (com `fetchSeguro` + allowlist de host) e trocar
-em `config.ts`. A suite `contratoClienteFiscal` (`@whaviso/shared/clientes/testing`) valida a impl.
+## Provedor de emissor (default: Focus NFe)
+Provedor padrao escolhido (decisao de engenharia, 2026-10-27): **Focus NFe** (REST documentado,
+idempotencia nativa por `ref`, ambiente por host, auth por token). A impl real
+(`criarFiscalFocusDoAmbiente`, em `@whaviso/shared/clientes`, arquivo `fiscal_focus.ts`) entra atras
+de `ClienteFiscal` via `config.ts`, GATED por ambiente: so com `API_FISCAL_PROVEDOR=focusnfe`. Sem
+isso (dev/offline/testes), `config.ts` mantem o stub `emissorNaoConfigurado` (erro Permanente
+`emissor_nao_configurado`: o documento fica `erro`). A suite `contratoClienteFiscal`
+(`@whaviso/shared/clientes/testing`) valida stub, fake e a impl real (testes com HTTP mockado).
+Trocar de provedor = nova impl atras de `ClienteFiscal`, sem tocar no resto do modulo.
+**Go-live (honesto):** exige uma conta Focus NFe (token por loja) e os atributos fiscais por item
+(NCM, CFOP, situacao tributaria) que o `ItemFiscal` minimo nao carrega hoje; a mecanica (ref,
+consulta de status, mapeamento de erro, credencial, SSRF) esta verificada so por mock.
 
 ## Regras de ouro
 - Credencial do emissor WRITE-ONLY na borda: so a entrada a carrega; saidas so tem `ultimos4`.

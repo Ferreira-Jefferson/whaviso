@@ -48,6 +48,10 @@ Alvo: a loja da assinatura, ou TODAS as lojas da conta quando `loja_id` e NULL.
 
 ## Decisoes
 
+- **Franquia + excedente (nota 2026-10-27):** segue preco MENSAL FIXO (`valor_mensal_centavos`),
+  conforme `historias/plataforma/cobranca.md` (fonte da verdade). Migrar para franquia + excedente
+  por evento, apoiado em `eventos_custo`, permanece uma DECISAO FUTURA DO DONO em aberto (rastreada
+  em REVISAO-PRODUTO); nada da logica de cobranca muda ate essa decisao.
 - **Franquia + excedente (STATUS.md):** o novo preco da Meta (out/2026) deve virar franquia +
   excedente por mensagem, apoiado em `eventos_custo` (modulo `API-custos`, futuro). Enquanto esse
   livro-razao nao existe, modelamos a **estrutura** de assinatura/fatura e a suspensao por trigger; o
