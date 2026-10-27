@@ -28,12 +28,14 @@ export async function reivindicar(pool: Pool, tamanhoLote: number): Promise<Envi
     pool,
     sql`
       with devidos as (
-        select id from public.envios
-        where status = 'agendado'
-          and agendado_para <= now()
-          and (proxima_tentativa_em is null or proxima_tentativa_em <= now())
-        order by agendado_para
-        for update skip locked
+        select e.id from public.envios e
+        join public.numeros_whatsapp n on n.id = e.numero_whatsapp_id
+        where e.status = 'agendado'
+          and e.agendado_para <= now()
+          and (e.proxima_tentativa_em is null or e.proxima_tentativa_em <= now())
+          and n.status = 'conectado'
+        order by e.agendado_para
+        for update of e skip locked
         limit ${tamanhoLote}
       )
       update public.envios e

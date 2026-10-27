@@ -71,6 +71,18 @@ describe.skipIf(!online)('ZAP-enviar: dreno da outbox', () => {
     expect(whats.chamadas[0]!.entrada).toMatchObject({ para: '+5511988887777' })
   })
 
+  it('numero pausado: o envio NAO e reivindicado (fica retido ate reativar, nao martela a Meta)', async () => {
+    const c = await cenario({ statusNumero: 'pausado' })
+    const id = await enfileirarTexto(c, 'ola')
+    const whats = new FakeClienteWhats()
+
+    const resumo = await drenarEnvios(deps(whats))
+
+    expect(resumo.reivindicados).toBe(0)
+    expect(whats.chamadas.length).toBe(0)
+    expect((await lerEnvio(id)).status).toBe('agendado')
+  })
+
   it('claim SKIP LOCKED: dois workers concorrentes enviam cada item UMA vez', async () => {
     const c = await cenario()
     const total = 5

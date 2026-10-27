@@ -91,8 +91,10 @@ async function processarEnvio(
   const para = resolverDestino(cifrado, deps.cifra)
   if (!para) return falhar(new Permanente('sem destino', { codigo: 'sem_destino' }))
 
-  // Guarda da janela de 24h: fora dela, so template (a escolha do template e de quem enfileira).
-  const ehTemplate = msg.data.tipo === 'template' || envio.template_chave !== null
+  // Guarda da janela de 24h: fora dela, so template. O que decide e o TIPO do payload (o que de
+  // fato sai), nao o template_chave: se a chave vier setada mas o payload for texto/interativo,
+  // nenhum template e resolvido e a mensagem sai como texto, entao a janela tem que valer.
+  const ehTemplate = msg.data.tipo === 'template'
   if (!ehTemplate) {
     const ultima = envio.conversa_id ? await repo.lerUltimaEntrada(pool, envio.conversa_id) : null
     if (!ultima || Date.now() - ultima.getTime() > JANELA_MS) {
@@ -137,13 +139,17 @@ export async function drenarEnvios(deps: DepsDreno): Promise<ResumoDreno> {
       else if (desfecho === 'reagendado') resumo.reagendados += 1
       else resumo.falhas += 1
     } catch (erro) {
-      // Erro inesperado no processamento (ex.: cifra/banco): reagenda sem perder o item e
-      // segue o lote. So id e mensagem no log; o payload/credencial nunca entram.
+      // Erro inesperado no processamento (ex.: cifra/banco corrompidos). Aplica o MESMO teto de
+      // tentativas do caminho normal, senao um item veneno reagendaria em loop infinito.
+      // So id e mensagem no log; o payload/credencial nunca entram.
       resumo.falhas += 1
       deps.logger.error({ err: erro, envio_id: envio.id }, 'falha ao processar envio')
-      await repo
-        .reagendar(deps.pool, envio.id, envio.tentativas + 1, cfg.retry.baseMs, 'Interno:processamento')
-        .catch(() => undefined)
+      const tentativa = envio.tentativas + 1
+      const desfecho =
+        tentativa >= cfg.maxTentativas
+          ? repo.marcarFalhou(deps.pool, envio.id, tentativa, 'Interno:processamento')
+          : repo.reagendar(deps.pool, envio.id, tentativa, cfg.retry.baseMs, 'Interno:processamento')
+      await desfecho.catch(() => undefined)
     }
   }
 
