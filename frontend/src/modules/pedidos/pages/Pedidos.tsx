@@ -139,9 +139,18 @@ export default function Pedidos() {
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-linha pb-4">
         <div>
           <h1 className="text-2xl text-salvia md:text-3xl">Pedidos</h1>
-          <p className="mt-1 text-sm text-tinta-2">Hoje, {formatarData(new Date(agora).toISOString())}. Atualiza sozinho quando um pedido muda.</p>
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-tinta-2">
+            <span className="inline-flex items-center gap-1.5 rounded-pill bg-folha/10 px-2 py-0.5 text-xs font-bold text-folha">
+              <span className="relative flex size-1.5" aria-hidden>
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-folha opacity-60" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-folha" />
+              </span>
+              Ao vivo
+            </span>
+            <span>Hoje, {formatarData(new Date(agora).toISOString())}. Atualiza sozinho quando um pedido muda.</span>
+          </p>
         </div>
-        <dl className="flex w-full justify-between gap-4 md:w-auto md:gap-6" aria-label="Resumo do dia">
+        <dl className="flex w-full items-stretch divide-x divide-linha overflow-hidden rounded-card border border-linha bg-cartao md:w-auto" aria-label="Resumo do dia">
           <Numero valor={total} rotulo="Pedidos" />
           <Numero valor={abertos} rotulo="Abertos" />
           <Numero valor={problemas} rotulo="Problemas" tom={problemas > 0 ? 'erro' : undefined} />
@@ -188,7 +197,7 @@ export default function Pedidos() {
                   <span
                     className={cn(
                       'rounded-pill px-1.5 text-xs font-bold tabular-nums',
-                      ativa ? 'bg-white/20 text-white' : c.chave === 'problema' && (colunas?.problema?.itens.length ?? 0) > 0 ? 'bg-barro/10 text-barro' : 'bg-papel-2',
+                      ativa ? 'bg-sobre-marca/20 text-sobre-marca' : c.chave === 'problema' && (colunas?.problema?.itens.length ?? 0) > 0 ? 'bg-barro/10 text-barro' : 'bg-papel-2 text-tinta-2',
                     )}
                   >
                     {colunas?.[c.chave]?.itens.length ?? 0}
@@ -251,10 +260,11 @@ export default function Pedidos() {
 }
 
 function Numero({ valor, rotulo, tom }: { valor: number; rotulo: string; tom?: 'erro' }) {
+  const alerta = tom === 'erro' && valor > 0
   return (
-    <div className="grid md:text-right">
-      <dd className={cn('order-1 font-display text-[22px] font-semibold leading-tight tabular-nums', tom === 'erro' && 'text-barro')}>{valor}</dd>
-      <dt className="order-2 text-xs font-bold uppercase tracking-[0.04em] text-tinta-2">{rotulo}</dt>
+    <div className={cn('flex flex-1 flex-col items-center gap-0.5 px-4 py-2 md:flex-none md:items-end md:px-5', alerta && 'bg-barro/5')}>
+      <dt className="order-2 text-[11px] font-bold uppercase tracking-[0.06em] text-tinta-2">{rotulo}</dt>
+      <dd className={cn('order-1 font-display text-[22px] font-semibold leading-none tabular-nums', alerta ? 'text-barro' : 'text-tinta')}>{valor}</dd>
     </div>
   )
 }

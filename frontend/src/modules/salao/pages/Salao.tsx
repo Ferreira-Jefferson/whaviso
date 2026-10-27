@@ -64,12 +64,12 @@ export default function Salao() {
         </div>
         <dl className="flex w-full justify-between gap-4 md:w-auto md:gap-6" aria-label="Resumo do salao">
           <Numero valor={resumo.ativas} rotulo="Mesas" />
-          <Numero valor={resumo.livres} rotulo="Livres" />
-          <Numero valor={resumo.ocupadas} rotulo="Ocupadas" />
+          <Numero valor={resumo.livres} rotulo="Livres" cor="text-folha" />
+          <Numero valor={resumo.ocupadas} rotulo="Ocupadas" cor="text-ambar" />
         </dl>
       </header>
 
-      <div className="mb-4 mt-3.5 flex justify-end">
+      <div className={cn('mb-4 mt-3.5 flex justify-end', temSelecao && 'max-md:hidden')}>
         <Button onClick={() => setDlgMesa({ aberto: true, mesa: null })} className="max-md:w-full">
           <Plus strokeWidth={1.75} className="size-4" aria-hidden />
           Nova mesa
@@ -95,7 +95,7 @@ export default function Salao() {
 
       {mesas.isSuccess && lista.length > 0 && (
         <div className="md:flex md:items-start md:gap-6">
-          <div className={cn('grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 md:flex-1', temSelecao && 'max-md:hidden')}>
+          <div className={cn('grid grid-cols-2 gap-3 sm:gap-3.5 lg:grid-cols-3 md:flex-1', temSelecao && 'max-md:hidden')}>
             {lista.map((mesa) => (
               <MesaCard
                 key={mesa.id}
@@ -136,10 +136,10 @@ export default function Salao() {
   )
 }
 
-function Numero({ valor, rotulo }: { valor: number; rotulo: string }) {
+function Numero({ valor, rotulo, cor }: { valor: number; rotulo: string; cor?: string }) {
   return (
     <div className="grid md:text-right">
-      <dd className="order-1 font-display text-[22px] font-semibold leading-tight tabular-nums">{valor}</dd>
+      <dd className={cn('order-1 font-display text-[22px] font-semibold leading-tight tabular-nums', cor)}>{valor}</dd>
       <dt className="order-2 text-xs font-bold uppercase tracking-[0.04em] text-tinta-2">{rotulo}</dt>
     </div>
   )
@@ -147,9 +147,9 @@ function Numero({ valor, rotulo }: { valor: number; rotulo: string }) {
 
 function Esqueleto() {
   return (
-    <div aria-busy="true" aria-label="Carregando mesas" className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+    <div aria-busy="true" aria-label="Carregando mesas" className="grid grid-cols-2 gap-3 sm:gap-3.5 lg:grid-cols-3">
       {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="rounded-card border border-linha bg-cartao p-4">
+        <div key={i} className="rounded-card border-y border-r border-linha border-l-4 border-l-linha bg-cartao p-4">
           <Skeleton className="h-6 w-1/2" />
           <Skeleton className="mt-3 h-4 w-1/3" />
           <Skeleton className="mt-4 h-11" />

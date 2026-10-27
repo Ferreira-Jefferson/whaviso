@@ -80,7 +80,7 @@ function NovoCargo() {
           setNome('')
           mostrarToast('Cargo criado.', { tom: 'sucesso' })
         },
-        onError: (e) => setErro(mensagem(e, 'Nao foi possivel criar o cargo.')),
+        onError: (e) => setErro(mensagem(e, 'Não foi possível criar o cargo.')),
       },
     )
   }
@@ -130,7 +130,7 @@ function LinhaCargo({ cargo }: { cargo: Cargo }) {
           setEditando(false)
           mostrarToast('Cargo atualizado.', { tom: 'sucesso' })
         },
-        onError: (e) => setErro(mensagem(e, 'Nao foi possivel salvar.')),
+        onError: (e) => setErro(mensagem(e, 'Não foi possível salvar.')),
       },
     )
   }
@@ -140,7 +140,7 @@ function LinhaCargo({ cargo }: { cargo: Cargo }) {
       { id: cargo.id, patch: { ativo: !cargo.ativo } },
       {
         onSuccess: () => mostrarToast(cargo.ativo ? 'Cargo arquivado.' : 'Cargo reativado.', { tom: 'sucesso' }),
-        onError: (e) => setErro(mensagem(e, 'Nao foi possivel mudar o status.')),
+        onError: (e) => setErro(mensagem(e, 'Não foi possível mudar o status.')),
       },
     )
   }
@@ -189,7 +189,7 @@ function LinhaCargo({ cargo }: { cargo: Cargo }) {
           Fixo do sistema
         </Badge>
       )}
-      {!cargo.sistema && cargo.loja_id == null && <Badge tom="neutro">Padrao</Badge>}
+      {!cargo.sistema && cargo.loja_id == null && <Badge tom="neutro">Padrão</Badge>}
       {!cargo.ativo && <Badge tom="neutro">Arquivado</Badge>}
 
       {podeEditar && (

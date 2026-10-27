@@ -43,12 +43,12 @@ export function InsumoDialog({ aberto, insumo, onFechar }: Props) {
   async function salvar() {
     const n = nome.trim()
     if (!n) {
-      setErro('De um nome para o insumo.')
+      setErro('Dê um nome para o insumo.')
       return
     }
     const min = minimo.trim() === '' ? 0 : parseQuantidade(minimo)
     if (min === null) {
-      setErro('Quantidade minima invalida.')
+      setErro('Quantidade mínima inválida.')
       return
     }
     setErro(null)
@@ -62,7 +62,7 @@ export function InsumoDialog({ aberto, insumo, onFechar }: Props) {
       } else {
         const ini = inicial.trim() === '' ? 0 : parseQuantidade(inicial)
         if (ini === null) {
-          setErro('Saldo inicial invalido.')
+          setErro('Saldo inicial inválido.')
           return
         }
         await criar.mutateAsync({
@@ -75,7 +75,7 @@ export function InsumoDialog({ aberto, insumo, onFechar }: Props) {
       }
       onFechar()
     } catch (e) {
-      setErro(e instanceof ApiError ? e.message : 'Nao foi possivel salvar o insumo.')
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar o insumo.')
     }
   }
 
@@ -99,7 +99,7 @@ export function InsumoDialog({ aberto, insumo, onFechar }: Props) {
       <div className="flex flex-col gap-4">
         {erro && <Banner tom="erro">{erro}</Banner>}
         <Field label="Nome">
-          <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Arroz, Carne moida" maxLength={120} autoFocus />
+          <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Arroz, Carne moída" maxLength={120} autoFocus />
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Unidade">
@@ -119,7 +119,7 @@ export function InsumoDialog({ aberto, insumo, onFechar }: Props) {
             <MoneyInput value={custo} onChange={setCusto} />
           </Field>
           {!insumo && (
-            <Field label="Saldo inicial" dica="Quanto ja tem em estoque hoje. Registra uma entrada.">
+            <Field label="Saldo inicial" dica="Quanto já tem em estoque hoje. Registra uma entrada.">
               <Input
                 value={inicial}
                 onChange={(e) => setInicial(e.target.value)}

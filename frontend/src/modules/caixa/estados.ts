@@ -57,6 +57,17 @@ export const CONFIG_MOVIMENTO: Record<TipoMovimentoManual, ConfigMovimento> = {
   },
 }
 
+/**
+ * Direcao do movimento na gaveta (apenas apresentacao, para sinal e cor na lista):
+ * 'entrada' soma (venda, suprimento), 'saida' subtrai (sangria). O 'ajuste' nao entra
+ * aqui: ele segue o sinal do proprio valor_centavos (pode ser + ou -).
+ */
+export const DIRECAO_MOVIMENTO: Record<'venda' | 'sangria' | 'suprimento', 'entrada' | 'saida'> = {
+  venda: 'entrada',
+  suprimento: 'entrada',
+  sangria: 'saida',
+}
+
 /** Tom da diferenca de fechamento: zero = bateu, positivo = sobra, negativo = falta. */
 export type TomDiferenca = 'exato' | 'sobra' | 'falta'
 

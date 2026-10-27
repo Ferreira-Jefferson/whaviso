@@ -80,7 +80,12 @@ export function ColunaKanban({
       <header className="relative hidden items-center gap-2 border-b border-linha px-3.5 pb-2.5 pt-3 md:flex">
         <span aria-hidden className={cn('absolute -top-px left-3.5 h-[3px] w-9 rounded-b-[3px]', FIO[chave])} />
         <h2 className="font-sans text-[15px] font-bold">{titulo}</h2>
-        <span className="ml-auto min-w-6.5 rounded-pill border border-linha bg-cartao px-2 text-center text-[13px] font-bold tabular-nums">
+        <span
+          className={cn(
+            'ml-auto min-w-6.5 rounded-pill border px-2 text-center text-[13px] font-bold tabular-nums',
+            problema && itens.length > 0 ? 'border-barro/25 bg-barro/10 text-barro' : 'border-linha bg-cartao text-tinta-2',
+          )}
+        >
           {itens.length}
           {temMais ? '+' : ''}
         </span>

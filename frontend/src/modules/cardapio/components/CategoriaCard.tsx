@@ -26,10 +26,10 @@ export function CategoriaCard({
     <section className="overflow-hidden rounded-card border border-linha bg-cartao">
       <header className="flex items-center gap-3 border-b border-linha bg-papel-2 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate font-display text-lg font-semibold text-salvia">{categoria.nome}</h2>
-            {!categoria.ativo && <Badge tom="neutro">Desligada</Badge>}
-            {categoria.ativo && !categoria.disponivel_agora && <Badge tom="atencao">Fora do horário</Badge>}
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="min-w-0 truncate font-display text-lg font-semibold text-salvia">{categoria.nome}</h2>
+            {!categoria.ativo && <Badge tom="neutro" className="shrink-0">Desligada</Badge>}
+            {categoria.ativo && !categoria.disponivel_agora && <Badge tom="atencao" className="shrink-0">Fora do horário</Badge>}
           </div>
           {categoria.descricao && <p className="mt-0.5 truncate text-xs text-tinta-2">{categoria.descricao}</p>}
         </div>
@@ -56,7 +56,7 @@ export function CategoriaCard({
           ))}
         </div>
       ) : (
-        <p className="px-4 py-5 text-sm text-tinta-2">Nenhum item nesta categoria ainda.</p>
+        <p className="px-4 py-6 text-center text-sm text-tinta-2">Nenhum item nesta categoria ainda.</p>
       )}
 
       <div className="border-t border-linha p-3">

@@ -56,7 +56,7 @@ export function ComandaPanel({ comandaId, aoLancarItem, aoFechada, aoVoltar }: P
           type="button"
           onClick={aoVoltar}
           aria-label="Fechar painel"
-          className="inline-flex size-9 flex-none items-center justify-center rounded-pill text-tinta-2 hover:bg-cartao focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia md:hidden"
+          className="inline-flex size-11 flex-none items-center justify-center rounded-pill text-tinta-2 hover:bg-cartao focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia md:hidden"
         >
           <X strokeWidth={1.75} className="size-4" aria-hidden />
         </button>

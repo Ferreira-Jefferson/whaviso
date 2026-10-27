@@ -3,6 +3,7 @@ import { Search, Users } from 'lucide-react'
 import { formatarData } from '@/shared/format'
 import {
   Button,
+  cn,
   EmptyState,
   ErrorState,
   Input,
@@ -11,6 +12,7 @@ import {
   type ColunaTabela,
 } from '@/shared/ui'
 import { useClientes, type ClienteItem } from '../api'
+import { AvatarCliente } from '../components/AvatarCliente'
 import { DetalheClienteDialog } from '../components/DetalheClienteDialog'
 
 const COLUNAS: ReadonlyArray<ColunaTabela<ClienteItem>> = [
@@ -18,12 +20,21 @@ const COLUNAS: ReadonlyArray<ColunaTabela<ClienteItem>> = [
     chave: 'nome',
     titulo: 'Cliente',
     principal: true,
-    render: (c) => <span className="font-medium">{c.nome ?? 'Cliente sem nome'}</span>,
+    render: (c) => (
+      <span className="flex items-center gap-3">
+        <AvatarCliente nome={c.nome} />
+        <span className={cn('min-w-0 truncate font-medium', c.nome ? 'text-tinta' : 'italic text-tinta-2')}>
+          {c.nome ?? 'Cliente sem nome'}
+        </span>
+      </span>
+    ),
   },
   {
     chave: 'telefone',
     titulo: 'Telefone',
-    render: (c) => <span className="tabular text-tinta-2">{c.telefone_mascarado ?? 'Nao informado'}</span>,
+    render: (c) => (
+      <span className="tabular-nums text-tinta-2">{c.telefone_mascarado ?? 'Nao informado'}</span>
+    ),
   },
   {
     chave: 'pedidos',
@@ -81,6 +92,10 @@ export default function Clientes() {
 
       {lista.isSuccess && itens.length > 0 && (
         <>
+          <p className="mb-3 text-sm text-tinta-2" aria-live="polite">
+            {itens.length}
+            {lista.hasNextPage ? '+' : ''} {itens.length === 1 ? 'cliente' : 'clientes'}
+          </p>
           <TableResponsive
             colunas={COLUNAS}
             linhas={itens}
@@ -136,7 +151,14 @@ function EsqueletoLista() {
   return (
     <div aria-busy="true" aria-label="Carregando clientes" className="mt-4 flex flex-col gap-3">
       {[0, 1, 2, 3, 4].map((i) => (
-        <Skeleton key={i} className="h-14 w-full" />
+        <div
+          key={i}
+          className="flex items-center gap-3 rounded-card border border-linha bg-cartao p-4 md:rounded-none md:border-0 md:border-b md:px-3 md:py-3"
+        >
+          <Skeleton className="size-9 flex-none rounded-full" />
+          <Skeleton className="h-4 w-40 max-w-[50%]" />
+          <Skeleton className="ml-auto hidden h-4 w-24 md:block" />
+        </div>
       ))}
     </div>
   )

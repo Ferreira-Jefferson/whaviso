@@ -85,6 +85,7 @@ export function MovimentoDialog({ aberto, tipo, carregando, erro, onConfirmar, o
               onChange={setForma}
               options={OPCOES_FORMA}
               ariaLabel="Forma de pagamento da venda"
+              preencher
             />
           </div>
         )}

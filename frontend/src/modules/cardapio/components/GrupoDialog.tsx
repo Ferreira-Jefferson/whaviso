@@ -6,6 +6,7 @@ import { Banner, Button, Dialog, Field, Input, Select } from '@/shared/ui'
 import type { TipoGrupo } from '@/shared/contracts/_generated/enums'
 import type { GrupoSaida } from '@/shared/contracts/_generated/cardapio'
 import { useAtualizarGrupo, useCriarGrupo } from '../api'
+import { CampoCheck } from './CampoCheck'
 import { OPCOES_TIPO_GRUPO } from '../estados'
 
 interface Props {
@@ -100,15 +101,7 @@ export function GrupoDialog({ aberto, grupo, onFechar }: Props) {
             <Input value={max} onChange={(e) => setMax(e.target.value)} inputMode="numeric" placeholder="Sem limite" />
           </Field>
         </div>
-        <label className="flex items-center gap-2.5 text-sm text-tinta">
-          <input
-            type="checkbox"
-            checked={obrigatorio}
-            onChange={(e) => setObrigatorio(e.target.checked)}
-            className="size-4 rounded border-linha text-salvia focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-          />
-          Escolha obrigatória
-        </label>
+        <CampoCheck checked={obrigatorio} onChange={setObrigatorio} titulo="Escolha obrigatória" />
       </div>
     </Dialog>
   )

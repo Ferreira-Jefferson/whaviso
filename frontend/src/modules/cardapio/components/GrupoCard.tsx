@@ -27,10 +27,10 @@ export function GrupoCard({
     <section className="overflow-hidden rounded-card border border-linha bg-cartao">
       <header className="flex items-center gap-3 border-b border-linha bg-papel-2 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate font-display text-lg font-semibold text-salvia">{grupo.nome}</h2>
-            <Badge tom="neutro">{ROTULO_TIPO_GRUPO[grupo.tipo]}</Badge>
-            {!grupo.ativo && <Badge tom="neutro">Desligado</Badge>}
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="min-w-0 truncate font-display text-lg font-semibold text-salvia">{grupo.nome}</h2>
+            <Badge tom="neutro" className="shrink-0">{ROTULO_TIPO_GRUPO[grupo.tipo]}</Badge>
+            {!grupo.ativo && <Badge tom="neutro" className="shrink-0">Desligado</Badge>}
           </div>
           <p className="mt-0.5 text-xs text-tinta-2">
             {regraEscolhas(grupo)}
@@ -60,7 +60,7 @@ export function GrupoCard({
           ))}
         </div>
       ) : (
-        <p className="px-4 py-5 text-sm text-tinta-2">Nenhuma opção neste grupo ainda.</p>
+        <p className="px-4 py-6 text-center text-sm text-tinta-2">Nenhuma opção neste grupo ainda.</p>
       )}
 
       <div className="border-t border-linha p-3">

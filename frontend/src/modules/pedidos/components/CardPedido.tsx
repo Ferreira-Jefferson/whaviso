@@ -44,9 +44,11 @@ export function CardPedido({ card, agora, destacado, ocupado, aoMarcarProblema, 
       }}
       onDragEnd={aoArrastarFim}
       className={cn(
-        'group relative rounded-card border bg-cartao',
+        'group relative rounded-card border bg-cartao transition-shadow',
         podeMover && 'md:cursor-grab md:active:cursor-grabbing',
-        destacado ? 'border-salvia shadow-[0_0_0_2px_var(--cor-primaria),0_6px_18px_rgba(30,77,59,0.14)]' : 'border-linha',
+        destacado
+          ? 'border-salvia shadow-[0_0_0_2px_var(--cor-primaria),0_8px_20px_-6px_rgba(32,50,42,0.18)]'
+          : 'border-linha shadow-[0_1px_2px_rgba(32,50,42,0.05)]',
       )}
     >
       {podeMover && (

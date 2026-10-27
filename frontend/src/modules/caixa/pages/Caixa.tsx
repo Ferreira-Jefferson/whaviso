@@ -158,7 +158,7 @@ export default function Caixa() {
 
       {sessao.isSuccess && caixa && (
         <div className="grid gap-5">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variante="secondary" onClick={() => abrirDialog('suprimento')}>
               <TrendingUp strokeWidth={1.75} className="size-4" aria-hidden />
               Suprimento
@@ -167,7 +167,7 @@ export default function Caixa() {
               <Minus strokeWidth={1.75} className="size-4" aria-hidden />
               Sangria
             </Button>
-            <Button variante="secondary" onClick={() => abrirDialog('fechar')}>
+            <Button variante="secondary" className="sm:ml-auto" onClick={() => abrirDialog('fechar')}>
               <Lock strokeWidth={1.75} className="size-4" aria-hidden />
               Fechar caixa
             </Button>

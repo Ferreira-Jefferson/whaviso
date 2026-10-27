@@ -7,6 +7,7 @@ import { formatarData } from '@/shared/format'
 import {
   Badge,
   Button,
+  cn,
   Dialog,
   ErrorState,
   Field,
@@ -16,6 +17,7 @@ import {
   useToast,
 } from '@/shared/ui'
 import { useAtualizarCliente, useClienteDetalhe, type ClienteDetalhe } from '../api'
+import { AvatarCliente } from './AvatarCliente'
 
 interface Props {
   /** Id do cliente aberto; null fecha o modal. */
@@ -42,12 +44,19 @@ function Corpo({ cliente }: { cliente: ClienteDetalhe }) {
   const { total, total_gasto_centavos, ultimo_pedido_em } = cliente.resumo_pedidos
   return (
     <div className="flex flex-col gap-5 text-left">
-      <EditarNome id={cliente.id} nome={cliente.nome} />
+      <div className="flex items-start gap-3">
+        <AvatarCliente nome={cliente.nome} tamanho="lg" />
+        <div className="min-w-0 flex-1">
+          <EditarNome id={cliente.id} nome={cliente.nome} criadoEm={cliente.criado_em} />
+        </div>
+      </div>
 
-      <div className="flex items-center gap-2 text-sm text-tinta">
+      <div className="flex items-center gap-2 rounded-input border border-linha bg-papel-2 px-3 py-2 text-sm">
         <Lock className="size-4 flex-none text-tinta-2" aria-hidden />
-        <span className="tabular">{cliente.telefone_mascarado ?? 'Telefone nao informado'}</span>
-        <Badge tom="neutro">Protegido</Badge>
+        <span className="tabular-nums text-tinta">{cliente.telefone_mascarado ?? 'Telefone nao informado'}</span>
+        <Badge tom="neutro" className="ml-auto flex-none">
+          Protegido
+        </Badge>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
@@ -64,6 +73,9 @@ function Corpo({ cliente }: { cliente: ClienteDetalhe }) {
         <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-tinta">
           <MapPin className="size-4 text-tinta-2" aria-hidden />
           Enderecos
+          {cliente.enderecos.length > 0 && (
+            <span className="text-tinta-2">({cliente.enderecos.length})</span>
+          )}
         </h3>
         {cliente.enderecos.length === 0 ? (
           <p className="text-sm text-tinta-2">Nenhum endereco cadastrado.</p>
@@ -71,11 +83,13 @@ function Corpo({ cliente }: { cliente: ClienteDetalhe }) {
           <ul className="flex flex-col gap-2">
             {cliente.enderecos.map((e) => (
               <li key={e.id} className="rounded-input border border-linha bg-papel-2 px-3 py-2 text-sm">
-                <div className="flex items-center gap-2">
-                  {e.apelido && <span className="font-medium text-tinta">{e.apelido}</span>}
-                  {!e.ativo && <Badge tom="neutro">Inativo</Badge>}
-                </div>
-                <p className="text-tinta-2">{linhaEndereco(e)}</p>
+                {(e.apelido || !e.ativo) && (
+                  <div className="mb-0.5 flex items-center gap-2">
+                    {e.apelido && <span className="font-medium text-tinta">{e.apelido}</span>}
+                    {!e.ativo && <Badge tom="neutro">Inativo</Badge>}
+                  </div>
+                )}
+                <p className={e.apelido ? 'text-tinta-2' : 'text-tinta'}>{linhaEndereco(e)}</p>
               </li>
             ))}
           </ul>
@@ -85,7 +99,7 @@ function Corpo({ cliente }: { cliente: ClienteDetalhe }) {
   )
 }
 
-function EditarNome({ id, nome }: { id: string; nome: string | null }) {
+function EditarNome({ id, nome, criadoEm }: { id: string; nome: string | null; criadoEm?: string }) {
   const [editando, setEditando] = useState(false)
   const [valor, setValor] = useState(nome ?? '')
   const [erro, setErro] = useState<string | null>(null)
@@ -102,10 +116,20 @@ function EditarNome({ id, nome }: { id: string; nome: string | null }) {
   if (!editando) {
     return (
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-display text-xl font-semibold text-tinta">{nome ?? 'Cliente sem nome'}</p>
+        <div className="min-w-0">
+          <p
+            className={cn(
+              'truncate font-display text-xl font-semibold',
+              nome ? 'text-tinta' : 'italic text-tinta-2',
+            )}
+          >
+            {nome ?? 'Cliente sem nome'}
+          </p>
+          {criadoEm && (
+            <p className="mt-0.5 text-xs text-tinta-2">Cliente desde {formatarData(criadoEm)}</p>
+          )}
         </div>
-        <Button variante="ghost" onClick={() => setEditando(true)}>
+        <Button variante="ghost" onClick={() => setEditando(true)} className="flex-none">
           Editar nome
         </Button>
       </div>
@@ -186,8 +210,14 @@ function linhaEndereco(e: ClienteDetalhe['enderecos'][number]): string {
 function EsqueletoDetalhe() {
   return (
     <div aria-busy="true" className="flex flex-col gap-5">
-      <Skeleton className="h-7 w-2/3" />
-      <Skeleton className="h-5 w-1/2" />
+      <div className="flex items-start gap-3">
+        <Skeleton className="size-12 flex-none rounded-full" />
+        <div className="flex flex-1 flex-col gap-2">
+          <Skeleton className="h-6 w-2/3" />
+          <Skeleton className="h-4 w-1/3" />
+        </div>
+      </div>
+      <Skeleton className="h-10 w-full" />
       <div className="grid grid-cols-3 gap-2.5">
         <Skeleton className="h-16" />
         <Skeleton className="h-16" />

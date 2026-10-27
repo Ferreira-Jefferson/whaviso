@@ -17,11 +17,11 @@ import {
 const DIAS: ReadonlyArray<{ valor: number; nome: string; curto: string }> = [
   { valor: 0, nome: 'Domingo', curto: 'Dom' },
   { valor: 1, nome: 'Segunda-feira', curto: 'Seg' },
-  { valor: 2, nome: 'Terca-feira', curto: 'Ter' },
+  { valor: 2, nome: 'Terça-feira', curto: 'Ter' },
   { valor: 3, nome: 'Quarta-feira', curto: 'Qua' },
   { valor: 4, nome: 'Quinta-feira', curto: 'Qui' },
   { valor: 5, nome: 'Sexta-feira', curto: 'Sex' },
-  { valor: 6, nome: 'Sabado', curto: 'Sab' },
+  { valor: 6, nome: 'Sábado', curto: 'Sáb' },
 ]
 
 const OPCOES_DIA: ReadonlyArray<SelectOption<string>> = DIAS.map((d) => ({
@@ -46,12 +46,12 @@ export function EscalaEditor({ pessoaId, escalas }: { pessoaId: string; escalas:
     <section className="flex flex-col gap-3">
       <div>
         <h3 className="text-sm font-medium text-tinta">Escala</h3>
-        <p className="text-xs text-tinta-2">Dias e horarios de trabalho (horario da loja).</p>
+        <p className="text-xs text-tinta-2">Dias e horários de trabalho (horário da loja).</p>
       </div>
 
       {ativas.length === 0 ? (
         <p className="rounded-input border border-dashed border-linha bg-papel-2 px-3 py-4 text-center text-sm text-tinta-2">
-          Sem escala definida. Adicione os dias e horarios abaixo.
+          Sem escala definida. Adicione os dias e horários abaixo.
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -79,45 +79,30 @@ function LinhaEscala({ escala }: { escala: Escala }) {
 
   const salvar = () => {
     if (!entrada || !saida) {
-      setErro('Informe entrada e saida.')
+      setErro('Informe entrada e saída.')
       return
     }
     if (entrada === saida) {
-      setErro('Entrada e saida nao podem ser iguais.')
+      setErro('Entrada e saída não podem ser iguais.')
       return
     }
     setErro(null)
     atualizar.mutate(
       { id: escala.id, patch: { entrada, saida } },
       {
-        onSuccess: () => mostrarToast('Horario atualizado.', { tom: 'sucesso' }),
-        onError: (e) => setErro(mensagem(e, 'Nao foi possivel salvar.')),
+        onSuccess: () => mostrarToast('Horário atualizado.', { tom: 'sucesso' }),
+        onError: (e) => setErro(mensagem(e, 'Não foi possível salvar.')),
       },
     )
   }
 
+  const dia = nomeDia(escala.dia_semana)
+
   return (
     <li className="flex flex-col gap-2 rounded-input border border-linha bg-papel-2 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="w-24 flex-none text-sm font-medium text-tinta">{nomeDia(escala.dia_semana)}</span>
-        <Input
-          type="time"
-          aria-label={`Entrada de ${nomeDia(escala.dia_semana)}`}
-          value={entrada}
-          onChange={(ev) => setEntrada(ev.target.value)}
-          className="w-28 tabular-nums"
-        />
-        <span className="text-tinta-2" aria-hidden>
-          ate
-        </span>
-        <Input
-          type="time"
-          aria-label={`Saida de ${nomeDia(escala.dia_semana)}`}
-          value={saida}
-          onChange={(ev) => setSaida(ev.target.value)}
-          className="w-28 tabular-nums"
-        />
-        <div className="ml-auto flex items-center gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-tinta">{dia}</span>
+        <div className="flex items-center gap-1">
           {sujo && (
             <Button variante="ghost" className="min-h-11 px-3" loading={atualizar.isPending} onClick={salvar}>
               Salvar
@@ -125,14 +110,33 @@ function LinhaEscala({ escala }: { escala: Escala }) {
           )}
           <button
             type="button"
-            aria-label={`Remover ${nomeDia(escala.dia_semana)}`}
+            aria-label={`Remover ${dia}`}
             disabled={remover.isPending}
-            onClick={() => remover.mutate({ id: escala.id }, { onError: (e) => setErro(mensagem(e, 'Nao foi possivel remover.')) })}
+            onClick={() => remover.mutate({ id: escala.id }, { onError: (e) => setErro(mensagem(e, 'Não foi possível remover.')) })}
             className="inline-flex size-11 flex-none items-center justify-center rounded-input text-tinta-2 hover:bg-barro/10 hover:text-barro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia disabled:opacity-60"
           >
             <Trash2 className="size-4" aria-hidden />
           </button>
         </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          type="time"
+          aria-label={`Entrada de ${dia}`}
+          value={entrada}
+          onChange={(ev) => setEntrada(ev.target.value)}
+          className="w-32 tabular-nums"
+        />
+        <span className="text-tinta-2" aria-hidden>
+          até
+        </span>
+        <Input
+          type="time"
+          aria-label={`Saída de ${dia}`}
+          value={saida}
+          onChange={(ev) => setSaida(ev.target.value)}
+          className="w-32 tabular-nums"
+        />
       </div>
       {erro && (
         <p className="text-xs text-barro" role="alert">
@@ -154,19 +158,19 @@ function AdicionarLinha({ pessoaId }: { pessoaId: string }) {
 
   const adicionar = () => {
     if (!entrada || !saida) {
-      setErro('Informe entrada e saida.')
+      setErro('Informe entrada e saída.')
       return
     }
     if (entrada === saida) {
-      setErro('Entrada e saida nao podem ser iguais.')
+      setErro('Entrada e saída não podem ser iguais.')
       return
     }
     setErro(null)
     criar.mutate(
       { pessoaId, body: { dia_semana: Number(dia), entrada, saida } },
       {
-        onSuccess: () => mostrarToast('Dia adicionado a escala.', { tom: 'sucesso' }),
-        onError: (e) => setErro(mensagem(e, 'Nao foi possivel adicionar.')),
+        onSuccess: () => mostrarToast('Dia adicionado à escala.', { tom: 'sucesso' }),
+        onError: (e) => setErro(mensagem(e, 'Não foi possível adicionar.')),
       },
     )
   }
@@ -186,7 +190,7 @@ function AdicionarLinha({ pessoaId }: { pessoaId: string }) {
         <Field label="Entrada">
           <Input type="time" value={entrada} onChange={(ev) => setEntrada(ev.target.value)} className="tabular-nums" />
         </Field>
-        <Field label="Saida">
+        <Field label="Saída">
           <Input type="time" value={saida} onChange={(ev) => setSaida(ev.target.value)} className="tabular-nums" />
         </Field>
       </div>

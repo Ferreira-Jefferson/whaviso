@@ -103,14 +103,14 @@ export function EditorAreaEntrega({
               {valor.bairros.map((b) => (
                 <li
                   key={b.toLowerCase()}
-                  className={cn('inline-flex items-center gap-1.5 rounded-pill bg-papel-2 py-1 pl-3 pr-1.5 text-sm text-tinta')}
+                  className={cn('inline-flex items-center gap-1 rounded-pill border border-linha bg-papel-2 py-1 pl-3 pr-1 text-sm text-tinta')}
                 >
                   {b}
                   <button
                     type="button"
                     aria-label={`Remover ${b}`}
                     onClick={() => set({ bairros: valor.bairros.filter((x) => x !== b) })}
-                    className="inline-flex size-6 items-center justify-center rounded-full text-tinta-2 hover:bg-cartao focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                    className="inline-flex size-6 items-center justify-center rounded-full text-tinta-2 transition-colors hover:bg-linha hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
                   >
                     <X strokeWidth={1.75} className="size-3.5" />
                   </button>

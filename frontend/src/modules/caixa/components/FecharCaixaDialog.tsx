@@ -24,6 +24,13 @@ const COR_DIFERENCA: Record<TomDiferenca, string> = {
   falta: 'text-barro',
 }
 
+/** Fundo/borda suave do box de diferenca, reforcando o sinal (nunca so pela cor: leva texto). */
+const FUNDO_DIFERENCA: Record<TomDiferenca, string> = {
+  exato: 'border-folha/30 bg-salvia-claro/40',
+  sobra: 'border-ambar/30 bg-ambar-claro/60',
+  falta: 'border-barro/30 bg-barro/5',
+}
+
 export function FecharCaixaDialog({
   aberto,
   carregando,
@@ -92,10 +99,10 @@ export function FecharCaixaDialog({
         </Field>
 
         {mostrarDiferenca && (
-          <div className="flex flex-col gap-1 rounded-input border border-linha bg-cartao px-3 py-2.5">
+          <div className={cn('flex flex-col gap-1 rounded-input border px-3 py-2.5', FUNDO_DIFERENCA[tom])}>
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-tinta-2">Diferença prevista</span>
-              <span className={cn('text-sm font-semibold tabular', COR_DIFERENCA[tom])}>
+              <span className={cn('text-base font-semibold tabular', COR_DIFERENCA[tom])}>
                 {diferenca > 0 ? '+' : ''}
                 {formatarCentavos(diferenca)}
               </span>

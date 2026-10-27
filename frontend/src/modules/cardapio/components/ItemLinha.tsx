@@ -16,13 +16,13 @@ export function ItemLinha({ item, ocupado, aoAlternar, aoEditar }: Props) {
   const esgotado = item.ativo && !item.disponivel
   const apagado = !item.disponivel
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-papel-2/50">
       <div className={cn('min-w-0 flex-1', apagado && 'opacity-60')}>
-        <div className="flex items-center gap-2">
-          <span className="truncate font-medium text-tinta">{item.nome}</span>
-          {!item.ativo && <Badge tom="neutro">Desligado</Badge>}
-          {esgotado && <Badge tom="atencao">Esgotado</Badge>}
-          {item.sugerivel && <Badge tom="marca">Sugerido</Badge>}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate font-medium text-tinta">{item.nome}</span>
+          {!item.ativo && <Badge tom="neutro" className="shrink-0">Desligado</Badge>}
+          {esgotado && <Badge tom="atencao" className="shrink-0">Esgotado</Badge>}
+          {item.sugerivel && <Badge tom="marca" className="shrink-0">Sugerido</Badge>}
         </div>
         {item.descricao && <p className="mt-0.5 truncate text-xs text-tinta-2">{item.descricao}</p>}
       </div>

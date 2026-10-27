@@ -14,6 +14,7 @@ import {
   Field,
   Input,
   PhoneInput,
+  Select,
   Skeleton,
   useToast,
 } from '@/shared/ui'
@@ -44,7 +45,7 @@ export function PessoaDialog({ aberto, pessoaId, aoFechar }: Props) {
       aberto={aberto}
       onFechar={aoFechar}
       titulo={ehEdicao ? 'Editar pessoa' : 'Nova pessoa'}
-      className="max-w-lg"
+      className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto"
     >
       {!ehEdicao && <Formulario key="novo" pessoa={null} aoFechar={aoFechar} />}
       {ehEdicao && detalhe.isPending && <Esqueleto />}
@@ -112,7 +113,7 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
             mostrarToast('Pessoa cadastrada.', { tom: 'sucesso' })
             aoFechar()
           },
-          onError: (e) => setErro(mensagem(e, 'Nao foi possivel cadastrar.')),
+          onError: (e) => setErro(mensagem(e, 'Não foi possível cadastrar.')),
         },
       )
       return
@@ -136,7 +137,7 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
           mostrarToast('Pessoa atualizada.', { tom: 'sucesso' })
           aoFechar()
         },
-        onError: (e) => setErro(mensagem(e, 'Nao foi possivel salvar.')),
+        onError: (e) => setErro(mensagem(e, 'Não foi possível salvar.')),
       },
     )
   }
@@ -153,7 +154,7 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
         },
         onError: (e) => {
           setConfirmarArquivar(false)
-          setErro(mensagem(e, 'Nao foi possivel mudar o status.'))
+          setErro(mensagem(e, 'Não foi possível mudar o status.'))
         },
       },
     )
@@ -178,21 +179,17 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
           <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={120} autoFocus placeholder="Nome da pessoa" />
         </Field>
 
-        <Field label="Cargo" erro={cargos.isError ? 'Nao foi possivel carregar os cargos.' : undefined}>
-          <select
-            aria-label="Cargo"
+        <Field label="Cargo" erro={cargos.isError ? 'Não foi possível carregar os cargos.' : undefined}>
+          <Select
+            ariaLabel="Cargo"
             value={cargoEfetivo}
             disabled={cargos.isPending || opcoesCargo.length === 0}
-            onChange={(e) => setCargoId(e.target.value)}
-            className="w-full appearance-none rounded-input border border-linha bg-cartao py-2.5 pl-3 pr-9 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {opcoesCargo.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-                {!c.ativo ? ' (arquivado)' : ''}
-              </option>
-            ))}
-          </select>
+            onChange={setCargoId}
+            options={opcoesCargo.map((c) => ({
+              value: c.id,
+              label: c.ativo ? c.nome : `${c.nome} (arquivado)`,
+            }))}
+          />
         </Field>
 
         <Field
@@ -211,10 +208,10 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
           <div className="-mt-2 flex items-center gap-2 text-xs text-tinta-2">
             <Lock className="size-3.5 flex-none" aria-hidden />
             {removerTelefone ? (
-              <span>O telefone sera removido ao salvar.</span>
+              <span>O telefone será removido ao salvar.</span>
             ) : (
               <>
-                <span className="tabular">Atual: {pessoa.telefone_mascarado ?? 'nao informado'}</span>
+                <span className="tabular">Atual: {pessoa.telefone_mascarado ?? 'não informado'}</span>
                 {pessoa.telefone_mascarado && (
                   <button
                     type="button"
@@ -232,13 +229,13 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
           </div>
         )}
 
-        <Field label="Observacoes">
+        <Field label="Observações">
           <textarea
             value={observacoes}
             onChange={(e) => setObservacoes(e.target.value)}
             maxLength={500}
             rows={3}
-            placeholder="Anotacoes internas (opcional)"
+            placeholder="Anotações internas (opcional)"
             className="w-full resize-y rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta placeholder:text-tinta-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
           />
         </Field>
@@ -287,7 +284,7 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
           onConfirmar={alternarAtivo}
           onCancelar={() => setConfirmarArquivar(false)}
         >
-          A pessoa sai da lista ativa, mas o historico e mantido. Da para reativar depois.
+          A pessoa sai da lista ativa, mas o histórico é mantido. Dá para reativar depois.
         </ConfirmDialog>
       )}
     </div>

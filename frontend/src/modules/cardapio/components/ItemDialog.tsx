@@ -5,6 +5,7 @@ import { ApiError } from '@/shared/api_client'
 import { Banner, Button, Dialog, Field, Input, MoneyInput, Select } from '@/shared/ui'
 import type { ItemResolvido } from '@/shared/contracts/_generated/cardapio'
 import { useAtualizarItem, useCriarItem } from '../api'
+import { CampoCheck } from './CampoCheck'
 import { Textarea } from './Textarea'
 
 interface Props {
@@ -91,7 +92,7 @@ export function ItemDialog({ aberto, item, categoriaIdInicial, categorias, onFec
         <Field label="Descrição" dica="Mostrada ao cliente junto do item. Opcional.">
           <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" maxLength={500} />
         </Field>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Preço">
             <MoneyInput value={preco} onChange={setPreco} />
           </Field>
@@ -104,15 +105,7 @@ export function ItemDialog({ aberto, item, categoriaIdInicial, categorias, onFec
             />
           </Field>
         </div>
-        <label className="flex items-center gap-2.5 text-sm text-tinta">
-          <input
-            type="checkbox"
-            checked={sugerivel}
-            onChange={(e) => setSugerivel(e.target.checked)}
-            className="size-4 rounded border-linha text-salvia focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-          />
-          Sugerir no atendimento
-        </label>
+        <CampoCheck checked={sugerivel} onChange={setSugerivel} titulo="Sugerir no atendimento" />
       </div>
     </Dialog>
   )

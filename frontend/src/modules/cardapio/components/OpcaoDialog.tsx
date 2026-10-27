@@ -5,6 +5,7 @@ import { ApiError } from '@/shared/api_client'
 import { Banner, Button, Dialog, Field, Input, MoneyInput } from '@/shared/ui'
 import type { OpcaoSaida } from '@/shared/contracts/_generated/cardapio'
 import { useAtualizarOpcao, useCriarOpcao } from '../api'
+import { CampoCheck } from './CampoCheck'
 
 interface Props {
   aberto: boolean
@@ -73,15 +74,7 @@ export function OpcaoDialog({ aberto, opcao, grupoId, onFechar }: Props) {
         <Field label="Preço" dica="Quanto esta opção soma ao item. Deixe zerado se não cobra a mais.">
           <MoneyInput value={preco} onChange={setPreco} />
         </Field>
-        <label className="flex items-center gap-2.5 text-sm text-tinta">
-          <input
-            type="checkbox"
-            checked={padrao}
-            onChange={(e) => setPadrao(e.target.checked)}
-            className="size-4 rounded border-linha text-salvia focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-          />
-          Vem marcada por padrão
-        </label>
+        <CampoCheck checked={padrao} onChange={setPadrao} titulo="Vem marcada por padrão" />
       </div>
     </Dialog>
   )

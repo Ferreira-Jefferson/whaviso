@@ -64,7 +64,7 @@ export default function Estoque() {
             <EmptyState
               icone={<Boxes className="size-7" aria-hidden />}
               titulo="Nenhum insumo cadastrado"
-              descricao="Cadastre a materia-prima da sua cozinha (ex.: arroz, carne, embalagem) para controlar o saldo."
+              descricao="Cadastre a matéria-prima da sua cozinha (ex.: arroz, carne, embalagem) para controlar o saldo."
               acao={
                 <Button onClick={() => setDlgInsumo({ aberto: true, insumo: null })}>
                   <Plus strokeWidth={1.75} className="size-4" aria-hidden />
@@ -108,9 +108,24 @@ function Esqueleto() {
   return (
     <div aria-busy="true" aria-label="Carregando insumos" className="grid gap-3">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="rounded-card border border-linha bg-cartao p-4">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="mt-3 h-4 w-1/2" />
+        <div
+          key={i}
+          className="flex flex-col gap-3 rounded-card border border-linha bg-cartao p-4 md:flex-row md:items-center md:justify-between md:gap-6"
+        >
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="mt-2 h-4 w-56" />
+          </div>
+          <div className="flex items-center justify-between gap-3 md:justify-end md:gap-5">
+            <div className="md:text-right">
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="mt-1.5 h-3 w-14" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-11 w-28 rounded-pill" />
+              <Skeleton className="h-11 w-11 rounded-pill" />
+            </div>
+          </div>
         </div>
       ))}
     </div>

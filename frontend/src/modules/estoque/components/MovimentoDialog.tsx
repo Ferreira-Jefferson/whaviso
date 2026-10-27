@@ -3,7 +3,7 @@
 // (validado contra a loja no servidor). Quantidade e decimal, nunca dinheiro.
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Banner, Button, Dialog, Field, Input, SegmentedControl } from '@/shared/ui'
+import { Badge, Banner, Button, Dialog, Field, Input, SegmentedControl, cn } from '@/shared/ui'
 import { dataHoraPtBR } from '@/shared/format'
 import type { InsumoDto } from '@/shared/contracts/_generated/estoque_insumos'
 import { useMovimentarInsumo, useMovimentosInsumo } from '../api'
@@ -11,7 +11,6 @@ import {
   DICA_TIPO_MOVIMENTO,
   OPCOES_TIPO_MOVIMENTO,
   ROTULO_TIPO_MOVIMENTO,
-  formatarQuantidade,
   parseQuantidade,
   saldoComUnidade,
 } from '../estados'
@@ -44,7 +43,7 @@ export function MovimentoDialog({ aberto, insumo, onFechar }: Props) {
     if (!insumo) return
     const q = parseQuantidade(quantidade)
     if (q === null) {
-      setErro('Informe uma quantidade valida.')
+      setErro('Informe uma quantidade válida.')
       return
     }
     if (tipo !== 'ajuste' && q <= 0) {
@@ -61,7 +60,7 @@ export function MovimentoDialog({ aberto, insumo, onFechar }: Props) {
       })
       onFechar()
     } catch (e) {
-      setErro(e instanceof ApiError ? e.message : 'Nao foi possivel registrar o movimento.')
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível registrar o movimento.')
     }
   }
 
@@ -114,25 +113,43 @@ export function MovimentoDialog({ aberto, insumo, onFechar }: Props) {
             />
           </Field>
 
-          <Field label="Motivo" dica="Anotacao opcional (ex.: compra, quebra, recontagem).">
+          <Field label="Motivo" dica="Anotação opcional (ex.: compra, quebra, recontagem).">
             <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Opcional" maxLength={200} />
           </Field>
 
           {historico.isSuccess && historico.data.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-tinta-2">Ultimos movimentos</p>
+            <div className="border-t border-linha pt-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-tinta-2">Últimos movimentos</p>
               <ul className="flex flex-col gap-1.5">
-                {historico.data.slice(0, 5).map((m) => (
-                  <li key={m.id} className="flex items-center justify-between gap-2 text-sm">
-                    <Badge tom={m.tipo === 'entrada' ? 'sucesso' : m.tipo === 'saida' ? 'atencao' : 'neutro'}>
-                      {ROTULO_TIPO_MOVIMENTO[m.tipo]}
-                    </Badge>
-                    <span className="tabular text-tinta">{formatarQuantidade(m.quantidade)}</span>
-                    <span className="min-w-0 flex-1 truncate text-right text-xs text-tinta-2">
-                      {dataHoraPtBR(m.criado_em)}
-                    </span>
-                  </li>
-                ))}
+                {historico.data.slice(0, 5).map((m) => {
+                  const entrada = m.tipo === 'entrada'
+                  const ajuste = m.tipo === 'ajuste'
+                  const sinal = entrada ? '+' : ajuste ? '' : '−'
+                  const corValor = entrada ? 'text-folha' : ajuste ? 'text-tinta' : 'text-barro'
+                  return (
+                    <li
+                      key={m.id}
+                      className="flex items-start justify-between gap-3 rounded-input bg-papel-2/60 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <Badge tom={entrada ? 'sucesso' : m.tipo === 'saida' ? 'atencao' : 'neutro'}>
+                          {ROTULO_TIPO_MOVIMENTO[m.tipo]}
+                        </Badge>
+                        {m.motivo && <p className="mt-1 truncate text-xs text-tinta-2">{m.motivo}</p>}
+                        <p className="mt-0.5 text-xs text-tinta-2/80">{dataHoraPtBR(m.criado_em)}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className={cn('tabular text-sm leading-tight', corValor)}>
+                          {sinal}
+                          {saldoComUnidade(ajuste ? m.quantidade_resultante : m.quantidade, unidade)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-tinta-2">
+                          {ajuste ? 'novo saldo' : `saldo ${saldoComUnidade(m.quantidade_resultante, unidade)}`}
+                        </p>
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}

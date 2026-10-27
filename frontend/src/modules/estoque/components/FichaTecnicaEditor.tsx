@@ -109,15 +109,15 @@ export function FichaTecnicaEditor({ insumos }: Props) {
       montadas.push({ insumo_id: l.insumo_id, quantidade: q })
     }
     if (new Set(montadas.map((m) => m.insumo_id)).size !== montadas.length) {
-      setErro('Ha insumo repetido na ficha. Deixe cada insumo uma vez so.')
+      setErro('Há insumo repetido na ficha. Deixe cada insumo uma vez só.')
       return
     }
     setErro(null)
     try {
       await definir.mutateAsync({ itemId, body: { linhas: montadas } })
-      mostrarToast('Ficha tecnica salva.', { tom: 'sucesso' })
+      mostrarToast('Ficha técnica salva.', { tom: 'sucesso' })
     } catch (e) {
-      setErro(e instanceof ApiError ? e.message : 'Nao foi possivel salvar a ficha.')
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar a ficha.')
     }
   }
 
@@ -129,13 +129,13 @@ export function FichaTecnicaEditor({ insumos }: Props) {
         {itens.isSuccess && (itens.data.length === 0 ? (
           <EmptyState
             icone={<Boxes className="size-7" aria-hidden />}
-            titulo="Nenhum item no cardapio"
+            titulo="Nenhum item no cardápio"
             descricao="Cadastre itens no cardápio primeiro: a ficha técnica descreve o que cada item consome."
           />
         ) : (
-          <Field label="Item do cardapio" dica="A ficha e a lista de insumos que 1 unidade vendida deste item consome.">
+          <Field label="Item do cardápio" dica="A ficha é a lista de insumos que 1 unidade vendida deste item consome.">
             <Select
-              ariaLabel="Item do cardapio"
+              ariaLabel="Item do cardápio"
               value={itemId}
               onChange={setItemId}
               options={opcoesItem}
@@ -160,7 +160,7 @@ export function FichaTecnicaEditor({ insumos }: Props) {
           {linhas.length === 0 ? (
             <EmptyState
               icone={<Boxes className="size-7" aria-hidden />}
-              titulo="Este item ainda nao tem ficha"
+              titulo="Este item ainda não tem ficha"
               descricao="Adicione os insumos que uma unidade do item consome para dar baixa no estoque a cada venda."
               acao={
                 <Button onClick={adicionarLinha}>
@@ -171,36 +171,46 @@ export function FichaTecnicaEditor({ insumos }: Props) {
             />
           ) : (
             <div className="grid gap-3">
+              <div className="hidden items-center gap-3 px-0.5 pb-1 sm:grid sm:grid-cols-[minmax(0,1fr)_9rem_2.75rem]">
+                <span className="text-xs font-medium uppercase tracking-wide text-tinta-2">Insumo</span>
+                <span className="text-right text-xs font-medium uppercase tracking-wide text-tinta-2">Quantidade</span>
+                <span className="sr-only">Ações</span>
+              </div>
               {linhas.map((l) => {
                 const insumo = insumos.find((i) => i.id === l.insumo_id)
                 const unidade = insumo?.unidade ?? ''
                 return (
-                  <div key={l.key} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <div className="flex-1">
-                      <Field label="Insumo">
-                        <Select
-                          ariaLabel="Insumo da ficha"
-                          value={l.insumo_id}
-                          onChange={(value) => alterarLinha(l.key, { insumo_id: value })}
-                          options={opcoesInsumo(l.insumo_id)}
-                        />
-                      </Field>
+                  <div
+                    key={l.key}
+                    className="grid grid-cols-1 gap-2 rounded-input max-sm:border max-sm:border-linha max-sm:bg-papel-2/40 max-sm:p-3 sm:grid-cols-[minmax(0,1fr)_9rem_2.75rem] sm:items-center sm:gap-3"
+                  >
+                    <div>
+                      <span className="mb-1 block text-xs font-medium text-tinta sm:hidden">Insumo</span>
+                      <Select
+                        ariaLabel="Insumo da ficha"
+                        value={l.insumo_id}
+                        onChange={(value) => alterarLinha(l.key, { insumo_id: value })}
+                        options={opcoesInsumo(l.insumo_id)}
+                      />
                     </div>
-                    <div className="sm:w-40">
-                      <Field label={unidade ? `Quantidade (${unidade})` : 'Quantidade'}>
-                        <Input
-                          value={l.quantidade}
-                          onChange={(e) => alterarLinha(l.key, { quantidade: e.target.value })}
-                          inputMode="decimal"
-                          placeholder="0"
-                        />
-                      </Field>
+                    <div>
+                      <span className="mb-1 block text-xs font-medium text-tinta sm:hidden">
+                        {unidade ? `Quantidade (${unidade})` : 'Quantidade'}
+                      </span>
+                      <Input
+                        aria-label={unidade ? `Quantidade em ${unidade}` : 'Quantidade'}
+                        value={l.quantidade}
+                        onChange={(e) => alterarLinha(l.key, { quantidade: e.target.value })}
+                        inputMode="decimal"
+                        placeholder="0"
+                        className="text-right"
+                      />
                     </div>
                     <Button
                       variante="ghost"
                       onClick={() => removerLinha(l.key)}
                       aria-label="Remover insumo da ficha"
-                      className="max-sm:w-full"
+                      className="max-sm:w-full sm:size-11 sm:px-0"
                     >
                       <Trash2 strokeWidth={1.75} className="size-4" aria-hidden />
                       <span className="sm:sr-only">Remover</span>
@@ -227,7 +237,7 @@ export function FichaTecnicaEditor({ insumos }: Props) {
         <EmptyState
           icone={<Boxes className="size-7" aria-hidden />}
           titulo="Escolha um item"
-          descricao="Selecione um item do cardapio acima para ver e editar os insumos que ele consome."
+          descricao="Selecione um item do cardápio acima para ver e editar os insumos que ele consome."
         />
       )}
     </div>

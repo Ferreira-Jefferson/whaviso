@@ -30,14 +30,14 @@ export const OPCOES_UNIDADE = UNIDADES_INSUMO.map((value) => ({
 
 export const ROTULO_TIPO_MOVIMENTO: Record<Tipo, string> = {
   entrada: 'Entrada',
-  saida: 'Saida',
+  saida: 'Saída',
   ajuste: 'Ajuste de saldo',
   consumo: 'Consumo (venda)',
 }
 
 /** Explica, em uma linha, o efeito do tipo no saldo (texto de apoio no dialog). */
 export const DICA_TIPO_MOVIMENTO: Record<TipoPainel, string> = {
-  entrada: 'Soma ao saldo atual (compra, reposicao).',
+  entrada: 'Soma ao saldo atual (compra, reposição).',
   saida: 'Subtrai do saldo atual (perda, quebra, uso manual).',
   ajuste: 'Define o saldo como o valor informado (recontagem).',
 }

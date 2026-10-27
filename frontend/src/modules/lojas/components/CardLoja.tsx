@@ -77,30 +77,32 @@ export function CardLoja({
         </div>
       </dl>
 
-      <div className="mt-auto flex flex-wrap gap-2">
-        {podeGerir && (
-          <Button type="button" variante="secondary" onClick={onEditar}>
-            <Pencil aria-hidden strokeWidth={1.75} className="size-4" />
-            Editar
-          </Button>
-        )}
-        {onUsar && (
-          <Button type="button" variante="ghost" onClick={onUsar}>
-            Usar esta loja
-          </Button>
-        )}
-        {ehDono && (
-          <Button
-            type="button"
-            variante="ghost"
-            loading={alterandoAtivo}
-            onClick={onAlternarAtivo}
-            className={cn(loja.ativo && 'text-barro hover:bg-barro/10')}
-          >
-            {loja.ativo ? 'Desativar' : 'Reativar'}
-          </Button>
-        )}
-      </div>
+      {(podeGerir || onUsar || ehDono) && (
+        <div className="mt-auto flex flex-wrap gap-2 border-t border-linha pt-4">
+          {podeGerir && (
+            <Button type="button" variante="secondary" onClick={onEditar}>
+              <Pencil aria-hidden strokeWidth={1.75} className="size-4" />
+              Editar
+            </Button>
+          )}
+          {onUsar && (
+            <Button type="button" variante="ghost" onClick={onUsar}>
+              Usar esta loja
+            </Button>
+          )}
+          {ehDono && (
+            <Button
+              type="button"
+              variante="ghost"
+              loading={alterandoAtivo}
+              onClick={onAlternarAtivo}
+              className={cn(loja.ativo && 'text-barro hover:bg-barro/10')}
+            >
+              {loja.ativo ? 'Desativar' : 'Reativar'}
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
   )
 }

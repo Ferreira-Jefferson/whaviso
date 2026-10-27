@@ -36,8 +36,11 @@ function Formulario({ carregando, erro, aoConfirmar, aoCancelar }: Omit<Props, '
         value={motivo}
         maxLength={300}
         onChange={(e) => setMotivo(e.target.value)}
-        className="mt-3 min-h-21 w-full rounded-input border border-linha bg-papel p-2.5 text-tinta focus-visible:outline-2 focus-visible:outline-salvia"
+        className="mt-3 min-h-21 w-full resize-none rounded-input border border-linha bg-papel p-2.5 text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
       />
+      <p className="mt-1 text-right text-xs tabular-nums text-tinta-2" aria-hidden>
+        {motivo.length}/300
+      </p>
       {erro && (
         <p role="alert" className="mt-2 text-barro">
           {erro}

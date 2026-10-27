@@ -121,7 +121,7 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
           <EditorAreaEntrega valor={area} onChange={setArea} />
         </Secao>
 
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 border-t border-linha pt-6 sm:flex-row sm:justify-end">
           <Button type="button" variante="secondary" onClick={onFechar} disabled={salvando}>
             Cancelar
           </Button>
@@ -136,10 +136,10 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
 
 function Secao({ titulo, descricao, children }: { titulo: string; descricao: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex flex-col gap-3 border-t border-linha pt-6">
       <div>
         <h3 className="font-display text-base font-semibold text-tinta">{titulo}</h3>
-        <p className="text-xs text-tinta-2">{descricao}</p>
+        <p className="mt-0.5 text-xs text-tinta-2">{descricao}</p>
       </div>
       {children}
     </section>

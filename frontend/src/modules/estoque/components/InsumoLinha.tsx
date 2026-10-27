@@ -17,8 +17,8 @@ export function InsumoLinha({ insumo, aoMovimentar, aoEditar }: Props) {
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-card border bg-cartao p-4 md:flex-row md:items-center md:justify-between',
-        baixo ? 'border-ambar/40' : 'border-linha',
+        'flex flex-col gap-3 rounded-card border bg-cartao p-4 md:flex-row md:items-center md:justify-between md:gap-6',
+        baixo ? 'border-ambar/50 bg-ambar-claro/30' : 'border-linha',
         !insumo.ativo && 'opacity-60',
       )}
     >
@@ -29,23 +29,26 @@ export function InsumoLinha({ insumo, aoMovimentar, aoEditar }: Props) {
           {!insumo.ativo && <Badge tom="neutro">Inativo</Badge>}
         </div>
         <p className="mt-1 text-sm text-tinta-2">
-          Minimo: <span className="tabular">{saldoComUnidade(insumo.quantidade_minima, insumo.unidade)}</span>
+          Mínimo:{' '}
+          <span className="tabular font-medium text-tinta-2">
+            {saldoComUnidade(insumo.quantidade_minima, insumo.unidade)}
+          </span>
           {insumo.custo_unitario_centavos !== null && (
             <>
-              {' · Custo: '}
-              <MoneyText centavos={insumo.custo_unitario_centavos} />
-              {` / ${insumo.unidade}`}
+              <span aria-hidden className="mx-1.5 text-tinta-2/50">·</span>
+              Custo: <MoneyText centavos={insumo.custo_unitario_centavos} />
+              <span className="text-tinta-2/80">{` / ${insumo.unidade}`}</span>
             </>
           )}
         </p>
       </div>
 
-      <div className="flex items-center gap-3 md:gap-4">
-        <div className="text-right">
-          <p className={cn('tabular text-lg leading-tight', baixo ? 'text-ambar' : 'text-tinta')}>
+      <div className="flex items-center justify-between gap-3 md:justify-end md:gap-5">
+        <div className="md:text-right">
+          <p className={cn('tabular text-xl leading-none', baixo ? 'text-ambar' : 'text-tinta')}>
             {saldoComUnidade(insumo.quantidade_atual, insumo.unidade)}
           </p>
-          <p className="text-xs text-tinta-2">em estoque</p>
+          <p className="mt-1 text-xs text-tinta-2">em estoque</p>
         </div>
         <div className="flex gap-2">
           <Button variante="secondary" onClick={() => aoMovimentar(insumo)} aria-label={`Movimentar ${insumo.nome}`}>

@@ -2,7 +2,7 @@
 // formato do contrato (Horarios, fuso America/Sao_Paulo) e a validacao de sobreposicao ficam
 // no FormularioLoja. Faixa que cruza a meia-noite: fecha < abre (ex.: 18:00 a 02:00).
 import { Plus, X } from 'lucide-react'
-import { Button, cn } from '@/shared/ui'
+import { Button, Input, cn } from '@/shared/ui'
 import type { DiaForm, FaixaForm, HorariosForm } from '../campos'
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'] as const
@@ -55,7 +55,7 @@ export function EditorHorarios({
               <span
                 className={cn(
                   'inline-flex h-6 w-11 flex-none items-center rounded-pill p-0.5 transition-colors',
-                  d.fechado ? 'bg-papel-2' : 'bg-salvia',
+                  d.fechado ? 'bg-tinta-2/25' : 'bg-salvia',
                 )}
               >
                 <span className={cn('size-5 rounded-full bg-cartao shadow-sm transition-transform', !d.fechado && 'translate-x-5')} />
@@ -69,29 +69,29 @@ export function EditorHorarios({
                 <div className="flex flex-col gap-2">
                   {d.faixas.map((f, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <input
+                      <Input
                         type="time"
                         value={f.abre}
                         onChange={(e) => setFaixa(dia, idx, 'abre', e.target.value)}
                         aria-label={`${rotulo}: abre (faixa ${idx + 1})`}
-                        className="min-h-11 rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                        className="min-h-11 min-w-0 flex-1 px-2.5 tabular-nums [color-scheme:light] sm:w-32 sm:flex-none"
                       />
-                      <span className="text-sm text-tinta-2" aria-hidden>
+                      <span className="shrink-0 text-sm text-tinta-2" aria-hidden>
                         às
                       </span>
-                      <input
+                      <Input
                         type="time"
                         value={f.fecha}
                         onChange={(e) => setFaixa(dia, idx, 'fecha', e.target.value)}
                         aria-label={`${rotulo}: fecha (faixa ${idx + 1})`}
-                        className="min-h-11 rounded-input border border-linha bg-cartao px-2.5 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+                        className="min-h-11 min-w-0 flex-1 px-2.5 tabular-nums [color-scheme:light] sm:w-32 sm:flex-none"
                       />
                       <Button
                         type="button"
                         variante="ghost"
                         aria-label={`Remover faixa ${idx + 1} de ${rotulo}`}
                         onClick={() => removerFaixa(dia, idx)}
-                        className="min-h-11 px-2"
+                        className="min-h-11 shrink-0 px-2"
                       >
                         <X strokeWidth={1.75} className="size-4" />
                       </Button>

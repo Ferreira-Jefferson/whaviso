@@ -23,6 +23,15 @@ export const TOM_ESTADO: Record<EstadoMesa, 'sucesso' | 'atencao' | 'neutro'> = 
   inativa: 'neutro',
 }
 
+/** Cor da faixa lateral do cartao: deixa o mapa de mesas legivel num relance (livre
+ *  em verde-folha, ocupada em ambar, inativa apagada). Faixa so com borda esquerda
+ *  para nao brigar com a cor das demais bordas. */
+export const ACENTO_ESTADO: Record<EstadoMesa, string> = {
+  livre: 'border-l-folha',
+  ocupada: 'border-l-ambar',
+  inativa: 'border-l-linha',
+}
+
 /** "4 lugares" / "" (quando a capacidade nao foi informada). */
 export function rotuloCapacidade(capacidade: number | null): string {
   if (capacidade == null) return ''
