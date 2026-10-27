@@ -161,6 +161,12 @@ export const CASOS_ESPECIFICOS: readonly LinhaMatriz[] = [
   { role: 'whaviso_api', tabela: 'convites', coluna: 'papel', operacao: 'update', esperado: 'negado', sec: 'SEC-041', nota: 'convite imutavel apos criado' },
   { role: 'whaviso_zap', tabela: 'convites', operacao: 'select', esperado: 'negado', sec: 'SEC-041', nota: 'zap nao toca convites' },
   { role: 'whaviso_atendente', tabela: 'convites', operacao: 'select', esperado: 'negado', sec: 'SEC-041', nota: 'atendente nao toca convites' },
+
+  // mensagens (migration 0015): o atendente so marca a coluna de claim (processada_em) para
+  // reivindicar o inbound; o conteudo e append-only e nao ha DELETE (SEC-033/030/024).
+  { role: 'whaviso_atendente', tabela: 'mensagens', coluna: 'processada_em', operacao: 'update', esperado: 'permitido', sec: 'SEC-033', nota: 'claim do inbound (0015)' },
+  { role: 'whaviso_atendente', tabela: 'mensagens', coluna: 'conteudo', operacao: 'update', esperado: 'negado', sec: 'SEC-033', nota: 'conteudo imutavel' },
+  { role: 'whaviso_atendente', tabela: 'mensagens', operacao: 'delete', esperado: 'negado', sec: 'SEC-030' },
 ] as const
 
 /** Tabelas (append-only) cujo UPDATE deve ser barrado pelo TRIGGER mesmo para o dono da tabela. */
