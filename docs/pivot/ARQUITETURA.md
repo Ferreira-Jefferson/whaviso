@@ -144,6 +144,29 @@ automatizados** (cada ameaça vira um teste com id, verde ou vermelho no CI). Um
 roda no gate, a cobertura de RLS continua obrigatória, e **subagents especializados** fazem o papel de
 red team periódico contra o catálogo. Toda feature nova atualiza o catálogo antes de entrar.
 
+## O harness do atendente e a resiliência
+
+O agente que responde no WhatsApp é um **harness de LLM hand-rolled** (não framework) sobre o
+`ClienteLLM`, detalhado em [HARNESS-ATENDENTE.md](HARNESS-ATENDENTE.md). A regra é a **fronteira
+sagrada**: o motor de fluxo determinístico **efetiva** (confirma pedido, total, Pix, status, com os
+gates de segurança); o harness só **entende e propõe** via tools. A saída do modelo é sempre dado,
+nunca comando. As tools ficam num registry atrás de `ToolContract` (família do `NodeContract`), cada
+uma impondo escopo de loja e privilégio mínimo: a autorização mora na tool, com `loja_id`/`cliente_id`
+num contexto selado pelo servidor que o modelo nunca vê. Novo em `atendente/`: `shared/harness`,
+`shared/prompts` (base + guardrails em arquivo versionado, persona por loja em tabela) e `tools/<nome>`.
+
+**Resiliência (não cair durante um atendimento):** todo `Cliente*` (LLM, Whats, Mapas, e o futuro
+`ClienteCanal` para iFood e outros canais) tem **timeout + circuit breaker**, e a falha degrada para o
+fluxo por botões, nunca erro cru. O estado da conversa é durável no Postgres (um crash retoma), o
+webhook persiste o inbound **antes** de responder 200 à Meta, e tudo é idempotente. Falta montar a
+observabilidade com **alerta de queda** e os testes de **carga, caos e idempotência sob crash**
+(categoria `RES-###` no [SEGURANCA.md](SEGURANCA.md)).
+
+**Compliance de canal:** a Meta permite atendimento e vendas, mas **proíbe chatbot de IA genérico** no
+WhatsApp (desde jan/2026) e passou a cobrar por mensagem (out/2026). O produto se apresenta como o
+atendimento da loja (templates aprovados, persona de atendimento), nunca como bot genérico; o custo por
+mensagem entra no modelo de billing da plataforma (franquia + excedente).
+
 ## Insights da pesquisa (fundamentam as decisões)
 
 Ressalva honesta: é convergência de praticantes, não benchmark controlado. O ganho é mecânico

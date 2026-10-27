@@ -132,6 +132,28 @@ vive em `backend/**/test/security/` (vitest) mais os scripts de banco; roda no g
 - **RAG-EVAL-002** Fidelidade da geração (faithfulness/groundedness) por LLM-judge, **amostrado fora
   do gate** (caro e não determinístico), como monitoramento.
 
+### M. Harness do atendente (tool-use seguro)
+- **SEC-063** Nenhuma tool aceita `loja_id`/`cliente_id` como argumento do modelo. *Verde:* o schema
+  das tools não expõe esses campos; o escopo vem do contexto selado pelo servidor.
+- **SEC-064** Id opaco passado pelo modelo é revalidado contra a loja da conversa antes de qualquer
+  leitura/escrita. *Verde:* id de outra loja é rejeitado.
+- **SEC-065** Injeção em tool-use: conteúdo do cliente não força tool de efeito nem exfiltra dado de
+  outra loja. *Verde:* bateria adversarial não quebra a fronteira.
+- **SEC-066** Idempotência de ação: repetir a proposta do harness não duplica efeito (o motor efetiva
+  uma vez).
+- **SEC-067** Teto de passos e de gasto por turno/dia degrada para o fluxo por botões, nunca erro cru.
+
+### N. Campanhas (CRM do restaurante)
+- **SEC-110** Campanha só atinge clientes da loja dona, nunca cruza loja.
+- **SEC-111** Campanha respeita opt-out e só envia dentro de template/janela de 24h.
+
+### Resiliência (RES-###, não cair sob atendimento)
+- **RES-001** Timeout + circuit breaker em cada `Cliente*`; LLM/Meta/Mapas fora do ar degrada para
+  botões, nunca derruba a conversa.
+- **RES-002** Estado da conversa sobrevive a crash (retoma sem perder o pedido); o inbound é persistido
+  antes do 200 à Meta.
+- **RES-003** Carga no caminho de pedido + caos + idempotência sob crash, no CI e no loop periódico.
+
 ## 5. Como automatizar
 
 - **Suíte `security/` no CI:** os SEC-### viram testes vitest que rodam no mesmo gate de
@@ -157,6 +179,9 @@ vive em `backend/**/test/security/` (vitest) mais os scripts de banco; roda no g
 | Replay/forja de webhook | SEC-050, SEC-051 | a implementar |
 | Vazamento passivo (log/dump/bundle) | SEC-023..025 | a implementar |
 | Qualidade e isolamento do RAG | RAG-ISO-001, RAG-EVAL-001/002 | a implementar |
+| Tool-use do harness (confused deputy, injeção) | SEC-063..067 | a implementar |
+| Campanhas (cross-loja, opt-out, janela) | SEC-110, SEC-111 | a implementar |
+| Estabilidade sob atendimento | RES-001..003 | a implementar |
 
 ## 7. Processo
 

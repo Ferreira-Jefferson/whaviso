@@ -4,6 +4,9 @@ Inventário de módulos, dependências e ondas. É o ponto de partida de qualque
 vivo de cada tarefa** mora no arquivo do seu módulo (coluna "arquivo"); esta tabela é o **mapa de
 dependências e a ordem**. Protocolo de execução: ver [README.md](README.md).
 
+> **Não é MVP.** Todo módulo listado é construído e vai para produção; as ondas são **ordem de
+> execução** por dependência (para paralelizar), nunca corte de escopo.
+
 **Status:** `A FAZER` · `EM ANDAMENTO (rótulo)` · `CONCLUIDO`. Mude aqui só o status de módulo; o
 detalhe por etapa fica no arquivo do módulo.
 
@@ -57,6 +60,8 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | API-cardapio-imp | cardapio_importacao | Importar cardápio por foto/PDF via LLM | AT-llm, API-cardapio | Sonnet | backend-api/cardapio_importacao.md | A FAZER |
 | API-conhecimento | conhecimento | Curadoria/aprovação/versionamento da base (RAG.md) | AT-rag | Opus | backend-api/conhecimento.md | A FAZER |
 | AT-importar | importar_cardapio | Consumidor no atendente que roda o LLM da importação | AT-llm, API-cardapio-imp | Sonnet | backend-atendente/importar_cardapio.md | A FAZER |
+| AT-tools | tools (registry) | ToolContract + tools do atendente (ler/rascunho/sinal, autorização na tool) | F1, AT-llm, API-cardapio, API-pedidos, API-clientes, AT-rag | Opus | backend-atendente/tools.md | A FAZER |
+| AT-harness | harness (agent loop) | Laço de agente, context engineering, prompts, teto de passos/gasto, observabilidade | AT-tools, AT-motor-min, AT-entender | Opus | backend-atendente/harness.md | A FAZER |
 
 ## Onda 3: Operação de entrega
 
@@ -163,3 +168,63 @@ migration usa o número reservado; se precisar de uma não listada, pega o próx
 Resta código de cobrança em `apps/zap/src/shared/meta_client`, `modules/webhook_whatsapp`, `contracts`,
 módulos de api/front, `shared/sync` e `shared/pix`. Regra: **adaptar o genérico, não reescrever**; a
 remoção do resto é um commit coordenado à parte, nunca no meio de uma onda.
+
+### Harness do atendente (de `../docs/pivot/HARNESS-ATENDENTE.md`)
+
+- **Fronteira sagrada:** o motor determinístico **efetiva** (pedido, cobrança, Pix, status, gates); o
+  harness só **entende e propõe** via tool (saída do modelo é dado, nunca comando, SEC-061).
+- **Autorização mora na tool:** `loja_id`/`cliente_id` vêm de um `ConversaCtx` selado pelo servidor,
+  nunca são argumento de tool nem o modelo os vê (fecha confused deputy).
+- `F1` (kernel) ganha `ToolContract` + schemas `EventoProposto`/`RespostaProposta`. `AT-motor-min`
+  invoca o harness no node de entendimento; `AT-entender` é a porta de entrada; `AT-rag` expõe
+  `buscar_conhecimento` como `ToolContract`.
+
+### Features da revisão de produto (de `../docs/pivot/REVISAO-PRODUTO.md`; tudo em escopo)
+
+| Módulo | O que | Onda | Obs |
+|---|---|---|---|
+| API-crm | CRM do restaurante sobre o consumidor final: histórico por cliente, RFM, o que compra | 3 | maior diferencial; dep API-pedidos/clientes |
+| API-campanhas | disparo de campanha por WhatsApp (opt-out, template, janela 24h) pela outbox | 4 | dep API-crm, ZAP-enviar |
+| FR-crm | telas de CRM + campanhas (artifact primeiro) | 3 | dep F6, API-crm |
+| API-onboarding | onboarding guiado, métrica tempo-até-1º-pedido | 1 | 1ª classe |
+| API-zonas (+) | pedido mínimo e frete grátis por zona | 3 | amplia o módulo |
+| API-pedidos/AT (+) | troco, forma de pagamento carimbada, repetir pedido inteiro | 1 | erro operacional real |
+| API-lojas (+) | pausar a loja no pico; capacidade por janela | 1 | `lojas.pausada` |
+| API-avaliacoes | avaliação/pós-venda do consumidor | 4 | tabela `avaliacoes` |
+| estoque-produto | baixa automática por pedido (produto, não ingrediente) | 5 | ver decisão do dono |
+| API-canais | integração iFood/outros atrás de `ClienteCanal` | futura | origem `ifood` já no schema |
+
+### Resiliência ("não cair durante um atendimento") -> categoria de teste RES-###
+
+- Contrato de resiliência (timeout + circuit breaker) nos `ClienteLLM`/`ClienteWhats`/`ClienteMapas`;
+  degradação graciosa (motor por botões sem LLM).
+- Observabilidade com **alerta de queda** (hoje só `healthz` + alerta de custo); ver
+  [[whaviso-resiliencia-systemd]].
+- O webhook persiste o inbound **antes** do 200 à Meta (era gap do produto antigo).
+- Testes de **carga** do caminho de pedido + **caos** + **idempotência sob crash**. Nova categoria
+  `RES-###` no catálogo do SEGURANCA.md.
+
+### Decisões do dono (adotadas pelo recomendado da revisão; dizer se quiser diferente)
+
+- **Fiscal/NFC-e: fica de fora** (integrar com terceiro depois). É o que viraria o whaviso num ERP;
+  mantém a aposta "canal próprio + retenção".
+- **Estoque:** por produto com baixa automática entra (onda 5); por ingrediente/ficha técnica, fora.
+- **iFood/canais:** entra como provedor `ClienteCanal` em onda futura, não agora.
+- **Billing da plataforma:** a assinatura fixa expõe a margem com o novo preço por mensagem da Meta
+  (out/2026); modelar **franquia + excedente** (revisar `P-cobranca`).
+- **Compliance Meta (jan/2026):** o número é atendimento/vendas da loja, **nunca** chatbot de IA
+  genérico; vira requisito (templates, persona de atendimento).
+
+### Segurança desta leva (vai pro catálogo)
+
+- Harness: `SEC-063` (tool não aceita `loja_id`/`cliente_id` como argumento), `SEC-064` (id opaco
+  revalidado contra a loja), `SEC-065` (injeção em tool-use), `SEC-066` (idempotência de ação),
+  `SEC-067` (teto de passos/gasto degrada para botões).
+- Campanhas: `SEC-11x` (campanha não cruza loja, exige opt-out, só dentro de template/janela).
+- Resiliência: categoria `RES-###`.
+
+### Migrations desta leva (reserva 0023+)
+
+campanhas, campanha_envios, cliente_consentimento, view `clientes_metricas` (RFM),
+`pedidos.forma_pagamento`/`troco_para`, `zonas.pedido_minimo`/`frete_gratis`, `lojas.pausada`,
+`avaliacoes`, anonimização LGPD. Numeração sequencial a partir de 0023, atualizando a tabela de reserva.
