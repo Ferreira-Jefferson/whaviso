@@ -6,6 +6,7 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import {
   BarChart3,
   Bike,
+  Bot,
   Boxes,
   CalendarDays,
   ChefHat,
@@ -14,7 +15,6 @@ import {
   FileBarChart,
   FileText,
   Gift,
-  KeyRound,
   LayoutGrid,
   Link2,
   MapPinned,
@@ -87,7 +87,7 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'agendamento', rotulo: 'Agenda', descricao: 'Pedidos agendados.', icone: CalendarDays, grupo: 'config', pagina: lazy(() => import('@/modules/agendamento')) },
   { caminho: 'pessoas', rotulo: 'Pessoas', descricao: 'Equipe, cargos e escalas.', icone: Contact, grupo: 'config', pagina: lazy(() => import('@/modules/pessoas')) },
   { caminho: 'canais', rotulo: 'Canais', descricao: 'WhatsApp, iFood e outros canais de pedidos.', icone: Link2, grupo: 'config', pagina: lazy(() => import('@/modules/canais')) },
-  { caminho: 'llm', rotulo: 'Atendente', descricao: 'A IA que atende: chave e consumo, conhecimento e fluxo da conversa.', icone: KeyRound, grupo: 'config', pagina: lazy(() => import('@/modules/llm')) },
+  { caminho: 'llm', rotulo: 'Atendente', descricao: 'A IA que atende: chave e consumo, conhecimento e fluxo da conversa.', icone: Bot, grupo: 'config', pagina: lazy(() => import('@/modules/llm')) },
   { caminho: 'onboarding', rotulo: 'Primeiros passos', descricao: 'Configure a loja para receber pedidos.', icone: Rocket, grupo: 'config', ocultoNoMenu: true, pagina: lazy(() => import('@/modules/onboarding')) },
 ]
 
