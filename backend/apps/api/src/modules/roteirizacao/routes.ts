@@ -4,7 +4,8 @@ import { criarMapasOsmDoAmbiente, type ClienteMapas } from '@whaviso/shared/clie
 import { HttpError } from '../../shared/http_errors'
 import { criarMapasIndisponivel } from './mapas_indisponivel'
 import {
-  DespachoConfigEntrada, DespachoConfigSaida, GeocodificarPendentesEntrada, GeocodificarPendentesSaida,
+  DespachoConfigEntrada, DespachoConfigSaida, GeocodificarEnderecoEntrada, GeocodificarEnderecoSaida,
+  GeocodificarPendentesEntrada, GeocodificarPendentesSaida,
   RoteirizacaoAceitarEntrada, RoteirizacaoAceitarSaida, RoteirizacaoReordenarEntrada,
   RoteirizacaoReordenarSaida, RoteirizacaoSugerirEntrada, RoteirizacaoSugerirSaida,
 } from './schemas'
@@ -46,6 +47,14 @@ export function criarRoteirizacaoRoutes(mapas: ClienteMapas, op: OpcoesServico =
       ...loja(limite(6)), preHandler: operar,
       schema: { body: GeocodificarPendentesEntrada, response: { 200: GeocodificarPendentesSaida } },
     }, async (req) => svc.geocodificarPendentes(ator(req), req.body))
+
+    // Seletor de mapa do painel (planta o icone da loja): geocodifica um endereco avulso, nao persiste.
+    // Custa uma chamada ao provedor (limite publico ~1 req/s): rate limit curto. Guard `loja:gerir`, de
+    // menor privilegio que cobre quem edita a area da loja E quem edita as zonas de entrega (ambos gerir).
+    app.post('/geocodificar-endereco', {
+      ...loja(limite(20)), preHandler: gerir,
+      schema: { body: GeocodificarEnderecoEntrada, response: { 200: GeocodificarEnderecoSaida } },
+    }, async (req) => svc.geocodificarEndereco(ator(req), req.body))
 
     app.post('/sugerir', {
       ...loja(limite(12)), preHandler: operar,

@@ -5,13 +5,13 @@
 import type { ClienteMapas } from '@whaviso/shared/clientes'
 import { comTransacao, notificar, type Executor, type Pool } from '@whaviso/shared/db'
 import type {
-  DespachoConfigEntrada, GeocodificarPendentesEntrada, RoteirizacaoAceitarEntrada,
+  DespachoConfigEntrada, GeocodificarEnderecoEntrada, GeocodificarPendentesEntrada, RoteirizacaoAceitarEntrada,
   RoteirizacaoReordenarEntrada, RoteirizacaoSugerirEntrada, StatusPedido,
 } from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import { agrupar, type Candidato } from './agrupar'
 import {
-  dentroDaArea, geocodificarEnderecos, MAX_GEOCODES_POR_SUGESTAO, type ResultadoGeocode,
+  consultaEndereco, dentroDaArea, geocodificarEnderecos, MAX_GEOCODES_POR_SUGESTAO, type ResultadoGeocode,
 } from './geocode'
 import { centroide, type Matrizes, type PontoGeo } from './geo'
 import { obterMatrizes } from './matriz'
@@ -19,7 +19,8 @@ import { custoCaminho, ordenarParadas } from './ordenar'
 import { prontoPrevistoEm } from './preparo'
 import * as repo from './repo'
 import type {
-  CorridaDto, CorridaSugerida, DespachoConfigDto, GeocodificarPendentesDto, ReordenarDto, SemLocalizacao, SugerirDto,
+  CorridaDto, CorridaSugerida, DespachoConfigDto, GeocodificarEnderecoDto, GeocodificarPendentesDto, ReordenarDto,
+  SemLocalizacao, SugerirDto,
 } from './schemas'
 
 export interface Ator {
@@ -80,6 +81,26 @@ export function criarServicoRoteirizacao(pool: Pool, mapas: ClienteMapas, op: Op
     return {
       processados: pendentes.length, geocodificados, falhas, interrompido,
       restantes: await repo.contarPendentes(pool, a.lojaId),
+    }
+  }
+
+  /**
+   * Geocodifica UM endereco avulso e devolve a coordenada (seletor de mapa do painel). Nao persiste,
+   * nao registra evento, nao loga: so consulta o provedor via ClienteMapas. Arredonda a 6 casas como o
+   * geocode em lote. Sem logradouro utilizavel ou erro do provedor: `encontrado: false` (sem detalhe).
+   */
+  async function geocodificarEndereco(_a: Ator, e: GeocodificarEnderecoEntrada): Promise<GeocodificarEnderecoDto> {
+    const consulta = consultaEndereco({
+      logradouro: e.logradouro, numero: e.numero ?? null, bairro: e.bairro ?? null,
+      cidade: e.cidade ?? null, uf: e.uf ?? null, cep: e.cep ?? null,
+    })
+    if (consulta === null) return { encontrado: false }
+    const r = await mapas.geocodificar(consulta)
+    if (!r.ok) return { encontrado: false }
+    return {
+      encontrado: true,
+      lat: Math.round(r.valor.lat * 1e6) / 1e6,
+      lng: Math.round(r.valor.lng * 1e6) / 1e6,
     }
   }
 
@@ -258,7 +279,7 @@ export function criarServicoRoteirizacao(pool: Pool, mapas: ClienteMapas, op: Op
     }
   }
 
-  return { obterConfig, atualizarConfig, geocodificarPendentes, sugerir, aceitar, reordenar }
+  return { obterConfig, atualizarConfig, geocodificarPendentes, geocodificarEndereco, sugerir, aceitar, reordenar }
 }
 
 export type ServicoRoteirizacao = ReturnType<typeof criarServicoRoteirizacao>

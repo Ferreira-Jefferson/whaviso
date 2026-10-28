@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { InjectOptions } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { FakeClienteMapas, Transitorio } from '@whaviso/shared/clientes'
+import { FakeClienteMapas, Permanente, Transitorio } from '@whaviso/shared/clientes'
 import { criarLogger } from '@whaviso/shared/logger'
 import {
   bancoAcessivel, criarConta, criarLoja, criarMembro, criarUsuario, fecharPools, limpar, novoCenario,
@@ -17,6 +17,7 @@ import { verificadorFake } from '../../../test/app'
 import { construirApp } from '../../app'
 import { envSchema } from '../../env'
 import { criarRoteirizacaoRoutes } from './routes'
+import { criarServicoRoteirizacao } from './service'
 
 const online = await bancoAcessivel()
 const d = online ? describe : describe.skip
@@ -288,6 +289,39 @@ d('modulo roteirizacao', () => {
     const outra = await chamar(donoB, lojaB, 'POST', '/geocodificar-pendentes', {})
     expect(outra.status, outra.body).toBe(200)
     expect((await A('POST', '/geocodificar-pendentes', { limite: 99 })).status).toBe(400)
+  })
+
+  it('geocodificar-endereco: avulso devolve coordenada, nao persiste; sem logradouro ou erro = encontrado false', async () => {
+    // ok: endereco conhecido devolve coordenada arredondada, sem gravar nada
+    const antes = mapas.chamadas.length
+    const r = await A('POST', '/geocodificar-endereco', {
+      logradouro: 'Rua Perto Um', numero: '10', bairro: 'Centro', cidade: 'Sao Paulo', uf: 'SP', cep: '01000000',
+    })
+    expect(r.status, r.body).toBe(200)
+    expect(r.corpo).toEqual({ encontrado: true, lat: -23.55, lng: -46.63 })
+    expect(mapas.chamadas.length).toBe(antes + 1)
+    // a resposta nao carrega campos de endereco de volta
+    expect(r.body).not.toMatch(/Rua|Centro|Perto/)
+    // atendente (so le/opera) nao pode: precisa de loja:gerir
+    expect((await chamar(atendente, lojaA, 'POST', '/geocodificar-endereco', { logradouro: 'Rua Perto Um' })).status).toBe(403)
+    // logradouro vazio e barrado na borda (schema estrito)
+    expect((await A('POST', '/geocodificar-endereco', { logradouro: '' })).status).toBe(400)
+    expect((await A('POST', '/geocodificar-endereco', { loja_id: lojaB, logradouro: 'Rua Perto Um' })).status).toBe(400)
+    // servico: consulta sem logradouro utilizavel = encontrado false (nao chama o provedor)
+    const svc = criarServicoRoteirizacao(poolApi, mapas, { pausaGeocodeMs: 0 })
+    const ator = { lojaId: lojaA, userId: dono }
+    const n = mapas.chamadas.length
+    expect(await svc.geocodificarEndereco(ator, { logradouro: '   ' })).toEqual({ encontrado: false })
+    expect(mapas.chamadas.length).toBe(n)
+    // provedor devolve erro = encontrado false
+    mapas.falharSempre(new Permanente('nao encontrado', { codigo: 'endereco_nao_encontrado' }))
+    try {
+      const f = await A('POST', '/geocodificar-endereco', { logradouro: 'Rua Perto Um', numero: '10', bairro: 'Centro' })
+      expect(f.status, f.body).toBe(200)
+      expect(f.corpo).toEqual({ encontrado: false })
+    } finally {
+      mapas.falharSempre(undefined)
+    }
   })
 
   it('texto do endereco mudou: a geocodificacao e zerada (trigger)', async () => {

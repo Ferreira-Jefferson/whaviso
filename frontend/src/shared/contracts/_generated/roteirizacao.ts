@@ -74,6 +74,30 @@ export const GeocodificarPendentesSaida = z.strictObject({
 export type GeocodificarPendentesSaida = z.infer<typeof GeocodificarPendentesSaida>
 
 // ---------------------------------------------------------------------------------------------
+// Geocodificar um endereco avulso (seletor de mapa do painel: planta o icone da loja).
+// Nao persiste nada: so devolve a coordenada para o front. Campos coerentes com `consultaEndereco`.
+// ---------------------------------------------------------------------------------------------
+export const GeocodificarEnderecoEntrada = z.strictObject({
+  logradouro: z.string().trim().min(1).max(200),
+  numero: z.string().trim().max(20).optional(),
+  bairro: z.string().trim().max(100).optional(),
+  cidade: z.string().trim().max(100).optional(),
+  uf: z.string().trim().max(2).optional(),
+  cep: z.string().trim().max(9).optional(),
+})
+export type GeocodificarEnderecoEntrada = z.infer<typeof GeocodificarEnderecoEntrada>
+
+export const GeocodificarEnderecoSaida = z.discriminatedUnion('encontrado', [
+  z.strictObject({
+    encontrado: z.literal(true),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  z.strictObject({ encontrado: z.literal(false) }),
+])
+export type GeocodificarEnderecoSaida = z.infer<typeof GeocodificarEnderecoSaida>
+
+// ---------------------------------------------------------------------------------------------
 // Sugestao
 // ---------------------------------------------------------------------------------------------
 export const RoteirizacaoSugerirEntrada = z.strictObject({
