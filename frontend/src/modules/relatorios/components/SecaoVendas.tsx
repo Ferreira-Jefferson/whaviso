@@ -6,7 +6,7 @@ import { Download, Receipt, ShoppingBag, Utensils, Wallet, X } from 'lucide-reac
 import { Button, Card, EmptyState, MeterBar, SectionHeader, Select, Skeleton, TableResponsive, type ColunaTabela, type SelectOption } from '@/shared/ui'
 import { formatarCentavos } from '@/shared/format'
 import type { DimensoesSaida, VendasSaida } from '@/shared/contracts/_generated/relatorios'
-import { useDimensoes, useSalao, useVendas, type FiltroVendas } from '../api'
+import { useDimensoes, useSalao, useVendas, type ConsultaVendas, type FiltroVendas } from '../api'
 import type { Periodo } from '../periodo'
 import { ErroRelatorio } from './ErroRelatorio'
 import { Tile } from './Tile'
@@ -109,20 +109,29 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
   const dims = useMemo(() => dimsQ.data?.dimensoes ?? [], [dimsQ.data])
   const porChave = useMemo(() => new Map(dims.map((d) => [d.chave, d])), [dims])
 
+  // Rascunho (o que o usuario esta montando) separado do que foi APLICADO: a chamada ao banco
+  // so acontece quando ele clica em "Gerar relatorio", nao a cada filtro adicionado.
   const [agruparPor, setAgruparPor] = useState('item')
   const [filtros, setFiltros] = useState<FiltroVendas[]>([])
+  const [aplicada, setAplicada] = useState<ConsultaVendas>({ agrupar_por: 'item', filtros: [] })
 
   // Agrupamento valido mesmo se o catalogo ainda carrega ou a dimensao sumiu do cardapio.
   const agrupamento = porChave.has(agruparPor) || dims.length === 0 ? agruparPor : 'item'
-  const q = useVendas(periodo, { agrupar_por: agrupamento, filtros: filtros.filter((f) => f.valores.length > 0) })
+  const rascunho = useMemo<ConsultaVendas>(
+    () => ({ agrupar_por: agrupamento, filtros: filtros.filter((f) => f.valores.length > 0) }),
+    [agrupamento, filtros],
+  )
+  const temAlteracoes = JSON.stringify(rascunho) !== JSON.stringify(aplicada)
+
+  const q = useVendas(periodo, aplicada)
   const d = q.data
 
   const opcoesAgrupar: SelectOption<string>[] = dims.map((dim) => ({
     value: dim.chave,
     label: dim.grupo === 'opcao' ? `Opção: ${dim.rotulo}` : dim.rotulo,
   }))
-  const dimAtual = porChave.get(agrupamento)
-  const colunaRotulo = dimAtual?.rotulo ?? 'Grupo'
+  // O cabecalho da coluna segue o relatorio APLICADO (o que esta na tabela), nao o rascunho.
+  const colunaRotulo = (d && porChave.get(d.agrupar_por)?.rotulo) ?? 'Grupo'
 
   const filtraveis = dims.filter((dim) => dim.filtravel && !filtros.some((f) => f.dimensao === dim.chave))
 
@@ -185,6 +194,15 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
                 ...filtraveis.map((dim) => ({ value: dim.chave, label: dim.grupo === 'opcao' ? `Opção: ${dim.rotulo}` : dim.rotulo })),
               ]}
             />
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-linha/60 pt-3">
+          <Button variante="primary" onClick={() => setAplicada(rascunho)} disabled={!temAlteracoes}>
+            {q.isFetching ? 'Gerando...' : 'Gerar relatório'}
+          </Button>
+          {temAlteracoes && (
+            <span className="text-xs text-tinta-2">Definições alteradas. Clique em Gerar para atualizar.</span>
           )}
         </div>
       </div>
