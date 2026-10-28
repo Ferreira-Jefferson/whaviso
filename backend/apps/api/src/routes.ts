@@ -38,6 +38,7 @@ import { promocoesRoutes } from './modules/promocoes'
 import { fidelidadeRoutes } from './modules/fidelidade'
 import { relatoriosRoutes } from './modules/relatorios'
 import { custosRoutes } from './modules/custos'
+import { contasPagarRoutes } from './modules/contas_pagar'
 import { roteirizacaoRoutes } from './modules/roteirizacao'
 import { fluxoRoutes } from './modules/fluxo'
 import { canaisRoutes } from './modules/canais'
@@ -89,6 +90,7 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'fidelidade', plugin: fidelidadeRoutes },
   { prefixo: 'relatorios', plugin: relatoriosRoutes },
   { prefixo: 'custos', plugin: custosRoutes },
+  { prefixo: 'contas-pagar', plugin: contasPagarRoutes },
   { prefixo: 'roteirizacao', plugin: roteirizacaoRoutes },
   { prefixo: 'fluxo', plugin: fluxoRoutes },
   { prefixo: 'canais', plugin: canaisRoutes },

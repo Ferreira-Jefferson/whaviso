@@ -15,6 +15,7 @@ import {
   FileBarChart,
   FileText,
   Gift,
+  HandCoins,
   LayoutGrid,
   Link2,
   Megaphone,
@@ -78,6 +79,7 @@ export const ROTAS: readonly RotaModulo[] = [
   // Financeiro (o dinheiro)
   { caminho: 'pagamentos', rotulo: 'Pagamentos', descricao: 'Pix dos pedidos e chave Pix.', icone: QrCode, grupo: 'financeiro', pagina: lazy(() => import('@/modules/pagamentos')) },
   { caminho: 'custos', rotulo: 'Custos', descricao: 'Quanto os serviços externos custaram.', icone: Receipt, grupo: 'financeiro', pagina: lazy(() => import('@/modules/custos')) },
+  { caminho: 'contas-a-pagar', rotulo: 'Contas a pagar', descricao: 'O que você paga a fornecedores e pessoas.', icone: HandCoins, grupo: 'financeiro', pagina: lazy(() => import('@/modules/contas_pagar')) },
   { caminho: 'fiscal', rotulo: 'Fiscal', descricao: 'Notas fiscais e emissor.', icone: FileText, grupo: 'financeiro', pagina: lazy(() => import('@/modules/fiscal')) },
   { caminho: 'fatura', rotulo: 'Minha fatura', descricao: 'Sua assinatura e faturas do Whaviso.', icone: ReceiptText, grupo: 'financeiro', pagina: lazy(() => import('@/modules/plataforma_cobranca').then((m) => ({ default: m.MinhaFaturaPage }))) },
   // Configuração (ajustes da loja e do atendente). Canais absorve os números de WhatsApp;
