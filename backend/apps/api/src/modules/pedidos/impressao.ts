@@ -1,6 +1,7 @@
 // Comanda do pedido, gerada SO do snapshot (nunca do cardapio vivo). Texto colunado para termica
 // de 58 mm (32 colunas) ou 80 mm (48) e HTML com CSS de impressao. Sem telefone; hora em SP.
 import { TZ, formatarValorBr } from '@whaviso/shared/datas'
+import { comandaEscPos, type LarguraBobina } from '@whaviso/shared/clientes'
 import type { PedidoDetalheSaida } from './schemas'
 
 const hora = new Intl.DateTimeFormat('pt-BR', {
@@ -87,6 +88,15 @@ export function comandaTexto(p: PedidoDetalheSaida, largura: number): string {
   }
   if (p.observacao) L.push(tracos, ...quebrar(`Obs: ${p.observacao}`, largura))
   return L.join('\n')
+}
+
+/**
+ * Comanda em bytes ESC/POS (base64). Reusa o texto colunado (comandaTexto) e o encoder do kernel
+ * (`@whaviso/shared/clientes`): um agente local envia esses bytes direto a termica (porta RAW 9100).
+ */
+export function comandaEscpos(p: PedidoDetalheSaida, largura: number): string {
+  const bytes = comandaEscPos({ texto: comandaTexto(p, largura), largura: largura as LarguraBobina })
+  return Buffer.from(bytes).toString('base64')
 }
 
 const esc = (s: string): string =>

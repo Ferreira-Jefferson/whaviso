@@ -8,7 +8,7 @@ import type { Cifra } from '@whaviso/shared/cifra'
 import { HttpError, conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import { carregarDetalhe } from './detalhe'
 import { destinosValidos, motivoObrigatorio, permiteCancelarLinha, podeTransicionar } from './estados'
-import { comandaHtml, comandaTexto } from './impressao'
+import { comandaEscpos, comandaHtml, comandaTexto } from './impressao'
 import { montarLinha, montarPedido, type LinhaEntrada, type LinhaMontada } from './montador'
 import * as repo from './repo'
 import * as escrita from './repo_escrita'
@@ -311,12 +311,19 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     return detalhe(a, pedidoId)
   }
 
-  async function imprimir(a: Ator, id: string, formato: 'html' | 'texto', largura: number): Promise<PedidoImpressaoSaida> {
+  async function imprimir(
+    a: Ator,
+    id: string,
+    formato: 'html' | 'texto' | 'escpos',
+    largura: number,
+  ): Promise<PedidoImpressaoSaida> {
     const d = await detalhe(a, id)
     await escrita.registrarEvento(pool, {
       lojaId: a.lojaId, tipo: 'pedido.impresso', pedidoId: id, detalhes: { user_id: a.userId, formato },
     })
-    return { formato, conteudo: formato === 'html' ? comandaHtml(d) : comandaTexto(d, largura) }
+    const conteudo =
+      formato === 'html' ? comandaHtml(d) : formato === 'escpos' ? comandaEscpos(d, largura) : comandaTexto(d, largura)
+    return { formato, conteudo }
   }
 
   return { criarManual, repetir, kanban, detalhe, mudarStatus, transicaoLote, cancelarLinha, imprimir }

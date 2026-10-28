@@ -10,6 +10,7 @@ import {
   Boxes,
   CalendarClock,
   CalendarDays,
+  ChefHat,
   ClipboardList,
   Contact,
   FileBarChart,
@@ -57,6 +58,7 @@ export interface RotaModulo {
 export const ROTAS: readonly RotaModulo[] = [
   // Painel (dia a dia)
   { caminho: 'pedidos', rotulo: 'Pedidos', descricao: 'Acompanhe os pedidos ao vivo.', icone: ClipboardList, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/pedidos')) },
+  { caminho: 'cozinha', rotulo: 'Cozinha', descricao: 'Tela da cozinha: prepare e marque pronto.', icone: ChefHat, grupo: 'painel', pagina: lazy(() => import('@/modules/kds')) },
   { caminho: 'conversas', rotulo: 'Conversas', descricao: 'Atendimento pelo WhatsApp.', icone: MessageCircle, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/conversas')) },
   { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/cardapio')) },
   { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'painel', fixoNoMobile: true, pagina: lazy(() => import('@/modules/clientes')) },

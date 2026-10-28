@@ -88,8 +88,10 @@ export const KanbanQuery = z.strictObject({
 })
 export type KanbanQuery = z.infer<typeof KanbanQuery>
 
+// `escpos`: bytes ESC/POS da comanda (init + CP860 + corte) em base64, para um agente local de
+// impressao enviar direto a termica (porta RAW 9100). `largura` respeita 32/48 colunas como o texto.
 export const ImpressaoQuery = z.strictObject({
-  formato: z.enum(['html', 'texto']).default('texto'),
+  formato: z.enum(['html', 'texto', 'escpos']).default('texto'),
   largura: z.coerce.number().int().refine((n) => n === 32 || n === 48, 'use 32 (58mm) ou 48 (80mm)').default(48),
 })
 
@@ -195,7 +197,8 @@ export const PedidoDetalheSaida = z.strictObject({
 export type PedidoDetalheSaida = z.infer<typeof PedidoDetalheSaida>
 
 export const PedidoImpressaoSaida = z.strictObject({
-  formato: z.enum(['html', 'texto']),
+  formato: z.enum(['html', 'texto', 'escpos']),
+  // Em `escpos`, `conteudo` e o payload ESC/POS em base64 (bytes, nao texto imprimivel).
   conteudo: z.string(),
 })
 export type PedidoImpressaoSaida = z.infer<typeof PedidoImpressaoSaida>
