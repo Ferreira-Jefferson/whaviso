@@ -21,8 +21,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
+  AcertoAjusteEntrada,
+  AcertoLancamento,
+  AcertoPagoSaida,
+  AcertoPeriodoSaida,
   ContaPagarListaSaida,
   ContaPagarSaida,
+  PagarAcertoEntrada,
+  type AcertoPagoDto,
+  type AcertoPeriodoDto,
   type ContaPagarDto,
   type ContaPagarNovo,
   type ContaPagarPatch,
@@ -189,6 +196,58 @@ export function usePagarConta() {
         body: { valor_centavos: valorCentavos },
         schema: ContaPagarSaida,
       }),
+    onSuccess: invalidar,
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Acerto do motoboy POR PERIODO (derivado do regime + ledger). Mapa REAL do backend:
+//   GET   /contas-pagar/acertos?de=&ate=   acerto do periodo -> AcertoPeriodoSaida
+//   POST  /contas-pagar/acertos/ajuste     ajuste manual (valor com sinal) -> AcertoPago? (append)
+//   POST  /contas-pagar/acertos/pagar      congela o periodo (409 total_divergente/periodo_sobreposto)
+// O total vem DERIVADO do servidor; ao pagar enviamos o total que o dono viu e o servidor recusa
+// (409) se mudou ou se o periodo sobrepoe um acerto ja pago.
+// ---------------------------------------------------------------------------------------------
+
+export type AcertoAjusteNovo = z.input<typeof AcertoAjusteEntrada>
+export type PagarAcertoNovo = z.input<typeof PagarAcertoEntrada>
+type AcertoLancamentoDto = z.infer<typeof AcertoLancamento>
+export type AcertoLinha = AcertoPeriodoDto['linhas'][number]
+
+function useInvalidarAcertos() {
+  const qc = useQueryClient()
+  return () => void qc.invalidateQueries({ queryKey: [RAIZ, 'acertos'] })
+}
+
+/** GET /v1/contas-pagar/acertos?de=&ate=: acerto do periodo (total derivado do regime + ledger). */
+export function useAcertoPeriodo(de: string, ate: string) {
+  return useQuery({
+    queryKey: [RAIZ, 'acertos', de, ate],
+    queryFn: ({ signal }) =>
+      apiClient.get<AcertoPeriodoDto>('/contas-pagar/acertos', {
+        query: { de, ate },
+        schema: AcertoPeriodoSaida,
+        signal,
+      }),
+  })
+}
+
+/** POST /v1/contas-pagar/acertos/ajuste: ajuste manual com sinal (bonus, desconto). */
+export function useLancarAjusteAcerto() {
+  const invalidar = useInvalidarAcertos()
+  return useMutation<AcertoLancamentoDto, Error, AcertoAjusteNovo>({
+    mutationFn: (body) =>
+      apiClient.post<AcertoLancamentoDto>('/contas-pagar/acertos/ajuste', { body, schema: AcertoLancamento }),
+    onSuccess: invalidar,
+  })
+}
+
+/** POST /v1/contas-pagar/acertos/pagar: congela o periodo, enviando o total visto (409 se divergiu). */
+export function usePagarAcerto() {
+  const invalidar = useInvalidarAcertos()
+  return useMutation<AcertoPagoDto, Error, PagarAcertoNovo>({
+    mutationFn: (body) =>
+      apiClient.post<AcertoPagoDto>('/contas-pagar/acertos/pagar', { body, schema: AcertoPagoSaida }),
     onSuccess: invalidar,
   })
 }

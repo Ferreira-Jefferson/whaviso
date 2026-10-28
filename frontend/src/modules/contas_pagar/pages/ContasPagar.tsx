@@ -3,6 +3,7 @@
 // PII (telefone do fornecedor) so MASCARADO, claro so sob demanda no dialog.
 import { useState } from 'react'
 import { PageHeader, Tabs, type TabItem } from '@/shared/ui'
+import { PainelAcerto } from '../components/PainelAcerto'
 import { PainelContas } from '../components/PainelContas'
 import { PainelFornecedores } from '../components/PainelFornecedores'
 
@@ -11,6 +12,7 @@ export default function ContasPagar() {
 
   const abas: ReadonlyArray<TabItem> = [
     { id: 'a-pagar', rotulo: 'A pagar', conteudo: <PainelContas /> },
+    { id: 'acerto-motoboys', rotulo: 'Acerto de motoboys', conteudo: <PainelAcerto /> },
     { id: 'fornecedores', rotulo: 'Fornecedores', conteudo: <PainelFornecedores /> },
   ]
 
