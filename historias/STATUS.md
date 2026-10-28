@@ -18,6 +18,42 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 
 ---
 
+## Estado real (2026-10-27): Ondas 1-5 construídas, integradas e verdes
+
+> Este bloco é a leitura autoritativa; onde uma célula "Status" de linha abaixo ainda disser `A FAZER`,
+> ela está **obsoleta** (as tabelas por onda nasceram como mapa de dependências, não como quadro vivo).
+>
+> **Backend + frontend completos e no git (branch `development`).** Gate integral verde: backend
+> typecheck + lint; suíte `npm test` (api 941, atendente 255, zap 65, shared 205) + `test:security`
+> (209, 0 skipped/0 todo) contra `whaviso_dev` recriado com as migrations 0052-0057; frontend typecheck
+> + lint + build (SEC-025 ok). Todas as 39 telas são reais.
+>
+> - **Onda 2 (IA):** CONCLUIDA (tabela abaixo atualizada). config-llm, llm_client, entender, rag,
+>   conhecimento, cardapio_importacao, importar, tools, harness ja existiam; fechado agora o
+>   `retroalimentar_base` (produtor do laco RAG) e as tools `cliente_cadastrar`/`tempo_de_entrega`.
+>   Guardrails SEC-060..067 implementados e testados. Motor consome o fluxo publicado e respeita loja pausada.
+> - **Onda 3 (entrega):** zonas, motoboys, pagamentos, despacho prontos. Fechado G9 (forma de pagamento +
+>   troco), G7 (pausar loja + capacidade), repetir pedido inteiro, despacho -> saiu_entrega em lote.
+> - **Onda 4 (negocio/plataforma):** dashboard, campanhas, avaliacoes, promocoes, relatorios, custos,
+>   plataforma_* prontos. Fechado o handoff humano ponta a ponta (assumir/devolver, status aguardando,
+>   botao no painel) e o rate-limit de frequencia de campanha.
+> - **Onda 5 (avancado):** roteirizacao e fluxo (builder) prontos; ClienteMapas real (Nominatim/OSRM) +
+>   resiliencia; mapa de despacho (Leaflet) e canvas do fluxo (React Flow); baixa de estoque/insumo na
+>   efetivacao do pedido (trigger); adapters reais ClienteFiscal (Focus NFe) e ClienteCanal (iFood),
+>   env-gated com fallback ao stub.
+> - **Seguranca/CI:** rastreabilidade enxerga os testes de modulo; catalogo atualizado; RES-001 e SEC-042
+>   escritos; pgvector no CI (a cobertura vetorial do RAG passa a rodar no PR).
+>
+> **Residuais documentados (dependem de decisao/credencial/hardware do dono, nao bloqueiam o build):**
+> Pix na conversa (exige o grant SEC-032 de SELECT do atendente em `loja_pix`, retido para revisao de
+> seguranca do dono) · KDS + ClienteImpressora ESC/POS (hardware) · caminho de foto do cliente (visao
+> multimodal no laco) · rewiring de topologia do fluxo por handles de aresta (evolucao do NodeContract) ·
+> cobranca franquia + excedente (decisao de preco; spec atual = fixo) · go-live fiscal/iFood (conta e
+> credenciais do provedor + campos fiscais por item NCM/CFOP/CSOSN vindos do catalogo).
+>
+> **Pendencia de deploy:** `supabase db push` das migrations 0052-0057 no cloud (acao de producao, via
+> fluxo de deploy; o runtime dev aponta para o cloud, entao as colunas/enums novos so valem la apos o push).
+
 ## Onda 0: Fundação (quase tudo depende daqui)
 
 > **FUNDAÇÃO CONCLUÍDA** (F0..F7 todos `CONCLUIDO`). Gate verde ponta a ponta: lint + typecheck +
@@ -110,16 +146,16 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 
 | ID | Módulo | Objetivo | Depende de | Modelo | Arquivo | Status |
 |---|---|---|---|---|---|---|
-| API-config-llm | configuracoes_llm | Área BYO key (write-only), set/rotate, validação | F4, F6 | Opus | backend-api/configuracoes_llm.md | A FAZER |
-| AT-llm | shared/llm_client | `ClienteLLM` (OpenRouter), resolve credencial da loja, no-train | F2, API-config-llm | Opus | backend-atendente/llm_client.md | A FAZER |
-| AT-entender | entender_mensagem | STT (áudio) + intenção do cliente | AT-llm, AT-motor-min | Sonnet | backend-atendente/entender_mensagem.md | A FAZER |
-| AT-rag | rag + base_conhecimento | Retrieval efetivo escopado por loja (ver RAG.md) | AT-llm, docs/pivot/RAG.md | Opus | backend-atendente/rag.md | A FAZER |
-| AT-realimentar | retroalimentar_base | LLM gera/curadoria de novos documentos, aprovação do dono | AT-rag | Opus | backend-atendente/retroalimentar_base.md | A FAZER |
-| API-cardapio-imp | cardapio_importacao | Importar cardápio por foto/PDF via LLM | AT-llm, API-cardapio | Sonnet | backend-api/cardapio_importacao.md | A FAZER |
-| API-conhecimento | conhecimento | Curadoria/aprovação/versionamento da base (RAG.md) | AT-rag | Opus | backend-api/conhecimento.md | A FAZER |
-| AT-importar | importar_cardapio | Consumidor no atendente que roda o LLM da importação | AT-llm, API-cardapio-imp | Sonnet | backend-atendente/importar_cardapio.md | A FAZER |
-| AT-tools | tools (registry) | ToolContract + tools do atendente (ler/rascunho/sinal, autorização na tool) | F1, AT-llm, API-cardapio, API-pedidos, API-clientes, AT-rag | Opus | backend-atendente/tools.md | A FAZER |
-| AT-harness | harness (agent loop) | Laço de agente, context engineering, prompts, teto de passos/gasto, observabilidade | AT-tools, AT-motor-min, AT-entender | Opus | backend-atendente/harness.md | A FAZER |
+| API-config-llm | configuracoes_llm | Área BYO key (write-only), set/rotate, validação | F4, F6 | Opus | backend-api/configuracoes_llm.md | CONCLUIDO |
+| AT-llm | shared/llm_client | `ClienteLLM` (OpenRouter), resolve credencial da loja, no-train | F2, API-config-llm | Opus | backend-atendente/llm_client.md | CONCLUIDO |
+| AT-entender | entender_mensagem | STT (áudio) + intenção do cliente | AT-llm, AT-motor-min | Sonnet | backend-atendente/entender_mensagem.md | CONCLUIDO |
+| AT-rag | rag + base_conhecimento | Retrieval efetivo escopado por loja (ver RAG.md) | AT-llm, docs/pivot/RAG.md | Opus | backend-atendente/rag.md | CONCLUIDO |
+| AT-realimentar | retroalimentar_base | LLM gera/curadoria de novos documentos, aprovação do dono | AT-rag | Opus | backend-atendente/retroalimentar_base.md | CONCLUIDO |
+| API-cardapio-imp | cardapio_importacao | Importar cardápio por foto/PDF via LLM | AT-llm, API-cardapio | Sonnet | backend-api/cardapio_importacao.md | CONCLUIDO |
+| API-conhecimento | conhecimento | Curadoria/aprovação/versionamento da base (RAG.md) | AT-rag | Opus | backend-api/conhecimento.md | CONCLUIDO |
+| AT-importar | importar_cardapio | Consumidor no atendente que roda o LLM da importação | AT-llm, API-cardapio-imp | Sonnet | backend-atendente/importar_cardapio.md | CONCLUIDO |
+| AT-tools | tools (registry) | ToolContract + tools do atendente (ler/rascunho/sinal, autorização na tool) | F1, AT-llm, API-cardapio, API-pedidos, API-clientes, AT-rag | Opus | backend-atendente/tools.md | CONCLUIDO |
+| AT-harness | harness (agent loop) | Laço de agente, context engineering, prompts, teto de passos/gasto, observabilidade | AT-tools, AT-motor-min, AT-entender | Opus | backend-atendente/harness.md | CONCLUIDO |
 
 ## Onda 3: Operação de entrega
 
