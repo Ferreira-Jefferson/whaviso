@@ -6,7 +6,6 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import {
   BarChart3,
   Bike,
-  BookOpen,
   Boxes,
   CalendarDays,
   ChefHat,
@@ -14,9 +13,7 @@ import {
   Contact,
   FileBarChart,
   FileText,
-  GitBranch,
   Gift,
-  HeartHandshake,
   KeyRound,
   LayoutGrid,
   Link2,
@@ -27,8 +24,6 @@ import {
   Receipt,
   ReceiptText,
   Rocket,
-  Route,
-  Smartphone,
   Star,
   Store,
   TicketPercent,
@@ -38,7 +33,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-export type GrupoNav = 'operacao' | 'cardapio' | 'entrega' | 'clientes' | 'atendente' | 'analise' | 'financeiro' | 'config'
+export type GrupoNav = 'operacao' | 'cardapio' | 'entrega' | 'clientes' | 'analise' | 'financeiro' | 'config'
 
 export interface RotaModulo {
   /** Segmento unico da URL, minusculo (ex.: 'pedidos' -> /pedidos). */
@@ -49,6 +44,9 @@ export interface RotaModulo {
   grupo: GrupoNav
   /** Aparece na barra inferior do mobile (maximo 4; o resto vai em "Mais"). */
   fixoNoMobile?: boolean
+  /** Fica fora do menu lateral e da barra mobile, mas segue roteavel (ex.: primeiros passos,
+   *  que e um guia de setup, nao um destino permanente). */
+  ocultoNoMenu?: boolean
   /** Pagina do modulo (lazy). Ausente = slot do shell. */
   pagina?: LazyExoticComponent<ComponentType>
 }
@@ -65,35 +63,32 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'cardapio', fixoNoMobile: true, pagina: lazy(() => import('@/modules/cardapio')) },
   { caminho: 'estoque', rotulo: 'Estoque', descricao: 'Insumos e fichas técnicas.', icone: Boxes, grupo: 'cardapio', pagina: lazy(() => import('@/modules/estoque')) },
   { caminho: 'promocoes', rotulo: 'Promoções', descricao: 'Cupons e combos para vender mais.', icone: TicketPercent, grupo: 'cardapio', pagina: lazy(() => import('@/modules/promocoes')) },
-  { caminho: 'fidelidade', rotulo: 'Fidelidade', descricao: 'Pontos ou cashback para quem volta.', icone: Gift, grupo: 'cardapio', pagina: lazy(() => import('@/modules/fidelidade')) },
   // Entrega
   { caminho: 'motoboys', rotulo: 'Motoboys', descricao: 'Cadastro de entregadores e fechamento do dia.', icone: Users, grupo: 'entrega', pagina: lazy(() => import('@/modules/motoboys')) },
   { caminho: 'zonas', rotulo: 'Zonas', descricao: 'Áreas e taxas de entrega.', icone: MapPinned, grupo: 'entrega', pagina: lazy(() => import('@/modules/zonas')) },
-  { caminho: 'roteirizacao', rotulo: 'Roteirização', descricao: 'Sugestões de corridas por preparo e proximidade.', icone: Route, grupo: 'entrega', pagina: lazy(() => import('@/modules/roteirizacao')) },
+  // Despacho absorve a roteirização (mapa + sugestões de corrida): despachar é uma coisa só.
   // Clientes (relacionamento e marketing)
   { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'clientes', fixoNoMobile: true, pagina: lazy(() => import('@/modules/clientes')) },
-  { caminho: 'crm', rotulo: 'CRM', descricao: 'Quem compra, quanto e com que frequência.', icone: HeartHandshake, grupo: 'clientes', pagina: lazy(() => import('@/modules/crm')) },
+  // Clientes absorve o CRM (segmentos, ticket, frequência): mesma entidade cliente.
   { caminho: 'campanhas', rotulo: 'Campanhas', descricao: 'Mensagens de WhatsApp para quem já pediu.', icone: Megaphone, grupo: 'clientes', pagina: lazy(() => import('@/modules/campanhas')) },
+  { caminho: 'fidelidade', rotulo: 'Fidelidade', descricao: 'Pontos ou cashback para quem volta.', icone: Gift, grupo: 'clientes', pagina: lazy(() => import('@/modules/fidelidade')) },
   { caminho: 'avaliacoes', rotulo: 'Avaliações', descricao: 'O que os clientes acharam dos pedidos.', icone: Star, grupo: 'clientes', pagina: lazy(() => import('@/modules/avaliacoes')) },
-  // Atendente (a IA, tudo num lugar só)
-  { caminho: 'llm', rotulo: 'Atendente', descricao: 'Chave do provedor e consumo do atendente.', icone: KeyRound, grupo: 'atendente', pagina: lazy(() => import('@/modules/llm')) },
-  { caminho: 'conhecimento', rotulo: 'Conhecimento', descricao: 'O que o atendente sabe sobre a loja.', icone: BookOpen, grupo: 'atendente', pagina: lazy(() => import('@/modules/conhecimento')) },
-  { caminho: 'fluxo', rotulo: 'Fluxo', descricao: 'Etapas da conversa do atendente.', icone: GitBranch, grupo: 'atendente', pagina: lazy(() => import('@/modules/fluxo')) },
   // Análise (os números)
   { caminho: 'dashboard', rotulo: 'Dashboard', descricao: 'Números do dia e do período.', icone: BarChart3, grupo: 'analise', pagina: lazy(() => import('@/modules/dashboard')) },
   { caminho: 'relatorios', rotulo: 'Relatórios', descricao: 'Vendas, pagamentos, problemas e retenção.', icone: FileBarChart, grupo: 'analise', pagina: lazy(() => import('@/modules/relatorios')) },
-  { caminho: 'custos', rotulo: 'Custos', descricao: 'Quanto os serviços externos custaram.', icone: Receipt, grupo: 'analise', pagina: lazy(() => import('@/modules/custos')) },
   // Financeiro (o dinheiro)
   { caminho: 'pagamentos', rotulo: 'Pagamentos', descricao: 'Pix dos pedidos e chave Pix.', icone: QrCode, grupo: 'financeiro', pagina: lazy(() => import('@/modules/pagamentos')) },
+  { caminho: 'custos', rotulo: 'Custos', descricao: 'Quanto os serviços externos custaram.', icone: Receipt, grupo: 'financeiro', pagina: lazy(() => import('@/modules/custos')) },
   { caminho: 'fiscal', rotulo: 'Fiscal', descricao: 'Notas fiscais e emissor.', icone: FileText, grupo: 'financeiro', pagina: lazy(() => import('@/modules/fiscal')) },
   { caminho: 'fatura', rotulo: 'Minha fatura', descricao: 'Sua assinatura e faturas do Whaviso.', icone: ReceiptText, grupo: 'financeiro', pagina: lazy(() => import('@/modules/plataforma_cobranca').then((m) => ({ default: m.MinhaFaturaPage }))) },
-  // Configuração (ajustes da loja, baixa frequência)
+  // Configuração (ajustes da loja e do atendente). Canais absorve os números de WhatsApp;
+  // o Atendente reúne chave/consumo, conhecimento e fluxo (tudo que configura a IA).
   { caminho: 'lojas', rotulo: 'Lojas', descricao: 'Perfil, horários, agendamento e área da loja.', icone: Store, grupo: 'config', pagina: lazy(() => import('@/modules/lojas')) },
   { caminho: 'agendamento', rotulo: 'Agenda', descricao: 'Pedidos agendados.', icone: CalendarDays, grupo: 'config', pagina: lazy(() => import('@/modules/agendamento')) },
   { caminho: 'pessoas', rotulo: 'Pessoas', descricao: 'Equipe, cargos e escalas.', icone: Contact, grupo: 'config', pagina: lazy(() => import('@/modules/pessoas')) },
-  { caminho: 'numeros', rotulo: 'Números', descricao: 'Números de WhatsApp conectados.', icone: Smartphone, grupo: 'config', pagina: lazy(() => import('@/modules/numeros')) },
-  { caminho: 'canais', rotulo: 'Canais', descricao: 'iFood e outros canais de pedidos.', icone: Link2, grupo: 'config', pagina: lazy(() => import('@/modules/canais')) },
-  { caminho: 'onboarding', rotulo: 'Primeiros passos', descricao: 'Configure a loja para receber pedidos.', icone: Rocket, grupo: 'config', pagina: lazy(() => import('@/modules/onboarding')) },
+  { caminho: 'canais', rotulo: 'Canais', descricao: 'WhatsApp, iFood e outros canais de pedidos.', icone: Link2, grupo: 'config', pagina: lazy(() => import('@/modules/canais')) },
+  { caminho: 'llm', rotulo: 'Atendente', descricao: 'A IA que atende: chave e consumo, conhecimento e fluxo da conversa.', icone: KeyRound, grupo: 'config', pagina: lazy(() => import('@/modules/llm')) },
+  { caminho: 'onboarding', rotulo: 'Primeiros passos', descricao: 'Configure a loja para receber pedidos.', icone: Rocket, grupo: 'config', ocultoNoMenu: true, pagina: lazy(() => import('@/modules/onboarding')) },
 ]
 
 /** Metadados de cada grupo da navegação, na ordem em que aparecem no menu. */
@@ -106,10 +101,9 @@ export interface GrupoInfo {
 
 export const GRUPOS_NAV: readonly GrupoInfo[] = [
   { id: 'operacao', rotulo: 'Operação', abertoPadrao: true },
-  { id: 'cardapio', rotulo: 'Cardápio' },
+  { id: 'cardapio', rotulo: 'Cardápio e estoque' },
   { id: 'entrega', rotulo: 'Entrega' },
-  { id: 'clientes', rotulo: 'Clientes' },
-  { id: 'atendente', rotulo: 'Atendente' },
+  { id: 'clientes', rotulo: 'Clientes e marketing' },
   { id: 'analise', rotulo: 'Análise' },
   { id: 'financeiro', rotulo: 'Financeiro' },
   { id: 'config', rotulo: 'Configuração' },

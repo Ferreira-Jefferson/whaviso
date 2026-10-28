@@ -70,7 +70,7 @@ function ItemNav({ rota, onNavegar }: { rota: RotaModulo; onNavegar?: () => void
 /** Uma seção recolhível do menu lateral: cabeçalho (chevron + rótulo) + lista de itens.
  *  A seção da rota atual fica sempre aberta, para o usuário nunca "perder" onde está. */
 function GrupoSecao({ id, rotulo, aberto, ativo, onAlternar }: { id: GrupoNav; rotulo: string; aberto: boolean; ativo: boolean; onAlternar: (id: GrupoNav) => void }) {
-  const itens = ROTAS.filter((r) => r.grupo === id)
+  const itens = ROTAS.filter((r) => r.grupo === id && !r.ocultoNoMenu)
   if (itens.length === 0) return null
   const expandido = aberto || ativo
   return (
@@ -146,7 +146,7 @@ function BarraInferior() {
   const [aberto, setAberto] = useState(false)
   const { pathname } = useLocation()
   const fixas = ROTAS.filter((r) => r.fixoNoMobile).slice(0, 4)
-  const resto = ROTAS.filter((r) => !fixas.includes(r))
+  const resto = ROTAS.filter((r) => !fixas.includes(r) && !r.ocultoNoMenu)
   const restoAtivo = resto.some((r) => pathname.startsWith(`/${r.caminho}`))
   const painel = useRef<HTMLDivElement>(null)
 
