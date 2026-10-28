@@ -11,6 +11,7 @@
 import type { EfeitoProposto, MensagemProposta } from '@whaviso/shared/contracts'
 import { ErroBanco, notificar, type PoolClient } from '@whaviso/shared/db'
 import { TZ } from '@whaviso/shared/datas'
+import type { ModoAtendente } from '@whaviso/shared/disponibilidade'
 import { botoes, EFEITO, texto } from './acoes'
 import { formatarPreco, menuCategorias } from './comum'
 import { ErroMontagem, montarLinha, type LinhaSnapshot } from './cardapio'
@@ -30,6 +31,8 @@ export interface DepsEfeito {
   destinatarioHash: string
   cardapio: CardapioCtx
   agora: Date
+  /** Modo do atendente AGORA (disponibilidade da loja): ajusta a copy do aviso de pedido recebido. */
+  modo: ModoAtendente
   /** Decifra da chave Pix (grant 0058). Ausente: o nó de pix degrada com aviso ao cliente. */
   pixDecifra?: PixDecifra
 }
@@ -45,6 +48,18 @@ export interface ResultadoEfeitos {
 const fmtData = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: '2-digit', month: '2-digit', day: '2-digit' })
 function aammdd(agora: Date): string {
   return fmtData.format(agora).replace(/-/g, '')
+}
+
+/**
+ * Aviso de pedido recebido. No modo `agendamento` deixa claro que o pedido foi AGENDADO e que a
+ * entrega sai dentro do horario de atendimento (nunca promete entrega imediata). Puro (testavel).
+ */
+export function mensagemPedidoRecebido(codigo: string, totalCentavos: number, modo: ModoAtendente): string {
+  const base = `Pedido ${codigo} recebido! Total ${formatarPreco(totalCentavos)}.`
+  if (modo === 'agendamento') {
+    return `${base} Seu pedido foi agendado: a entrega sai dentro do horario de atendimento. Avisamos por aqui assim que comecar o preparo.`
+  }
+  return `${base} Avisamos por aqui quando comecar o preparo.`
 }
 
 export async function aplicarEfeitos(
@@ -143,10 +158,7 @@ async function criarPedido(deps: DepsEfeito, estado: EstadoFluxo, mensagensExtra
   })
   await escrita.registrarEvento(deps.tx, { lojaId: deps.lojaId, tipo: 'pedido.criado', entidade: 'pedido', entidadeId: pedidoId })
 
-  mensagensExtra.push({
-    tipo: 'texto',
-    texto: `Pedido ${codigo} recebido! Total ${formatarPreco(total)}. Avisamos por aqui quando comecar o preparo.`,
-  })
+  mensagensExtra.push({ tipo: 'texto', texto: mensagemPedidoRecebido(codigo, total, deps.modo) })
   return { ...estado, pedido_id: pedidoId, codigo }
 }
 

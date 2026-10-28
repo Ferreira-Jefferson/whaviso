@@ -75,6 +75,11 @@ async function um<T = { id: string }>(sqlTexto: string, params: unknown[]): Prom
 
 export interface OpcoesCenario {
   horarios?: unknown
+  /**
+   * Nao semeia a disponibilidade padrao (loja aberta a semana toda). Com isso, sem horario de
+   * atendimento nem agendamento, o modo do atendente deriva para `fechado` (simula loja fechada).
+   */
+  semDisponibilidade?: boolean
   /** bairro do endereco do cliente (default 'Centro'). */
   bairro?: string
   /** bairro da zona de entrega ativa (default = `bairro`); use para simular fora de area. */
@@ -144,6 +149,19 @@ export async function semear(op: OpcoesCenario = {}): Promise<Cenario> {
   )).id
 
   const pix = op.semPix ? null : await semearPix(lojaId, op.pix)
+
+  // Disponibilidade padrao: loja aceitando pedido ao vivo a semana toda (modo atendimento). Duas
+  // faixas por dia cobrem as 24h sem buraco na virada (00:00-23:00 e 23:00-02:00 cruzando a
+  // meia-noite), para o modo ser estavel em qualquer horario real do relogio dos testes.
+  if (!op.semDisponibilidade) {
+    for (let dia = 0; dia < 7; dia++) {
+      await poolSuper.query(
+        `insert into public.horarios_funcionamento (loja_id, dia_semana, abre, fecha)
+         values ($1,$2,'00:00','23:00'),($1,$2,'23:00','02:00')`,
+        [lojaId, dia],
+      )
+    }
+  }
 
   const cardapio = await semearCardapio(lojaId)
   return { contaId, lojaId, numeroId, clienteId, conversaId, enderecoId, cardapio, telefoneHash, pix }

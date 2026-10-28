@@ -3,6 +3,7 @@
 // efetiva (ver HARNESS-ATENDENTE.md, fronteira sagrada). Aqui ficam so os contratos de dados
 // do turno; a logica mora nos nodes e no service.
 import { z } from 'zod'
+import type { ModoAtendente } from '@whaviso/shared/disponibilidade'
 
 /** Uma linha do carrinho em construcao (referencias opacas; o preco e calculado no servidor). */
 export const LinhaCarrinho = z
@@ -71,7 +72,8 @@ export interface EventoTurno {
 export interface LojaCtx {
   readonly id: string
   readonly nome: string
-  readonly horarios: unknown
+  /** Modo do atendente AGORA, derivado da disponibilidade da loja: atendimento|agendamento|fechado. */
+  readonly modo: ModoAtendente
   /** Pausa operacional em vigor agora (G7, migration 0053): nao aceita pedido novo enquanto durar. */
   readonly pausada_agora: boolean
 }

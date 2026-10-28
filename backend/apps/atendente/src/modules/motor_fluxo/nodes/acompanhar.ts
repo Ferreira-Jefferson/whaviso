@@ -18,10 +18,15 @@ export const acompanharNode: NodeContract<ConfigVazia, EntradaTurno> = {
   usaLlm: false,
   configSchema: ConfigVazia,
   async executar(entrada) {
-    const { estado, pedidoStatus } = entrada
+    const { estado, pedidoStatus, loja } = entrada
     const codigo = estado.codigo ? ` (${estado.codigo})` : ''
+    // Pedido ainda `novo` no modo agendamento: deixa claro que e agendado (entra no preparo dentro
+    // do horario de atendimento), nunca promete entrega imediata. Status reais (em preparo, saiu
+    // para entrega) refletem a operacao de verdade e seguem como estao.
     const base = pedidoStatus
-      ? (MENSAGEM[pedidoStatus] ?? 'Seu pedido esta em andamento.')
+      ? pedidoStatus === 'novo' && loja.modo === 'agendamento'
+        ? 'Recebemos seu pedido agendado. Ele entra no preparo dentro do horario de atendimento.'
+        : (MENSAGEM[pedidoStatus] ?? 'Seu pedido esta em andamento.')
       : 'Nao encontrei um pedido em andamento. Quando quiser pedir, e so chamar.'
     return saida('acompanhar', [texto(`${base}${pedidoStatus ? codigo : ''}`)], [])
   },

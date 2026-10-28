@@ -4,6 +4,7 @@
 // forma invalida/ausente cai no estado inicial (saudacao).
 import type { PoolClient } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
+import { modoAtendente } from '@whaviso/shared/disponibilidade'
 import { normalizarMensagem } from './entrada'
 import { resolverFonte, type FonteFluxo } from './fluxo_fonte'
 import { montarCardapio } from './montar_cardapio'
@@ -56,10 +57,16 @@ export async function montarContexto(
     ? await leitura.lerStatusPedido(tx, conversa.loja_id, estado.pedido_id)
     : null
 
+  // Modo do atendente derivado da disponibilidade da loja (fonte unica, regras-negocio/05): o motor
+  // nao tem horario proprio. atendimento|agendamento|fechado guia a comunicacao dos nodes.
+  const dados = await leitura.lerDisponibilidade(tx, conversa.loja_id, agora)
+  const agendamento = await leitura.lerAgendamento(tx, conversa.loja_id)
+  const modo = modoAtendente(dados, agendamento, agora)
+
   const entrada: EntradaTurno = {
     evento: normalizarMensagem(claim),
     estado,
-    loja: { id: loja.id, nome: loja.nome, horarios: loja.horarios, pausada_agora: pausadaAgora(loja, agora) },
+    loja: { id: loja.id, nome: loja.nome, modo, pausada_agora: pausadaAgora(loja, agora) },
     cliente: { id: cliente.id, nome: cliente.nome, telefone_hash: cliente.telefone_hash },
     cardapio: montarCardapio(cardapioRaw, agora),
     ultimoEnderecoId: ultimoEndereco?.id ?? null,

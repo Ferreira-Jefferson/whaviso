@@ -149,6 +149,7 @@ async function rodarTurno(deps: DepsMotor, tx: PoolClient, ctx: ContextoTurno, m
       destinatarioHash: ctx.destinatarioHash,
       cardapio: entrada.cardapio,
       agora: entrada.agora,
+      modo: entrada.loja.modo,
       pixDecifra: deps.pixDecifra,
     },
     entrada.estado,

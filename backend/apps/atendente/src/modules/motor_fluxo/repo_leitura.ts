@@ -1,7 +1,14 @@
 // Leitura do motor: SO via @whaviso/shared/db (sql parametrizado, SEC-080). Todas as leituras
 // filtram pela loja_id da conversa (SEC-001/002). Nunca projeta telefone/conteudo em log.
-import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
+import { consultar, consultarUm, sql, sqlBruto, type Executor } from '@whaviso/shared/db'
 import type { TipoChavePix } from '@whaviso/shared/contracts'
+import {
+  momentoSp,
+  type Agendamento,
+  type DadosDisponibilidade,
+  type Excecao,
+  type FaixaHorario,
+} from '@whaviso/shared/disponibilidade'
 
 /** Reivindica a proxima mensagem de ENTRADA nao processada (claim do inbound, FOR UPDATE SKIP LOCKED). */
 export interface MensagemClaim {
@@ -45,7 +52,6 @@ export async function lockConversa(tx: Executor, conversaId: string): Promise<Co
 export interface LojaRow {
   id: string
   nome: string
-  horarios: unknown
   /** Pausa operacional (G7): liga/desliga. `pausada_ate` limita a pausa no tempo (null = indefinida). */
   pausada: boolean
   pausada_ate: Date | null
@@ -53,8 +59,50 @@ export interface LojaRow {
 export async function lerLoja(tx: Executor, lojaId: string): Promise<LojaRow | null> {
   return consultarUm<LojaRow>(
     tx,
-    sql`select id, nome, horarios, pausada, pausada_ate from public.lojas where id = ${lojaId}`,
+    sql`select id, nome, pausada, pausada_ate from public.lojas where id = ${lojaId}`,
   )
+}
+
+// time -> "HH:mm" (fragmento fixo de codigo; nome de coluna, nunca entrada do cliente).
+const HM = (col: string) => sqlBruto(`to_char(${col}, 'HH24:MI')`)
+
+/**
+ * Disponibilidade da loja (fonte unica, regras-negocio/05) para o motor derivar o modo do atendente:
+ * faixas de atendimento ATIVAS + a excecao ativa da data de HOJE (America/Sao_Paulo). O calculo do
+ * modo e puro e mora no kernel `@whaviso/shared/disponibilidade`; aqui so lemos e mapeamos.
+ */
+export async function lerDisponibilidade(tx: Executor, lojaId: string, agora: Date): Promise<DadosDisponibilidade> {
+  const hoje = momentoSp(agora).data
+  const horarios = await consultar<FaixaHorario>(
+    tx,
+    sql`select dia_semana, ${HM('abre')} as abre, ${HM('fecha')} as fecha
+          from public.horarios_funcionamento where loja_id = ${lojaId} and ativo`,
+  )
+  const exc = await consultarUm<{ fechado: boolean; abre: string | null; fecha: string | null }>(
+    tx,
+    sql`select fechado, ${HM('abre')} as abre, ${HM('fecha')} as fecha
+          from public.excecoes_disponibilidade
+         where loja_id = ${lojaId} and ativo and data = ${hoje}::date`,
+  )
+  const excecoes: Excecao[] = exc
+    ? [{ data: hoje, fechado: exc.fechado, abre: exc.abre, fecha: exc.fecha }]
+    : []
+  return { horarios, excecoes }
+}
+
+/**
+ * Janela de agendamento da loja (uma linha por loja, modo desligado|faixa|24h). Sem linha =
+ * agendamento desligado (so pedido ao vivo). inicio/fim nulos do banco viram '00:00' (o modo que
+ * nao e `faixa` nao os usa). dias nulo vira [].
+ */
+export async function lerAgendamento(tx: Executor, lojaId: string): Promise<Agendamento> {
+  const r = await consultarUm<{ modo: Agendamento['modo']; inicio: string | null; fim: string | null; dias: number[] | null }>(
+    tx,
+    sql`select modo, ${HM('inicio')} as inicio, ${HM('fim')} as fim, dias
+          from public.agendamento_config where loja_id = ${lojaId}`,
+  )
+  if (!r) return { modo: 'desligado', dias: [], inicio: '00:00', fim: '00:00' }
+  return { modo: r.modo, dias: r.dias ?? [], inicio: r.inicio ?? '00:00', fim: r.fim ?? '00:00' }
 }
 
 export interface ClienteRow {

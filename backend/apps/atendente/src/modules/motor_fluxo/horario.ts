@@ -1,6 +1,8 @@
-// Checagem PURA de horario de funcionamento da loja, em America/Sao_Paulo. Mesma forma das
-// janelas da programacao de categoria (dias 0=Dom..6=Sab, inicio/fim 'HH:MM'). `horarios` null
-// ou de forma desconhecida = loja sempre aberta (nao bloqueia por configuracao ausente/invalida).
+// Checagem PURA de janela ativa, em America/Sao_Paulo (dias 0=Dom..6=Sab, inicio/fim 'HH:MM').
+// Usada SO pela PROGRAMACAO DE CATEGORIA do cardapio (agendamento de categoria, nao horario de
+// loja: o modo do atendente vem da disponibilidade da loja, kernel `@whaviso/shared/disponibilidade`).
+// `programacao` null ou de forma desconhecida = categoria sempre visivel (nao bloqueia por config
+// ausente/invalida).
 import { z } from 'zod'
 import { TZ } from '@whaviso/shared/datas'
 

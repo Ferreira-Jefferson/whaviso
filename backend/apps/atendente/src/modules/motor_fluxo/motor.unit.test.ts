@@ -2,14 +2,18 @@
 // tamanho + maximo), disponibilidade (esgotado_ate expirado volta a vender; categoria fora do
 // horario nao aparece), SEC-061 (texto livre nao confirma) e validacao do registry.
 import { describe, expect, it } from 'vitest'
+import type { ModoAtendente } from '@whaviso/shared/disponibilidade'
 import { ErroMontagem, montarLinha } from './cardapio'
 import { montarCardapio } from './montar_cardapio'
+import { mensagemPedidoRecebido } from './efeitos'
 import { criarRegistry, NODES_COM_LLM } from './registry'
 import { elegivelParaHarness, validarRascunho } from './texto_livre'
+import { acompanharNode } from './nodes/acompanhar'
 import { confirmarNode } from './nodes/confirmar'
+import { saudacaoNode } from './nodes/saudacao'
 import { EFEITO } from './acoes'
 import type { CardapioRaw } from './repo_leitura'
-import type { EntradaTurno, EstadoFluxo, GrupoCtx, ItemCtx } from './tipos'
+import type { CategoriaCtx, EntradaTurno, EstadoFluxo, GrupoCtx, ItemCtx } from './tipos'
 
 const ONTEM = new Date('2026-01-01T00:00:00Z')
 const HOJE = new Date('2026-06-15T15:00:00Z') // domingo 12:00 em Sao_Paulo
@@ -87,7 +91,11 @@ describe('montarCardapio (disponibilidade e programacao)', () => {
   })
 })
 
-function entrada(evento: EntradaTurno['evento'], estado: Partial<EstadoFluxo>): EntradaTurno {
+function entrada(
+  evento: EntradaTurno['evento'],
+  estado: Partial<EstadoFluxo>,
+  loja: Partial<EntradaTurno['loja']> = {},
+): EntradaTurno {
   return {
     evento,
     estado: {
@@ -96,7 +104,7 @@ function entrada(evento: EntradaTurno['evento'], estado: Partial<EstadoFluxo>): 
       aguardando: null, bairro_rascunho: null, pagamento: null, pedido_id: null, codigo: null, falhas: 0,
       fluxo_versao_id: null, ...estado,
     },
-    loja: { id: 'l1', nome: 'Loja', horarios: null, pausada_agora: false },
+    loja: { id: 'l1', nome: 'Loja', modo: 'atendimento', pausada_agora: false, ...loja },
     cliente: { id: 'cli', nome: null, telefone_hash: 'x'.repeat(64) },
     cardapio: { categorias: [], itensPorCategoria: new Map(), itensPorId: new Map(), gruposPorItem: new Map() },
     ultimoEnderecoId: 'end1',
@@ -106,6 +114,15 @@ function entrada(evento: EntradaTurno['evento'], estado: Partial<EstadoFluxo>): 
     agora: HOJE,
   }
 }
+
+const NODE_CTX = { loja_id: 'l1', conversa_id: 'conv1' }
+
+/** Entrada de saudacao com `n` categorias e um `modo` dado (default atendimento). */
+function entradaSaudacao(modo: ModoAtendente, categorias: readonly CategoriaCtx[]): EntradaTurno {
+  const e = entrada({ tipo: 'texto', texto: 'oi', botaoId: null }, { etapa: 'saudacao', carrinho: [] }, { modo })
+  return { ...e, cardapio: { ...e.cardapio, categorias } }
+}
+const UMA_CATEGORIA: CategoriaCtx[] = [{ id: 'c1', nome: 'Lanches' }]
 
 describe('confirmar (SEC-061: texto livre nao confirma)', () => {
   it('texto "confirmar pedido" fora do botao nao gera criar_pedido', async () => {
@@ -125,6 +142,67 @@ describe('confirmar (SEC-061: texto livre nao confirma)', () => {
       { loja_id: 'l1', conversa_id: 'conv1' },
     )
     expect(saida.proximo).toBe('endereco')
+  })
+})
+
+describe('saudacao por modo do atendente (disponibilidade, fonte unica)', () => {
+  it('fechado: responde loja fechada, nao abre pedido e encerra', async () => {
+    const saida = await saudacaoNode.executar(entradaSaudacao('fechado', UMA_CATEGORIA), {}, NODE_CTX)
+    expect(saida.proximo).toBeNull()
+    expect(saida.efeitos.some((e) => e.tipo === EFEITO.encerrar)).toBe(true)
+    expect((saida.mensagens[0] as { texto: string }).texto.toLowerCase()).toContain('fechada')
+  })
+
+  it('atendimento: abre o cardapio com a saudacao normal (sem aviso de agendamento)', async () => {
+    const saida = await saudacaoNode.executar(entradaSaudacao('atendimento', UMA_CATEGORIA), {}, NODE_CTX)
+    expect(saida.proximo).toBe('pedir_categoria')
+    const texto = (saida.mensagens[0] as { texto: string }).texto
+    expect(texto).toContain('Bem-vindo')
+    expect(texto.toLowerCase()).not.toContain('agendad')
+  })
+
+  it('agendamento: abre o cardapio deixando claro que o pedido e agendado, sem prometer entrega imediata', async () => {
+    const saida = await saudacaoNode.executar(entradaSaudacao('agendamento', UMA_CATEGORIA), {}, NODE_CTX)
+    expect(saida.proximo).toBe('pedir_categoria')
+    const texto = (saida.mensagens[0] as { texto: string }).texto.toLowerCase()
+    expect(texto).toContain('agendad')
+    expect(texto).toContain('horario de atendimento')
+    expect(texto).not.toMatch(/\d+\s*min/) // nunca promete "sai em X min"
+  })
+
+  it('sem categorias (qualquer modo aberto): avisa indisponivel e encerra', async () => {
+    const saida = await saudacaoNode.executar(entradaSaudacao('agendamento', []), {}, NODE_CTX)
+    expect(saida.proximo).toBeNull()
+    expect(saida.efeitos.some((e) => e.tipo === EFEITO.encerrar)).toBe(true)
+  })
+})
+
+describe('agendamento nao promete entrega imediata', () => {
+  it('aviso de pedido recebido: atendimento fala do preparo; agendamento fala de pedido agendado', () => {
+    const atendimento = mensagemPedidoRecebido('A01', 2500, 'atendimento')
+    const agendamento = mensagemPedidoRecebido('A01', 2500, 'agendamento')
+    expect(atendimento).toContain('quando comecar o preparo')
+    expect(atendimento.toLowerCase()).not.toContain('agendad')
+    expect(agendamento.toLowerCase()).toContain('agendad')
+    expect(agendamento).toContain('horario de atendimento')
+    expect(agendamento).not.toMatch(/\d+\s*min/)
+  })
+
+  it('acompanhar: pedido novo no modo agendamento nao promete entrega imediata', async () => {
+    const base = entrada({ tipo: 'texto', texto: 'cade meu pedido', botaoId: null }, { etapa: 'acompanhar' }, { modo: 'agendamento' })
+    const saida = await acompanharNode.executar({ ...base, pedidoStatus: 'novo' }, {}, NODE_CTX)
+    const texto = (saida.mensagens[0] as { texto: string }).texto.toLowerCase()
+    expect(texto).toContain('agendad')
+    expect(texto).toContain('horario de atendimento')
+    expect(texto).not.toMatch(/\d+\s*min/)
+  })
+
+  it('acompanhar: pedido novo no modo atendimento mantem a copy de preparo imediato', async () => {
+    const base = entrada({ tipo: 'texto', texto: 'cade meu pedido', botaoId: null }, { etapa: 'acompanhar' }, { modo: 'atendimento' })
+    const saida = await acompanharNode.executar({ ...base, pedidoStatus: 'novo' }, {}, NODE_CTX)
+    const texto = (saida.mensagens[0] as { texto: string }).texto.toLowerCase()
+    expect(texto).toContain('fila de preparo')
+    expect(texto).not.toContain('agendad')
   })
 })
 
