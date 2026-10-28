@@ -12,6 +12,7 @@
     "configuracoes_llm.ts",
     "conhecimento.ts",
     "conta.ts",
+    "contas_pagar.ts",
     "conversas.ts",
     "crm.ts",
     "custos.ts",
@@ -26,6 +27,7 @@
     "fidelidade.ts",
     "fiscal.ts",
     "fluxo.ts",
+    "fornecedores.ts",
     "index.ts",
     "lojas.ts",
     "motoboys.ts",
@@ -49,5 +51,5 @@
     "tool.ts",
     "zonas_entrega.ts"
   ],
-  "hash": "3b712243115dd51431676aa9f5fcab9ac45fb24429dfa7cb05dcc6cb29925a75"
+  "hash": "3bf51f6e6737cf2cad42e87268f63935ce1ebafd8e8b2ac9fa20a85c4498c3fd"
 }

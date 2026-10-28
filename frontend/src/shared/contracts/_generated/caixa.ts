@@ -34,6 +34,9 @@ export const MovimentoEntrada = z.strictObject({
   valor_centavos: ValorAssinado,
   pedido_id: UuidSchema.optional(),
   motivo: z.string().trim().min(1).max(300).optional(),
+  // Idempotencia: uma chave por acao do operador (ex.: uuid do clique). Reenviar o mesmo movimento
+  // com a mesma chave e no-op (devolve o movimento ja gravado), fechando o duplo-clique/retry.
+  chave_idempotencia: z.string().trim().regex(/^[A-Za-z0-9_.:-]{1,120}$/).optional(),
 })
 export type MovimentoEntrada = z.infer<typeof MovimentoEntrada>
 

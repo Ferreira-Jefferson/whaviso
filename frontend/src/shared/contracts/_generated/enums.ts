@@ -68,6 +68,21 @@ export type TipoLancamento = z.infer<typeof tipoLancamento>
 export const statusCorrida = z.enum(['montando', 'despachada', 'concluida'])
 export type StatusCorrida = z.infer<typeof statusCorrida>
 
+// --- Contas a pagar (Financeiro: dinheiro saindo) ---
+// Regime de pagamento do motoboy (como a loja paga o entregador) + tipos do lancamento manual
+// (pagavel de fornecedor ou pessoa nao-motoboy).
+export const regimePagamento = z.enum(['por_entrega', 'fixo', 'fixo_mais_entrega'])
+export type RegimePagamento = z.infer<typeof regimePagamento>
+
+export const periodicidadeFixo = z.enum(['dia', 'mes'])
+export type PeriodicidadeFixo = z.infer<typeof periodicidadeFixo>
+
+export const credorTipo = z.enum(['fornecedor', 'pessoa'])
+export type CredorTipo = z.infer<typeof credorTipo>
+
+export const statusContaPagar = z.enum(['a_pagar', 'pago'])
+export type StatusContaPagar = z.infer<typeof statusContaPagar>
+
 // --- Pagamento (Pix na conversa) ---
 export const statusPagamento = z.enum(['pendente', 'pago', 'expirado', 'cancelado'])
 export type StatusPagamento = z.infer<typeof statusPagamento>
@@ -155,6 +170,10 @@ export const ENUMS_POSTGRES = {
   status_fechamento: statusFechamento.options,
   tipo_lancamento: tipoLancamento.options,
   status_corrida: statusCorrida.options,
+  regime_pagamento: regimePagamento.options,
+  periodicidade_fixo: periodicidadeFixo.options,
+  credor_tipo: credorTipo.options,
+  status_conta_pagar: statusContaPagar.options,
   status_pagamento: statusPagamento.options,
   papel_operador: papelOperador.options,
   estagio_prospecto: estagioProspecto.options,
