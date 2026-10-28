@@ -5,6 +5,7 @@
 // pessoa e PII: so existe em claro na ENTRADA (cadastro/edicao) e em PessoaTelefoneSaida (revelar,
 // dono/gerente).
 import { z } from 'zod'
+import { periodicidadeFixo, regimePagamento, tipoChavePix, tipoVeiculo } from './enums'
 import { UuidSchema } from './primitivos'
 
 const Uuid = UuidSchema
@@ -88,6 +89,52 @@ export const PessoaListaSaida = z.strictObject({ itens: z.array(PessoaSaida) })
 export const PessoaTelefoneSaida = z.strictObject({ telefone: z.string() })
 
 // ---------------------------------------------------------------------------------------------
+// Dados de entrega (so para a pessoa de cargo 'motoboy'): veiculo, placa, Pix e REGIME de
+// pagamento. Grava na tabela `motoboys` (1:1 com a pessoa). Pix e PII: so existe em claro na
+// ENTRADA e em PessoaEntregaPixSaida (revelar, dono/gerente); a saida normal traz so a mascara
+// (ultimos 4). Dinheiro em centavos (int). Placa/Pix validam no service (422 de regra de negocio
+// 'placa_invalida'/'pix_invalido'), como o telefone; nao e erro de shape (400).
+// ---------------------------------------------------------------------------------------------
+export const PessoaEntregaSaida = z.strictObject({
+  veiculo: tipoVeiculo,
+  placa: z.string().nullable(),
+  pix_tipo: tipoChavePix.nullable(),
+  pix_ultimos4: z.string().nullable(),
+  regime_pagamento: regimePagamento,
+  periodicidade_fixo: periodicidadeFixo,
+  valor_fixo_centavos: z.number().int().min(0),
+})
+
+// Upsert da entrega: veiculo/regime/periodicidade/valor sao sempre o estado desejado. placa e Pix
+// seguem a semantica de edicao do MotoboyAtualizarEntrada (o Pix so sai mascarado, nao da para
+// reenviar em claro): ausente = mantem o atual, null = remove, presente = troca (pix_tipo e pix
+// sempre juntos). Em INSERT (sem linha ainda) ausente/null = sem o campo.
+export const PessoaEntregaEntrada = z
+  .strictObject({
+    veiculo: tipoVeiculo,
+    placa: z.string().trim().min(1).max(12).nullable().optional(),
+    pix_tipo: tipoChavePix.nullable().optional(),
+    pix: z.string().trim().min(1).max(140).nullable().optional(),
+    regime_pagamento: regimePagamento,
+    periodicidade_fixo: periodicidadeFixo.default('dia'),
+    valor_fixo_centavos: z.number().int().min(0).max(1_000_000_000).default(0),
+  })
+  .refine((o) => (o.pix_tipo === undefined) === (o.pix === undefined), {
+    message: 'informe pix_tipo e pix juntos',
+  })
+  .refine((o) => (o.pix_tipo === null) === (o.pix === null), {
+    message: 'para limpar o Pix, envie pix_tipo e pix como null',
+  })
+// Coerencia do regime (com parcela fixa o valor tem de ser > 0; em 'por_entrega' e ignorado) e
+// regra de negocio, validada no service (422 'valor_fixo_obrigatorio'), nao shape (400).
+
+/** Chave Pix em claro: so na resposta de "revelar" (dono/gerente, rate limit, no-store). */
+export const PessoaEntregaPixSaida = z.strictObject({
+  pix_tipo: tipoChavePix,
+  pix: z.string(),
+})
+
+// ---------------------------------------------------------------------------------------------
 // Escalas (dias e horarios que a pessoa trabalha; varias linhas por pessoa).
 // ---------------------------------------------------------------------------------------------
 export const EscalaCriarEntrada = z
@@ -120,6 +167,8 @@ export const EscalaListaSaida = z.strictObject({ itens: z.array(EscalaSaida) })
 
 export const PessoaDetalheSaida = PessoaSaida.extend({
   escalas: z.array(EscalaSaida),
+  // Dados de entrega quando a pessoa tem linha em `motoboys`; null quando nao tem (nao e motoboy).
+  entrega: PessoaEntregaSaida.nullable(),
 })
 
 export type CargoNovo = z.infer<typeof CargoCriarEntrada>
@@ -131,3 +180,5 @@ export type EscalaPatch = z.infer<typeof EscalaAtualizarEntrada>
 export type EscalaDto = z.infer<typeof EscalaSaida>
 export type CargoDto = z.infer<typeof CargoSaida>
 export type PessoaDto = z.infer<typeof PessoaSaida>
+export type PessoaEntregaNova = z.infer<typeof PessoaEntregaEntrada>
+export type PessoaEntregaDto = z.infer<typeof PessoaEntregaSaida>

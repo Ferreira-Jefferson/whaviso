@@ -18,15 +18,18 @@ import {
   Skeleton,
   useToast,
 } from '@/shared/ui'
-import type { PessoaPatch } from '@/shared/contracts/_generated/pessoas'
+import type { PessoaEntregaNova, PessoaPatch } from '@/shared/contracts/_generated/pessoas'
 import {
   useAtualizarPessoa,
   useCargos,
   useCriarPessoa,
+  useDefinirEntrega,
   usePessoaDetalhe,
   type Cargo,
   type PessoaDetalhe,
 } from '../api'
+import { entregaInicial, type EntregaForm } from '../estados'
+import { EntregaSecao } from './EntregaSecao'
 import { EscalaEditor } from './EscalaEditor'
 
 interface Props {
@@ -71,13 +74,15 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
   const [telefoneNovo, setTelefoneNovo] = useState<string | null>(null)
   const [removerTelefone, setRemoverTelefone] = useState(false)
   const [observacoes, setObservacoes] = useState(pessoa?.observacoes ?? '')
+  const [entrega, setEntrega] = useState<EntregaForm>(() => entregaInicial(pessoa?.entrega ?? null))
   const [erro, setErro] = useState<string | null>(null)
   const [confirmarArquivar, setConfirmarArquivar] = useState(false)
 
   const criar = useCriarPessoa()
   const atualizar = useAtualizarPessoa()
+  const definirEntrega = useDefinirEntrega()
   const { mostrarToast } = useToast()
-  const salvando = criar.isPending || atualizar.isPending
+  const salvando = criar.isPending || atualizar.isPending || definirEntrega.isPending
 
   // Cargos selecionaveis: ativos + o cargo atual da pessoa (mesmo arquivado, para nao sumir).
   const opcoesCargo = useMemo<ReadonlyArray<Cargo>>(() => {
@@ -86,8 +91,36 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
   }, [cargos.data, pessoa?.cargo_id])
 
   const cargoEfetivo = cargoId || opcoesCargo[0]?.id || ''
+  // A secao de entrega so aparece para o cargo com chave 'motoboy' (a pessoa da entrega).
+  const ehMotoboy = opcoesCargo.find((c) => c.id === cargoEfetivo)?.chave === 'motoboy'
+  const mudarEntrega = (patch: Partial<EntregaForm>) => setEntrega((e) => ({ ...e, ...patch }))
 
-  const salvar = () => {
+  /** Corpo do PUT /entrega a partir do formulario (placa/Pix: ausente mantem, null limpa, valor troca). */
+  function corpoEntrega(): PessoaEntregaNova {
+    const body: PessoaEntregaNova = {
+      veiculo: entrega.veiculo,
+      regime_pagamento: entrega.regime,
+      periodicidade_fixo: entrega.periodicidade,
+      valor_fixo_centavos: entrega.regime === 'por_entrega' ? 0 : (entrega.valorFixo ?? 0),
+    }
+    const placaLimpa = entrega.placa.trim()
+    if (ehEdicao) {
+      if (placaLimpa !== (pessoa?.entrega?.placa ?? '')) body.placa = placaLimpa === '' ? null : placaLimpa
+    } else if (placaLimpa) {
+      body.placa = placaLimpa
+    }
+    const pixLimpo = entrega.pix.trim()
+    if (entrega.removerPix) {
+      body.pix_tipo = null
+      body.pix = null
+    } else if (pixLimpo) {
+      body.pix_tipo = entrega.pixTipo
+      body.pix = pixLimpo
+    }
+    return body
+  }
+
+  const salvar = async () => {
     const nomeLimpo = nome.trim()
     if (nomeLimpo.length === 0) {
       setErro('Informe o nome.')
@@ -97,49 +130,43 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
       setErro('Escolha um cargo.')
       return
     }
+    if (ehMotoboy && entrega.regime !== 'por_entrega' && !(entrega.valorFixo && entrega.valorFixo > 0)) {
+      setErro('Informe o valor fixo para esse regime de pagamento.')
+      return
+    }
     setErro(null)
     const obs = observacoes.trim()
 
-    if (!ehEdicao) {
-      criar.mutate(
-        {
+    try {
+      let pessoaId: string
+      if (!ehEdicao) {
+        const nova = await criar.mutateAsync({
           nome: nomeLimpo,
           cargo_id: cargoEfetivo,
           ...(telefoneNovo ? { telefone: telefoneNovo } : {}),
           ...(obs ? { observacoes: obs } : {}),
-        },
-        {
-          onSuccess: () => {
-            mostrarToast('Pessoa cadastrada.', { tom: 'sucesso' })
-            aoFechar()
-          },
-          onError: (e) => setErro(mensagem(e, 'Não foi possível cadastrar.')),
-        },
-      )
-      return
-    }
-
-    const patch: PessoaPatch = {}
-    if (nomeLimpo !== pessoa.nome) patch.nome = nomeLimpo
-    if (cargoEfetivo !== pessoa.cargo_id) patch.cargo_id = cargoEfetivo
-    if (removerTelefone) patch.telefone = null
-    else if (telefoneNovo) patch.telefone = telefoneNovo
-    if (obs !== (pessoa.observacoes ?? '')) patch.observacoes = obs.length > 0 ? obs : null
-
-    if (Object.keys(patch).length === 0) {
-      aoFechar()
-      return
-    }
-    atualizar.mutate(
-      { id: pessoa.id, patch },
-      {
-        onSuccess: () => {
-          mostrarToast('Pessoa atualizada.', { tom: 'sucesso' })
+        })
+        pessoaId = nova.id
+      } else {
+        const patch: PessoaPatch = {}
+        if (nomeLimpo !== pessoa.nome) patch.nome = nomeLimpo
+        if (cargoEfetivo !== pessoa.cargo_id) patch.cargo_id = cargoEfetivo
+        if (removerTelefone) patch.telefone = null
+        else if (telefoneNovo) patch.telefone = telefoneNovo
+        if (obs !== (pessoa.observacoes ?? '')) patch.observacoes = obs.length > 0 ? obs : null
+        if (Object.keys(patch).length === 0 && !ehMotoboy) {
           aoFechar()
-        },
-        onError: (e) => setErro(mensagem(e, 'Não foi possível salvar.')),
-      },
-    )
+          return
+        }
+        if (Object.keys(patch).length > 0) await atualizar.mutateAsync({ id: pessoa.id, patch })
+        pessoaId = pessoa.id
+      }
+      if (ehMotoboy) await definirEntrega.mutateAsync({ id: pessoaId, body: corpoEntrega() })
+      mostrarToast(ehEdicao ? 'Pessoa atualizada.' : 'Pessoa cadastrada.', { tom: 'sucesso' })
+      aoFechar()
+    } catch (e) {
+      setErro(mensagem(e, ehEdicao ? 'Não foi possível salvar.' : 'Não foi possível cadastrar.'))
+    }
   }
 
   const alternarAtivo = () => {
@@ -171,7 +198,7 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          salvar()
+          void salvar()
         }}
         className="flex flex-col gap-4"
       >
@@ -239,6 +266,18 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
             className="w-full resize-y rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta placeholder:text-tinta-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
           />
         </Field>
+
+        {ehMotoboy && (
+          <>
+            <div className="h-px w-full bg-linha" />
+            <EntregaSecao
+              valor={entrega}
+              aoMudar={mudarEntrega}
+              entregaAtual={pessoa?.entrega ?? null}
+              ehEdicao={ehEdicao}
+            />
+          </>
+        )}
 
         {erro && (
           <p className="text-sm text-barro" role="alert">

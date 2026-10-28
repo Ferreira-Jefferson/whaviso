@@ -13,6 +13,8 @@ revelado sob permissao elevada.
 - Rotas finais (`/v1/pessoas`):
   - Cargos: `GET /cargos`, `POST /cargos`, `PATCH /cargos/:id`.
   - Pessoas: `GET /`, `POST /`, `GET|PATCH /:id`, `POST /:id/telefone/revelar`.
+  - Entrega (so cargo motoboy): `PUT /:id/entrega` (upsert veiculo/placa/Pix/regime),
+    `POST /:id/entrega/pix/revelar` (papel dono/gerente, rate limit 10/min, `no-store`).
   - Escalas: `GET|POST /:id/escalas`, `PATCH /escalas/:id`, `POST /escalas/:id/desativar`.
 
 ## Permissoes
@@ -35,7 +37,20 @@ revelado sob permissao elevada.
 ## Cifra: kernel compartilhado
 `cripto.ts` so reexporta `@whaviso/shared/cifra` (mesma cifra de clientes). Telefone da pessoa
 cifrado com a `MASTER_KEY` (AES-256-GCM); a cifra e injetavel (`criarPessoasRoutes(cifra)`).
-Diferente de clientes, nao ha `telefone_hash`: pessoa nao e deduplicada por telefone.
+Diferente de clientes, nao ha `telefone_hash`: pessoa nao e deduplicada por telefone. O Pix da
+entrega usa o kernel `@whaviso/shared/pix_credencial` (normaliza/hash/mascara, mesmo do motoboys),
+nunca importando o modulo motoboys.
+
+## Dados de entrega (tabela `motoboys`, cargo motoboy)
+A entrega (veiculo, placa, Pix e regime de pagamento) e a linha 1:1 em `public.motoboys` por
+`pessoa_id` (unica por `motoboys_pessoa_unica`). O proprio modulo pessoas passou a escreve-la pelo
+`PUT /:id/entrega` (so cargo `chave='motoboy'`, senao 422 `cargo_nao_motoboy`); INSERT se nova,
+UPDATE se ja existe. placa/Pix: ausente mantem, null limpa, presente troca (o Pix so sai mascarado,
+ultimos 4). Regime (`regime_pagamento`, `periodicidade_fixo`, `valor_fixo_centavos`): com parcela
+fixa o valor tem de ser > 0 (422 `valor_fixo_obrigatorio`); em `por_entrega` o valor e gravado 0.
+O claro do Pix so sai em `POST /:id/entrega/pix/revelar`, auditado sem o valor (eventos
+`pessoa.entrega_definida`/`pessoa.pix_revelado`, sem PII). Convive com o modulo motoboys (mesma
+tabela) ate a eliminacao futura daquele modulo; pessoas nunca importa motoboys.
 
 ## Tabelas (migration 0025)
 - dono de (escrita pelo painel): `cargos`, `pessoas`, `escalas` (`escalas.pessoa_id` referencia a pessoa).

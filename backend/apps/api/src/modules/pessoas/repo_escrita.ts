@@ -1,6 +1,6 @@
 // Escrita do modulo: SO via @whaviso/shared/db, sql`...` parametrizado. Tudo carimba loja_id da
 // loja ativa (nunca do corpo). Sem DELETE: escala/pessoa/cargo saem de cena com ativo=false.
-import { consultarUm, sql, sqlBruto, type Consulta, type Executor } from '@whaviso/shared/db'
+import { consultar, consultarUm, sql, sqlBruto, type Consulta, type Executor } from '@whaviso/shared/db'
 import type { CargoLinha, EscalaLinha } from './repo'
 
 const TS = (col: string): Consulta =>
@@ -83,6 +83,76 @@ export async function atualizarPessoa(
         returning id`,
   )
   return { afetou: r !== null }
+}
+
+// --- dados de entrega (linha 1:1 em public.motoboys; INSERT se nova, UPDATE se ja existe) ---
+export interface EntregaNovaDb {
+  pessoaId: string
+  nome: string
+  veiculo: string
+  placa: string | null
+  pixTipo: string | null
+  pixHash: string | null
+  pixCifrado: Buffer | null
+  regimePagamento: string
+  periodicidadeFixo: string
+  valorFixoCentavos: number
+}
+
+/** INSERT da linha de entrega (pessoa sem cadastro de entrega ainda). loja_id so do escopo. */
+export async function inserirEntrega(exec: Executor, lojaId: string, n: EntregaNovaDb) {
+  await consultarUm(
+    exec,
+    sql`insert into public.motoboys
+          (loja_id, pessoa_id, nome, veiculo, placa, pix_tipo, pix_hash, pix_cifrado,
+           regime_pagamento, periodicidade_fixo, valor_fixo_centavos)
+        values (${lojaId}, ${n.pessoaId}, ${n.nome}, ${n.veiculo}::tipo_veiculo, ${n.placa},
+                ${n.pixTipo}, ${n.pixHash}, ${n.pixCifrado},
+                ${n.regimePagamento}::regime_pagamento, ${n.periodicidadeFixo}::periodicidade_fixo,
+                ${n.valorFixoCentavos})`,
+  )
+}
+
+export interface EntregaParcial {
+  veiculo: string
+  regimePagamento: string
+  periodicidadeFixo: string
+  valorFixoCentavos: number
+  /** undefined mantem; null limpa; string troca. */
+  placa?: string | null | undefined
+  /** Pix completo (tipo, hash, cifra) ou null para limpar; undefined mantem. */
+  pix?: { tipo: string; hash: string; cifrado: Buffer } | null | undefined
+}
+
+/** UPDATE da entrega: veiculo/regime sempre; placa/Pix so quando presentes (undefined = manter). */
+export async function atualizarEntrega(exec: Executor, lojaId: string, pessoaId: string, p: EntregaParcial) {
+  const tem = (v: unknown) => v !== undefined
+  await consultar(
+    exec,
+    sql`update public.motoboys set
+          veiculo = ${p.veiculo}::tipo_veiculo,
+          regime_pagamento = ${p.regimePagamento}::regime_pagamento,
+          periodicidade_fixo = ${p.periodicidadeFixo}::periodicidade_fixo,
+          valor_fixo_centavos = ${p.valorFixoCentavos},
+          placa = case when ${tem(p.placa)}::boolean then ${p.placa ?? null} else placa end,
+          pix_tipo = case when ${tem(p.pix)}::boolean then ${p.pix?.tipo ?? null} else pix_tipo end,
+          pix_hash = case when ${tem(p.pix)}::boolean then ${p.pix?.hash ?? null} else pix_hash end,
+          pix_cifrado = case when ${tem(p.pix)}::boolean then ${p.pix?.cifrado ?? null}::bytea else pix_cifrado end
+        where loja_id = ${lojaId} and pessoa_id = ${pessoaId}`,
+  )
+}
+
+/** Auditoria sem PII (tabela eventos): so ids, user_id e nomes de campo/valores de negocio. */
+export async function registrarEvento(
+  exec: Executor,
+  e: { lojaId: string; tipo: string; entidade: string; entidadeId: string; detalhes: Record<string, unknown> },
+) {
+  await consultarUm(
+    exec,
+    sql`insert into public.eventos (loja_id, tipo, entidade, entidade_id, ator, detalhes)
+        values (${e.lojaId}, ${e.tipo}, ${e.entidade}, ${e.entidadeId}, 'loja',
+                ${JSON.stringify(e.detalhes)}::jsonb)`,
+  )
 }
 
 // --- escalas ---

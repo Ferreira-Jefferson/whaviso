@@ -12,6 +12,7 @@
     "./disponibilidade": "./src/disponibilidade/index.ts",
     "./pix": "./src/pix/index.ts",
     "./cifra": "./src/cifra/index.ts",
+    "./pix_credencial": "./src/pix_credencial/index.ts",
     "./clientes": "./src/clientes/index.ts",
     "./clientes/testing": "./src/clientes/contratos/index.ts"
   },

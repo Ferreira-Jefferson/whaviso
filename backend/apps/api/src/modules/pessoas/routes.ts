@@ -8,7 +8,8 @@ import { atualizarCargo, criarCargo, listarCargos } from './service_cargos'
 import {
   CargoAtualizarEntrada, CargoCriarEntrada, CargoListaSaida, CargoSaida, EscalaAtualizarEntrada,
   EscalaCriarEntrada, EscalaListaSaida, EscalaSaida, PessoaAtualizarEntrada, PessoaCriarEntrada,
-  PessoaDetalheSaida, PessoaListaSaida, PessoaSaida, PessoaTelefoneSaida, IdParams,
+  PessoaDetalheSaida, PessoaEntregaEntrada, PessoaEntregaPixSaida, PessoaEntregaSaida, PessoaListaSaida,
+  PessoaSaida, PessoaTelefoneSaida, IdParams,
 } from './schemas'
 
 /** Loja efetiva = SO a do escopo resolvido (nunca corpo/query). */
@@ -74,6 +75,22 @@ export function criarPessoasRoutes(cifra?: Cifra): FastifyPluginAsync {
     }, async (req, reply) => {
       void reply.header('cache-control', 'no-store')
       return svc.revelarTelefone(ator(req), req.params.id)
+    })
+
+    // --- Dados de entrega (so para a pessoa de cargo motoboy; grava a tabela motoboys) ---
+    app.put('/:id/entrega', {
+      ...loja(), preHandler: gerir,
+      schema: { params: IdParams, body: PessoaEntregaEntrada, response: { 200: PessoaEntregaSaida } },
+    }, async (req) => svc.definirEntrega(ator(req), req.params.id, req.body))
+
+    // Pix da entrega (PII): revelar so dono/gerente, rate limit, sem cache, auditado sem o valor.
+    app.post('/:id/entrega/pix/revelar', {
+      ...loja({ rateLimit: { max: 10, timeWindow: '1 minute' } }),
+      preHandler: [app.autenticar, app.escopoLoja, app.exigirPapel('dono', 'gerente')],
+      schema: { params: IdParams, response: { 200: PessoaEntregaPixSaida } },
+    }, async (req, reply) => {
+      void reply.header('cache-control', 'no-store')
+      return svc.revelarPixEntrega(ator(req), req.params.id)
     })
 
     // --- Escalas (aninhadas na pessoa) ---

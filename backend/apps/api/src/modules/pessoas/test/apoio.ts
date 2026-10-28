@@ -91,12 +91,12 @@ export async function chamar(
   url: string,
   corpo?: unknown,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- corpo JSON livre nos testes
-): Promise<{ status: number; corpo: any; body: string }> {
+): Promise<{ status: number; corpo: any; body: string; headers: Record<string, unknown> }> {
   const res = await m.app.inject({
     method: metodo,
     url: `/v1/pessoas${url}`,
     headers: { authorization: `Bearer ${user}`, ...(loja ? { 'x-loja-id': loja } : {}) },
     ...(corpo === undefined ? {} : { payload: corpo as object }),
   })
-  return { status: res.statusCode, corpo: res.body ? res.json() : null, body: res.body }
+  return { status: res.statusCode, corpo: res.body ? res.json() : null, body: res.body, headers: res.headers }
 }

@@ -25,12 +25,15 @@ import {
   CargoSaida,
   EscalaSaida,
   PessoaDetalheSaida,
+  PessoaEntregaSaida,
   PessoaListaSaida,
   PessoaSaida,
   type CargoNovo,
   type CargoPatch,
   type EscalaNova,
   type EscalaPatch,
+  type PessoaEntregaDto,
+  type PessoaEntregaNova,
   type PessoaNova,
   type PessoaPatch,
 } from '@/shared/contracts/_generated/pessoas'
@@ -41,6 +44,7 @@ export type Pessoa = z.infer<typeof PessoaSaida>
 export type PessoaDetalhe = z.infer<typeof PessoaDetalheSaida>
 export type Cargo = z.infer<typeof CargoSaida>
 export type Escala = z.infer<typeof EscalaSaida>
+export type Entrega = PessoaEntregaDto
 type PessoaLista = z.infer<typeof PessoaListaSaida>
 type CargoLista = z.infer<typeof CargoListaSaida>
 
@@ -86,6 +90,20 @@ export function useAtualizarPessoa() {
   return useMutation<Pessoa, Error, { id: string; patch: PessoaPatch }>({
     mutationFn: ({ id, patch }) =>
       apiClient.patch<Pessoa>(`/pessoas/${id}`, { body: patch, schema: PessoaSaida }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ] }),
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Dados de entrega (so para a pessoa de cargo motoboy; grava a tabela motoboys)
+// ---------------------------------------------------------------------------------------------
+
+/** PUT /v1/pessoas/:id/entrega: upsert de veiculo/placa/Pix/regime. Invalida a raiz (detalhe). */
+export function useDefinirEntrega() {
+  const qc = useQueryClient()
+  return useMutation<Entrega, Error, { id: string; body: PessoaEntregaNova }>({
+    mutationFn: ({ id, body }) =>
+      apiClient.put<Entrega>(`/pessoas/${id}/entrega`, { body, schema: PessoaEntregaSaida }),
     onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ] }),
   })
 }

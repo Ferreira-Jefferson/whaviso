@@ -97,6 +97,27 @@ export async function obterPessoa(exec: Executor, lojaId: string, id: string) {
   )
 }
 
+// --- Dados de entrega (linha 1:1 em public.motoboys; so para a pessoa de cargo 'motoboy') ---
+export interface EntregaLinha {
+  veiculo: 'moto' | 'bicicleta' | 'carro' | 'a_pe'
+  placa: string | null
+  pix_tipo: 'cpf' | 'cnpj' | 'email' | 'telefone' | 'aleatoria' | null
+  pix_cifrado: Buffer | null
+  regime_pagamento: 'por_entrega' | 'fixo' | 'fixo_mais_entrega'
+  periodicidade_fixo: 'dia' | 'mes'
+  valor_fixo_centavos: number
+}
+
+/** Linha de entrega da pessoa (null quando ela nao tem cadastro de entrega). */
+export async function obterEntrega(exec: Executor, lojaId: string, pessoaId: string) {
+  return consultarUm<EntregaLinha>(
+    exec,
+    sql`select veiculo, placa, pix_tipo, pix_cifrado,
+                regime_pagamento, periodicidade_fixo, valor_fixo_centavos
+           from public.motoboys where loja_id = ${lojaId} and pessoa_id = ${pessoaId}`,
+  )
+}
+
 const COLS_ESCALA = sql`id, pessoa_id, dia_semana, ${HM('entrada')} as entrada,
   ${HM('saida')} as saida, ativo, ${TS('criado_em')} as criado_em`
 
