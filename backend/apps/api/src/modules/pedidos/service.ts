@@ -62,8 +62,8 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     })
 
   /** Barra o aceite de pedido novo quando a loja esta pausada agora ou lotou a janela. */
-  async function exigirAceiteDaLoja(lojaId: string): Promise<void> {
-    const estado = await repo.estadoAceiteLoja(pool, lojaId)
+  async function exigirAceiteDaLoja(exec: Executor, lojaId: string): Promise<void> {
+    const estado = await repo.estadoAceiteLoja(exec, lojaId)
     if (!estado) return // loja fora do escopo ja e tratada pelos demais guards
     if (estado.pausada_agora) {
       throw conflito('loja_pausada', 'A loja esta pausada e nao aceita novos pedidos agora')
@@ -91,7 +91,8 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
       throw regraNegocio('troco_so_dinheiro', 'Troco so se aplica a pagamento em dinheiro')
     }
     // G7: recusa aceitar pedido novo com a loja pausada ou acima da capacidade da janela.
-    await exigirAceiteDaLoja(a.lojaId)
+    // Pre-checagem amigavel; o guard que garante a corrida roda sob lock dentro de inserirPedidoComRetry.
+    await exigirAceiteDaLoja(pool, a.lojaId)
     if (!(await repo.clienteDaLoja(pool, a.lojaId, b.cliente_id))) throw naoEncontrado('Cliente nao encontrado')
     if (b.endereco_id && !(await repo.enderecoAtivoDoCliente(pool, a.lojaId, b.cliente_id, b.endereco_id))) {
       throw naoEncontrado('Endereco nao encontrado')
@@ -117,6 +118,10 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     for (let tentativa = 0; tentativa < 5; tentativa++) {
       try {
         return await comTransacao(pool, async (tx: PoolClient) => {
+          // G7 autoritativo: serializa o aceite por loja e reconfere pausa/capacidade DENTRO da tx,
+          // senao duas criacoes concorrentes passam a pre-checagem e estouram a capacidade da janela.
+          await repo.travarAceiteLoja(tx, a.lojaId)
+          await exigirAceiteDaLoja(tx, a.lojaId)
           const codigo = await escrita.proximoCodigo(tx, a.lojaId, dia)
           const pedidoId = await escrita.inserirPedido(tx, {
             lojaId: a.lojaId, clienteId: p.clienteId, enderecoId: p.enderecoId, modalidade: p.modalidade,
@@ -167,7 +172,7 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     if (trocoPara != null && formaPagamento !== 'dinheiro') {
       throw regraNegocio('troco_so_dinheiro', 'Troco so se aplica a pagamento em dinheiro')
     }
-    await exigirAceiteDaLoja(a.lojaId)
+    await exigirAceiteDaLoja(pool, a.lojaId)
     if (!(await repo.clienteDaLoja(pool, a.lojaId, clienteId))) throw naoEncontrado('Cliente nao encontrado')
     if (enderecoId && !(await repo.enderecoAtivoDoCliente(pool, a.lojaId, clienteId, enderecoId))) {
       throw naoEncontrado('Endereco nao encontrado')

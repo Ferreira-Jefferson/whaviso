@@ -95,6 +95,12 @@ export interface EstadoAceiteLoja {
  * Leitura cruzada do modulo pedidos sobre `lojas`/`pedidos` (sem importar o modulo lojas), sempre
  * escopada por loja. O rascunho nao conta para a capacidade (so pedido efetivado ocupa a janela).
  */
+/** Serializa o aceite de pedido novo por loja: a checagem de pausa/capacidade e o insert caem na
+ *  mesma tx, sem janela entre contar a ocupacao e gravar o pedido. */
+export async function travarAceiteLoja(exec: Executor, lojaId: string): Promise<void> {
+  await consultar(exec, sql`select pg_advisory_xact_lock(hashtext(${'aceite-loja:' + lojaId}))`)
+}
+
 export async function estadoAceiteLoja(exec: Executor, lojaId: string): Promise<EstadoAceiteLoja | null> {
   return consultarUm<EstadoAceiteLoja>(
     exec,
