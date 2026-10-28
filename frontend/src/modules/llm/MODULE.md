@@ -1,20 +1,20 @@
-# llm (frontend)
+# llm (frontend) — Atendente
 
 ## Propósito
-Área da chave do atendente (BYO key do provedor) e do consumo. Rota `/llm` (grupo config).
-A chave é **write-only**: a tela só mostra metadado ("configurada, termina em 1234, validada em ...").
+A IA que atende, reunida numa tela só (rota `/llm`, rótulo "Atendente", grupo Configuração). Três abas:
+- **Chave e consumo** (`pages/ConfiguracoesLlm`): chave BYO do provedor (write-only, cifrada no servidor) e consumo.
+- **Conhecimento** (`conhecimento/`): o que a IA sabe sobre a loja (documentos, avaliação, feedback do laço RAG).
+- **Fluxo** (`fluxo/`): editor visual do grafo de atendimento (canvas React Flow), carregado sob demanda (lazy)
+  para não puxar o canvas pesado fora da sua aba.
 
-## Entry points
-- `index.ts`: export default da página (`lazy(() => import('@/modules/llm'))`).
+`pages/Atendente` é o shell de abas (`SegmentedControl`); `index.ts` exporta ele.
+
+## Absorção
+As subpastas `conhecimento/` e `fluxo/` eram módulos próprios (`/conhecimento`, `/fluxo`), absorvidos aqui:
+tudo que configura o atendente é parte do atendente. Mantêm os próprios `api.ts`/componentes/estados; o
+módulo nunca importa outro módulo (só `shared/` e o próprio `llm/`). As rotas antigas saíram do registry.
 
 ## Dados
-- `GET /v1/llm/credencial` (estado), `PUT` (cadastrar/trocar; a api valida no provedor antes de gravar),
-  `PATCH` (ligar/desligar e modelo, sem chave), `POST /credencial/testar` (revalida a chave digitada),
-  `GET /v1/llm/uso` (consumo do mês, centavos).
-- Contratos: `@/shared/contracts/_generated/configuracoes_llm` (não redefinir). Cache: raiz `['llm']`.
-
-## Segredo (regras do módulo)
-- A chave vive só no `useState` do `FormularioChave`; é apagada em `finally` após cada envio.
-- As mutações com chave limpam o cache de mutação (`reset`) para a chave não ficar em `variables`.
-- Campo `type="password"`, `autoComplete="new-password"`; nunca em storage, URL, log ou query key.
-- Só o papel `dono` escreve; 403 vira mensagem amigável.
+- Chave/consumo: `api.ts` (raiz `['llm']`); chave só escrita, nunca lida de volta.
+- Conhecimento: `conhecimento/api.ts`. Fluxo: `fluxo/api.ts` (grafo, versões publicada/rascunho, validação).
+- Contratos em `@/shared/contracts/_generated` (llm, conhecimento, fluxo); nunca logar chave.
