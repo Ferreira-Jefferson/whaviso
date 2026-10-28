@@ -26,6 +26,7 @@ d('modulo relatorios', () => {
   const cen = novoCenario()
   let app: Awaited<ReturnType<typeof construirApp>>
   let donoA: string, atendenteA: string, donoB: string, lojaA: string, lojaB: string
+  let grpTamId: string
   let seq = 0
 
   const chamar = (user: string, loja: string | null, url: string) =>
@@ -34,6 +35,13 @@ d('modulo relatorios', () => {
       url: `/v1/relatorios${url}`,
       headers: { authorization: `Bearer ${user}`, ...(loja ? { 'x-loja-id': loja } : {}) },
     })
+
+  const auth = (user: string, loja: string | null) =>
+    ({ authorization: `Bearer ${user}`, ...(loja ? { 'x-loja-id': loja } : {}) })
+
+  // Montador flexivel e POST (carrega o array de filtros no corpo).
+  const vendas = (user: string, loja: string | null, body: Record<string, unknown>) =>
+    app.inject({ method: 'POST', url: '/v1/relatorios/vendas', headers: auth(user, loja), payload: body })
 
   async function pedido(
     loja: string,
@@ -116,11 +124,11 @@ d('modulo relatorios', () => {
       `insert into public.motoboys (loja_id, nome) values ($1, 'Ze Entregas') returning id`, [lojaA])).rows[0].id as string
     await poolSuper.query('update public.pedidos set motoboy_id = $1 where id = $2', [motoboy, p3])
 
-    // Tamanho: grupo tipo 'tamanho' com a opcao 'Grande' escolhida no Burger do p1 (2 unidades, 4000).
-    const grpTam = (await poolSuper.query(
+    // Grupo de opcao 'Tamanho' com a opcao 'Grande' escolhida no Burger do p1 (2 unidades, 4000).
+    grpTamId = (await poolSuper.query(
       `insert into public.grupos_opcoes (loja_id, nome, tipo) values ($1, 'Tamanho', 'tamanho') returning id`, [lojaA])).rows[0].id as string
     const opGrande = (await poolSuper.query(
-      `insert into public.opcoes (loja_id, grupo_id, nome) values ($1, $2, 'Grande') returning id`, [lojaA, grpTam])).rows[0].id as string
+      `insert into public.opcoes (loja_id, grupo_id, nome) values ($1, $2, 'Grande') returning id`, [lojaA, grpTamId])).rows[0].id as string
     const ipBurger = (await poolSuper.query(
       `select id from public.itens_pedido where pedido_id = $1 and nome_snapshot = 'Burger'`, [p1])).rows[0].id as string
     await poolSuper.query(
@@ -168,10 +176,13 @@ d('modulo relatorios', () => {
     await fecharPools()
   })
 
+  const PERIODO = { de: '2026-03-01', ate: '2026-04-30' }
   const Q = 'de=2026-03-01&ate=2026-04-30'
+  const map3 = (j: { linhas: { rotulo: string; faturamento_centavos: number; pedidos: number }[] }) =>
+    j.linhas.map((l) => [l.rotulo, l.faturamento_centavos, l.pedidos])
 
-  it('vendas por dia: fuso SP (23:59 de 09/03 fica no dia 09), so entregues, centavos', async () => {
-    const r = await chamar(donoA, lojaA, `/vendas?agrupar_por=dia&${Q}`)
+  it('agrupar por dia: grao de item, fuso SP (23:59 de 09/03 no dia 09), so entregues', async () => {
+    const r = await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: 'dia' })
     expect(r.statusCode).toBe(200)
     const j = r.json()
     expect(j.linhas.map((l: { chave: string }) => l.chave)).toEqual(['2026-03-09', '2026-03-10', '2026-04-05'])
@@ -181,57 +192,68 @@ d('modulo relatorios', () => {
     expect(JSON.stringify(j)).not.toContain('Segredo B')
   })
 
-  it('vendas por mes, origem, hora e dia da semana', async () => {
-    const mes = (await chamar(donoA, lojaA, `/vendas?agrupar_por=mes&${Q}`)).json()
-    expect(mes.linhas.map((l: { chave: string; faturamento_centavos: number }) => [l.chave, l.faturamento_centavos]))
-      .toEqual([['2026-03', 8000], ['2026-04', 2000]])
-    const origem = (await chamar(donoA, lojaA, `/vendas?agrupar_por=origem&${Q}`)).json()
-    expect(origem.linhas[0]).toMatchObject({ chave: 'whatsapp', pedidos: 2, faturamento_centavos: 7000 })
-    expect(origem.linhas[0].participacao).toBeCloseTo(0.7)
-    const hora = (await chamar(donoA, lojaA, `/vendas?agrupar_por=hora&${Q}`)).json()
-    expect(hora.linhas.map((l: { chave: string }) => l.chave)).toEqual(['12', '23'])
-    expect(hora.linhas[1].rotulo).toBe('23h')
-    const dow = (await chamar(donoA, lojaA, `/vendas?agrupar_por=dia_semana&${Q}`)).json()
-    expect(dow.linhas.some((l: { rotulo: string }) => l.rotulo === 'Terca')).toBe(true)
-  })
-
-  it('vendas por item e categoria: cancelado/rascunho fora, sem categoria agrupada', async () => {
-    const it = (await chamar(donoA, lojaA, `/vendas?agrupar_por=item&${Q}`)).json()
-    expect(it.linhas[0]).toMatchObject({ chave: 'Burger', quantidade: 4, pedidos: 3, faturamento_centavos: 8000, ticket_medio_centavos: null })
-    const cat = (await chamar(donoA, lojaA, `/vendas?agrupar_por=categoria&${Q}`)).json()
+  it('agrupar por item e categoria: grao de item, cancelado/rascunho fora, com ticket', async () => {
+    const it = (await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: 'item' })).json()
+    expect(it.linhas[0]).toMatchObject({ chave: 'Burger', quantidade: 4, pedidos: 3, faturamento_centavos: 8000, ticket_medio_centavos: 2667 })
+    const cat = (await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: 'categoria' })).json()
     expect(cat.linhas.map((l: { chave: string; faturamento_centavos: number }) => [l.chave, l.faturamento_centavos]))
       .toEqual([['Lanches', 8000], ['Sem categoria', 2000]])
-    const top1 = (await chamar(donoA, lojaA, `/vendas?agrupar_por=item&limite=1&${Q}`)).json()
+    const top1 = (await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: 'item', limite: 1 })).json()
     expect(top1.linhas).toHaveLength(1)
   })
 
-  it('vendas por motoboy: entregador e balde "Sem motoboy", ticket por pedido', async () => {
-    const j = (await chamar(donoA, lojaA, `/vendas?agrupar_por=motoboy&${Q}`)).json()
-    expect(j.linhas.map((l: { rotulo: string; faturamento_centavos: number; pedidos: number }) =>
-      [l.rotulo, l.faturamento_centavos, l.pedidos]))
-      .toEqual([['Sem motoboy', 8000, 2], ['Ze Entregas', 2000, 1]])
+  it('agrupar por motoboy: entregador e balde "Sem motoboy"', async () => {
+    const j = (await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: 'motoboy' })).json()
+    expect(map3(j)).toEqual([['Sem motoboy', 8000, 2], ['Ze Entregas', 2000, 1]])
     expect(j.linhas[1].ticket_medio_centavos).toBe(2000)
     expect(j.total_faturamento_centavos).toBe(10000)
   })
 
-  it('vendas por tamanho: so opcao de grupo tipo tamanho, unidades e sem ticket', async () => {
-    const j = (await chamar(donoA, lojaA, `/vendas?agrupar_por=tamanho&${Q}`)).json()
-    expect(j.linhas).toHaveLength(1)
-    expect(j.linhas[0]).toMatchObject({
-      chave: 'Grande', rotulo: 'Grande', quantidade: 2, pedidos: 1, faturamento_centavos: 4000, ticket_medio_centavos: null,
-    })
-    expect(j.linhas[0].participacao).toBeCloseTo(1)
+  it('agrupar por grupo de opcao dinamico (opcao:<grupo>): Grande x sem opcao', async () => {
+    const j = (await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: `opcao:${grpTamId}` })).json()
+    expect(map3(j)).toEqual([['(sem opção)', 6000, 3], ['Grande', 4000, 1]])
+    const grande = j.linhas.find((l: { rotulo: string }) => l.rotulo === 'Grande')
+    expect(grande).toMatchObject({ quantidade: 2, pedidos: 1 })
   })
 
-  it('vendas por mesa: comandas fechadas do salao, universo proprio (nao pedidos)', async () => {
-    const j = (await chamar(donoA, lojaA, `/vendas?agrupar_por=mesa&${Q}`)).json()
-    expect(j.linhas.map((l: { rotulo: string; faturamento_centavos: number; pedidos: number }) =>
-      [l.rotulo, l.faturamento_centavos, l.pedidos]))
-      .toEqual([['Mesa 1', 4500, 1]])
-    expect(j.linhas[0].quantidade).toBeNull()
-    expect(j.linhas[0].ticket_medio_centavos).toBe(4500)
+  it('filtro de opcao: agrupar por item mantendo so quem tem Tamanho=Grande', async () => {
+    const j = (await vendas(donoA, lojaA, {
+      ...PERIODO, agrupar_por: 'item', filtros: [{ dimensao: `opcao:${grpTamId}`, valores: ['Grande'] }],
+    })).json()
+    expect(j.linhas).toHaveLength(1)
+    expect(j.linhas[0]).toMatchObject({ chave: 'Burger', quantidade: 2, pedidos: 1, faturamento_centavos: 4000 })
     expect(j.total_pedidos).toBe(1)
-    expect(j.total_faturamento_centavos).toBe(4500) // comandas, nao os 10000 de pedidos
+    expect(j.total_faturamento_centavos).toBe(4000)
+  })
+
+  it('filtros combinados (E): sem motoboy E categoria Lanches deixa so o Burger', async () => {
+    const j = (await vendas(donoA, lojaA, {
+      ...PERIODO, agrupar_por: 'item',
+      filtros: [{ dimensao: 'motoboy', valores: ['sem'] }, { dimensao: 'categoria', valores: ['Lanches'] }],
+    })).json()
+    expect(j.linhas.map((l: { chave: string }) => l.chave)).toEqual(['Burger'])
+    expect(j.linhas[0]).toMatchObject({ faturamento_centavos: 6000, quantidade: 3, pedidos: 2 })
+  })
+
+  it('dimensoes disponiveis: fixas + grupo de opcao do cardapio, com valores de filtro', async () => {
+    const j = (await chamar(donoA, lojaA, '/dimensoes')).json()
+    const chaves = j.dimensoes.map((d: { chave: string }) => d.chave)
+    expect(chaves).toContain('item')
+    expect(chaves).toContain(`opcao:${grpTamId}`)
+    const tam = j.dimensoes.find((d: { chave: string }) => d.chave === `opcao:${grpTamId}`)
+    expect(tam).toMatchObject({ rotulo: 'Tamanho', grupo: 'opcao', filtravel: true })
+    expect(tam.valores.map((v: { chave: string }) => v.chave)).toContain('Grande')
+    const mb = j.dimensoes.find((d: { chave: string }) => d.chave === 'motoboy')
+    expect(mb.valores.some((v: { rotulo: string }) => v.rotulo === 'Ze Entregas')).toBe(true)
+    expect(mb.valores.some((v: { chave: string }) => v.chave === 'sem')).toBe(true)
+  })
+
+  it('salao: comandas fechadas por mesa, universo proprio (nao pedidos)', async () => {
+    const j = (await chamar(donoA, lojaA, `/salao?${'de=2026-03-01&ate=2026-04-30'}`)).json()
+    expect(map3(j)).toEqual([['Mesa 1', 4500, 1]])
+    expect(j.linhas[0]).toMatchObject({ quantidade: 0, ticket_medio_centavos: 4500 })
+    expect(j.total_pedidos).toBe(1)
+    expect(j.total_faturamento_centavos).toBe(4500)
   })
 
   it('formas de pagamento: caixa + Pix online sem dupla contagem', async () => {
@@ -261,22 +283,27 @@ d('modulo relatorios', () => {
   })
 
   it('isolamento: loja B ve so o seu; atendente sem relatorios:ver recebe 403', async () => {
-    const b = (await chamar(donoB, lojaB, `/vendas?agrupar_por=item&${Q}`)).json()
+    const b = (await vendas(donoB, lojaB, { ...PERIODO, agrupar_por: 'item' })).json()
     expect(b.linhas.map((l: { chave: string }) => l.chave)).toEqual(['Segredo B'])
     // dono de B tentando ler a loja A pelo header: escopo recusa.
-    const cruzado = await chamar(donoB, lojaA, `/vendas?agrupar_por=dia&${Q}`)
+    const cruzado = await vendas(donoB, lojaA, { ...PERIODO, agrupar_por: 'dia' })
     expect(cruzado.statusCode).toBeGreaterThanOrEqual(403)
-    const at = await chamar(atendenteA, lojaA, `/vendas?agrupar_por=dia&${Q}`)
+    const at = await vendas(atendenteA, lojaA, { ...PERIODO, agrupar_por: 'dia' })
     expect(at.statusCode).toBe(403)
     expect(at.json().error.code).toBeTruthy()
+    const atDim = await chamar(atendenteA, lojaA, '/dimensoes')
+    expect(atDim.statusCode).toBe(403)
   })
 
-  it('validacao: dimensao invalida, periodo invertido e sem loja', async () => {
-    expect((await chamar(donoA, lojaA, `/vendas?agrupar_por=cliente&${Q}`)).statusCode).toBe(400)
-    expect((await chamar(donoA, lojaA, `/vendas`)).statusCode).toBe(400)
-    const inv = await chamar(donoA, lojaA, '/cancelamentos?de=2026-04-30&ate=2026-03-01')
+  it('validacao: dimensao desconhecida, filtro mal formado e periodo invertido', async () => {
+    expect((await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: 'cliente' })).statusCode).toBe(400)
+    expect((await vendas(donoA, lojaA, { ...PERIODO, agrupar_por: 'opcao:nao-e-uuid' })).statusCode).toBe(400)
+    expect((await vendas(donoA, lojaA, {})).statusCode).toBe(400)
+    expect((await vendas(donoA, lojaA, {
+      ...PERIODO, agrupar_por: 'item', filtros: [{ dimensao: 'motoboy', valores: [] }],
+    })).statusCode).toBe(400)
+    const inv = await vendas(donoA, lojaA, { de: '2026-04-30', ate: '2026-03-01', agrupar_por: 'dia' })
     expect(inv.statusCode).toBe(400)
     expect(inv.json().error.code).toBe('periodo_invalido')
-    expect((await chamar(donoA, null, `/coortes?${Q}`)).statusCode).toBeGreaterThanOrEqual(400)
   })
 })

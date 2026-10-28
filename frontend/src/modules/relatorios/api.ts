@@ -6,9 +6,10 @@ import { apiClient } from '@/shared/api_client'
 import {
   CancelamentosSaida,
   CoortesSaida,
+  DimensoesSaida,
   FormasPagamentoSaida,
+  SalaoSaida,
   VendasSaida,
-  type VendasDimensao,
 } from '@/shared/contracts/_generated/relatorios'
 import type { Periodo } from './periodo'
 
@@ -16,17 +17,47 @@ export const RAIZ = 'relatorios'
 
 const OPCOES = { placeholderData: keepPreviousData } as const
 
-/** GET /v1/relatorios/vendas?agrupar_por=...: vendas realizadas por dimensao. */
-export function useVendas(p: Periodo, agruparPor: VendasDimensao) {
+/** Um filtro do montador: mantem linhas cuja `dimensao` casa com algum dos `valores`. */
+export interface FiltroVendas {
+  dimensao: string
+  valores: string[]
+}
+export interface ConsultaVendas {
+  agrupar_por: string
+  filtros: FiltroVendas[]
+}
+
+/** POST /v1/relatorios/vendas: montador flexivel (agrupamento + filtros combinados). */
+export function useVendas(p: Periodo, consulta: ConsultaVendas) {
   return useQuery({
-    queryKey: [RAIZ, 'vendas', p, agruparPor],
+    queryKey: [RAIZ, 'vendas', p, consulta],
     ...OPCOES,
     queryFn: ({ signal }) =>
-      apiClient.get<VendasSaida>('/relatorios/vendas', {
-        query: { ...p, agrupar_por: agruparPor, limite: 20 },
+      apiClient.post<VendasSaida>('/relatorios/vendas', {
+        body: { ...p, agrupar_por: consulta.agrupar_por, filtros: consulta.filtros },
         schema: VendasSaida,
         signal,
       }),
+  })
+}
+
+/** GET /v1/relatorios/dimensoes: catalogo de dimensoes da loja (fixas + grupos de opcao). */
+export function useDimensoes() {
+  return useQuery({
+    queryKey: [RAIZ, 'dimensoes'],
+    staleTime: 60_000,
+    queryFn: ({ signal }) =>
+      apiClient.get<DimensoesSaida>('/relatorios/dimensoes', { schema: DimensoesSaida, signal }),
+  })
+}
+
+/** GET /v1/relatorios/salao: vendas do salao por mesa (fora do montador). */
+export function useSalao(p: Periodo) {
+  return useQuery({
+    queryKey: [RAIZ, 'salao', p],
+    ...OPCOES,
+    queryFn: ({ signal }) =>
+      apiClient.get<SalaoSaida>('/relatorios/salao', { query: { ...p }, schema: SalaoSaida, signal }),
   })
 }
 
@@ -56,5 +87,3 @@ export function useCoortes(p: Periodo) {
       apiClient.get<CoortesSaida>('/relatorios/coortes', { query: { ...p }, schema: CoortesSaida, signal }),
   })
 }
-
-export type { VendasDimensao }

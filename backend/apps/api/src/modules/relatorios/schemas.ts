@@ -3,11 +3,16 @@
 // trocar por '@whaviso/shared/contracts'.
 export {
   RelatorioPeriodo,
+  DimensaoFixa,
+  RE_DIMENSAO_OPCAO,
   VendasFiltro,
+  VendasConsulta,
   VendasSaida,
+  SalaoSaida,
+  DimensoesSaida,
   FormasPagamentoSaida,
   CancelamentosFiltro,
   CancelamentosSaida,
   CoortesSaida,
-  type VendasDimensao,
+  type Dimensao,
 } from '@whaviso/shared/contracts'
