@@ -4,7 +4,7 @@
 // matriz de privilegio faz SET ROLE e o teste de dump roda pg_dump: rodar isso contra o
 // cloud seria desastroso. `garantirBancoLocal()` roda no beforeAll de cada suite e ABORTA
 // se o host parecer do Supabase (ou nao for loopback).
-import pg from 'pg'
+import { criarPoolSuper } from '../../test-support/banco'
 
 const SENHA = process.env.POSTGRES_PASSWORD ?? process.env.PGPASSWORD ?? 'postgres'
 export const HOST = process.env.PGHOST ?? '127.0.0.1'
@@ -40,7 +40,7 @@ export function garantirBancoLocal(): void {
 }
 
 /** Pool de superusuario (aberto sob demanda). Usa SET ROLE para exercer cada role de servico. */
-export const poolSuper = new pg.Pool({ connectionString: URL_SUPER, max: 4 })
+export const poolSuper = criarPoolSuper(4)
 
 /** Verdadeiro se o banco local responde. Suites se pulam com aviso quando offline. */
 export async function bancoAcessivel(): Promise<boolean> {

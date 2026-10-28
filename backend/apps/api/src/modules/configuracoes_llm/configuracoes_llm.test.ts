@@ -6,8 +6,8 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import pg from 'pg'
 import { construirApp } from '../../app'
+import { criarPool, criarPoolSuper, bancoDoWorker, HOST } from '../../../../../test-support/banco'
 import { envSchema } from '../../env'
 import { verificadorFake } from '../../../test/app'
 import { criarCifraLlm } from './cifra'
@@ -16,31 +16,8 @@ import { criarRotasConfigLlm } from './routes'
 import type { DepsConfigLlm } from './service'
 import type { ResultadoValidacaoLlm } from './schemas'
 
-const HOST = process.env.PGHOST ?? '127.0.0.1'
-const DB = process.env.PGDATABASE ?? 'whaviso_dev'
-
-// Senha do superusuario da fonte canonica backend/.env (o .env.test carrega uma senha de super
-// desatualizada que sombra a correta). So para o DB LOCAL de teste; nunca e logada.
-function senhaSuper(): string {
-  try {
-    const aqui = dirname(fileURLToPath(import.meta.url))
-    const txt = readFileSync(resolve(aqui, '../../../../../.env'), 'utf8')
-    for (const linha of txt.split('\n')) {
-      const m = /^\s*POSTGRES_PASSWORD\s*=\s*(.*)\s*$/.exec(linha)
-      if (m) return m[1]!.replace(/^["']|["']$/g, '').trim()
-    }
-  } catch {
-    /* sem .env: cai no process.env/default */
-  }
-  return process.env.POSTGRES_PASSWORD ?? 'postgres'
-}
-
-const poolApi = new pg.Pool({
-  host: HOST, port: 5432, user: 'whaviso_api', password: 'whaviso_api_dev', database: DB, max: 3,
-})
-const poolSuper = new pg.Pool({
-  host: HOST, port: 5432, user: 'postgres', password: senhaSuper(), database: DB, max: 3,
-})
+const poolApi = criarPool('whaviso_api', 'whaviso_api_dev', 3)
+const poolSuper = criarPoolSuper(3)
 
 async function bancoAcessivel(): Promise<boolean> {
   try {
@@ -119,7 +96,7 @@ function deps(resultado: ResultadoValidacaoLlm, plausivel = true): DepsConfigLlm
 let disponivel = false
 
 const env = envSchema.parse({
-  DATABASE_URL: `postgresql://whaviso_api:whaviso_api_dev@${HOST}:5432/${DB}`,
+  DATABASE_URL: `postgresql://whaviso_api:whaviso_api_dev@${HOST}:5432/${bancoDoWorker()}`,
   SUPABASE_URL: 'https://exemplo.supabase.co',
   APP_URL: 'http://localhost:5173',
   RATE_LIMIT_DESLIGADO: 'true',

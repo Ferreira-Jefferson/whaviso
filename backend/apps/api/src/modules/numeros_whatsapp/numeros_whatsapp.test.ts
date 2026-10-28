@@ -1,54 +1,17 @@
-// Integracao + seguranca do modulo numeros_whatsapp. Roda no Postgres LOCAL isolado
-// (whaviso_dev_numeros via PGDATABASE). Pula com aviso se o banco nao estiver acessivel.
+// Integracao + seguranca do modulo numeros_whatsapp. Roda no Postgres LOCAL (banco por worker,
+// ver backend/test-support). Pula com aviso se o banco nao estiver acessivel.
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
-import pg from 'pg'
 import { construirApp } from '../../app'
 import { envSchema } from '../../env'
 import { verificadorFake } from '../../../test/app'
 import { criarCripto } from './cripto'
 import { criarRotasNumeros } from './routes'
 import { ErroMeta, type MetaOnboarding } from './meta_onboarding'
+import { criarPool, criarPoolSuper, bancoDoWorker, HOST } from '../../../../../test-support/banco'
 
-const HOST = process.env.PGHOST ?? '127.0.0.1'
-const DB = process.env.PGDATABASE ?? 'whaviso_dev_numeros'
-
-// Harness de banco proprio (isolado no DB desta tarefa). A senha do superusuario e lida da
-// fonte canonica backend/.env (o .env.test do repo carrega uma senha de super desatualizada
-// que sombra a correta). So para o DB LOCAL de teste; nunca e logada.
-function senhaSuper(): string {
-  try {
-    const aqui = dirname(fileURLToPath(import.meta.url))
-    const txt = readFileSync(resolve(aqui, '../../../../../.env'), 'utf8')
-    for (const linha of txt.split('\n')) {
-      const m = /^\s*POSTGRES_PASSWORD\s*=\s*(.*)\s*$/.exec(linha)
-      if (m) return m[1]!.replace(/^["']|["']$/g, '').trim()
-    }
-  } catch {
-    /* sem .env: cai no process.env/default */
-  }
-  return process.env.POSTGRES_PASSWORD ?? 'postgres'
-}
-
-const poolApi = new pg.Pool({
-  host: HOST,
-  port: 5432,
-  user: 'whaviso_api',
-  password: 'whaviso_api_dev',
-  database: DB,
-  max: 3,
-})
-const poolSuper = new pg.Pool({
-  host: HOST,
-  port: 5432,
-  user: 'postgres',
-  password: senhaSuper(),
-  database: DB,
-  max: 3,
-})
+const poolApi = criarPool('whaviso_api', 'whaviso_api_dev', 3)
+const poolSuper = criarPoolSuper(3)
 
 async function bancoAcessivel(): Promise<boolean> {
   try {
@@ -123,7 +86,7 @@ const NUMERO = '+5511988887777'
 let disponivel = false
 
 const env = envSchema.parse({
-  DATABASE_URL: `postgresql://whaviso_api:whaviso_api_dev@${HOST}:5432/${DB}`,
+  DATABASE_URL: `postgresql://whaviso_api:whaviso_api_dev@${HOST}:5432/${bancoDoWorker()}`,
   SUPABASE_URL: 'https://exemplo.supabase.co',
   APP_URL: 'http://localhost:5173',
   MASTER_KEY,

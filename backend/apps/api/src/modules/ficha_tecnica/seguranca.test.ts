@@ -3,8 +3,8 @@
 // Depende da 0027 (fichas_tecnicas) e da 0026 (insumos): pula se ausentes.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import pg from 'pg'
 import { criarLogger } from '@whaviso/shared/logger'
+import { criarPool } from '../../../../../test-support/banco'
 import {
   bancoAcessivel, criarConta, criarLoja, criarMembro, criarUsuario, fecharPools, limpar, novoCenario, poolApi,
 } from '../../../test/db'
@@ -29,12 +29,7 @@ if (!pronto) console.warn('[ficha_tecnica/seguranca] PULADA: aplicar 0026+0027 n
 
 const d = pronto ? describe : describe.skip
 
-const HOST = process.env.PGHOST ?? '127.0.0.1'
-const DB = process.env.PGDATABASE ?? 'whaviso_dev'
-const poolAtendente = new pg.Pool({
-  connectionString: `postgresql://whaviso_atendente:whaviso_atendente_dev@${HOST}:5432/${DB}`,
-  max: 2,
-})
+const poolAtendente = criarPool('whaviso_atendente', 'whaviso_atendente_dev', 2)
 
 async function montar() {
   const app = await construirApp({
