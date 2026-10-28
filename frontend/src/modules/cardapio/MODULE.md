@@ -6,6 +6,11 @@ Gerência do cardápio da loja ativa. Duas seções numa só tela (`/cardapio`):
   (disponibilidade) e mudar preço (em centavos).
 - **Grupos de opções**: biblioteca de grupos (tamanho/adicional/personalizado) e suas opções.
   Criar/editar grupo e opção, ligar/desligar opção e mudar preço de acréscimo.
+- **Importar cardápio** (foto/PDF): botão "Importar" no header abre o fluxo num modal
+  (`components/ImportarCardapioDialog`), não é mais rota/módulo próprio. Enviar o arquivo,
+  acompanhar a leitura, revisar o rascunho e aprovar; o lote aprovado cai na árvore `['cardapio']`.
+  Código em `importacao/` (api, aplicarLote, estados, components). Absorvido do antigo módulo
+  `cardapio_importacao`, que deixou de existir (telas soltas que são parte do cardápio moram aqui).
 
 ## Entry points
 - `index.ts`: export default da página (para `lazy(() => import('@/modules/cardapio'))` no registry).
@@ -25,3 +30,6 @@ Gerência do cardápio da loja ativa. Duas seções numa só tela (`/cardapio`):
 - Reordenação (endpoints `PUT .../ordem`) ainda não tem UI aqui; a ordem vem do servidor.
 - Vínculos de grupo por categoria/item (herança/exceção) ainda não têm UI aqui.
 - Usa os primitivos compartilhados `Switch` e `Textarea` de `@/shared/ui` (antes eram copias locais, ja consolidadas).
+- Importação (`importacao/api.ts`, raiz de cache `['cardapio_importacao']`): `POST/GET /v1/cardapio-importacao`,
+  `GET/PATCH /:id`, `POST /:id/aprovar`, `POST /:id/descartar`; contrato `_generated/cardapio_importacao`.
+  Arquivo/rascunho nunca vão para log. Aprovar aplica o lote e invalida `['cardapio']`.

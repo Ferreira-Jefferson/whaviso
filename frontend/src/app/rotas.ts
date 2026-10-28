@@ -15,7 +15,6 @@ import {
   Contact,
   FileBarChart,
   FileText,
-  FileUp,
   GitBranch,
   Gift,
   HeartHandshake,
@@ -65,7 +64,6 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'caixa', rotulo: 'Caixa', descricao: 'Abra, registre e feche o caixa do dia.', icone: Wallet, grupo: 'operacao', pagina: lazy(() => import('@/modules/caixa')) },
   // Cardápio (o que você vende)
   { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'cardapio', fixoNoMobile: true, pagina: lazy(() => import('@/modules/cardapio')) },
-  { caminho: 'cardapio-importacao', rotulo: 'Importar cardápio', descricao: 'Foto ou PDF vira cardápio.', icone: FileUp, grupo: 'cardapio', pagina: lazy(() => import('@/modules/cardapio_importacao')) },
   { caminho: 'estoque', rotulo: 'Estoque', descricao: 'Insumos e fichas técnicas.', icone: Boxes, grupo: 'cardapio', pagina: lazy(() => import('@/modules/estoque')) },
   { caminho: 'promocoes', rotulo: 'Promoções', descricao: 'Cupons e combos para vender mais.', icone: TicketPercent, grupo: 'cardapio', pagina: lazy(() => import('@/modules/promocoes')) },
   { caminho: 'fidelidade', rotulo: 'Fidelidade', descricao: 'Pontos ou cashback para quem volta.', icone: Gift, grupo: 'cardapio', pagina: lazy(() => import('@/modules/fidelidade')) },

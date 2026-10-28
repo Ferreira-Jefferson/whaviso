@@ -2,7 +2,7 @@
 // grupos de opcoes (aba Grupos). CRUD por dialog, disponibilidade por interruptor na lista.
 // Dados pela api REST (raiz de cache ['cardapio']); nada e decidido no cliente. Rota /cardapio.
 import { useCallback, useState } from 'react'
-import { Plus, UtensilsCrossed, SlidersHorizontal } from 'lucide-react'
+import { FileUp, Plus, UtensilsCrossed, SlidersHorizontal } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { Button, EmptyState, ErrorState, SegmentedControl, Skeleton, useToast } from '@/shared/ui'
 import type {
@@ -17,6 +17,7 @@ import {
   useDisponibilidadeOpcao,
   useGrupos,
 } from '../api'
+import { ImportarCardapioDialog } from '../components/ImportarCardapioDialog'
 import { CategoriaCard } from '../components/CategoriaCard'
 import { GrupoCard } from '../components/GrupoCard'
 import { CategoriaDialog } from '../components/CategoriaDialog'
@@ -45,6 +46,7 @@ export default function Cardapio() {
   const [dlgItem, setDlgItem] = useState<{ aberto: boolean; item: ItemResolvido | null; categoriaId: string }>({ aberto: false, item: null, categoriaId: '' })
   const [dlgGrupo, setDlgGrupo] = useState<{ aberto: boolean; grupo: GrupoSaida | null }>({ aberto: false, grupo: null })
   const [dlgOpcao, setDlgOpcao] = useState<{ aberto: boolean; opcao: OpcaoSaida | null; grupoId: string }>({ aberto: false, opcao: null, grupoId: '' })
+  const [importarAberto, setImportarAberto] = useState(false)
 
   const categorias = arvore.data?.categorias ?? []
   const listaCategorias = categorias.map((c) => ({ id: c.id, nome: c.nome }))
@@ -79,10 +81,16 @@ export default function Cardapio() {
           <p className="mt-1 text-sm text-tinta-2">Categorias, itens e grupos de opções. Ligue e desligue o que está disponível na hora.</p>
         </div>
         {aba === 'cardapio' ? (
-          <Button onClick={() => setDlgCategoria({ aberto: true, categoria: null })} className="max-md:w-full">
-            <Plus strokeWidth={1.75} className="size-4" aria-hidden />
-            Nova categoria
-          </Button>
+          <div className="flex flex-wrap gap-2 max-md:w-full">
+            <Button variante="secondary" onClick={() => setImportarAberto(true)} className="max-md:flex-1">
+              <FileUp strokeWidth={1.75} className="size-4" aria-hidden />
+              Importar
+            </Button>
+            <Button onClick={() => setDlgCategoria({ aberto: true, categoria: null })} className="max-md:flex-1">
+              <Plus strokeWidth={1.75} className="size-4" aria-hidden />
+              Nova categoria
+            </Button>
+          </div>
         ) : (
           <Button onClick={() => setDlgGrupo({ aberto: true, grupo: null })} className="max-md:w-full">
             <Plus strokeWidth={1.75} className="size-4" aria-hidden />
@@ -186,6 +194,7 @@ export default function Cardapio() {
         grupoId={dlgOpcao.grupoId}
         onFechar={() => setDlgOpcao((s) => ({ ...s, aberto: false }))}
       />
+      <ImportarCardapioDialog aberto={importarAberto} onFechar={() => setImportarAberto(false)} />
     </div>
   )
 }
