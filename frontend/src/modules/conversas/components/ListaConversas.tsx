@@ -1,6 +1,6 @@
 import { MessageCircle, Search } from 'lucide-react'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { cn, EmptyState, ErrorState, Input, SegmentedControl, Skeleton } from '@/shared/ui'
+import { cn, EmptyState, ErrorState, Input, Select, Skeleton } from '@/shared/ui'
 import type { ConversaLista } from '../api'
 import { FILTROS_STATUS, type FiltroStatus } from '../estados'
 import { ItemConversa } from './ItemConversa'
@@ -45,12 +45,11 @@ export function ListaConversas({
           />
         </label>
         <div className="mt-3">
-          <SegmentedControl
+          <Select
             ariaLabel="Filtrar por estado"
             value={status}
             onChange={aoMudarStatus}
             options={FILTROS_STATUS}
-            preencher
           />
         </div>
       </div>
