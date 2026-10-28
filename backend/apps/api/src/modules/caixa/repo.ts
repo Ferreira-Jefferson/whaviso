@@ -99,6 +99,16 @@ export async function pedidoDaLoja(exec: Executor, lojaId: string, pedidoId: str
   )
 }
 
+const COLS_MOV = sqlBruto(
+  `id, caixa_id, tipo, forma_pagamento, valor_centavos, pedido_id, motivo, criado_por_user_id`,
+)
+const SAIDA_MOV = sql`${COLS_MOV}, ${TS('criado_em')} as criado_em`
+
+/**
+ * Insere um movimento. Com `chaveIdempotencia`, o reenvio da mesma chave (duplo-clique/retry) e
+ * no-op: o `on conflict do nothing` nao grava a 2a linha e o fallback devolve o movimento original,
+ * tornando o lancamento idempotente. Sem chave, insere sempre (indice parcial nao se aplica a null).
+ */
 export async function inserirMovimento(
   exec: Executor,
   lojaId: string,
@@ -110,17 +120,27 @@ export async function inserirMovimento(
     pedidoId: string | null
     motivo: string | null
     criadoPor: string
+    chaveIdempotencia: string | null
   },
-) {
-  return consultarUm<MovimentoLinha>(
+): Promise<{ movimento: MovimentoLinha; criado: boolean }> {
+  const inserido = await consultarUm<MovimentoLinha>(
     exec,
     sql`insert into public.movimentos_caixa
-          (loja_id, caixa_id, tipo, forma_pagamento, valor_centavos, pedido_id, motivo, criado_por_user_id)
+          (loja_id, caixa_id, tipo, forma_pagamento, valor_centavos, pedido_id, motivo,
+           criado_por_user_id, chave_idempotencia)
         values (${lojaId}, ${caixaId}, ${m.tipo}, ${m.formaPagamento}, ${m.valor},
-                ${m.pedidoId}, ${m.motivo}, ${m.criadoPor})
-        returning id, caixa_id, tipo, forma_pagamento, valor_centavos, pedido_id, motivo,
-                  criado_por_user_id, ${TS('criado_em')} as criado_em`,
+                ${m.pedidoId}, ${m.motivo}, ${m.criadoPor}, ${m.chaveIdempotencia})
+        on conflict (loja_id, chave_idempotencia) where chave_idempotencia is not null do nothing
+        returning ${SAIDA_MOV}`,
   )
+  if (inserido) return { movimento: inserido, criado: true }
+  // Conflito: ja havia um movimento com esta chave. Devolve o original (idempotente), sem novo evento.
+  const existente = await consultarUm<MovimentoLinha>(
+    exec,
+    sql`select ${SAIDA_MOV} from public.movimentos_caixa
+         where loja_id = ${lojaId} and chave_idempotencia = ${m.chaveIdempotencia}`,
+  )
+  return { movimento: existente!, criado: false }
 }
 
 export async function listarMovimentos(exec: Executor, lojaId: string, caixaId: string) {

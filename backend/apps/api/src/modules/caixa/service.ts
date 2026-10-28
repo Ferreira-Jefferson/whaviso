@@ -117,19 +117,23 @@ export function criarServicoCaixa(pool: Pool) {
       if (!travado || travado.status !== 'aberto') {
         throw conflito('caixa_fechado', 'O caixa esta fechado; abra um novo para lancar')
       }
-      const mov = await repo.inserirMovimento(tx, a.lojaId, caixaId, {
+      const { movimento, criado } = await repo.inserirMovimento(tx, a.lojaId, caixaId, {
         tipo: b.tipo,
         formaPagamento: b.tipo === 'venda' ? b.forma_pagamento! : null,
         valor: b.valor_centavos,
         pedidoId,
         motivo: b.motivo ?? null,
         criadoPor: a.userId,
+        chaveIdempotencia: b.chave_idempotencia ?? null,
       })
-      await repo.registrarEvento(tx, {
-        lojaId: a.lojaId, tipo: 'caixa.movimento', entidade: 'movimento_caixa', entidadeId: mov!.id,
-        detalhes: { user_id: a.userId, caixa_id: caixaId, tipo: b.tipo, valor_centavos: b.valor_centavos },
-      })
-      return mov!
+      // Reenvio com a mesma chave (duplo-clique/retry): nada de novo gravado, nao registra evento.
+      if (criado) {
+        await repo.registrarEvento(tx, {
+          lojaId: a.lojaId, tipo: 'caixa.movimento', entidade: 'movimento_caixa', entidadeId: movimento.id,
+          detalhes: { user_id: a.userId, caixa_id: caixaId, tipo: b.tipo, valor_centavos: b.valor_centavos },
+        })
+      }
+      return movimento
     })
     return paraMovimento(m)
   }
