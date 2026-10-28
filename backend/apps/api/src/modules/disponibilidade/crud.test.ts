@@ -189,4 +189,23 @@ d('modulo disponibilidade (integracao)', () => {
     // Se a loja estiver aceitando pedido ao vivo agora, o modo e atendimento; senao, agendamento (nunca fechado com 24h).
     expect(s.modo_atendente).toBe(s.aceitando_agora ? 'atendimento' : 'agendamento')
   })
+
+  // --- corrida (concorrencia) ---
+  it('corrida: duas faixas sobrepostas no mesmo dia em paralelo: so uma vence, a outra 422', async () => {
+    // Dia 3 ainda nao tem faixa. O advisory lock (travarHorarios) serializa: a 2a tx enxerga a 1a e
+    // a sobreposicao e barrada. Conta quantas venceram, nao qual chamada.
+    const rs = await Promise.all([
+      chamar(dono, lojaA, 'POST', '/horarios', { dia_semana: 3, abre: '09:00', fecha: '12:00' }),
+      chamar(dono, lojaA, 'POST', '/horarios', { dia_semana: 3, abre: '10:00', fecha: '14:00' }),
+    ])
+    const ok = rs.filter((r) => r.statusCode === 201)
+    const barrados = rs.filter((r) => r.statusCode === 422)
+    expect(ok).toHaveLength(1)
+    expect(barrados).toHaveLength(1)
+    expect(barrados[0]!.json().error.code).toBe('horario_sobreposto')
+    // So UMA faixa ativa ficou no dia 3.
+    const ativas = (await chamar(dono, lojaA, 'GET', '/horarios')).json().itens
+      .filter((h: { dia_semana: number }) => h.dia_semana === 3)
+    expect(ativas).toHaveLength(1)
+  })
 })
