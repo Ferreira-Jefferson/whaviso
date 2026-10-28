@@ -58,6 +58,12 @@ function iconeHandle(): L.DivIcon {
   return L.divIcon({ html, className: 'whv-mapa-handle', iconSize: [16, 16], iconAnchor: [8, 8] })
 }
 
+// Rotulo de km mostrado colado na alca do raio (atualiza ao vivo durante o arraste).
+function rotuloKm(metros: number): string {
+  const km = Math.round((metros / 1000) * 100) / 100
+  return `${String(km).replace('.', ',')} km`
+}
+
 // Vertice numerado do poligono (arrastavel).
 function iconeVertice(numero: number): L.DivIcon {
   const html =
@@ -155,14 +161,19 @@ export default function SeletorAreaLeaflet(props: Props) {
       keyboard: false,
       title: 'Arraste para ajustar o raio',
     }).addTo(map)
+    // Rotulo permanente com os km do raio, colado na alca (fica visivel tambem depois de soltar).
+    handle.bindTooltip(rotuloKm(metrosRef.current), { permanent: true, direction: 'right', offset: [12, 0] })
     handleMkRef.current = handle
 
     map.fitBounds(circulo.getBounds(), { padding: [40, 40], maxZoom: 16 })
 
-    // Arrastar o handle: ajusta o raio pela distancia ao centro (ao vivo e no fim).
+    // Arrastar o handle: ajusta o raio pela distancia ao centro (ao vivo e no fim), e atualiza o
+    // rotulo de km em tempo real para o usuario ver quanto cobre enquanto mexe, antes de soltar.
     const aoArrastarHandle = () => {
       const d = map.distance(centroMk.getLatLng(), handle.getLatLng())
-      circulo.setRadius(Math.min(d, maxRef.current))
+      const r = Math.min(d, maxRef.current)
+      circulo.setRadius(r)
+      handle.setTooltipContent(rotuloKm(r))
     }
     const aoSoltarHandle = () => {
       const d = map.distance(centroMk.getLatLng(), handle.getLatLng())
@@ -170,6 +181,7 @@ export default function SeletorAreaLeaflet(props: Props) {
       circulo.setRadius(metrosFinal)
       // Normaliza o handle de volta para a borda leste do circulo.
       handle.setLatLng([centroMk.getLatLng().lat, circulo.getBounds().getEast()])
+      handle.setTooltipContent(rotuloKm(metrosFinal))
       cbRef.current.onMetros(metrosFinal)
     }
     handle.on('drag', aoArrastarHandle)
@@ -227,6 +239,7 @@ export default function SeletorAreaLeaflet(props: Props) {
     circulo.setRadius(metros)
     centroMk.setLatLng([centro.lat, centro.lng])
     handle.setLatLng([centro.lat, circulo.getBounds().getEast()])
+    handle.setTooltipContent(rotuloKm(metros))
     if (metros > 0) map.fitBounds(circulo.getBounds(), { padding: [40, 40], maxZoom: 16 })
   }, [modo, centro.lat, centro.lng, metros])
 
