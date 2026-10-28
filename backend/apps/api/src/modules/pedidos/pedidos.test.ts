@@ -245,6 +245,106 @@ d('modulo pedidos (integracao)', () => {
     })
   })
 
+  describe('repetir pedido inteiro (G13)', () => {
+    it('cria um pedido novo espelhando os itens do anterior, reresolvendo preco de agora', async () => {
+      const original = await criar()
+      const det = (await chamar(m, m.dono, m.A.loja, 'GET', `/${original.id}`)).corpo
+      const r = await chamar(m, m.dono, m.A.loja, 'POST', `/${original.id}/repetir`, {})
+      expect(r.status, JSON.stringify(r.corpo)).toBe(201)
+      expect(r.corpo.id).not.toBe(original.id)
+      expect(r.corpo.status).toBe('novo')
+      expect(r.corpo.origem).toBe('manual')
+      // Mesmos itens e opcoes (snapshot), mesmos totais (cardapio inalterado).
+      expect(r.corpo.subtotal_centavos).toBe(det.subtotal_centavos)
+      expect(r.corpo.total_centavos).toBe(det.total_centavos)
+      expect(r.corpo.itens.map((i: { nome_snapshot: string }) => i.nome_snapshot)).toEqual(
+        det.itens.map((i: { nome_snapshot: string }) => i.nome_snapshot))
+      expect(r.corpo.itens[0].opcoes.map((o: { nome_snapshot: string }) => o.nome_snapshot).sort()).toEqual(['Bacon', 'Grande'])
+      expect(r.corpo.cliente.id).toBe(det.cliente.id)
+      expect(r.corpo.endereco.id).toBe(det.endereco.id)
+      // Auditoria carrega a origem (repetido_de), sem PII.
+      const ev = await poolSuper.query(
+        "select detalhes from public.eventos where tipo = 'pedido.criado' and entidade_id = $1", [r.corpo.id])
+      expect(ev.rows[0].detalhes.repetido_de).toBe(original.id)
+      expect(JSON.stringify(ev.rows)).not.toContain(NOME_CLIENTE)
+    })
+
+    it('reresolve o preco atual do cardapio ao repetir', async () => {
+      const original = await criar()
+      await poolSuper.query('update public.itens set preco_centavos = 3000 where id = $1', [m.A.cardapio.burger])
+      try {
+        const r = await chamar(m, m.dono, m.A.loja, 'POST', `/${original.id}/repetir`, {})
+        expect(r.status).toBe(201)
+        // (3000 + 500 grande + 300 bacon) x 2 = 7600 ; original era 5600
+        expect(r.corpo.subtotal_centavos).toBe(7600)
+        expect(r.corpo.itens[0].preco_unitario_centavos).toBe(3000)
+      } finally {
+        await poolSuper.query('update public.itens set preco_centavos = 2000 where id = $1', [m.A.cardapio.burger])
+      }
+    })
+
+    it('rejeita 422 quando um item do anterior nao e mais pedivel, dizendo qual', async () => {
+      const original = await criar()
+      await poolSuper.query('update public.itens set ativo = false where id = $1', [m.A.cardapio.burger])
+      try {
+        const r = await chamar(m, m.dono, m.A.loja, 'POST', `/${original.id}/repetir`, {})
+        expect(r.status).toBe(422)
+        expect(r.corpo.error.code).toBe('itens_indisponiveis')
+        expect(r.corpo.error.message).toContain('Burger')
+      } finally {
+        await poolSuper.query('update public.itens set ativo = true where id = $1', [m.A.cardapio.burger])
+      }
+    })
+
+    it('SEC-001: nao repete pedido de outra loja (404)', async () => {
+      const original = await criar()
+      const r = await chamar(m, m.donoB, m.B.loja, 'POST', `/${original.id}/repetir`, {})
+      expect(r.status).toBe(404)
+    })
+  })
+
+  describe('transicao de status em lote (POST /transicao)', () => {
+    const prep = async () => {
+      const p = await criar()
+      await mover(p.id, 'em_preparo')
+      return p.id
+    }
+    it('move varios pedidos atomicamente e e idempotente no alvo', async () => {
+      const [a, b] = [await prep(), await prep()]
+      const r = await chamar(m, m.dono, m.A.loja, 'POST', '/transicao', { pedido_ids: [a, b], para: 'saiu_entrega' })
+      expect(r.status, JSON.stringify(r.corpo)).toBe(200)
+      expect(r.corpo.resultados.every((x: { mudou: boolean }) => x.mudou)).toBe(true)
+      for (const id of [a, b]) expect((await chamar(m, m.dono, m.A.loja, 'GET', `/${id}`)).corpo.status).toBe('saiu_entrega')
+      // Repetir o mesmo lote: ja no alvo, no-op (mudou=false), continua 200.
+      const r2 = await chamar(m, m.dono, m.A.loja, 'POST', '/transicao', { pedido_ids: [a, b], para: 'saiu_entrega' })
+      expect(r2.status).toBe(200)
+      expect(r2.corpo.resultados.every((x: { mudou: boolean }) => x.mudou === false)).toBe(true)
+    })
+
+    it('transicao invalida em qualquer pedido rejeita o lote inteiro (nada aplicado)', async () => {
+      const bom = await prep()
+      const ruim = await criar() // fica em novo: novo -> saiu_entrega e invalido
+      const r = await chamar(m, m.dono, m.A.loja, 'POST', '/transicao', { pedido_ids: [bom, ruim.id], para: 'saiu_entrega' })
+      expect(r.status).toBe(409)
+      expect(r.corpo.error.code).toBe('transicao_invalida')
+      // Tudo ou nada: o pedido valido NAO foi movido.
+      expect((await chamar(m, m.dono, m.A.loja, 'GET', `/${bom}`)).corpo.status).toBe('em_preparo')
+    })
+
+    it('problema em lote exige motivo (422)', async () => {
+      const a = await prep()
+      const r = await chamar(m, m.dono, m.A.loja, 'POST', '/transicao', { pedido_ids: [a], para: 'problema' })
+      expect(r.status).toBe(422)
+      expect(r.corpo.error.code).toBe('motivo_obrigatorio')
+    })
+
+    it('SEC-001: lote com pedido de outra loja nao e encontrado (404)', async () => {
+      const a = await prep()
+      const r = await chamar(m, m.donoB, m.B.loja, 'POST', '/transicao', { pedido_ids: [a], para: 'saiu_entrega' })
+      expect(r.status).toBe(404)
+    })
+  })
+
   describe('cancelar linha', () => {
     it('recalcula subtotal e total; nao cancela a ultima linha; so em novo/em_preparo', async () => {
       const corpo = corpoPadrao(m.A, {

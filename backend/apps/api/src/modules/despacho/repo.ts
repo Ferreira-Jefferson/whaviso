@@ -134,6 +134,21 @@ export function propagarMotoboy(
   )
 }
 
+/**
+ * Ao despachar: move os pedidos da corrida de `em_preparo` para `saiu_entrega` (G2 do despacho). O
+ * guarda `status = 'em_preparo'` espelha a UNICA origem que a maquina de estados do pedido admite para
+ * `saiu_entrega` (sem retrocesso; novo ainda nao preparado nao sai para entrega). Idempotente: num
+ * novo despacho nenhuma linha casa (ja estao em `saiu_entrega`). Devolve os pedidos movidos (realtime).
+ */
+export function marcarPedidosSaiuEntrega(ex: Executor, lojaId: string, corridaId: string) {
+  return consultar<{ id: string; status: StatusPedidoLinha }>(
+    ex,
+    sql`update public.pedidos set status = 'saiu_entrega'
+         where loja_id = ${lojaId} and corrida_id = ${corridaId} and status = 'em_preparo'
+     returning id, status`,
+  )
+}
+
 export async function idsDaCorrida(ex: Executor, lojaId: string, corridaId: string): Promise<string[]> {
   const r = await consultar<{ id: string }>(
     ex,

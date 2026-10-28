@@ -6,7 +6,8 @@ import { HttpError } from '../../shared/http_errors'
 import { criarServicoPedidos, type Ator } from './service'
 import {
   IdParams, ImpressaoQuery, ItemParams, KanbanQuery, PedidoCriarManualEntrada, PedidoDetalheSaida,
-  PedidoImpressaoSaida, PedidoKanbanSaida, PedidoStatusEntrada,
+  PedidoImpressaoSaida, PedidoKanbanSaida, PedidoRepetirEntrada, PedidoStatusEntrada,
+  PedidoTransicaoLoteEntrada, PedidoTransicaoLoteSaida,
 } from './schemas'
 
 /** Loja efetiva = SO a do escopo resolvido (nunca corpo/query). */
@@ -33,6 +34,18 @@ export function criarPedidosRoutes(cifra?: Cifra): FastifyPluginAsync {
       ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: guarda,
       schema: { body: PedidoCriarManualEntrada, response: { 201: PedidoDetalheSaida } },
     }, async (req, reply) => reply.status(201).send(await svc.criarManual(ator(req), req.body)))
+
+    // Transicao de status EM LOTE (coordenacao com o despacho e painel). Rota estatica antes de /:id.
+    app.post('/transicao', {
+      ...loja(), preHandler: guarda,
+      schema: { body: PedidoTransicaoLoteEntrada, response: { 200: PedidoTransicaoLoteSaida } },
+    }, async (req) => svc.transicaoLote(ator(req), req.body))
+
+    // G13: repetir um pedido anterior inteiro (cria um pedido novo a partir dele).
+    app.post('/:id/repetir', {
+      ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: guarda,
+      schema: { params: IdParams, body: PedidoRepetirEntrada, response: { 201: PedidoDetalheSaida } },
+    }, async (req, reply) => reply.status(201).send(await svc.repetir(ator(req), req.params.id, req.body)))
 
     app.get('/:id', {
       ...loja(), preHandler: guarda,

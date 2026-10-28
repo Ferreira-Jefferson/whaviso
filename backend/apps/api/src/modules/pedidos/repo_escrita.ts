@@ -4,6 +4,27 @@ import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
 import type { FormaPagamento, ModalidadePedido, StatusPedido } from '@whaviso/shared/contracts'
 import type { LinhaMontada } from './montador'
 
+export interface PedidoTravado {
+  id: string
+  codigo: string
+  status: StatusPedido
+  modalidade: ModalidadePedido
+}
+
+/**
+ * Trava varias linhas de pedido na transacao (FOR UPDATE, ordenado por id para evitar deadlock) e
+ * devolve id/codigo/status/modalidade de cada uma. So os pedidos da loja ativa. Base da transicao
+ * em lote (POST /transicao).
+ */
+export async function travarPedidos(exec: Executor, lojaId: string, ids: readonly string[]) {
+  return consultar<PedidoTravado>(
+    exec,
+    sql`select id, codigo, status, modalidade from public.pedidos
+         where loja_id = ${lojaId} and id = any(${[...ids]}::uuid[])
+         order by id for update`,
+  )
+}
+
 /** Proximo codigo `AAMMDD-NNN` do dia (sequencia diaria por loja). Conflito = retry no chamador. */
 export async function proximoCodigo(exec: Executor, lojaId: string, aammdd: string): Promise<string> {
   const r = await consultarUm<{ n: number }>(

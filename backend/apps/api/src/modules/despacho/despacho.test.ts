@@ -1,5 +1,5 @@
 // Integracao do despacho basico: atribuir motoboy, compor/reordenar/despachar/concluir/cancelar corrida,
-// isolamento entre lojas e a garantia de que `pedidos.status` nunca muda. Roda no Postgres LOCAL
+// isolamento entre lojas; ao despachar, os pedidos preparados vao a `saiu_entrega`. Roda no Postgres LOCAL
 // whaviso_dev com a app real; se offline, pula.
 import { randomUUID } from 'node:crypto'
 import type { InjectOptions } from 'fastify'
@@ -184,6 +184,9 @@ d('modulo despacho', () => {
     // Pedido na corrida: atribuicao individual e 409.
     expect((await A('POST', `/pedidos/${p1}/motoboy`, { motoboy_id: motoboyA })).corpo.error.code).toBe('pedido_em_corrida')
 
+    // p3 entrou novo; ao preparar, pode ser despachado junto. p1/p2 ja estao em_preparo.
+    await q('update public.pedidos set status = $2::status_pedido where id = $1', [p3, 'em_preparo'])
+
     const d1 = await A('POST', `/corridas/${id}/despachar`)
     expect(d1.status, d1.body).toBe(200)
     expect(d1.corpo.status).toBe('despachada')
@@ -191,13 +194,13 @@ d('modulo despacho', () => {
     const d2 = await A('POST', `/corridas/${id}/despachar`)
     expect(d2.corpo.despachada_em).toBe(quando)
 
+    // Despachar moveu os pedidos preparados da corrida para saiu_entrega (maquina de estados do pedido).
+    for (const p of [p1, p2, p3]) expect((await estado(p)).status).toBe('saiu_entrega')
+
     // Composicao travada apos despachar.
     const extra = await pedido(lojaA)
     expect((await A('POST', `/corridas/${id}/pedidos`, { pedido_ids: [extra] })).corpo.error.code).toBe('corrida_imutavel')
     expect((await A('POST', `/corridas/${id}/cancelar`)).corpo.error.code).toBe('corrida_ja_despachada')
-
-    // Status do pedido intocado.
-    expect((await estado(p1)).status).toBe('em_preparo')
 
     const painel = await A('GET', '/')
     expect(painel.status).toBe(200)
@@ -212,6 +215,21 @@ d('modulo despacho', () => {
     expect((await A('POST', `/corridas/${id}/concluir`)).status).toBe(200)
     const painel2 = await A('GET', '/')
     expect(painel2.corpo.corridas.some((x: { id: string }) => x.id === id)).toBe(false)
+  })
+
+  it('despachar move os pedidos preparados a saiu_entrega; novo nao preparado fica; idempotente', async () => {
+    const preparado = await pedido(lojaA, { status: 'em_preparo' })
+    const aindaNovo = await pedido(lojaA, { status: 'novo' })
+    const c = await A('POST', '/corridas', { motoboy_id: motoboyA, pedido_ids: [preparado, aindaNovo] })
+    const id = c.corpo.id
+    const d = await A('POST', `/corridas/${id}/despachar`)
+    expect(d.status, d.body).toBe(200)
+    // Preparado sai para entrega; o que ainda estava novo (nao preparado) nao e arrastado.
+    expect((await estado(preparado)).status).toBe('saiu_entrega')
+    expect((await estado(aindaNovo)).status).toBe('novo')
+    // Re-despachar nao re-transiciona (idempotente): continua saiu_entrega, nada quebra.
+    expect((await A('POST', `/corridas/${id}/despachar`)).status).toBe(200)
+    expect((await estado(preparado)).status).toBe('saiu_entrega')
   })
 
   it('despachar corrida vazia: 422; concluir antes de despachar: 409', async () => {

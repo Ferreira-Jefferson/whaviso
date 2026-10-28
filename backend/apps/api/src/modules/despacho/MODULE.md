@@ -17,7 +17,9 @@ Fonte: `historias/backend-api/despacho.md`.
 
 ## Tabelas
 - dono de escrita: `corridas` (0007; sem DELETE).
-- escreve em `pedidos` SO `motoboy_id`, `motoboy_nome`, `corrida_id`, `ordem_parada`; **nunca** `status`.
+- escreve em `pedidos` as 4 colunas de despacho (`motoboy_id`, `motoboy_nome`, `corrida_id`, `ordem_parada`)
+  e, SO no `despachar`, move `status` `em_preparo -> saiu_entrega` dos pedidos da corrida (ver Regras). Fora
+  do `despachar` nao toca `status`; a maquina de estados continua sendo do modulo pedidos.
 - le (read-model, sem importar modulo): `pedidos`, `enderecos`, `zonas_entrega` (valor do motoboy), `motoboys`, `pessoas`.
 - auditoria em `eventos` (`pedido.motoboy_atribuido|trocado|removido`, `corrida.criada|pedidos_adicionados|pedido_removido|reordenada|motoboy_atribuido|motoboy_trocado|despachada|concluida|cancelada`); `detalhes` so com ids e `user_id`.
 
@@ -27,7 +29,11 @@ Fonte: `historias/backend-api/despacho.md`.
 - Compor corrida: so `novo|em_preparo`, entrega, sem outra corrida; `ordem_parada` sequencial sem buracos; so em `montando`
   (senao 409 `corrida_imutavel`). Concorrencia: `FOR UPDATE` na corrida e nos pedidos + `UPDATE ... WHERE corrida_id IS NULL`.
 - Corrida com motoboy propaga o nome/id a todos os pedidos (inclusive os adicionados depois).
-- `despachar`: exige motoboy (422 `corrida_sem_motoboy`) e >= 1 pedido (422 `corrida_vazia`); idempotente.
+- `despachar`: exige motoboy (422 `corrida_sem_motoboy`) e >= 1 pedido (422 `corrida_vazia`); idempotente. Ao
+  sair a corrida, move os pedidos preparados para `saiu_entrega` na mesma transacao. O guarda `status = 'em_preparo'`
+  espelha a UNICA origem que a maquina de estados do pedido admite para `saiu_entrega` (sem retrocesso; pedido
+  ainda `novo`/nao preparado nao e arrastado). Idempotente (num re-despacho `despachar` ja retorna cedo). Para a
+  coordenacao generica (front/painel movendo status em lote) existe `POST /v1/pedidos/transicao` no modulo pedidos.
 - `concluir`: so despachada (409 `corrida_nao_despachada`); idempotente.
 - `cancelar`: so em `montando`; libera pedidos (e o motoboy que veio da corrida) e encerra a corrida como `concluida`
   sem `despachada_em`, exposta como `cancelada: true` (sem DELETE e sem novo valor de enum; evita migration).
@@ -38,4 +44,4 @@ Reusa o canal existente `pedido.atualizado` (ids + status, sem PII) a cada pedid
 `corrida.atualizada` e `pedido.motoboy_atribuido` exigem estender `contracts/eventos.ts` (fora deste modulo).
 
 ## Fora de escopo
-Mover `pedidos.status` (e do modulo pedidos), roteirizacao/mapas, fechamento do dia (modulo motoboys).
+Transicoes de status do pedido fora do `despachar` (sao do modulo pedidos), roteirizacao/mapas, fechamento do dia (modulo motoboys).

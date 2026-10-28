@@ -9,13 +9,28 @@ import { HttpError, conflito, naoEncontrado, regraNegocio } from '../../shared/h
 import { carregarDetalhe } from './detalhe'
 import { destinosValidos, motivoObrigatorio, permiteCancelarLinha, podeTransicionar } from './estados'
 import { comandaHtml, comandaTexto } from './impressao'
-import { montarPedido } from './montador'
+import { montarLinha, montarPedido, type LinhaEntrada, type LinhaMontada } from './montador'
 import * as repo from './repo'
 import * as escrita from './repo_escrita'
 import type {
   ColunaKanban, KanbanQuery, PedidoCriarManualEntrada, PedidoDetalheSaida, PedidoImpressaoSaida,
-  PedidoKanbanSaida, PedidoStatusEntrada,
+  PedidoKanbanSaida, PedidoRepetirEntrada, PedidoStatusEntrada, PedidoTransicaoLoteEntrada,
+  PedidoTransicaoLoteSaida,
 } from './schemas'
+
+interface PedidoParaInserir {
+  clienteId: string
+  enderecoId: string | null
+  modalidade: PedidoCriarManualEntrada['modalidade']
+  subtotal: number
+  taxa: number
+  total: number
+  formaPagamento: PedidoDetalheSaida['forma_pagamento']
+  trocoPara: number | null
+  observacao: string | null
+  linhas: LinhaMontada[]
+  evento: Record<string, unknown>
+}
 
 export interface Ator {
   lojaId: string
@@ -86,27 +101,34 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     const m = montarPedido(cardapio, b.itens, b.taxa_entrega_centavos, new Date())
     if (m.total_centavos > TETO_TOTAL) throw regraNegocio('total_acima_do_teto', 'Total acima do limite')
 
+    const id = await inserirPedidoComRetry(a, {
+      clienteId: b.cliente_id, enderecoId: b.endereco_id ?? null, modalidade: b.modalidade,
+      subtotal: m.subtotal_centavos, taxa: m.taxa_entrega_centavos, total: m.total_centavos,
+      formaPagamento: b.forma_pagamento ?? null, trocoPara: b.troco_para_centavos ?? null,
+      observacao: b.observacao ?? null, linhas: m.linhas,
+      evento: { user_id: a.userId, origem: 'manual', modalidade: b.modalidade, total_centavos: m.total_centavos },
+    })
+    return detalhe(a, id)
+  }
+
+  /** Insere pedido + itens + opcoes numa transacao, com retry no conflito do codigo diario. */
+  async function inserirPedidoComRetry(a: Ator, p: PedidoParaInserir): Promise<string> {
     const dia = hojeSp().slice(2).replace(/-/g, '')
     for (let tentativa = 0; tentativa < 5; tentativa++) {
       try {
-        const id = await comTransacao(pool, async (tx: PoolClient) => {
+        return await comTransacao(pool, async (tx: PoolClient) => {
           const codigo = await escrita.proximoCodigo(tx, a.lojaId, dia)
           const pedidoId = await escrita.inserirPedido(tx, {
-            lojaId: a.lojaId, clienteId: b.cliente_id, enderecoId: b.endereco_id ?? null,
-            modalidade: b.modalidade, codigo, subtotal: m.subtotal_centavos, taxa: m.taxa_entrega_centavos,
-            total: m.total_centavos, formaPagamento: b.forma_pagamento ?? null,
-            trocoPara: b.troco_para_centavos ?? null, observacao: b.observacao ?? null,
+            lojaId: a.lojaId, clienteId: p.clienteId, enderecoId: p.enderecoId, modalidade: p.modalidade,
+            codigo, subtotal: p.subtotal, taxa: p.taxa, total: p.total, formaPagamento: p.formaPagamento,
+            trocoPara: p.trocoPara, observacao: p.observacao,
           })
-          for (const l of m.linhas) await escrita.inserirLinha(tx, a.lojaId, pedidoId, l)
-          if (b.endereco_id) await escrita.marcarUsoEndereco(tx, a.lojaId, b.endereco_id)
-          await escrita.registrarEvento(tx, {
-            lojaId: a.lojaId, tipo: 'pedido.criado', pedidoId,
-            detalhes: { user_id: a.userId, origem: 'manual', modalidade: b.modalidade, total_centavos: m.total_centavos },
-          })
+          for (const l of p.linhas) await escrita.inserirLinha(tx, a.lojaId, pedidoId, l)
+          if (p.enderecoId) await escrita.marcarUsoEndereco(tx, a.lojaId, p.enderecoId)
+          await escrita.registrarEvento(tx, { lojaId: a.lojaId, tipo: 'pedido.criado', pedidoId, detalhes: p.evento })
           await emitir(tx, a.lojaId, pedidoId, 'novo')
           return pedidoId
         })
-        return await detalhe(a, id)
       } catch (e) {
         // Corrida na sequencia diaria: outro pedido pegou o mesmo codigo; tenta o proximo.
         if (e instanceof ErroBanco && e.tipo === 'unique' && e.constraint === 'pedidos_codigo_loja') continue
@@ -114,6 +136,121 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
       }
     }
     throw conflito('codigo_indisponivel', 'Nao foi possivel gerar o codigo do pedido, tente de novo')
+  }
+
+  /**
+   * G13: cria um pedido NOVO a partir de um pedido ANTERIOR do mesmo cliente/loja, reusando os itens
+   * do snapshot (item_id + opcoes) reresolvidos contra o cardapio de AGORA (mesma regra do criar
+   * manual: preco/disponibilidade atuais; preco nunca do corpo). Se algum item nao for mais pedivel
+   * agora, rejeita 422 `itens_indisponiveis` dizendo quais. Cliente/modalidade herdam do anterior;
+   * endereco, taxa, observacao e pagamento podem ser sobrescritos no corpo.
+   */
+  async function repetir(a: Ator, anteriorId: string, b: PedidoRepetirEntrada): Promise<PedidoDetalheSaida> {
+    const anterior = await repo.obterPedido(pool, a.lojaId, anteriorId)
+    if (!anterior) throw naoEncontrado('Pedido nao encontrado')
+    if (!anterior.cliente_id) throw regraNegocio('pedido_sem_cliente', 'Pedido anterior sem cliente para repetir')
+    const clienteId = anterior.cliente_id
+    const modalidade = anterior.modalidade
+    const enderecoId = b.endereco_id ?? (modalidade === 'entrega' ? anterior.endereco_id : null)
+    const taxa = b.taxa_entrega_centavos ?? anterior.taxa_entrega_centavos
+    const formaPagamento = b.forma_pagamento === undefined ? anterior.forma_pagamento : b.forma_pagamento
+    const trocoPara = b.troco_para_centavos === undefined ? anterior.troco_para_centavos : b.troco_para_centavos
+    const observacao = b.observacao === undefined ? anterior.observacao : b.observacao
+
+    // Mesmas regras de borda do criar manual.
+    if (modalidade === 'entrega' && !enderecoId) {
+      throw regraNegocio('endereco_obrigatorio', 'Pedido de entrega exige endereco')
+    }
+    if (modalidade === 'retirada' && (enderecoId || taxa > 0)) {
+      throw regraNegocio('retirada_sem_entrega', 'Retirada nao tem endereco nem taxa de entrega')
+    }
+    if (trocoPara != null && formaPagamento !== 'dinheiro') {
+      throw regraNegocio('troco_so_dinheiro', 'Troco so se aplica a pagamento em dinheiro')
+    }
+    await exigirAceiteDaLoja(a.lojaId)
+    if (!(await repo.clienteDaLoja(pool, a.lojaId, clienteId))) throw naoEncontrado('Cliente nao encontrado')
+    if (enderecoId && !(await repo.enderecoAtivoDoCliente(pool, a.lojaId, clienteId, enderecoId))) {
+      throw naoEncontrado('Endereco nao encontrado')
+    }
+
+    // Reconstroi as linhas do snapshot anterior (so itens ativos) e reresolve contra o cardapio agora.
+    const { itens, opcoes } = await repo.itensDoPedido(pool, a.lojaId, anteriorId)
+    const ativos = itens.filter((i) => !i.cancelado)
+    if (ativos.length === 0) throw regraNegocio('pedido_sem_itens', 'Pedido anterior nao tem itens para repetir')
+    const itemIds = [...new Set(ativos.map((i) => i.item_id).filter((x): x is string => x !== null))]
+    const cardapio = await repo.lerCardapio(pool, a.lojaId, itemIds)
+    const agora = new Date()
+    const montadas: LinhaMontada[] = []
+    const indisponiveis: string[] = []
+    for (const it of ativos) {
+      if (!it.item_id) { indisponiveis.push(it.nome_snapshot); continue } // item removido do cardapio
+      const entrada: LinhaEntrada = {
+        item_id: it.item_id,
+        quantidade: it.quantidade,
+        // Opcao sem opcao_id (removida do cardapio) sai da lista; se era de grupo obrigatorio, o
+        // montador rejeita a linha e ela entra como indisponivel.
+        opcoes_ids: opcoes
+          .filter((o) => o.item_pedido_id === it.id && o.opcao_id !== null)
+          .map((o) => o.opcao_id as string),
+        observacao: it.observacao,
+      }
+      try {
+        montadas.push(montarLinha(cardapio, entrada, agora))
+      } catch {
+        indisponiveis.push(it.nome_snapshot)
+      }
+    }
+    if (indisponiveis.length > 0) {
+      const lista = [...new Set(indisponiveis)].join(', ')
+      throw regraNegocio('itens_indisponiveis', `Itens fora do cardapio agora, nao da para repetir: ${lista}`)
+    }
+    const subtotal = montadas.reduce((s, l) => s + l.total_centavos, 0)
+    const total = subtotal + taxa
+    if (total > TETO_TOTAL) throw regraNegocio('total_acima_do_teto', 'Total acima do limite')
+
+    const id = await inserirPedidoComRetry(a, {
+      clienteId, enderecoId, modalidade, subtotal, taxa, total, formaPagamento, trocoPara, observacao,
+      linhas: montadas,
+      evento: { user_id: a.userId, origem: 'manual', modalidade, total_centavos: total, repetido_de: anteriorId },
+    })
+    return detalhe(a, id)
+  }
+
+  /**
+   * Transicao de status EM LOTE (coordenacao com o despacho e uso do painel): aplica a MESMA maquina
+   * de estados do POST /:id/status a varios pedidos numa unica transacao. Tudo ou nada: se qualquer
+   * pedido tiver transicao invalida, o lote inteiro e rejeitado (409). Idempotente: pedido ja no
+   * status alvo e no-op (`mudou: false`). FOR UPDATE em todas as linhas serializa contra corridas.
+   */
+  async function transicaoLote(a: Ator, b: PedidoTransicaoLoteEntrada): Promise<PedidoTransicaoLoteSaida> {
+    const ids = [...new Set(b.pedido_ids)]
+    if (motivoObrigatorio(b.para) && !b.motivo) throw regraNegocio('motivo_obrigatorio', 'Informe o motivo do problema')
+    const resultados = await comTransacao(pool, async (tx) => {
+      const pedidos = await escrita.travarPedidos(tx, a.lojaId, ids)
+      if (pedidos.length !== ids.length) throw naoEncontrado('Pedido nao encontrado')
+      const invalidos = pedidos.filter((p) => p.status !== b.para && !podeTransicionar(p.status, b.para, p.modalidade))
+      if (invalidos.length > 0) {
+        throw conflito('transicao_invalida', `Transicao invalida para: ${invalidos.map((p) => p.codigo).join(', ')}`)
+      }
+      const out: PedidoTransicaoLoteSaida['resultados'] = []
+      for (const p of pedidos) {
+        if (p.status === b.para) {
+          out.push({ pedido_id: p.id, codigo: p.codigo, de: p.status, para: b.para, mudou: false })
+          continue
+        }
+        const r = await escrita.atualizarStatus(tx, a.lojaId, p.id, p.status, b.para, b.motivo ?? null)
+        // Sob FOR UPDATE nenhuma outra transacao muda o status no meio; a guarda fecha o invariante.
+        if (!r) throw conflito('status_alterado', 'Um pedido mudou de status, atualize a tela')
+        await escrita.registrarEvento(tx, {
+          lojaId: a.lojaId, tipo: 'pedido.status_alterado', pedidoId: p.id,
+          detalhes: { user_id: a.userId, de: p.status, para: b.para },
+        })
+        await emitir(tx, a.lojaId, p.id, b.para)
+        out.push({ pedido_id: p.id, codigo: p.codigo, de: p.status, para: b.para, mudou: true })
+      }
+      return out
+    })
+    return { resultados }
   }
 
   async function kanban(a: Ator, q: KanbanQuery): Promise<PedidoKanbanSaida> {
@@ -182,5 +319,5 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     return { formato, conteudo: formato === 'html' ? comandaHtml(d) : comandaTexto(d, largura) }
   }
 
-  return { criarManual, kanban, detalhe, mudarStatus, cancelarLinha, imprimir }
+  return { criarManual, repetir, kanban, detalhe, mudarStatus, transicaoLote, cancelarLinha, imprimir }
 }

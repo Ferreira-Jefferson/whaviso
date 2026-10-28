@@ -227,8 +227,17 @@ export async function despachar(pool: Pool, a: Ator, corridaId: string): Promise
     const m = await motoboyAtivo(tx, a.lojaId, c.motoboy_id)
     const afetados = await repo.propagarMotoboy(tx, a.lojaId, corridaId, m)
     await repo.marcarDespachada(tx, a.lojaId, corridaId)
-    await evento(tx, a, 'corrida.despachada', 'corrida', corridaId, { pedidos: ids.length })
-    for (const p of afetados) await emitir(tx, a.lojaId, p.id, p.status)
+    // G2 do despacho: ao sair a corrida, os pedidos preparados vao a `saiu_entrega` pela maquina de
+    // estados do pedido (origem unica permitida: `em_preparo`). Idempotente e sem mover novo/entregue.
+    const saiuEntrega = await repo.marcarPedidosSaiuEntrega(tx, a.lojaId, corridaId)
+    await evento(tx, a, 'corrida.despachada', 'corrida', corridaId, {
+      pedidos: ids.length, saiu_entrega: saiuEntrega.length,
+    })
+    // Realtime: motoboy propagado + status que mudou para saiu_entrega (dedup por pedido).
+    const estados = new Map<string, string>()
+    for (const p of afetados) estados.set(p.id, p.status)
+    for (const p of saiuEntrega) estados.set(p.id, p.status)
+    for (const [id, status] of estados) await emitir(tx, a.lojaId, id, status)
   })
   return obterCorrida(pool, a, corridaId)
 }

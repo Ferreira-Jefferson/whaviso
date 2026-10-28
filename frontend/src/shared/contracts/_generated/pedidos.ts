@@ -38,6 +38,42 @@ export const PedidoStatusEntrada = z.strictObject({
 })
 export type PedidoStatusEntrada = z.infer<typeof PedidoStatusEntrada>
 
+// G13 (repetir pedido inteiro): cria um pedido NOVO a partir de um pedido ANTERIOR do mesmo
+// cliente/loja, reusando os itens (item_id + opcoes do snapshot), reresolvidos contra o cardapio
+// de AGORA (preco/disponibilidade atuais; preco nunca vem do corpo). Os campos abaixo sobrescrevem
+// o que vier do pedido anterior (todos opcionais); o restante (cliente, modalidade) herda do anterior.
+export const PedidoRepetirEntrada = z.strictObject({
+  endereco_id: UuidSchema.optional(),
+  taxa_entrega_centavos: Centavos.optional(),
+  observacao: texto(500).nullable().optional(),
+  forma_pagamento: formaPagamento.nullable().optional(),
+  troco_para_centavos: Centavos.nullable().optional(),
+})
+export type PedidoRepetirEntrada = z.infer<typeof PedidoRepetirEntrada>
+
+// Transicao de status EM LOTE (coordenacao com o despacho: mover a corrida para `saiu_entrega`;
+// tambem usavel pelo painel/atendente). Aplica a mesma maquina de estados do POST /:id/status,
+// de forma atomica (tudo ou nada): transicao invalida em qualquer pedido rejeita o lote inteiro.
+// Idempotente: pedido ja no status alvo e no-op (`mudou: false`), nao erro.
+export const PedidoTransicaoLoteEntrada = z.strictObject({
+  pedido_ids: z.array(UuidSchema).min(1).max(100),
+  para: statusPedido,
+  motivo: texto(300).optional(),
+})
+export type PedidoTransicaoLoteEntrada = z.infer<typeof PedidoTransicaoLoteEntrada>
+
+export const PedidoTransicaoResultado = z.strictObject({
+  pedido_id: UuidSchema,
+  codigo: z.string(),
+  de: statusPedido,
+  para: statusPedido,
+  mudou: z.boolean(),
+})
+export const PedidoTransicaoLoteSaida = z.strictObject({
+  resultados: z.array(PedidoTransicaoResultado),
+})
+export type PedidoTransicaoLoteSaida = z.infer<typeof PedidoTransicaoLoteSaida>
+
 export const colunaKanban = z.enum(['novo', 'em_preparo', 'saiu_entrega', 'entregue', 'problema'])
 export type ColunaKanban = z.infer<typeof colunaKanban>
 

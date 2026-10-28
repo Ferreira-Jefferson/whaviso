@@ -12,7 +12,10 @@ evento ao vivo. Fonte: `historias/backend-api/pedidos.md`.
   `POST /` (criacao manual, status inicial `novo`, origem `manual`; aceita `forma_pagamento` e
   `troco_para_centavos` opcionais), `GET /:id`,
   `POST /:id/status` (`{ para, motivo? }`), `POST /:id/itens/:itemId/cancelar`,
-  `GET /:id/impressao?formato=html|texto&largura=32|48`.
+  `GET /:id/impressao?formato=html|texto&largura=32|48`,
+  `POST /:id/repetir` (`{ endereco_id?, taxa_entrega_centavos?, observacao?, forma_pagamento?, troco_para_centavos? }`;
+  cria pedido novo a partir do anterior, G13),
+  `POST /transicao` (`{ pedido_ids, para, motivo? }`; transicao de status EM LOTE, usada pelo despacho e pelo painel).
 
 ## Especialistas consumidos
 - `@whaviso/shared/db` (sql, comTransacao, `notificar`), `@whaviso/shared/contracts`, `@whaviso/shared/datas`,
@@ -41,6 +44,16 @@ evento ao vivo. Fonte: `historias/backend-api/pedidos.md`.
   novo/em_preparo/saiu_entrega (exige motivo) e retomada para em_preparo/saiu_entrega/entregue; retirada pula
   `saiu_entrega`; entrega nao pula; sem retrocesso. Transicao invalida = 409 `transicao_invalida`; corrida = 409
   `status_alterado` (`UPDATE ... WHERE status = :de`). Falta de motivo = 422 `motivo_obrigatorio`.
+- **Transicao em lote (`POST /transicao`):** aplica a MESMA maquina de estados a `pedido_ids` numa unica
+  transacao (`FOR UPDATE` em todas as linhas), tudo ou nada. Transicao invalida em qualquer pedido rejeita o
+  lote (409 `transicao_invalida`, mensagem lista os codigos). Idempotente: pedido ja no alvo e no-op
+  (`mudou: false`). Resposta `{ resultados: [{ pedido_id, codigo, de, para, mudou }] }`. Usada pelo despacho
+  ao sair a corrida (mover para `saiu_entrega`) e pelo painel. Motivo obrigatorio para `problema` (422).
+- **Repetir pedido inteiro (G13, `POST /:id/repetir`):** cria um pedido NOVO a partir de um anterior do mesmo
+  cliente/loja, reusando os itens do snapshot (item_id + opcoes) reresolvidos contra o cardapio de AGORA (mesma
+  regra do criar manual: preco e disponibilidade atuais, preco nunca do corpo). Cliente e modalidade herdam do
+  anterior; endereco, taxa, observacao e pagamento podem ser sobrescritos no corpo. Se algum item nao for mais
+  pedivel agora, rejeita 422 `itens_indisponiveis` com os nomes. Auditoria `pedido.criado` com `repetido_de`.
 - **Codigo:** `AAMMDD-NNN` (dia de Sao Paulo, sequencia por loja), unicidade pelo indice `(loja_id, codigo)` com retry.
 - **Cancelar linha:** so em novo/em_preparo, trava o pedido (`FOR UPDATE`), nao deixa zerar as linhas (422
   `ultima_linha`; cancelar o pedido inteiro = `problema`), recalcula totais na mesma transacao.
