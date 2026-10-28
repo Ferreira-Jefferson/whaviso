@@ -15,7 +15,6 @@ type Dimensao = DimensoesSaida['dimensoes'][number]
 type Linha = VendasSaida['linhas'][number]
 
 const pct = (n: number | null) => (n === null ? '-' : `${Math.round(n * 100)}%`)
-const PREFIXO_GRUPO: Record<Dimensao['grupo'], string> = { tempo: 'Tempo', pedido: 'Pedido', item: 'Item', opcao: 'Opção' }
 
 // --- Export CSV (abre no Excel; ';' e BOM para o pt-BR) -----------------------
 const csvCampo = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
@@ -84,6 +83,7 @@ function FiltroLinha({ dim, filtro, aoMudar, aoRemover }: {
           }}
         >
           <input
+            name={`filtro-${dim.chave}`}
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder={`Digite um valor de ${dim.rotulo.toLowerCase()}`}
@@ -119,7 +119,7 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
 
   const opcoesAgrupar: SelectOption<string>[] = dims.map((dim) => ({
     value: dim.chave,
-    label: dim.grupo === 'opcao' ? `Opção: ${dim.rotulo}` : `${PREFIXO_GRUPO[dim.grupo]}: ${dim.rotulo}`,
+    label: dim.grupo === 'opcao' ? `Opção: ${dim.rotulo}` : dim.rotulo,
   }))
   const dimAtual = porChave.get(agrupamento)
   const colunaRotulo = dimAtual?.rotulo ?? 'Grupo'
