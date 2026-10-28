@@ -105,7 +105,7 @@ export function criarServicoCampanhas(pool: Pool) {
         if (!(await repo.numeroConectado(tx, a.lojaId, l.numero_whatsapp_id))) {
           throw regraNegocio('numero_indisponivel', 'Numero de WhatsApp nao conectado')
         }
-        const enfileirados = await repo.enfileirar(tx, {
+        const { enfileirados, suprimidos } = await repo.enfileirar(tx, {
           campanhaId: l.id,
           lojaId: a.lojaId,
           numeroId: l.numero_whatsapp_id,
@@ -116,7 +116,7 @@ export function criarServicoCampanhas(pool: Pool) {
         await repo.marcarEnfileirada(tx, a.lojaId, l.id, enfileirados)
         await repo.registrarEvento(tx, {
           lojaId: a.lojaId, tipo: 'campanha.disparada', campanhaId: l.id, userId: a.userId,
-          detalhes: { total: enfileirados },
+          detalhes: { total: enfileirados, suprimidos_frequencia: suprimidos },
         })
         return { id: l.id, status: 'enfileirada' as const, total_destinatarios: enfileirados, enfileirados }
       })

@@ -16,9 +16,9 @@ Acompanha o estado por campanha e por destinatario.
   - `POST /:id/cancelar` aborta os envios ainda nao enviados na outbox.
 
 ## Tabelas
-- dono de: `campanhas` e `campanha_envios` (migration 0038; SELECT/INSERT/UPDATE, sem DELETE).
+- dono de: `campanhas` e `campanha_envios` (migration 0038; SELECT/INSERT/UPDATE, sem DELETE; status `enfileirado`/`cancelado`/`suprimido_frequencia`).
 - produz em: `envios` (outbox; so ENFILEIRA, nunca fala com a Meta nem importa o zap/crm).
-- le de: view `clientes_metricas` (publico-alvo + opt-out), `clientes` (so `telefone_hash`, p/ o
+- le de: `lojas` (config de frequencia), view `clientes_metricas` (publico-alvo + opt-out), `clientes` (so `telefone_hash`, p/ o
   `envios.destinatario_hash`; nunca o telefone em claro), `templates`, `numeros_whatsapp` (via SQL).
 - escreve: `eventos` (`campanha.criada`/`disparada`/`cancelada`, `detalhes` so com user_id e totais).
 
@@ -31,6 +31,16 @@ Acompanha o estado por campanha e por destinatario.
   `{ tipo: 'template', template, variaveis }` com `template_chave` setado: o caminho sancionado fora
   da janela de 24h. Texto livre nao existe em campanha.
 - Nunca loga telefone nem hash (o telefone nem e lido aqui; o hash so trafega dentro do SQL).
+
+## Limite de frequencia por cliente (anti-spam, migration 0057)
+- Config por loja em `lojas`: `campanha_freq_max` (padrao 2; NULL = sem limite) e
+  `campanha_freq_janela_dias` (padrao 7, janela movel). Ainda sem endpoint de edicao (so coluna).
+- No disparo (`repo.enfileirar`), para cada cliente conta-se as mensagens de OUTRAS campanhas da
+  mesma loja na janela (`campanha_envios.status = 'enfileirado'` com envio na outbox nem cancelado
+  nem falhou). Quem ja atingiu o maximo e SUPRIMIDO: linha `suprimido_frequencia` em
+  `campanha_envios` (sem `envio_id`, nada na outbox), nao conta como falha nem em `enfileirados`, e
+  nao bloqueia os demais. O total suprimido vai em `eventos.detalhes.suprimidos_frequencia`.
+- Contagem sempre por (loja, cliente): nao vaza entre lojas. Suprimido nao consome o teto.
 
 ## Permissoes
 - Tudo por `loja:gerir` (dono/gerente). O atendente NAO gere campanhas (marketing, nao turno).

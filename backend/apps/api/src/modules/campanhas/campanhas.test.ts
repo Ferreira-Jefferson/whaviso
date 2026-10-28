@@ -15,6 +15,7 @@ import { verificadorFake } from '../../../test/app'
 import { construirApp } from '../../app'
 import { envSchema } from '../../env'
 import { campanhasRoutes } from './routes'
+import { criarServicoCampanhas } from './service'
 
 const env = envSchema.parse({
   DATABASE_URL: 'postgres://ignorado',
@@ -38,13 +39,17 @@ const destino = new Writable({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Reg = Record<string, any>
 
+// Disparo direto no servico (a rota tem rate limit de 10/min por IP, que estouraria nos testes de frequencia).
+const dispararC = (loja: string, user: string, id: string) =>
+  criarServicoCampanhas(poolApi).disparar({ lojaId: loja, userId: user }, id)
+
 const hash = (s: string) => createHash('sha256').update(s).digest('hex')
 
 d('modulo campanhas (integracao)', () => {
   const cen = novoCenario()
   let app: Awaited<ReturnType<typeof construirApp>>
-  let dono = '', atend = '', donoB = ''
-  let lojaA = '', lojaB = ''
+  let dono = '', atend = '', donoB = '', donoC = ''
+  let lojaA = '', lojaB = '', lojaC = '', numeroC = ''
   let numeroA = '', numeroPausadoA = '', numeroB = ''
   // clientes de A
   let c1 = '', c2 = '', optout = '', campeaoA = ''
@@ -115,6 +120,12 @@ d('modulo campanhas (integracao)', () => {
     const contaB = await criarConta(cen, donoB)
     lojaA = await criarLoja(contaA)
     lojaB = await criarLoja(contaB)
+    donoC = await criarUsuario(cen)
+    const contaC = await criarConta(cen, donoC)
+    lojaC = await criarLoja(contaC)
+    await criarMembro(contaC, donoC, 'dono', null)
+    // Os testes antigos disparam varias campanhas ao mesmo publico: desliga o limite so na loja A.
+    await poolSuper.query('update public.lojas set campanha_freq_max = null where id = $1', [lojaA])
     await criarMembro(contaA, dono, 'dono', null)
     await criarMembro(contaA, atend, 'atendente', lojaA)
     await criarMembro(contaB, donoB, 'dono', null)
@@ -122,6 +133,8 @@ d('modulo campanhas (integracao)', () => {
     numeroA = await numero(lojaA)
     numeroPausadoA = await numero(lojaA, 'pausado')
     numeroB = await numero(lojaB)
+    numeroC = await numero(lojaC)
+    await template(lojaC, 'camp.promo', ['cupom'], 'aprovado', true)
 
     // Templates: aprovado+ativo (promo), ativo-mas-pendente (nao aprovado), inativo.
     await template(lojaA, 'camp.promo', ['cupom'], 'aprovado', true)
@@ -149,7 +162,7 @@ d('modulo campanhas (integracao)', () => {
 
   afterAll(async () => {
     await app?.close()
-    for (const l of [lojaA, lojaB]) {
+    for (const l of [lojaA, lojaB, lojaC]) {
       await poolSuper.query('delete from public.eventos where loja_id = $1', [l]).catch(() => {})
     }
     await limpar(cen)
@@ -264,6 +277,111 @@ d('modulo campanhas (integracao)', () => {
       [id],
     )
     expect(env.rows.map((x: Reg) => x.status)).toEqual(['cancelado'])
+  })
+
+  it('limite de frequencia: cliente no teto da janela e suprimido (nao falha); abaixo do teto recebe', async () => {
+    await poolSuper.query(
+      'update public.lojas set campanha_freq_max = 2, campanha_freq_janela_dias = 7 where id = $1', [lojaC],
+    )
+    const cheio = await cliente(lojaC, 'No teto')
+    const metade = await cliente(lojaC, 'Abaixo do teto')
+    const novo = await cliente(lojaC, 'Novo')
+    const camp = () => chamar(donoC, lojaC, 'POST', '/', {
+      nome: 'Freq', template_chave: 'camp.promo', numero_whatsapp_id: numeroC, filtro: {}, variaveis: { cupom: 'X' },
+    })
+    const disparar = async () => {
+      const id = (await camp()).json().id as string
+      return { id, body: await dispararC(lojaC, donoC, id) }
+    }
+    // 'cheio' e 'novo' recebem as duas primeiras; 'metade' tem a primeira cancelada (nao conta).
+    const c1 = await disparar()
+    expect(c1.body).toMatchObject({ enfileirados: 3 })
+    await poolSuper.query(
+      `update public.envios set status = 'cancelado'
+        where id in (select envio_id from public.campanha_envios where campanha_id = $1 and cliente_id = $2)`,
+      [c1.id, metade],
+    )
+    const c2 = await disparar()
+    expect(c2.body).toMatchObject({ enfileirados: 3 }) // todos abaixo do teto de 2 (metade tem 0 vivos)
+    // agora: cheio=2 vivos, novo=2 vivos, metade=1 vivo (da c2)
+    const c3 = await disparar()
+    expect(c3.body).toMatchObject({ status: 'enfileirada', enfileirados: 1, total_destinatarios: 1 })
+
+    const linhas = await poolSuper.query(
+      `select ce.cliente_id, ce.status::text as status, ce.envio_id, e.status::text as envio_status
+         from public.campanha_envios ce left join public.envios e on e.id = ce.envio_id
+        where ce.campanha_id = $1`,
+      [c3.id],
+    )
+    const por = Object.fromEntries(linhas.rows.map((x: Reg) => [x.cliente_id, x]))
+    expect(por[metade]).toMatchObject({ status: 'enfileirado', envio_status: 'agendado' })
+    for (const sup of [cheio, novo]) {
+      expect(por[sup].status).toBe('suprimido_frequencia')
+      expect(por[sup].envio_id).toBeNull() // nada na outbox: suprimido, nao falha
+    }
+    const fora = await poolSuper.query(
+      `select count(*)::int as n from public.envios where loja_id = $1 and cliente_id = any($2)
+        and dedupe_chave = $3`,
+      [lojaC, [cheio, novo], `campanha:${c3.id}:${cheio}`],
+    )
+    expect(fora.rows[0].n).toBe(0)
+    // resumo de entrega nao conta suprimido como falha
+    const det = await chamar(donoC, lojaC, 'GET', `/${c3.id}`)
+    expect(det.json().entrega).toMatchObject({ enfileirados: 1, falhas: 0 })
+    // auditoria registra o total suprimido (sem PII)
+    const ev = await poolSuper.query(
+      `select detalhes from public.eventos where loja_id = $1 and tipo = 'campanha.disparada'
+        and entidade_id = $2`, [lojaC, c3.id],
+    )
+    expect(ev.rows[0].detalhes).toMatchObject({ total: 1, suprimidos_frequencia: 2 })
+  })
+
+  it('limite de frequencia e por loja+cliente: nao vaza entre lojas e e configuravel', async () => {
+    // Mesmo telefone_hash em duas lojas = mesmo consumidor, mas contagem e por loja.
+    const h = hash('consumidor-compartilhado')
+    const cA = randomUUID(), cC = randomUUID()
+    await poolSuper.query(
+      'insert into public.clientes (id, loja_id, telefone_hash, nome) values ($1,$2,$3,$4),($5,$6,$3,$7)',
+      [cA, lojaA, h, 'Compart A', cC, lojaC, 'Compart C'],
+    )
+    // Loja A (limite desligado) manda uma campanha: nao pode consumir o teto do cliente da loja C.
+    const ca = await criarCamp(lojaA, { filtro: {} })
+    await dispararC(lojaA, dono, ca.json().id)
+    await poolSuper.query(
+      'update public.lojas set campanha_freq_max = 1, campanha_freq_janela_dias = 7 where id = $1', [lojaC],
+    )
+    const mk = async () => {
+      const r = await chamar(donoC, lojaC, 'POST', '/', {
+        nome: 'Iso', template_chave: 'camp.promo', numero_whatsapp_id: numeroC, filtro: {}, variaveis: { cupom: 'X' },
+      })
+      return r.json().id as string
+    }
+    const estado = async (id: string) => (await poolSuper.query(
+      'select status::text as s from public.campanha_envios where campanha_id = $1 and cliente_id = $2', [id, cC],
+    )).rows[0]?.s
+    // campanhas previas da loja C ja consumiram o teto de quem existia; o cliente cC e novo na loja C
+    // (so recebeu a campanha da loja A, que nao conta): 1a campanha da C entrega, a 2a suprime.
+    const i1 = await mk()
+    await dispararC(lojaC, donoC, i1)
+    expect(await estado(i1)).toBe('enfileirado')
+    const i2 = await mk()
+    await dispararC(lojaC, donoC, i2)
+    expect(await estado(i2)).toBe('suprimido_frequencia')
+    // configuravel: sem limite (null) volta a enfileirar
+    await poolSuper.query('update public.lojas set campanha_freq_max = null where id = $1', [lojaC])
+    const i3 = await mk()
+    await dispararC(lojaC, donoC, i3)
+    expect(await estado(i3)).toBe('enfileirado')
+    // janela: envios fora da janela nao contam
+    await poolSuper.query(
+      'update public.lojas set campanha_freq_max = 1, campanha_freq_janela_dias = 1 where id = $1', [lojaC],
+    )
+    await poolSuper.query(
+      `update public.campanha_envios set criado_em = now() - interval '3 days' where loja_id = $1`, [lojaC],
+    )
+    const i4 = await mk()
+    await dispararC(lojaC, donoC, i4)
+    expect(await estado(i4)).toBe('enfileirado')
   })
 
   it('RBAC: atendente nao gere campanhas (403); sem x-loja-id recusado', async () => {

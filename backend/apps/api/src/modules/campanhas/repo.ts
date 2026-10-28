@@ -132,10 +132,16 @@ export async function contarDestinatarios(
 /**
  * Enfileira a campanha na outbox `envios` (sempre TEMPLATE; caminho sancionado fora da janela de
  * 24h, SEC-111) e registra o par (campanha, cliente) em `campanha_envios`, num unico passo:
- *   1. alvo: clientes da loja sem opt-out (view clientes_metricas) + telefone_hash (de `clientes`).
- *   2. ins_envio: insere na outbox com dedupe por (numero, 'campanha:<id>:<cliente>').
- *   3. campanha_envios: liga cada envio criado ao par.
- * Devolve quantos destinatarios foram enfileirados. O payload de template e fixo (mesmo p/ todos).
+ *   1. alvo: clientes da loja sem opt-out (view clientes_metricas) + telefone_hash (de `clientes`)
+ *      + `anteriores`: quantas mensagens de OUTRAS campanhas o cliente ja recebeu na janela da loja
+ *      (`lojas.campanha_freq_janela_dias`), contando so envios vivos (nem cancelado nem falhou).
+ *   2. elegivel: `campanha_freq_max` nulo (sem limite) ou anteriores < maximo. Quem ja atingiu o
+ *      maximo e SUPRIMIDO: vira linha `suprimido_frequencia` em campanha_envios (sem outbox), sem
+ *      bloquear os demais.
+ *   3. ins_envio: insere na outbox os elegiveis, com dedupe por (numero, 'campanha:<id>:<cliente>').
+ *   4. campanha_envios: liga cada envio criado ao par (status enfileirado) e grava os suprimidos.
+ * Devolve quantos foram enfileirados e quantos suprimidos por frequencia. O payload de template e
+ * fixo (mesmo p/ todos). Tudo escopado por loja_id (SEC-110).
  */
 export async function enfileirar(
   exec: Executor,
@@ -147,14 +153,30 @@ export async function enfileirar(
     segmento: string | null
     variaveis: Record<string, string>
   },
-): Promise<number> {
+): Promise<{ enfileirados: number; suprimidos: number }> {
   const payload = JSON.stringify({ tipo: 'template', template: d.templateChave, variaveis: d.variaveis })
-  const linhas = await consultar<{ cliente_id: string }>(
+  const r = await consultarUm<{ enfileirados: number; suprimidos: number }>(
     exec,
-    sql`with alvo as (
-           select m.cliente_id, c.telefone_hash
+    sql`with cfg as (
+           select campanha_freq_max as maximo, campanha_freq_janela_dias as janela_dias
+             from public.lojas where id = ${d.lojaId}
+         ),
+         alvo as (
+           select m.cliente_id, c.telefone_hash,
+                  (cfg.maximo is null or coalesce(p.n, 0) < cfg.maximo) as elegivel
              from public.clientes_metricas m
              join public.clientes c on c.id = m.cliente_id and c.loja_id = m.loja_id
+             cross join cfg
+             left join lateral (
+               select count(*)::int as n
+                 from public.campanha_envios ce2
+                 join public.envios e2 on e2.id = ce2.envio_id and e2.loja_id = ce2.loja_id
+                where ce2.loja_id = m.loja_id and ce2.cliente_id = m.cliente_id
+                  and ce2.campanha_id <> ${d.campanhaId}
+                  and ce2.status = 'enfileirado'
+                  and e2.status not in ('cancelado', 'falhou')
+                  and ce2.criado_em >= now() - make_interval(days => cfg.janela_dias)
+             ) p on true
             where m.loja_id = ${d.lojaId} and m.opt_out_marketing = false${filtroSegmento(d.segmento)}
          ),
          ins_envio as (
@@ -163,16 +185,29 @@ export async function enfileirar(
            select ${d.lojaId}, ${d.numeroId}, a.cliente_id, a.telefone_hash, ${d.templateChave},
                   ${payload}::jsonb, 'campanha:' || ${d.campanhaId}::text || ':' || a.cliente_id::text
              from alvo a
+            where a.elegivel
            on conflict (numero_whatsapp_id, dedupe_chave) where dedupe_chave is not null do nothing
            returning id, cliente_id
+         ),
+         ins_ce as (
+           insert into public.campanha_envios (campanha_id, loja_id, cliente_id, envio_id, status)
+           select ${d.campanhaId}, ${d.lojaId}, ie.cliente_id, ie.id, 'enfileirado'
+             from ins_envio ie
+           on conflict (campanha_id, cliente_id) do nothing
+           returning cliente_id
+         ),
+         ins_sup as (
+           insert into public.campanha_envios (campanha_id, loja_id, cliente_id, envio_id, status)
+           select ${d.campanhaId}, ${d.lojaId}, a.cliente_id, null, 'suprimido_frequencia'
+             from alvo a
+            where not a.elegivel
+           on conflict (campanha_id, cliente_id) do nothing
+           returning cliente_id
          )
-         insert into public.campanha_envios (campanha_id, loja_id, cliente_id, envio_id, status)
-         select ${d.campanhaId}, ${d.lojaId}, ie.cliente_id, ie.id, 'enfileirado'
-           from ins_envio ie
-         on conflict (campanha_id, cliente_id) do nothing
-         returning cliente_id`,
+         select (select count(*) from ins_ce)::int as enfileirados,
+                (select count(*) from ins_sup)::int as suprimidos`,
   )
-  return linhas.length
+  return r ?? { enfileirados: 0, suprimidos: 0 }
 }
 
 /** Marca a campanha como enfileirada com o total efetivo. */
