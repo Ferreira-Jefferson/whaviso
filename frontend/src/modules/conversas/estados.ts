@@ -6,14 +6,33 @@ import type { MensagemSaida } from '@/shared/contracts/_generated/conversas'
 
 export type FiltroStatus = 'todas' | StatusConversa
 
-/** Abas de filtro da lista. 'ia' aparece como "Automacao" (sem citar IA ao usuario). */
-export const FILTROS_STATUS: ReadonlyArray<{ value: FiltroStatus; label: string }> = [
-  { value: 'todas', label: 'Todas' },
-  { value: 'ia', label: 'Automação' },
-  { value: 'aguardando', label: 'Aguardando' },
-  { value: 'humano', label: 'Humano' },
-  { value: 'encerrada', label: 'Encerradas' },
-]
+/** Rotulo curto de cada opcao de filtro. 'ia' aparece como "Automacao" (sem citar IA ao usuario). */
+export const ROTULO_FILTRO: Record<FiltroStatus, string> = {
+  todas: 'Todas',
+  ia: 'Automação',
+  aguardando: 'Aguardando atendente',
+  humano: 'Em atendimento',
+  encerrada: 'Encerradas',
+}
+
+/**
+ * Ponto colorido (a "elipse") de cada estado, reforcando no filtro a mesma cor que o status
+ * tem na lista. 'todas' nao tem cor propria (e o estado neutro, mostrado com um ponto vazado).
+ */
+export const COR_PONTO_STATUS: Record<StatusConversa, string> = {
+  ia: 'bg-salvia',
+  humano: 'bg-folha',
+  aguardando: 'bg-ambar',
+  encerrada: 'bg-tinta-2',
+}
+
+/**
+ * Ordem dos estados no filtro: UM eixo so, a progressao de vida da conversa (nao dois eixos).
+ * O status_conversa e um snapshot mutuamente exclusivo de quem conduz agora + aberta/fechada
+ * (ver historias/backend-api/handoff.md): a automacao conduz (ia) -> pede humano e fica na fila
+ * (aguardando) -> um humano assume (humano) -> encerrada (terminal). 'todas' fica fora, no topo.
+ */
+export const ESTADOS_ORDEM: ReadonlyArray<StatusConversa> = ['ia', 'aguardando', 'humano', 'encerrada']
 
 export const ROTULO_STATUS: Record<StatusConversa, string> = {
   ia: 'Com a automação',

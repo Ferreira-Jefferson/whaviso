@@ -1,8 +1,9 @@
 import { MessageCircle, Search } from 'lucide-react'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { cn, EmptyState, ErrorState, Input, Select, Skeleton } from '@/shared/ui'
+import { cn, EmptyState, ErrorState, Input, Skeleton } from '@/shared/ui'
 import type { ConversaLista } from '../api'
-import { FILTROS_STATUS, type FiltroStatus } from '../estados'
+import type { FiltroStatus } from '../estados'
+import { FiltroEstado } from './FiltroEstado'
 import { ItemConversa } from './ItemConversa'
 
 interface Props {
@@ -45,12 +46,7 @@ export function ListaConversas({
           />
         </label>
         <div className="mt-3">
-          <Select
-            ariaLabel="Filtrar por estado"
-            value={status}
-            onChange={aoMudarStatus}
-            options={FILTROS_STATUS}
-          />
+          <FiltroEstado value={status} onChange={aoMudarStatus} />
         </div>
       </div>
 
