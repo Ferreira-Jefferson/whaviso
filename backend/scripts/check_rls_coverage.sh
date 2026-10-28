@@ -12,11 +12,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# .env local (Windows) traz POSTGRES_PASSWORD. No CI nao existe: usa PGPASSWORD do ambiente.
+# .env local (Windows) traz POSTGRES_PASSWORD. No CI nao existe: usa POSTGRES_PASSWORD/PGPASSWORD do ambiente.
 if [ -f ./.env ]; then
   set -a; . ./.env; set +a
-  export PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 fi
+# Deriva a senha fora do bloco do .env: no CI (sem .env) a senha vem do ambiente do job.
+export PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 export PGCLIENTENCODING=UTF8
 
 DB="${1:-${PGDATABASE:-whaviso_dev}}"
