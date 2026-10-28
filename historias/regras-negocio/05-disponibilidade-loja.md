@@ -85,11 +85,18 @@ sempre derivado pelo servidor, nunca definido à mão.
    exceção fechar a loja por completo naquela data).
 5. **Agendamento é opcional e tem três modos:** desligado (só pedido ao vivo), faixa própria (dias +
    horário), ou 24h. A janela de agendamento vale **além** do horário de atendimento, não no lugar dele.
-6. **Atendente ativo = horário de atendimento ∪ janela de agendamento.** Se o agendamento é 24h, o
-   atendente fica ativo 24h; se o agendamento está desligado, o atendente fica ativo só no horário de
-   atendimento. No horário de atendimento o atendente aceita pedido imediato; na janela de agendamento
-   (fora do atendimento) aceita apenas pedido agendado, avisando que é agendado e que a entrega sai no
-   horário de atendimento.
+6. **O atendente opera em um de três modos, derivado da disponibilidade, e sabe em qual está:**
+   - `atendimento`: a loja aceita pedido ao vivo agora. Comunicação de pedido imediato (ex.: tempo de
+     preparo/entrega estimado).
+   - `agendamento`: fora do horário de atendimento, mas dentro da janela de agendamento. **Outra
+     comunicação:** deixa claro que é pedido agendado e que a entrega sai no horário de atendimento;
+     nunca promete entrega imediata ("sai em 20 min").
+   - `fechado`: fora do atendimento e fora do agendamento. Responde que a loja está fechada e não abre
+     pedido.
+   O modo é `atendimento` quando a loja aceita pedido ao vivo; senão `agendamento` quando dentro da
+   janela de agendamento; senão `fechado`. Se o agendamento é 24h, nunca há `fechado` (fica em
+   `agendamento` quando não está em `atendimento`); se o agendamento está desligado, só há `atendimento`
+   e `fechado`. O motor do atendente **recebe esse modo** e escolhe a comunicação por ele.
 7. **Fora da disponibilidade o sistema não para de ouvir:** o recebimento de mensagens (webhook)
    continua de pé sempre. Fora do horário de atendimento e da janela de agendamento, o atendente não
    abre pedido e responde que a loja está fechada. Mensagens não se perdem.
@@ -123,8 +130,10 @@ sempre derivado pelo servidor, nunca definido à mão.
 - **Aceitando pedido ao vivo (derivado):** `aberta` <-> `fechada`, resultado de horário de atendimento +
   exceções + relógio. Transições pela passagem do tempo e pela mudança de configuração, não por ação
   direta sobre o estado.
-- **Atendente ativo (derivado):** `ativo` <-> `inativo`, igual a (aceita pedido ao vivo) **ou** (dentro
-  da janela de agendamento). Não é um controle próprio: deriva da disponibilidade da loja.
+- **Modo do atendente (derivado):** `atendimento` | `agendamento` | `fechado`, a partir do horário de
+  atendimento, da janela de agendamento, das exceções e do relógio. Não é um controle próprio: deriva da
+  disponibilidade da loja. O motor usa o modo para escolher a comunicação (imediato vs agendado vs
+  fechado).
 - **Horário / janela de agendamento / exceção (configuração):** `ativo` -> `inativo` (desativado) ->
   `ativo` (reativado ou recadastrado). Nunca apagado.
 
