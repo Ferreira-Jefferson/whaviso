@@ -1,15 +1,19 @@
 # fiscal (frontend)
 
 ## Proposito
-Pagina `/fiscal` com duas secoes: **Documentos** (lista NFC-e/NFS-e com status, chave de acesso, link, nova
-tentativa em caso de erro) e **Emissor** (configuracao: credencial write-only, CNPJ, regime, series, ambiente, ativar/desativar).
+Pagina `/fiscal` com tres secoes: **Documentos** (pedidos entregues a emitir + lista NFC-e/NFS-e com
+status, chave, link, nova tentativa), **Itens** (dado fiscal por item do catalogo: NCM, CFOP, origem,
+unidade e CSOSN/CST, com editor por item e marca de pendentes) e **Emissor** (credencial write-only,
+CNPJ, regime, series, ambiente, ativar/desativar e emissao automatica).
 
 ## Entry points
 - `index.ts`: export default da pagina (`lazy(() => import('@/modules/fiscal'))`).
 
 ## Dados (`api.ts`, raiz `['fiscal']`)
-- `GET/PUT/PATCH /v1/fiscal/config`, `GET/POST /v1/fiscal/documentos`. Leitura/emissao: `loja:gerir`;
-  PUT da config: so o dono. Contrato `_generated/fiscal`.
+- `GET/PUT/PATCH /v1/fiscal/config`, `GET/POST /v1/fiscal/documentos`, `POST /v1/fiscal/documentos/auto`
+  (emissao em lote), `GET /v1/fiscal/pedidos-emissiveis`, `GET /v1/fiscal/itens` + `PUT /v1/fiscal/itens/:itemId`.
+  Leitura/emissao/dado fiscal: `loja:gerir`; PUT da credencial: so o dono. Contrato `_generated/fiscal`.
+- Regime da loja (config) decide o campo de situacao tributaria no editor de item: CSOSN (Simples/MEI) ou CST.
 
 ## Segredo
 - **Credencial do emissor WRITE-ONLY**: `type="password"`, limpa ao fim do envio; leituras so trazem `ultimos4` mascarado.

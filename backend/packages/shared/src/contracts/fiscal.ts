@@ -46,6 +46,7 @@ export const FiscalConfigPatch = z
     serie_nfse: Serie.optional(),
     ambiente: ambienteFiscal.optional(),
     ativo: z.boolean().optional(),
+    auto_emitir: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'nenhum campo informado' })
 export type FiscalConfigPatch = z.infer<typeof FiscalConfigPatch>
@@ -59,6 +60,8 @@ export const FiscalConfigEstado = z.strictObject({
   serie_nfce: z.number().int().nullable(),
   serie_nfse: z.number().int().nullable(),
   ambiente: ambienteFiscal.nullable(),
+  /** Emissao automatica de NFC-e para pedidos concluidos (acionada pelo painel/endpoint auto). */
+  auto_emitir: z.boolean(),
   ultimos4: z.string().nullable(),
   criado_em: DataHoraIso.nullable(),
   atualizado_em: DataHoraIso.nullable(),
@@ -103,3 +106,73 @@ export const DocumentosFiscaisSaida = z.strictObject({
 })
 
 export const DocumentoFiscalIdParams = z.strictObject({ id: UuidSchema })
+
+// ---- Dados fiscais por item (catalogo) -------------------------------------------------------
+// DADO de cadastro (fonte: contador da loja), nao calculo: NCM, CFOP, origem, unidade e a situacao
+// tributaria (CSOSN para Simples/MEI, CST para regime normal). Um item sem estes dados nao gera
+// NFC-e (a emissao lista os itens pendentes). CSOSN e CST sao exclusivos: informe o do seu regime.
+
+const Ncm = z.string().regex(/^[0-9]{8}$/, 'NCM: 8 digitos')
+const Cfop = z.string().regex(/^[0-9]{4}$/, 'CFOP: 4 digitos')
+const Origem = z.number().int().min(0).max(8)
+const Unidade = z.string().trim().min(1).max(6)
+const Csosn = z.string().regex(/^[0-9]{3}$/, 'CSOSN: 3 digitos')
+const Cst = z.string().regex(/^[0-9]{2,3}$/, 'CST: 2 ou 3 digitos')
+
+/** PUT /fiscal/itens/:itemId: cadastra/ajusta o dado fiscal de um item do catalogo. */
+export const ItemFiscalDadoEntrada = z
+  .strictObject({
+    ncm: Ncm,
+    cfop: Cfop,
+    origem: Origem.default(0),
+    unidade: Unidade.default('UN'),
+    csosn: Csosn.nullish(),
+    cst: Cst.nullish(),
+  })
+  .refine((v) => v.csosn != null || v.cst != null, {
+    message: 'informe a situacao tributaria (CSOSN para Simples/MEI ou CST para regime normal)',
+  })
+export type ItemFiscalDadoEntrada = z.infer<typeof ItemFiscalDadoEntrada>
+
+/** Item do catalogo com o dado fiscal (nulo quando ainda nao cadastrado). */
+export const ItemFiscalLinha = z.strictObject({
+  item_id: UuidSchema,
+  nome: z.string(),
+  categoria_nome: z.string().nullable(),
+  ativo: z.boolean(),
+  ncm: z.string().nullable(),
+  cfop: z.string().nullable(),
+  origem: z.number().int().nullable(),
+  unidade: z.string().nullable(),
+  csosn: z.string().nullable(),
+  cst: z.string().nullable(),
+  /** true quando o item ja tem o dado minimo para emitir (NCM, CFOP, origem, unidade e situacao). */
+  completo: z.boolean(),
+})
+export type ItemFiscalLinhaDto = z.infer<typeof ItemFiscalLinha>
+
+export const ItensFiscaisSaida = z.strictObject({ itens: z.array(ItemFiscalLinha) })
+
+export const ItemFiscalIdParams = z.strictObject({ itemId: UuidSchema })
+
+// ---- Pedidos elegiveis a emissao -------------------------------------------------------------
+
+/** Pedido concluido que ainda nao tem NFC-e (candidato a emissao pelo painel). */
+export const PedidoEmissivelSaida = z.strictObject({
+  pedido_id: UuidSchema,
+  codigo: z.string(),
+  status: z.string(),
+  total_centavos: Centavos,
+  criado_em: DataHoraIso,
+})
+export type PedidoEmissivelDto = z.infer<typeof PedidoEmissivelSaida>
+
+export const PedidosEmissiveisSaida = z.strictObject({ itens: z.array(PedidoEmissivelSaida) })
+
+/** Resumo da emissao automatica em lote (POST /fiscal/documentos/auto). */
+export const AutoEmissaoSaida = z.strictObject({
+  emitidos: z.number().int().nonnegative(),
+  com_erro: z.number().int().nonnegative(),
+  pulados: z.number().int().nonnegative(),
+})
+export type AutoEmissaoResumo = z.infer<typeof AutoEmissaoSaida>

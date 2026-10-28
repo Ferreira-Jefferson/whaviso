@@ -6,13 +6,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
+  AutoEmissaoSaida,
   DocumentoFiscalSaida,
   DocumentosFiscaisSaida,
   FiscalConfigEstado,
+  type AutoEmissaoResumo,
   type DocumentoFiscalDto,
   type DocumentoFiscalEmitirEntrada,
   FiscalConfigEntrada,
   type FiscalConfigPatch,
+  ItemFiscalLinha,
+  type ItemFiscalDadoEntrada,
+  type ItemFiscalLinhaDto,
+  ItensFiscaisSaida,
+  type PedidoEmissivelDto,
+  PedidosEmissiveisSaida,
   type StatusDocumentoFiscal,
 } from '@/shared/contracts/_generated/fiscal'
 
@@ -68,6 +76,54 @@ export function useEmitirDocumento() {
   const qc = useQueryClient()
   return useMutation<DocumentoFiscalDto, Error, DocumentoFiscalEmitirEntrada>({
     mutationFn: (body) => apiClient.post<DocumentoFiscalDto>('/fiscal/documentos', { body, schema: DocumentoFiscalSaida }),
-    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'documentos'] }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [RAIZ, 'documentos'] })
+      void qc.invalidateQueries({ queryKey: [RAIZ, 'pedidos-emissiveis'] })
+    },
+  })
+}
+
+/** GET /v1/fiscal/pedidos-emissiveis: pedidos concluidos sem NFC-e (candidatos a emissao). */
+export function usePedidosEmissiveis() {
+  return useQuery({
+    queryKey: [RAIZ, 'pedidos-emissiveis'],
+    queryFn: ({ signal }) =>
+      apiClient.get<z.infer<typeof PedidosEmissiveisSaida>>('/fiscal/pedidos-emissiveis', {
+        schema: PedidosEmissiveisSaida,
+        signal,
+      }),
+    select: (d): PedidoEmissivelDto[] => d.itens,
+  })
+}
+
+/** POST /v1/fiscal/documentos/auto: emite NFC-e em lote para os pedidos concluidos (auto ligado). */
+export function useEmitirAuto() {
+  const qc = useQueryClient()
+  return useMutation<AutoEmissaoResumo, Error, void>({
+    mutationFn: () => apiClient.post<AutoEmissaoResumo>('/fiscal/documentos/auto', { schema: AutoEmissaoSaida }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [RAIZ, 'documentos'] })
+      void qc.invalidateQueries({ queryKey: [RAIZ, 'pedidos-emissiveis'] })
+    },
+  })
+}
+
+/** GET /v1/fiscal/itens: itens do catalogo com o dado fiscal e a flag `completo`. */
+export function useItensFiscais() {
+  return useQuery({
+    queryKey: [RAIZ, 'itens'],
+    queryFn: ({ signal }) =>
+      apiClient.get<z.infer<typeof ItensFiscaisSaida>>('/fiscal/itens', { schema: ItensFiscaisSaida, signal }),
+    select: (d): ItemFiscalLinhaDto[] => d.itens,
+  })
+}
+
+/** PUT /v1/fiscal/itens/:itemId: cadastra/ajusta o dado fiscal de um item. */
+export function useDefinirItemFiscal() {
+  const qc = useQueryClient()
+  return useMutation<ItemFiscalLinhaDto, Error, { itemId: string; dados: ItemFiscalDadoEntrada }>({
+    mutationFn: ({ itemId, dados }) =>
+      apiClient.put<ItemFiscalLinhaDto>(`/fiscal/itens/${itemId}`, { body: dados, schema: ItemFiscalLinha }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'itens'] }),
   })
 }

@@ -103,7 +103,13 @@ function erroTransporte(e: unknown): ErroProvedor {
   return new Transitorio('falha de rede com o emissor', { codigo: 'rede' })
 }
 
-/** Corpo minimo de NFC-e. Atributos fiscais por item (NCM/CFOP/tributos) ficam a cargo do catalogo. */
+/**
+ * Corpo minimo de NFC-e. Os atributos fiscais por item (NCM, CFOP, origem, unidade, situacao
+ * tributaria) sao DADO do catalogo da loja: a api so chega aqui depois de validar que estao
+ * presentes, entao sao incluidos quando vierem (chaves da Focus: `codigo_ncm`, `cfop`,
+ * `unidade_comercial`/`unidade_tributavel`, `icms_origem`, `icms_situacao_tributaria`). A Focus
+ * trata CSOSN e CST pelo mesmo campo `icms_situacao_tributaria`; a api ja resolve qual pelo regime.
+ */
 function corpoNfce(entrada: EmitirFiscalEntrada): unknown {
   const { emitente, pedido } = entrada
   return {
@@ -114,16 +120,25 @@ function corpoNfce(entrada: EmitirFiscalEntrada): unknown {
     modalidade_frete: 9,
     local_destino: 1,
     serie: emitente.serie,
-    items: pedido.itens.map((it, i) => ({
-      numero_item: i + 1,
-      codigo_produto: String(i + 1),
-      descricao: it.descricao,
-      quantidade_comercial: it.quantidade,
-      quantidade_tributavel: it.quantidade,
-      valor_unitario_comercial: reais(it.valorUnitarioCentavos),
-      valor_unitario_tributavel: reais(it.valorUnitarioCentavos),
-      valor_bruto: reais(it.valorTotalCentavos),
-    })),
+    items: pedido.itens.map((it, i) => {
+      const unidade = it.unidade ?? 'UN'
+      return {
+        numero_item: i + 1,
+        codigo_produto: String(i + 1),
+        descricao: it.descricao,
+        quantidade_comercial: it.quantidade,
+        quantidade_tributavel: it.quantidade,
+        valor_unitario_comercial: reais(it.valorUnitarioCentavos),
+        valor_unitario_tributavel: reais(it.valorUnitarioCentavos),
+        valor_bruto: reais(it.valorTotalCentavos),
+        unidade_comercial: unidade,
+        unidade_tributavel: unidade,
+        ...(it.ncm !== undefined ? { codigo_ncm: it.ncm } : {}),
+        ...(it.cfop !== undefined ? { cfop: it.cfop } : {}),
+        ...(it.origem !== undefined ? { icms_origem: it.origem } : {}),
+        ...(it.situacaoTributaria !== undefined ? { icms_situacao_tributaria: it.situacaoTributaria } : {}),
+      }
+    }),
     formas_pagamento: [{ forma_pagamento: '01', valor_pagamento: reais(pedido.totalCentavos) }],
   }
 }

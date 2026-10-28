@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { ReceiptText, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
-import { Badge, Banner, Button, Card, ErrorState, Field, IconChip, Input, Select, Skeleton, useToast } from '@/shared/ui'
+import { Badge, Banner, Button, Card, ErrorState, Field, IconChip, Input, Select, Skeleton, Switch, useToast } from '@/shared/ui'
 import { formatarDataHora } from '@/shared/format'
 import {
   CredencialFiscal,
@@ -110,6 +110,16 @@ export function FiscalConfig() {
     }
   }
 
+  async function alternarAuto() {
+    if (!estado) return
+    try {
+      await ajustar.mutateAsync({ auto_emitir: !estado.auto_emitir })
+      mostrarToast(estado.auto_emitir ? 'Emissão automática desligada.' : 'Emissão automática ligada.', { tom: 'sucesso' })
+    } catch (err) {
+      mostrarToast(err instanceof ApiError ? err.message : 'Não foi possível alterar.', { tom: 'erro' })
+    }
+  }
+
   const salvando = definir.isPending || ajustar.isPending
 
   return (
@@ -167,6 +177,21 @@ export function FiscalConfig() {
             <Button variante="secondary" loading={ajustar.isPending} onClick={() => void alternarAtivo()} className="max-md:w-full md:self-start">
               {estado.ativo ? 'Desativar emissão' : 'Ativar emissão'}
             </Button>
+            <div className="flex items-start justify-between gap-3 border-t border-linha pt-4">
+              <div className="min-w-0">
+                <p className="text-sm text-tinta">Emissão automática</p>
+                <p className="mt-0.5 text-xs text-tinta-2">
+                  Emite NFC-e dos pedidos entregues na tela Documentos, com um toque em "Emitir pendentes".
+                </p>
+              </div>
+              <Switch
+                ligado={estado.auto_emitir}
+                onMudar={() => void alternarAuto()}
+                carregando={ajustar.isPending}
+                disabled={!estado.ativo}
+                rotulo="Emissão automática de notas"
+              />
+            </div>
           </>
         )}
         <p className="flex items-start gap-2 border-t border-linha pt-3 text-xs text-tinta-2">

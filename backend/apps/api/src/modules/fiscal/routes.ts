@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastif
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { proibido } from '../../shared/http_errors'
 import {
+  AutoEmissaoSaida,
   DocumentoFiscalEmitirEntrada,
   DocumentoFiscalIdParams,
   DocumentoFiscalSaida,
@@ -15,6 +16,11 @@ import {
   FiscalConfigEntrada,
   FiscalConfigEstado,
   FiscalConfigPatch,
+  ItemFiscalDadoEntrada,
+  ItemFiscalIdParams,
+  ItemFiscalLinha,
+  ItensFiscaisSaida,
+  PedidosEmissiveisSaida,
 } from './schemas'
 import * as service from './service'
 import type { DepsFiscal } from './service'
@@ -62,6 +68,31 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsFiscal): void {
     req.log.info({ loja_id: lojaId, documento_id: doc.id, status: doc.status, tipo: doc.tipo }, 'documento fiscal solicitado')
     return reply.status(201).send(doc)
   })
+
+  r.post('/documentos/auto', {
+    config: { acesso: ACESSO_LOJA, rateLimit: LIMITE_SENSIVEL }, preHandler: gerir,
+    schema: { response: { 200: AutoEmissaoSaida } },
+  }, async (req) => {
+    const { lojaId, userId } = escopo(req)
+    const resumo = await service.emitirAuto(app.pool, obterDeps(), lojaId, userId)
+    req.log.info({ loja_id: lojaId, ...resumo, acao: 'emitir_auto' }, 'emissao fiscal automatica')
+    return resumo
+  })
+
+  r.get('/pedidos-emissiveis', {
+    config: { acesso: ACESSO_LOJA }, preHandler: gerir,
+    schema: { response: { 200: PedidosEmissiveisSaida } },
+  }, async (req) => service.pedidosEmissiveis(app.pool, escopo(req).lojaId, 50))
+
+  r.get('/itens', {
+    config: { acesso: ACESSO_LOJA }, preHandler: gerir,
+    schema: { response: { 200: ItensFiscaisSaida } },
+  }, async (req) => service.listarItensFiscais(app.pool, escopo(req).lojaId))
+
+  r.put('/itens/:itemId', {
+    config: { acesso: ACESSO_LOJA }, preHandler: gerir,
+    schema: { params: ItemFiscalIdParams, body: ItemFiscalDadoEntrada, response: { 200: ItemFiscalLinha } },
+  }, async (req) => service.definirItemFiscal(app.pool, escopo(req).lojaId, req.params.itemId, req.body))
 
   r.get('/documentos', {
     config: { acesso: ACESSO_LOJA }, preHandler: gerir,

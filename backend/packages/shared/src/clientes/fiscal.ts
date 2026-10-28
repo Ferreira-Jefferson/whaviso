@@ -23,12 +23,26 @@ export type AmbienteFiscal = z.infer<typeof AmbienteFiscal>
 
 const Centavos = z.number().int().nonnegative()
 
+// Atributos fiscais do item (DADO de cadastro da loja, nao calculo): NCM, CFOP, origem, unidade e
+// a situacao tributaria ja resolvida pelo regime (CSOSN p/ Simples/MEI, CST p/ regime normal). Sao
+// opcionais no contrato (o fake/stub nao os exige); o emissor real (Focus) os repassa a SEFAZ e so
+// autoriza a NFC-e quando presentes. A api valida a presenca antes de chamar o emissor.
 export const ItemFiscal = z
   .object({
     descricao: z.string().min(1).max(200),
     quantidade: z.number().int().positive(),
     valorUnitarioCentavos: Centavos,
     valorTotalCentavos: Centavos,
+    /** Codigo NCM (8 digitos). */
+    ncm: z.string().regex(/^[0-9]{8}$/).optional(),
+    /** CFOP (4 digitos). */
+    cfop: z.string().regex(/^[0-9]{4}$/).optional(),
+    /** Origem da mercadoria (0..8, tabela da SEFAZ). */
+    origem: z.number().int().min(0).max(8).optional(),
+    /** Unidade comercial/tributavel (ex.: UN, KG). */
+    unidade: z.string().min(1).max(6).optional(),
+    /** Situacao tributaria ja resolvida pelo regime (CSOSN ou CST), como string curta. */
+    situacaoTributaria: z.string().regex(/^[0-9]{2,3}$/).optional(),
   })
   .strict()
 export type ItemFiscal = z.infer<typeof ItemFiscal>

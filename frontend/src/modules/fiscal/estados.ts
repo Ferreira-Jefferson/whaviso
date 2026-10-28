@@ -54,3 +54,21 @@ export function formatarCnpj(v: string): string {
 export function linkSeguro(link: string | null): string | null {
   return link && /^https:\/\//i.test(link) ? link : null
 }
+
+/** Regime define qual situação tributária o item usa: CSOSN (Simples/MEI) ou CST (regime normal). */
+export function usaCsosn(regime: RegimeFiscalDto | null | undefined): boolean {
+  return regime === 'mei' || regime === 'simples_nacional'
+}
+
+/** Origem da mercadoria (tabela da SEFAZ). Rótulos curtos; o código é o que vale. */
+export const OPCOES_ORIGEM = [
+  { value: '0', label: '0 - Nacional' },
+  { value: '1', label: '1 - Estrangeira (importação direta)' },
+  { value: '2', label: '2 - Estrangeira (mercado interno)' },
+  { value: '3', label: '3 - Nacional (importação > 40%)' },
+  { value: '4', label: '4 - Nacional (processos produtivos)' },
+  { value: '5', label: '5 - Nacional (importação ≤ 40%)' },
+  { value: '6', label: '6 - Estrangeira (sem similar nacional)' },
+  { value: '7', label: '7 - Estrangeira (mercado interno, sem similar)' },
+  { value: '8', label: '8 - Nacional (conteúdo importado > 70%)' },
+] as const

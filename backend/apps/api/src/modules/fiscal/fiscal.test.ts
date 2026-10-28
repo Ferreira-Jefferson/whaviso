@@ -86,7 +86,27 @@ async function seed(papel: 'dono' | 'gerente' | 'atendente'): Promise<Fixtura> {
   return { contaId, userId, lojaId, outraLojaId }
 }
 
-async function pedido(lojaId: string, status = 'novo', comItens = true): Promise<string> {
+/** Cria categoria + item de catalogo e (opcional) seu dado fiscal. Devolve o item_id. */
+async function itemCatalogo(lojaId: string, comFiscal: boolean): Promise<string> {
+  const { rows: cat } = await poolSuper.query<{ id: string }>(
+    `insert into public.categorias (loja_id, nome) values ($1,'Pizzas') returning id`,
+    [lojaId],
+  )
+  const { rows: it } = await poolSuper.query<{ id: string }>(
+    `insert into public.itens (loja_id, categoria_id, nome, preco_centavos) values ($1,$2,'Pizza',3500) returning id`,
+    [lojaId, cat[0]!.id],
+  )
+  if (comFiscal) {
+    await poolSuper.query(
+      `insert into public.itens_fiscais (loja_id, item_id, ncm, cfop, origem, unidade, csosn)
+       values ($1,$2,'21069090','5102',0,'UN','102')`,
+      [lojaId, it[0]!.id],
+    )
+  }
+  return it[0]!.id
+}
+
+async function pedido(lojaId: string, status = 'novo', comItens = true, comFiscal = true): Promise<string> {
   const { rows } = await poolSuper.query<{ id: string }>(
     `insert into public.pedidos (loja_id, codigo, status, subtotal_centavos, total_centavos)
      values ($1,$2,$3,3500,3500) returning id`,
@@ -94,10 +114,11 @@ async function pedido(lojaId: string, status = 'novo', comItens = true): Promise
   )
   const id = rows[0]!.id
   if (comItens) {
+    const itemId = comFiscal ? await itemCatalogo(lojaId, true) : null
     await poolSuper.query(
-      `insert into public.itens_pedido (pedido_id, loja_id, nome_snapshot, preco_unitario_centavos, quantidade, total_centavos)
-       values ($1,$2,'Pizza',3500,1,3500)`,
-      [id, lojaId],
+      `insert into public.itens_pedido (pedido_id, loja_id, item_id, nome_snapshot, preco_unitario_centavos, quantidade, total_centavos)
+       values ($1,$2,$3,'Pizza',3500,1,3500)`,
+      [id, lojaId, itemId],
     )
   }
   return id
@@ -282,6 +303,147 @@ describe('documentos fiscais', () => {
     const det = await app.inject({ method: 'GET', url: `/v1/fiscal/documentos/${r.json().id}`, headers: hdr(outro) })
     expect(det.statusCode).toBe(404)
     expect((await app.inject({ method: 'GET', url: '/v1/fiscal/documentos', headers: hdr(outro) })).json().itens).toHaveLength(0)
+    await app.close()
+  })
+})
+
+describe('dado fiscal por item', () => {
+  async function comConfig(emissor: FakeClienteFiscal) {
+    const f = await seed('dono')
+    const app = await montarApp({ cifra, emissor })
+    await poolSuper.query(
+      `insert into public.fiscal_config (loja_id, credencial_cifrada, ultimos4, cnpj, regime)
+       values ($1,$2,'6789','12345678000195','simples_nacional')`,
+      [f.lojaId, cifra.cifrar(SEGREDO)],
+    )
+    return { f, app }
+  }
+
+  it('NFC-e com item sem dado fiscal nao emite: barra com 422 e nomeia o item', async () => {
+    if (!disponivel) return
+    const emissor = new FakeClienteFiscal()
+    const { f, app } = await comConfig(emissor)
+    const pid = await pedido(f.lojaId, 'entregue', true, false) // item sem itens_fiscais
+    const r = await app.inject({ method: 'POST', url: '/v1/fiscal/documentos', headers: hdr(f), payload: { pedido_id: pid, tipo: 'nfce' } })
+    expect(r.statusCode).toBe(422)
+    expect(r.json().error.code).toBe('itens_sem_dado_fiscal')
+    expect(r.json().error.message).toContain('Pizza')
+    // Nao chamou o emissor nem reservou documento (barrado antes).
+    expect(emissor.chamadas).toHaveLength(0)
+    expect((await app.inject({ method: 'GET', url: '/v1/fiscal/documentos', headers: hdr(f) })).json().itens).toHaveLength(0)
+    // NFS-e nao exige dado por item: emite normalmente.
+    const nfse = await app.inject({ method: 'POST', url: '/v1/fiscal/documentos', headers: hdr(f), payload: { pedido_id: pid, tipo: 'nfse' } })
+    expect(nfse.statusCode).toBe(201)
+    expect(nfse.json().status).toBe('emitido')
+    await app.close()
+  })
+
+  it('a emissao de NFC-e repassa o item COM NCM/CFOP/CSOSN e origem ao emissor', async () => {
+    if (!disponivel) return
+    const emissor = new FakeClienteFiscal()
+    const { f, app } = await comConfig(emissor)
+    const pid = await pedido(f.lojaId, 'entregue', true, true)
+    const r = await app.inject({ method: 'POST', url: '/v1/fiscal/documentos', headers: hdr(f), payload: { pedido_id: pid, tipo: 'nfce' } })
+    expect(r.statusCode).toBe(201)
+    const item = emissor.chamadas[0]!.pedido.itens[0]!
+    expect(item).toMatchObject({ ncm: '21069090', cfop: '5102', origem: 0, unidade: 'UN', situacaoTributaria: '102' })
+    await app.close()
+  })
+
+  it('GET /itens lista itens com o dado fiscal e flag completo; PUT /itens/:id faz upsert', async () => {
+    if (!disponivel) return
+    const { f, app } = await comConfig(new FakeClienteFiscal())
+    const semFiscal = await itemCatalogo(f.lojaId, false)
+    const lista0 = await app.inject({ method: 'GET', url: '/v1/fiscal/itens', headers: hdr(f) })
+    expect(lista0.statusCode).toBe(200)
+    const linha0 = lista0.json().itens.find((i: { item_id: string }) => i.item_id === semFiscal)
+    expect(linha0).toMatchObject({ nome: 'Pizza', categoria_nome: 'Pizzas', completo: false, ncm: null })
+
+    const put = await app.inject({
+      method: 'PUT', url: `/v1/fiscal/itens/${semFiscal}`, headers: hdr(f),
+      payload: { ncm: '21069090', cfop: '5102', origem: 0, unidade: 'UN', csosn: '102' },
+    })
+    expect(put.statusCode).toBe(200)
+    expect(put.json()).toMatchObject({ item_id: semFiscal, ncm: '21069090', completo: true })
+    // idempotente: segundo PUT atualiza (sem erro de unique)
+    const put2 = await app.inject({
+      method: 'PUT', url: `/v1/fiscal/itens/${semFiscal}`, headers: hdr(f),
+      payload: { ncm: '19059090', cfop: '5102', origem: 0, unidade: 'UN', csosn: '102' },
+    })
+    expect(put2.json().ncm).toBe('19059090')
+
+    // item de outra loja: 404 (escopo)
+    const outraItem = await itemCatalogo(f.outraLojaId, false)
+    const alheio = await app.inject({
+      method: 'PUT', url: `/v1/fiscal/itens/${outraItem}`, headers: hdr(f),
+      payload: { ncm: '21069090', cfop: '5102', origem: 0, unidade: 'UN', csosn: '102' },
+    })
+    expect(alheio.statusCode).toBe(404)
+    await app.close()
+  })
+
+  it('dado fiscal e isolado por loja (nao vaza entre lojas)', async () => {
+    if (!disponivel) return
+    const { f, app } = await comConfig(new FakeClienteFiscal())
+    await itemCatalogo(f.lojaId, true)
+    const outro = await seed('dono')
+    const appOutro = await montarApp({ cifra, emissor: new FakeClienteFiscal() })
+    const lista = await appOutro.inject({ method: 'GET', url: '/v1/fiscal/itens', headers: hdr(outro) })
+    expect(lista.json().itens).toHaveLength(0)
+    await app.close()
+    await appOutro.close()
+  })
+})
+
+describe('pedidos elegiveis e emissao automatica', () => {
+  async function comConfig(emissor: FakeClienteFiscal, auto: boolean) {
+    const f = await seed('dono')
+    const app = await montarApp({ cifra, emissor })
+    await poolSuper.query(
+      `insert into public.fiscal_config (loja_id, credencial_cifrada, ultimos4, cnpj, regime, auto_emitir)
+       values ($1,$2,'6789','12345678000195','simples_nacional',$3)`,
+      [f.lojaId, cifra.cifrar(SEGREDO), auto],
+    )
+    return { f, app }
+  }
+
+  it('GET /pedidos-emissiveis lista so os concluidos sem NFC-e', async () => {
+    if (!disponivel) return
+    const { f, app } = await comConfig(new FakeClienteFiscal(), false)
+    const entregue = await pedido(f.lojaId, 'entregue', true, true)
+    await pedido(f.lojaId, 'em_preparo', true, true) // nao concluido: fora
+    const lista = await app.inject({ method: 'GET', url: '/v1/fiscal/pedidos-emissiveis', headers: hdr(f) })
+    expect(lista.statusCode).toBe(200)
+    const ids = lista.json().itens.map((p: { pedido_id: string }) => p.pedido_id)
+    expect(ids).toContain(entregue)
+    expect(ids).toHaveLength(1)
+    await app.close()
+  })
+
+  it('POST /documentos/auto emite os concluidos, e idempotente e so com auto ligado', async () => {
+    if (!disponivel) return
+    const emissor = new FakeClienteFiscal()
+    const { f, app } = await comConfig(emissor, true)
+    const p1 = await pedido(f.lojaId, 'entregue', true, true)
+    await pedido(f.lojaId, 'entregue', true, false) // sem dado fiscal: pulado, nao derruba o lote
+    const r = await app.inject({ method: 'POST', url: '/v1/fiscal/documentos/auto', headers: hdr(f) })
+    expect(r.statusCode).toBe(200)
+    expect(r.json()).toMatchObject({ emitidos: 1, pulados: 1 })
+    // segunda passada: o p1 ja tem documento, nada novo a emitir
+    const r2 = await app.inject({ method: 'POST', url: '/v1/fiscal/documentos/auto', headers: hdr(f) })
+    expect(r2.json().emitidos).toBe(0)
+    const docs = await app.inject({ method: 'GET', url: '/v1/fiscal/documentos?status=emitido', headers: hdr(f) })
+    expect(docs.json().itens.map((d: { pedido_id: string }) => d.pedido_id)).toContain(p1)
+    await app.close()
+  })
+
+  it('auto desligado: 422 auto_emissao_desligada', async () => {
+    if (!disponivel) return
+    const { f, app } = await comConfig(new FakeClienteFiscal(), false)
+    await pedido(f.lojaId, 'entregue', true, true)
+    const r = await app.inject({ method: 'POST', url: '/v1/fiscal/documentos/auto', headers: hdr(f) })
+    expect(r.statusCode).toBe(422)
+    expect(r.json().error.code).toBe('auto_emissao_desligada')
     await app.close()
   })
 })

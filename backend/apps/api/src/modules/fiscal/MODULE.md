@@ -14,9 +14,17 @@ isso (dev/offline/testes), `config.ts` mantem o stub `emissorNaoConfigurado` (er
 `emissor_nao_configurado`: o documento fica `erro`). A suite `contratoClienteFiscal`
 (`@whaviso/shared/clientes/testing`) valida stub, fake e a impl real (testes com HTTP mockado).
 Trocar de provedor = nova impl atras de `ClienteFiscal`, sem tocar no resto do modulo.
-**Go-live (honesto):** exige uma conta Focus NFe (token por loja) e os atributos fiscais por item
-(NCM, CFOP, situacao tributaria) que o `ItemFiscal` minimo nao carrega hoje; a mecanica (ref,
-consulta de status, mapeamento de erro, credencial, SSRF) esta verificada so por mock.
+**Dado fiscal por item (catalogo):** a NFC-e exige por item NCM, CFOP, origem, unidade e a situacao
+tributaria (CSOSN p/ Simples/MEI, CST p/ regime normal). Isso e DADO de cadastro (tabela
+`itens_fiscais`, por loja+item), nao calculo: a api valida a presenca e repassa ao emissor
+(`ItemFiscal` agora carrega esses campos). Um item sem o dado NAO emite: a api barra antes de chamar
+o emissor e lista os itens pendentes (`itens_sem_dado_fiscal`). NFS-e nao exige dado por item (o
+emissor trata o pedido como um servico unico).
+
+**Go-live (honesto):** exige uma conta Focus NFe (token por loja) e o dado fiscal cadastrado por
+item; so entao a SEFAZ autoriza. A mecanica (ref idempotente, consulta de status, mapeamento de
+erro, credencial, SSRF) e o mapeamento (NCM/CFOP/origem/situacao -> corpo da Focus) estao
+verificados so por mock.
 
 ## Regras de ouro
 - Credencial do emissor WRITE-ONLY na borda: so a entrada a carrega; saidas so tem `ultimos4`.
@@ -29,8 +37,14 @@ consulta de status, mapeamento de erro, credencial, SSRF) esta verificada so por
 - Config e escrita so pelo `dono`; leitura/emissao por `loja:gerir`.
 
 ## Entry points
-`index.ts` -> `fiscalRoutes` (prefixo `fiscal`): `GET/PUT/PATCH /config`,
-`POST/GET /documentos`, `GET /documentos/:id`.
+`index.ts` -> `fiscalRoutes` (prefixo `fiscal`): `GET/PUT/PATCH /config`, `POST/GET /documentos`,
+`GET /documentos/:id`, `POST /documentos/auto` (emissao automatica em lote dos pedidos concluidos,
+quando `auto_emitir` ligado), `GET /pedidos-emissiveis` (pedidos `entregue` sem NFC-e),
+`GET /itens` + `PUT /itens/:itemId` (dado fiscal por item do catalogo). Dado fiscal e emissao:
+`loja:gerir`; credencial do emissor (`PUT /config`): so o `dono`.
 
 ## Tabelas
-`fiscal_config` (unique loja), `documentos_fiscais` (unique pedido+tipo). Sem DELETE.
+`fiscal_config` (unique loja; `auto_emitir` governa a emissao automatica), `documentos_fiscais`
+(unique pedido+tipo), `itens_fiscais` (unique loja+item: NCM/CFOP/origem/unidade/CSOSN|CST; sem
+DELETE: desfazer e limpar na tela). Pedido e itens lidos por SQL (nao importa o modulo pedidos/
+cardapio). Sem DELETE em nenhuma.

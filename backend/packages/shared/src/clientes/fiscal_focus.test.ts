@@ -89,6 +89,32 @@ describe('fiscal_focus: emissao', () => {
     expect(g.chamadas.some((c) => c.metodo === 'GET' && c.pathname === '/v2/nfce/doc-xyz-9')).toBe(true)
   })
 
+  it('repassa NCM, CFOP, origem, unidade e situacao tributaria do item no corpo da NFC-e', async () => {
+    const g = gravador(rotaFeliz)
+    await criarFiscalFocus({ ...BASE, fetchImpl: g.fetchImpl }).emitir(
+      entrada({
+        pedido: {
+          codigo: 'P-200',
+          totalCentavos: 3500,
+          itens: [{
+            descricao: 'Pizza', quantidade: 1, valorUnitarioCentavos: 3500, valorTotalCentavos: 3500,
+            ncm: '21069090', cfop: '5102', origem: 0, unidade: 'UN', situacaoTributaria: '102',
+          }],
+        },
+      }),
+    )
+    const post = g.chamadas.find((c) => c.metodo === 'POST')!
+    const corpo = JSON.parse(post.body!) as { items: Array<Record<string, unknown>> }
+    expect(corpo.items[0]).toMatchObject({
+      codigo_ncm: '21069090',
+      cfop: '5102',
+      icms_origem: 0,
+      icms_situacao_tributaria: '102',
+      unidade_comercial: 'UN',
+      unidade_tributavel: 'UN',
+    })
+  })
+
   it('nunca envia a credencial no corpo nem a devolve na resposta', async () => {
     const g = gravador(rotaFeliz)
     const r = await criarFiscalFocus({ ...BASE, fetchImpl: g.fetchImpl }).emitir(entrada())

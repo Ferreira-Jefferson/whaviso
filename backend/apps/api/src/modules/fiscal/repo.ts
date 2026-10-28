@@ -14,6 +14,7 @@ export interface ConfigMeta {
   serie_nfse: number
   ambiente: 'homologacao' | 'producao'
   ativo: boolean
+  auto_emitir: boolean
   ultimos4: string | null
   criado_em: string
   atualizado_em: string
@@ -22,7 +23,7 @@ export interface ConfigComCredencial extends ConfigMeta {
   credencial_cifrada: Buffer
 }
 
-const META = sql`${sqlBruto('cnpj, regime, serie_nfce, serie_nfse, ambiente, ativo, ultimos4')},
+const META = sql`${sqlBruto('cnpj, regime, serie_nfce, serie_nfse, ambiente, ativo, auto_emitir, ultimos4')},
   ${TS('criado_em')} as criado_em, ${TS('atualizado_em')} as atualizado_em`
 
 export async function obterConfig(exec: Executor, lojaId: string) {
@@ -67,7 +68,15 @@ export async function upsertConfig(exec: Executor, d: DadosConfig): Promise<Conf
 export async function ajustarConfig(
   exec: Executor,
   lojaId: string,
-  c: { cnpj?: string; regime?: string; serie_nfce?: number; serie_nfse?: number; ambiente?: string; ativo?: boolean },
+  c: {
+    cnpj?: string
+    regime?: string
+    serie_nfce?: number
+    serie_nfse?: number
+    ambiente?: string
+    ativo?: boolean
+    auto_emitir?: boolean
+  },
 ): Promise<ConfigMeta | null> {
   const sets: Consulta[] = []
   if (c.cnpj !== undefined) sets.push(sql`cnpj = ${c.cnpj}`)
@@ -76,6 +85,7 @@ export async function ajustarConfig(
   if (c.serie_nfse !== undefined) sets.push(sql`serie_nfse = ${c.serie_nfse}`)
   if (c.ambiente !== undefined) sets.push(sql`ambiente = ${c.ambiente}`)
   if (c.ativo !== undefined) sets.push(sql`ativo = ${c.ativo}`)
+  if (c.auto_emitir !== undefined) sets.push(sql`auto_emitir = ${c.auto_emitir}`)
   if (sets.length === 0) return obterConfig(exec, lojaId)
   let clausula = sets[0]!
   for (let i = 1; i < sets.length; i++) clausula = sql`${clausula}, ${sets[i]!}`
@@ -106,15 +116,135 @@ export interface ItemPedidoFiscal {
   quantidade: number
   unitario: number
   total: number
+  /** Dado fiscal do item do catalogo (nulo quando o item nao tem referencia ou cadastro fiscal). */
+  ncm: string | null
+  cfop: string | null
+  origem: number | null
+  unidade: string | null
+  csosn: string | null
+  cst: string | null
 }
-export async function itensDoPedido(exec: Executor, lojaId: string, pedidoId: string) {
+/**
+ * Itens do pedido com o dado fiscal do item do catalogo (left join por item_id). Snapshot manda
+ * no texto/valores; o dado fiscal vem da linha de catalogo (itens_fiscais), quando existir. Itens
+ * sem referencia (item_id null) ou sem cadastro fiscal vem com os campos fiscais nulos: a emissao
+ * de NFC-e os aponta como pendentes.
+ */
+export async function itensDoPedidoComFiscal(exec: Executor, lojaId: string, pedidoId: string) {
   return consultar<ItemPedidoFiscal>(
     exec,
-    sql`select nome_snapshot as nome, quantidade::int as quantidade,
-               preco_unitario_centavos as unitario, total_centavos as total
-          from public.itens_pedido
-         where pedido_id = ${pedidoId} and loja_id = ${lojaId} and not cancelado
-         order by criado_em, id`,
+    sql`select ip.nome_snapshot as nome, ip.quantidade::int as quantidade,
+               ip.preco_unitario_centavos as unitario, ip.total_centavos as total,
+               itf.ncm, itf.cfop, itf.origem::int as origem, itf.unidade, itf.csosn, itf.cst
+          from public.itens_pedido ip
+          left join public.itens_fiscais itf
+            on itf.item_id = ip.item_id and itf.loja_id = ip.loja_id
+         where ip.pedido_id = ${pedidoId} and ip.loja_id = ${lojaId} and not ip.cancelado
+         order by ip.criado_em, ip.id`,
+  )
+}
+
+// ---- Dados fiscais por item (catalogo) ---------------------------------------------------------
+
+export interface ItemFiscalLinha {
+  item_id: string
+  nome: string
+  categoria_nome: string | null
+  ativo: boolean
+  ncm: string | null
+  cfop: string | null
+  origem: number | null
+  unidade: string | null
+  csosn: string | null
+  cst: string | null
+}
+
+/** Itens do catalogo da loja com o dado fiscal (left join), para o editor em massa. */
+export async function listarItensComFiscal(exec: Executor, lojaId: string) {
+  return consultar<ItemFiscalLinha>(
+    exec,
+    sql`select it.id as item_id, it.nome, c.nome as categoria_nome, it.ativo,
+               itf.ncm, itf.cfop, itf.origem::int as origem, itf.unidade, itf.csosn, itf.cst
+          from public.itens it
+          join public.categorias c on c.id = it.categoria_id
+          left join public.itens_fiscais itf on itf.item_id = it.id and itf.loja_id = it.loja_id
+         where it.loja_id = ${lojaId}
+         order by c.ordem, c.nome, it.ordem, it.nome`,
+  )
+}
+
+/** Confere que o item existe e pertence a loja (antes do upsert fiscal). */
+export async function itemPertenceALoja(exec: Executor, lojaId: string, itemId: string): Promise<boolean> {
+  const r = await consultarUm<{ id: string }>(
+    exec,
+    sql`select id from public.itens where id = ${itemId} and loja_id = ${lojaId}`,
+  )
+  return r != null
+}
+
+export interface DadoFiscalItem {
+  ncm: string
+  cfop: string
+  origem: number
+  unidade: string
+  csosn: string | null
+  cst: string | null
+}
+
+/** Set/ajuste do dado fiscal de um item (unique por loja+item). */
+export async function upsertItemFiscal(
+  exec: Executor,
+  lojaId: string,
+  itemId: string,
+  d: DadoFiscalItem,
+): Promise<ItemFiscalLinha | null> {
+  await consultar(
+    exec,
+    sql`insert into public.itens_fiscais (loja_id, item_id, ncm, cfop, origem, unidade, csosn, cst)
+        values (${lojaId}, ${itemId}, ${d.ncm}, ${d.cfop}, ${d.origem}, ${d.unidade}, ${d.csosn}, ${d.cst})
+        on conflict (loja_id, item_id) do update set
+          ncm = ${d.ncm}, cfop = ${d.cfop}, origem = ${d.origem}, unidade = ${d.unidade},
+          csosn = ${d.csosn}, cst = ${d.cst}`,
+  )
+  return consultarUm<ItemFiscalLinha>(
+    exec,
+    sql`select it.id as item_id, it.nome, c.nome as categoria_nome, it.ativo,
+               itf.ncm, itf.cfop, itf.origem::int as origem, itf.unidade, itf.csosn, itf.cst
+          from public.itens it
+          join public.categorias c on c.id = it.categoria_id
+          left join public.itens_fiscais itf on itf.item_id = it.id and itf.loja_id = it.loja_id
+         where it.id = ${itemId} and it.loja_id = ${lojaId}`,
+  )
+}
+
+// ---- Pedidos elegiveis a emissao ---------------------------------------------------------------
+
+export interface PedidoEmissivel {
+  pedido_id: string
+  codigo: string
+  status: string
+  total_centavos: number
+  criado_em: string
+}
+
+/**
+ * Pedidos concluidos (`entregue`) que ainda nao tem NFC-e. Base para o painel oferecer a emissao e
+ * para a emissao automatica em lote. Exclui os que ja tem documento do tipo (nao-erro).
+ */
+export async function pedidosEmissiveis(exec: Executor, lojaId: string, limite: number) {
+  return consultar<PedidoEmissivel>(
+    exec,
+    sql`select p.id as pedido_id, p.codigo, p.status::text as status, p.total_centavos,
+               ${TS('p.criado_em')} as criado_em
+          from public.pedidos p
+         where p.loja_id = ${lojaId}
+           and p.status = 'entregue'
+           and not exists (
+             select 1 from public.documentos_fiscais d
+              where d.pedido_id = p.id and d.tipo = 'nfce' and d.status <> 'erro'
+           )
+         order by p.criado_em desc, p.id desc
+         limit ${limite}`,
   )
 }
 
