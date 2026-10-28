@@ -4,7 +4,7 @@
 // Dona (escrita): public.fichas_tecnicas. Le/escreve (baixa na venda) nas tabelas da 0026
 // public.insumos e public.movimentos_insumo por SQL direto, porque modulo nunca importa modulo
 // (nao importamos estoque_insumos). O contrato de colunas usadas esta no MODULE.md.
-import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
+import { consultar, consultarUm, ErroBanco, sql, type Executor } from '@whaviso/shared/db'
 
 export interface LinhaFicha {
   insumo_id: string
@@ -92,9 +92,10 @@ export async function baixarConsumo(
   exec: Executor,
   p: { lojaId: string; insumoId: string; consumo: number; pedidoId: string },
 ): Promise<boolean> {
-  const r = await consultarUm<{ ok: boolean }>(
-    exec,
-    sql`with ja as (
+  try {
+    const r = await consultarUm<{ ok: boolean }>(
+      exec,
+      sql`with ja as (
           select 1 from public.movimentos_insumo
            where pedido_id = ${p.pedidoId} and insumo_id = ${p.insumoId} and tipo = 'consumo'
            limit 1
@@ -114,8 +115,14 @@ export async function baixarConsumo(
           returning 1
         )
         select exists (select 1 from inserido) as ok`,
-  )
-  return r?.ok ?? false
+    )
+    return r?.ok ?? false
+  } catch (e) {
+    // Corrida: outro lancamento de 'consumo' deste (pedido, insumo) commitou entre o `not exists`
+    // e o insert; o indice unico parcial (0063) barra a duplicata. Ja estava registrado.
+    if (e instanceof ErroBanco && e.tipo === 'unique') return false
+    throw e
+  }
 }
 
 /** Auditoria sem PII (tabela eventos). `detalhes` so carrega ids e contagem. */
