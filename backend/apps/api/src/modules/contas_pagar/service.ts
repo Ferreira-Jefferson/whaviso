@@ -3,13 +3,15 @@
 // so a mascara (ultimos 4) e o claro so em `revelarTelefone` (dono/gerente). O nome do credor vem
 // por read-model (join), nunca importando os modulos fornecedor/pessoas.
 import { comTransacao, type Executor, type Pool } from '@whaviso/shared/db'
+import { hojeSp } from '@whaviso/shared/datas'
 import { ultimos4 } from '@whaviso/shared/pix_credencial'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import type { Cifra } from './cripto'
 import * as repo from './repo'
 import * as escrita from './repo_escrita'
 import type {
-  ContaPagarDto, ContaPagarNovo, ContaPagarPatch, FornecedorDto, FornecedorNovo, FornecedorPatch,
+  AcertoAjusteNovo, AcertoMotoboyLinhaDto, AcertoPagoDto, AcertoPeriodoDto, ContaPagarDto,
+  ContaPagarNovo, ContaPagarPatch, FornecedorDto, FornecedorNovo, FornecedorPatch, PagarAcertoNovo,
 } from './schemas'
 
 export interface Ator {
@@ -81,6 +83,58 @@ export function criarServicoContasPagar(pool: Pool, cifra: Cifra) {
     const c = await repo.obterConta(pool, a.lojaId, id)
     if (!c) throw naoEncontrado('Conta nao encontrada')
     return contaSaida(c)
+  }
+
+  // --- Acerto do motoboy por periodo (aplica o regime de pagamento sobre o ledger) ---
+
+  /** Meses-calendario (SP) distintos em [de,ate] inclusive. Ex.: 2026-01-20..2026-02-05 = 2. */
+  function mesesNoPeriodo(de: string, ate: string): number {
+    const [ay, am] = de.split('-').map(Number)
+    const [by, bm] = ate.split('-').map(Number)
+    return (by! * 12 + bm!) - (ay! * 12 + am!) + 1
+  }
+
+  /** Parcela fixa derivada e total do regime. fixo: 0 em por_entrega; por dia trabalhado ou por mes. */
+  function calcularAcerto(g: repo.AcertoAgregadoDb, meses: number): { fixo: number; total: number } {
+    const temFixo = g.regime_pagamento === 'fixo' || g.regime_pagamento === 'fixo_mais_entrega'
+    const temEntrega = g.regime_pagamento === 'por_entrega' || g.regime_pagamento === 'fixo_mais_entrega'
+    const fixo = !temFixo
+      ? 0
+      : g.periodicidade_fixo === 'dia'
+        ? g.valor_fixo_centavos * g.dias_trabalhados
+        : g.valor_fixo_centavos * meses
+    const total = (temFixo ? fixo : 0) + (temEntrega ? g.entregas_centavos : 0) + g.ajustes_centavos
+    return { fixo, total }
+  }
+
+  function montarLinhaAcerto(
+    g: repo.AcertoAgregadoDb, meses: number, lancs: repo.AcertoLancamentoDb[],
+  ): AcertoMotoboyLinhaDto {
+    const { fixo, total } = calcularAcerto(g, meses)
+    return {
+      motoboy_id: g.motoboy_id,
+      motoboy_nome: g.motoboy_nome,
+      regime_pagamento: g.regime_pagamento,
+      periodicidade_fixo: g.periodicidade_fixo,
+      valor_fixo_centavos: g.valor_fixo_centavos,
+      qtd_entregas: g.qtd_entregas,
+      dias_trabalhados: g.dias_trabalhados,
+      entregas_centavos: g.entregas_centavos,
+      fixo_centavos: fixo,
+      ajustes_centavos: g.ajustes_centavos,
+      total_centavos: total,
+      pago: g.pago,
+      lancamentos: lancs
+        .filter((x) => x.motoboy_id === g.motoboy_id)
+        .map((x) => ({
+          id: x.id, data: x.data, tipo: x.tipo, pedido_id: x.pedido_id,
+          valor_centavos: x.valor_centavos, descricao: x.descricao, criado_em: x.criado_em,
+        })),
+    }
+  }
+
+  async function motoboyExistente(exec: Executor, a: Ator, id: string): Promise<void> {
+    if (!(await repo.motoboyDaLoja(exec, a.lojaId, id))) throw naoEncontrado('Motoboy nao encontrado')
   }
 
   return {
@@ -222,6 +276,88 @@ export function criarServicoContasPagar(pool: Pool, cifra: Cifra) {
         await evento(tx, a, 'conta_pagar.paga', 'conta_pagar', id, { valor_centavos: valorVisto })
       })
       return contaPorId(a, id)
+    },
+
+    // --- Acerto do motoboy por periodo ---
+
+    /** Acerto de [de,ate]: materializa as entregas e devolve o breakdown por regime (total DERIVADO). */
+    async acertoPeriodo(a: Ator, de: string, ate: string): Promise<AcertoPeriodoDto> {
+      if (ate < de) {
+        throw regraNegocio('periodo_invalido', 'A data final nao pode ser anterior a inicial')
+      }
+      await comTransacao(pool, (tx) => escrita.materializarEntregasPeriodo(tx, a.lojaId, de, ate))
+      const [agregados, lancs] = await Promise.all([
+        repo.acertosDoPeriodo(pool, a.lojaId, de, ate),
+        repo.lancamentosDoPeriodo(pool, a.lojaId, de, ate),
+      ])
+      const meses = mesesNoPeriodo(de, ate)
+      const linhas = agregados.map((g) => montarLinhaAcerto(g, meses, lancs))
+      return { de, ate, total_centavos: linhas.reduce((s, l) => s + l.total_centavos, 0), linhas }
+    },
+
+    /** Ajuste manual no acerto (append-only, valor com sinal). Dia em acerto pago = 409. */
+    async lancarAjuste(a: Ator, e: AcertoAjusteNovo) {
+      await motoboyExistente(pool, a, e.motoboy_id)
+      const hoje = hojeSp()
+      const data = e.data ?? hoje
+      if (data > hoje) throw regraNegocio('data_futura', 'A data do lancamento nao pode ser futura')
+      const lanc = await comTransacao(pool, async (tx) => {
+        await escrita.travarAcertoMotoboy(tx, e.motoboy_id)
+        if (await repo.acertoPagoCobre(tx, a.lojaId, e.motoboy_id, data)) {
+          throw conflito('periodo_ja_pago', 'Periodo ja pago: lance em um periodo aberto')
+        }
+        const { lancamento, criado } = await escrita.inserirAjuste(tx, {
+          lojaId: a.lojaId, motoboyId: e.motoboy_id, data, valorCentavos: e.valor_centavos,
+          descricao: e.descricao, userId: a.userId, chaveIdempotencia: e.chave_idempotencia ?? null,
+        })
+        // Reenvio com a mesma chave (duplo-clique/retry): nada de novo gravado, nao registra evento.
+        if (criado) {
+          await evento(tx, a, 'acerto_motoboy.ajuste', 'motoboy', e.motoboy_id, {
+            lancamento_id: lancamento.id, data, valor_centavos: e.valor_centavos,
+          })
+        }
+        return lancamento
+      })
+      return {
+        id: lanc.id, data: lanc.data, tipo: 'ajuste' as const, pedido_id: null,
+        valor_centavos: lanc.valor_centavos, descricao: lanc.descricao, criado_em: lanc.criado_em,
+      }
+    },
+
+    /** Paga [de,ate] de um motoboy: trava, recusa sobreposicao com pago, recomputa e congela o total. */
+    async pagarAcerto(a: Ator, e: PagarAcertoNovo): Promise<AcertoPagoDto> {
+      if (e.ate < e.de) {
+        throw regraNegocio('periodo_invalido', 'A data final nao pode ser anterior a inicial')
+      }
+      const acerto = await comTransacao(pool, async (tx) => {
+        await escrita.travarAcertoMotoboy(tx, e.motoboy_id)
+        await motoboyExistente(tx, a, e.motoboy_id)
+        if (await repo.acertoPagoSobrepoe(tx, a.lojaId, e.motoboy_id, e.de, e.ate)) {
+          throw conflito('periodo_sobreposto', 'Ja existe acerto pago que sobrepoe este periodo')
+        }
+        await escrita.materializarEntregasPeriodo(tx, a.lojaId, e.de, e.ate)
+        const g = await repo.acertoDoMotoboy(tx, a.lojaId, e.motoboy_id, e.de, e.ate)
+        const total = g ? calcularAcerto(g, mesesNoPeriodo(e.de, e.ate)).total : 0
+        if (total !== e.total_centavos) {
+          throw conflito('total_divergente', 'O total do periodo mudou; revise antes de pagar')
+        }
+        const pago = await escrita.inserirAcertoPago(tx, {
+          lojaId: a.lojaId, motoboyId: e.motoboy_id, de: e.de, ate: e.ate, totalCentavos: total,
+          userId: a.userId,
+        })
+        await evento(tx, a, 'acerto_motoboy.pago', 'acerto_motoboy', pago.id, {
+          de: e.de, ate: e.ate, total_centavos: total,
+        })
+        return pago
+      })
+      return {
+        id: acerto.id,
+        motoboy_id: e.motoboy_id,
+        periodo_inicio: acerto.periodo_inicio,
+        periodo_fim: acerto.periodo_fim,
+        total_pago_centavos: acerto.total_pago_centavos,
+        pago_em: acerto.pago_em,
+      }
     },
   }
 }

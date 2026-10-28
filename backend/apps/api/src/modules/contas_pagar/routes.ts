@@ -4,9 +4,11 @@ import { HttpError } from '../../shared/http_errors'
 import { cifraPadrao, type Cifra } from './cripto'
 import { criarServicoContasPagar, type Ator } from './service'
 import {
+  AcertoAjusteEntrada, AcertoLancamento, AcertoPagoSaida, AcertoPeriodoQuery, AcertoPeriodoSaida,
   ContaPagarAtualizarEntrada, ContaPagarEntrada, ContaPagarListaQuery, ContaPagarListaSaida,
   ContaPagarSaida, FornecedorAtualizarEntrada, FornecedorEntrada, FornecedorListaQuery,
-  FornecedorListaSaida, FornecedorSaida, FornecedorTelefoneSaida, IdParams, PagarContaEntrada,
+  FornecedorListaSaida, FornecedorSaida, FornecedorTelefoneSaida, IdParams, PagarAcertoEntrada,
+  PagarContaEntrada,
 } from './schemas'
 
 /** Loja efetiva = SO a do escopo resolvido (nunca corpo/query). */
@@ -61,6 +63,22 @@ export function criarContasPagarRoutes(cifra?: Cifra): FastifyPluginAsync {
       ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: gerir,
       schema: { params: IdParams, body: PagarContaEntrada, response: { 200: ContaPagarSaida } },
     }, async (req) => svc.pagarConta(ator(req), req.params.id, req.body.valor_centavos))
+
+    // --- Acerto do motoboy por periodo (rotas estaticas; antes das rotas /:id de fornecedor) ---
+    app.get('/acertos', {
+      ...loja(), preHandler: gerir,
+      schema: { querystring: AcertoPeriodoQuery, response: { 200: AcertoPeriodoSaida } },
+    }, async (req) => svc.acertoPeriodo(ator(req), req.query.de, req.query.ate))
+
+    app.post('/acertos/ajuste', {
+      ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: gerir,
+      schema: { body: AcertoAjusteEntrada, response: { 201: AcertoLancamento } },
+    }, async (req, reply) => reply.status(201).send(await svc.lancarAjuste(ator(req), req.body)))
+
+    app.post('/acertos/pagar', {
+      ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: gerir,
+      schema: { body: PagarAcertoEntrada, response: { 200: AcertoPagoSaida } },
+    }, async (req) => svc.pagarAcerto(ator(req), req.body))
 
     // --- Fornecedor por id ---
     app.get('/:id', {

@@ -2,6 +2,7 @@
 // injetado, verificador fake (token = user_id), cifra de teste e duas contas isoladas. Semeia uma
 // pessoa por loja (credor tipo pessoa) direto no banco (poolSuper). Roda no Postgres LOCAL
 // whaviso_dev; se offline, a suite se pula.
+import { randomUUID } from 'node:crypto'
 import type { InjectOptions } from 'fastify'
 import { criarCifra } from '@whaviso/shared/cifra'
 import {
@@ -95,10 +96,61 @@ export async function montarMundo(): Promise<Mundo> {
 
 export async function encerrar(m: Mundo): Promise<void> {
   await m.app.close()
-  // eventos nao cascateia das lojas; o resto (fornecedores, contas_pagar, pessoas) cascateia das lojas.
+  // eventos nao cascateia das lojas; o resto (motoboys/lancamentos/acertos/pedidos/fornecedores/
+  // contas_pagar/pessoas) cascateia das lojas.
   await poolSuper.query('delete from public.eventos where loja_id = any($1)', [[m.A.loja, m.B.loja]])
   await limpar(m.cenario)
   await fecharPools()
+}
+
+/** Zona de entrega com o valor do motoboy informado (centavos). */
+export async function semearZona(loja: string, valorMotoboyCentavos: number): Promise<string> {
+  const r = await poolSuper.query<{ id: string }>(
+    `insert into public.zonas_entrega (loja_id, nome, tipo, bairro, taxa_cliente_centavos, valor_motoboy_centavos)
+     values ($1,'Centro','bairro','Centro',500,$2) returning id`,
+    [loja, valorMotoboyCentavos],
+  )
+  return r.rows[0]!.id
+}
+
+/** Pessoa de cargo motoboy + cadastro de motoboy com o regime informado. Devolve o motoboy_id. */
+export async function semearMotoboy(
+  loja: string,
+  nome: string,
+  regime: { regime: 'por_entrega' | 'fixo' | 'fixo_mais_entrega'; periodicidade?: 'dia' | 'mes'; valorFixo?: number },
+): Promise<string> {
+  const cargo = (
+    await poolSuper.query<{ id: string }>(
+      "select id from public.cargos where chave = 'motoboy' and loja_id is null",
+    )
+  ).rows[0]!.id
+  const pessoa = (
+    await poolSuper.query<{ id: string }>(
+      'insert into public.pessoas (loja_id, nome, cargo_id) values ($1,$2,$3) returning id',
+      [loja, nome, cargo],
+    )
+  ).rows[0]!.id
+  const r = await poolSuper.query<{ id: string }>(
+    `insert into public.motoboys (loja_id, pessoa_id, nome, regime_pagamento, periodicidade_fixo, valor_fixo_centavos)
+     values ($1,$2,$3,$4::regime_pagamento,$5::periodicidade_fixo,$6) returning id`,
+    [loja, pessoa, nome, regime.regime, regime.periodicidade ?? 'dia', regime.valorFixo ?? 0],
+  )
+  return r.rows[0]!.id
+}
+
+/** Pedido entregue (status entregue) numa data/hora UTC, com motoboy e zona opcionais. */
+export async function semearPedidoEntregue(
+  loja: string,
+  o: { motoboyId: string | null; zonaId: string | null; entregueEmUtc: string; status?: string },
+): Promise<string> {
+  const codigo = `T${randomUUID().slice(0, 8)}`
+  const r = await poolSuper.query<{ id: string }>(
+    `insert into public.pedidos (loja_id, codigo, status, modalidade, subtotal_centavos, total_centavos,
+                                 motoboy_id, zona_id, entregue_em)
+     values ($1,$2,$3::status_pedido,'entrega',2000,2000,$4,$5,$6) returning id`,
+    [loja, codigo, o.status ?? 'entregue', o.motoboyId, o.zonaId, o.entregueEmUtc],
+  )
+  return r.rows[0]!.id
 }
 
 export const como = (user: string, loja: string): Record<string, string> => ({
