@@ -33,7 +33,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-export type GrupoNav = 'operacao' | 'cardapio' | 'entrega' | 'clientes' | 'analise' | 'financeiro' | 'config'
+export type GrupoNav = 'operacao' | 'cardapio' | 'clientes' | 'analise' | 'financeiro' | 'config'
 
 export interface RotaModulo {
   /** Segmento unico da URL, minusculo (ex.: 'pedidos' -> /pedidos). */
@@ -62,10 +62,8 @@ export const ROTAS: readonly RotaModulo[] = [
   // Cardápio (o que você vende)
   { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'cardapio', fixoNoMobile: true, pagina: lazy(() => import('@/modules/cardapio')) },
   { caminho: 'estoque', rotulo: 'Estoque', descricao: 'Insumos e fichas técnicas.', icone: Boxes, grupo: 'cardapio', pagina: lazy(() => import('@/modules/estoque')) },
-  // Entrega
-  { caminho: 'motoboys', rotulo: 'Motoboys', descricao: 'Cadastro de entregadores e fechamento do dia.', icone: Users, grupo: 'entrega', pagina: lazy(() => import('@/modules/motoboys')) },
-  // Zonas de entrega agora moram no editor da loja (aba Entrega), não numa rota própria.
-  // Despacho absorve a roteirização (mapa + sugestões de corrida): despachar é uma coisa só.
+  // Entrega não tem mais rota própria: o cadastro de entregadores vive em Pessoas, o acerto em
+  // Contas a pagar, as zonas no editor da loja (aba Entrega) e o despacho absorve a roteirização.
   // Clientes (relacionamento e marketing)
   { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'clientes', fixoNoMobile: true, pagina: lazy(() => import('@/modules/clientes')) },
   // Clientes absorve o CRM (segmentos, ticket, frequência): mesma entidade cliente.
@@ -103,7 +101,6 @@ export interface GrupoInfo {
 export const GRUPOS_NAV: readonly GrupoInfo[] = [
   { id: 'operacao', rotulo: 'Operação', abertoPadrao: true },
   { id: 'cardapio', rotulo: 'Cardápio e estoque' },
-  { id: 'entrega', rotulo: 'Entrega' },
   { id: 'clientes', rotulo: 'Clientes e marketing' },
   { id: 'analise', rotulo: 'Análise' },
   { id: 'financeiro', rotulo: 'Financeiro' },

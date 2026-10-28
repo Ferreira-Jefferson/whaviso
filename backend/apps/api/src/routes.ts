@@ -18,7 +18,6 @@ import { fichaTecnicaRoutes } from './modules/ficha_tecnica'
 import { caixaRoutes } from './modules/caixa'
 import { salaoRoutes } from './modules/salao'
 import { zonasEntregaRoutes } from './modules/zonas_entrega'
-import { motoboysRoutes } from './modules/motoboys'
 import { pagamentosRoutes } from './modules/pagamentos'
 import { dashboardRoutes } from './modules/dashboard'
 import { crmRoutes } from './modules/crm'
@@ -69,7 +68,6 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'salao', plugin: salaoRoutes },
   // Onda 3 (entrega) e Onda 4 (negocio/plataforma). Um prefixo por modulo.
   { prefixo: 'zonas', plugin: zonasEntregaRoutes },
-  { prefixo: 'motoboys', plugin: motoboysRoutes },
   { prefixo: 'pagamentos', plugin: pagamentosRoutes },
   { prefixo: 'dashboard', plugin: dashboardRoutes },
   { prefixo: 'crm', plugin: crmRoutes },

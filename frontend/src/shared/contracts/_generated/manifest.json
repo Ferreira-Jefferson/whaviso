@@ -30,7 +30,6 @@
     "fornecedores.ts",
     "index.ts",
     "lojas.ts",
-    "motoboys.ts",
     "node.ts",
     "numeros_whatsapp.ts",
     "onboarding.ts",
@@ -51,5 +50,5 @@
     "tool.ts",
     "zonas_entrega.ts"
   ],
-  "hash": "d3c5c5613cd2e5cf005ddcc10dcade087d3e361bfa774ed86a17034f71e9851c"
+  "hash": "aac8d16a575f4e1fa95d8e06130eda25883b9ce6679a4c255ebf546fbdbef6ec"
 }

@@ -113,3 +113,15 @@ export const DespachoPainelSaida = z.strictObject({
   motoboys: z.array(MotoboyCargaSaida),
 })
 export type DespachoPainelSaida = z.infer<typeof DespachoPainelSaida>
+
+/** Listagem leve de motoboys para o seletor do despacho: so id, nome, veiculo e ativo (sem PII). */
+export const MotoboySeletorSaida = z.strictObject({
+  id: Uuid,
+  nome: z.string(),
+  veiculo: tipoVeiculo,
+  ativo: z.boolean(),
+})
+export type MotoboySeletorSaida = z.infer<typeof MotoboySeletorSaida>
+
+export const MotoboySeletorListaSaida = z.strictObject({ itens: z.array(MotoboySeletorSaida) })
+export type MotoboySeletorListaSaida = z.infer<typeof MotoboySeletorListaSaida>

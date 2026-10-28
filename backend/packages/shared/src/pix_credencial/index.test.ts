@@ -1,7 +1,7 @@
-// Unidade: normalizacao de Pix/placa e hash (sem banco).
+// Unidade: normalizacao de Pix/placa e hash (sem banco). Cobre o kernel direto.
 import { describe, expect, it } from 'vitest'
 import { criarCifra } from '@whaviso/shared/cifra'
-import { hashPix, normalizarPix, normalizarPlaca, ultimos4 } from './protecao'
+import { hashPix, normalizarPix, normalizarPlaca, ultimos4 } from './index'
 
 const cifra = criarCifra('master-key-de-teste-motoboys-0123456789')
 

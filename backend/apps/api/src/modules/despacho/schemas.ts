@@ -11,12 +11,16 @@ export {
   PedidoDespachoSaida,
   CorridaSaida,
   DespachoPainelSaida,
+  MotoboySeletorSaida,
+  MotoboySeletorListaSaida,
   type CorridaSaida as CorridaDto,
   type PedidoDespachoSaida as PedidoDespachoDto,
   type DespachoPainelSaida as DespachoPainelDto,
   type ParadaSaida as ParadaDto,
   type PedidoProntoSaida as PedidoProntoDto,
   type MotoboyCargaSaida as MotoboyCargaDto,
+  type MotoboySeletorSaida as MotoboySeletorDto,
+  type MotoboySeletorListaSaida as MotoboySeletorListaDto,
 } from '@whaviso/shared/contracts'
 
 export const IdParams = z.strictObject({ id: UuidSchema })

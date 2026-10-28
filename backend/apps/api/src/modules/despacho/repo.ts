@@ -27,6 +27,24 @@ export function buscarMotoboy(ex: Executor, lojaId: string, id: string) {
   )
 }
 
+export interface MotoboySeletorLinha {
+  id: string
+  nome: string
+  veiculo: 'moto' | 'bicicleta' | 'carro' | 'a_pe'
+  ativo: boolean
+}
+
+/** Read-model do seletor: todos os motoboys da loja (o front filtra ativo). Nome vem de pessoas. */
+export function listarMotoboysSeletor(ex: Executor, lojaId: string) {
+  return consultar<MotoboySeletorLinha>(
+    ex,
+    sql`select m.id, coalesce(p.nome, m.nome) as nome, m.veiculo, m.ativo
+          from public.motoboys m left join public.pessoas p on p.id = m.pessoa_id
+         where m.loja_id = ${lojaId}
+         order by nome, m.id`,
+  )
+}
+
 // ------------------------------------------------------------------------------- pedidos
 
 export interface PedidoLinha {

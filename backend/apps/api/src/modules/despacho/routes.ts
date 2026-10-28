@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { HttpError } from '../../shared/http_errors'
 import {
   AdicionarPedidosEntrada, AtribuirMotoboyEntrada, CorridaEntrada, CorridaPedidoParams, CorridaSaida,
-  DespachoPainelSaida, IdParams, PedidoDespachoSaida, ReordenarParadasEntrada,
+  DespachoPainelSaida, IdParams, MotoboySeletorListaSaida, PedidoDespachoSaida, ReordenarParadasEntrada,
 } from './schemas'
 import * as service from './service'
 import type { Ator } from './service'
@@ -23,6 +23,10 @@ export const despachoRoutes: FastifyPluginAsync = async (instancia) => {
 
   app.get('/', { ...operar, schema: { response: { 200: DespachoPainelSaida } } },
     async (req) => service.painel(app.pool, ator(req)))
+
+  // Seletor leve de motoboys para montar a corrida (so id, nome, veiculo, ativo; sem PII).
+  app.get('/seletor', { ...operar, schema: { response: { 200: MotoboySeletorListaSaida } } },
+    async (req) => service.seletorMotoboys(app.pool, ator(req)))
 
   // --- Motoboy do pedido ---
   app.post('/pedidos/:id/motoboy', {

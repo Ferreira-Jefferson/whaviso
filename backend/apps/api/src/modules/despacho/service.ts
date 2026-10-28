@@ -6,7 +6,8 @@ import type { StatusPedido } from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import * as repo from './repo'
 import type {
-  CorridaDto, DespachoPainelDto, MotoboyCargaDto, ParadaDto, PedidoDespachoDto, PedidoProntoDto,
+  CorridaDto, DespachoPainelDto, MotoboyCargaDto, MotoboySeletorListaDto, ParadaDto, PedidoDespachoDto,
+  PedidoProntoDto,
 } from './schemas'
 
 export interface Ator {
@@ -287,6 +288,11 @@ function paraPronto(p: repo.ParadaLinha): PedidoProntoDto {
     endereco: { resumo: p.endereco_resumo, bairro: p.bairro, lat: p.lat, lng: p.lng },
     criado_em: p.criado_em,
   }
+}
+
+/** Seletor leve de motoboys (so id, nome, veiculo, ativo): o front filtra os ativos. */
+export async function seletorMotoboys(pool: Pool, a: Ator): Promise<MotoboySeletorListaDto> {
+  return { itens: await repo.listarMotoboysSeletor(pool, a.lojaId) }
 }
 
 /** Read-model do painel: 4 queries agregadas, sem N+1. */

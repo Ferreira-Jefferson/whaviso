@@ -10,11 +10,10 @@
 //   POST /roteirizacao/sugerir                 sugere corridas; NAO persiste
 //   POST /roteirizacao/aceitar                 { pedido_ids, motoboy_id? } cria a corrida (sugerida)
 //   POST /roteirizacao/reordenar               { pedido_ids } recalcula a ordem; NAO persiste
-// Motoboys: o seletor leve vem de GET /v1/motoboys/seletor (chamada HTTP, nao import do modulo).
+// Motoboys: o seletor leve vem de GET /v1/despacho/seletor (chamada HTTP, nao import do modulo).
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api_client'
-import { CorridaSaida } from '@/shared/contracts/_generated/despacho'
-import { MotoboySeletorListaSaida } from '@/shared/contracts/_generated/motoboys'
+import { CorridaSaida, MotoboySeletorListaSaida } from '@/shared/contracts/_generated/despacho'
 import {
   DespachoConfigSaida,
   GeocodificarPendentesSaida,
@@ -59,12 +58,12 @@ export function useSalvarConfig() {
   })
 }
 
-/** GET /v1/motoboys/seletor: motoboys ativos (id e nome) para escolher no aceite. */
+/** GET /v1/despacho/seletor: motoboys ativos (id e nome) para escolher no aceite. */
 export function useMotoboysAtivos() {
   return useQuery({
     queryKey: [RAIZ, 'motoboys-ativos'],
     queryFn: async ({ signal }) => {
-      const r = await apiClient.get<z.infer<typeof MotoboySeletorListaSaida>>('/motoboys/seletor', {
+      const r = await apiClient.get<z.infer<typeof MotoboySeletorListaSaida>>('/despacho/seletor', {
         schema: MotoboySeletorListaSaida,
         signal,
       })
