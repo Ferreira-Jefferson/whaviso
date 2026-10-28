@@ -115,7 +115,7 @@ export function EditorExcecoes({ itens }: { itens: Excecao[] }) {
             </div>
           )}
 
-          <Field label="Motivo (opcional)" dica="Aparece só para a sua equipe, nunca para o cliente.">
+          <Field label="Motivo " dica="Aparece só para a sua equipe, nunca para o cliente.">
             <Input
               value={motivo}
               maxLength={200}

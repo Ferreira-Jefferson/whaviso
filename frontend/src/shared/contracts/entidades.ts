@@ -86,7 +86,7 @@ export type Produto = z.infer<typeof produtoSchema>
 
 // Fase A: item OPCIONAL do pedido (composição do que foi vendido). Interno do dono; nunca
 // vai ao devedor. Espelha o backend. valor_unit_centavos em centavos, >=0. E17: `produto_id`
-// (opcional) vincula ao catálogo; descrição/preço são snapshot congelado. null = item avulso.
+//  vincula ao catálogo; descrição/preço são snapshot congelado. null = item avulso.
 export const itemPedidoSchema = z.object({
   descricao: z.string().trim().min(1).max(80),
   qtd: z.number().int().min(1).max(9999),

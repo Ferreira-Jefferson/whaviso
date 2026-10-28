@@ -160,7 +160,7 @@ export default function Despacho() {
                       value={motoboyNova}
                       onChange={setMotoboyNova}
                       options={[
-                        { value: '', label: 'Motoboy (opcional)' },
+                        { value: '', label: 'Motoboy ' },
                         ...motoboys.map((m) => ({ value: m.id, label: m.nome })),
                       ]}
                     />

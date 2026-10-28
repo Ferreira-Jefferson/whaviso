@@ -18,11 +18,10 @@ export function sinais(ex: Executor, lojaId: string) {
     ex,
     sql`select l.id as loja_id, l.criado_em,
                (l.endereco is not null and l.endereco <> '{}'::jsonb) as endereco_ok,
-               coalesce(exists (
-                 select 1 from jsonb_array_elements(
-                   case when jsonb_typeof(l.horarios -> 'dias') = 'array' then l.horarios -> 'dias' else '[]'::jsonb end
-                 ) d where coalesce((d ->> 'fechado')::boolean, true) = false
-               ), false) as horarios_ok,
+               exists (
+                 select 1 from public.horarios_funcionamento hf
+                  where hf.loja_id = l.id and hf.ativo
+               ) as horarios_ok,
                (select min(w.criado_em) from public.numeros_whatsapp w
                  where w.loja_id = l.id and w.status = 'conectado') as numero_em,
                (select min(i.criado_em) from public.itens i

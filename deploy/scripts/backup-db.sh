@@ -111,7 +111,7 @@ mv -f "$tmp" "$final"
 size="$(du -h "$final" | cut -f1)"
 log "dump concluido e validado: $final ($size)"
 
-# ── Envio para fora da maquina (opcional) ──
+# ── Envio para fora da maquina  ──
 # BACKUP_REMOTE_CMD recebe o caminho do dump como ULTIMO argumento E na variavel de
 # ambiente BACKUP_FILE. Ex.: BACKUP_REMOTE_CMD="rclone copy" -> `rclone copy <arquivo>`.
 # Se o envio falhar, o job inteiro falha (set -e) para o systemd marcar failed.

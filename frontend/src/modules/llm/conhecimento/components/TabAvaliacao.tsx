@@ -171,7 +171,7 @@ function FormAvaliacao({
       <Field label="Pergunta do cliente">
         <Input value={pergunta} maxLength={500} onChange={(e) => setPergunta(e.target.value)} />
       </Field>
-      <Field label="Resposta esperada (opcional)">
+      <Field label="Resposta esperada ">
         <Textarea rows={4} value={resposta} maxLength={2000} onChange={(e) => setResposta(e.target.value)} />
       </Field>
       <Field label="Tipo de documento esperado">

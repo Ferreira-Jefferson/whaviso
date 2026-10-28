@@ -91,7 +91,7 @@ export function FormularioChave({
         <Field label="Provedor">
           <Select value={provedor} onChange={setProvedor} options={OPCOES_PROVEDOR} ariaLabel="Provedor" disabled={ocupado} />
         </Field>
-        <Field label="Modelo preferido (opcional)">
+        <Field label="Modelo preferido ">
           <Input value={modelo} maxLength={120} onChange={(e) => setModelo(e.target.value)} disabled={ocupado} />
         </Field>
       </div>

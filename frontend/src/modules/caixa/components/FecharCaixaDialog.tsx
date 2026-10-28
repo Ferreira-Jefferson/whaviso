@@ -111,7 +111,7 @@ export function FecharCaixaDialog({
           </div>
         )}
 
-        <Field label="Observações (opcional)" dica="Anotação sobre o fechamento, útil quando o valor não bate.">
+        <Field label="Observações " dica="Anotação sobre o fechamento, útil quando o valor não bate.">
           <Input
             value={observacoes}
             onChange={(e) => setObservacoes(e.target.value)}

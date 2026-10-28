@@ -195,7 +195,7 @@ function Conteudo({ prospecto: p, aoFechar }: { prospecto: ProspectoDetalhe; aoF
             {p.nome_restaurante}: de {ROTULO_ESTAGIO[p.estagio]} para {destino ? ROTULO_ESTAGIO[destino] : ''}. A mudança
             fica registrada no histórico.
           </p>
-          <Field label="Motivo (opcional)">
+          <Field label="Motivo ">
             <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} />
           </Field>
         </div>
@@ -310,7 +310,7 @@ function FormAtividade({ prospectoId }: { prospectoId: string }) {
       )}
       <textarea
         aria-label="Descrição"
-        placeholder={ehFollowUp ? 'O que combinar (opcional)' : 'O que aconteceu'}
+        placeholder={ehFollowUp ? 'O que combinar ' : 'O que aconteceu'}
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         rows={2}

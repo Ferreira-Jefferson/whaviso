@@ -205,7 +205,7 @@ export function FiscalConfig() {
           <h2 className="text-lg text-salvia">{configurada ? 'Ajustar configuração' : 'Configurar emissor'}</h2>
           {erroGeral && <Banner tom="erro">{erroGeral}</Banner>}
           <Field
-            label={configurada ? 'Nova credencial do emissor (opcional)' : 'Credencial do emissor'}
+            label={configurada ? 'Nova credencial do emissor ' : 'Credencial do emissor'}
             erro={erros.credencial}
             dica={
               configurada

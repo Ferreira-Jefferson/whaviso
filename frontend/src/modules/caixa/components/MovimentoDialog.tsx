@@ -90,7 +90,7 @@ export function MovimentoDialog({ aberto, tipo, carregando, erro, onConfirmar, o
           </div>
         )}
 
-        <Field label="Observação (opcional)" dica="Anotação curta sobre este movimento. Ajuda a conferir o caixa depois.">
+        <Field label="Observação " dica="Anotação curta sobre este movimento. Ajuda a conferir o caixa depois.">
           <Input
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}

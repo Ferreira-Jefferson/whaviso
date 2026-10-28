@@ -39,7 +39,7 @@ export interface TemplateWhats {
 }
 
 /**
- * Mensagem estruturada que o transporte entende: texto, botões e (opcional) mídia.
+ * Mensagem estruturada que o transporte entende: texto, botões e  mídia.
  * Com mídia, `texto` vira a legenda. Com `template`, o transporte envia por template
  * aprovado em vez de texto livre. O transporte não conhece regra de negócio.
  */

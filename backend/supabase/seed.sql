@@ -18,18 +18,14 @@ on conflict (id) do nothing;
 insert into public.contas (id, dono_user_id, nome)
 values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', 'Conta Exemplo');
 
-insert into public.lojas (id, conta_id, nome, cores, horarios)
+insert into public.lojas (id, conta_id, nome, cores)
 values ('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000c1',
-        'Pizzaria Exemplo', '{"primaria":"#c0392b"}'::jsonb,
-        '{"fuso":"America/Sao_Paulo","dias":[
-           {"dia":0,"fechado":false,"faixas":[{"abre":"18:00","fecha":"23:30"}]},
-           {"dia":1,"fechado":false,"faixas":[{"abre":"18:00","fecha":"23:30"}]},
-           {"dia":2,"fechado":false,"faixas":[{"abre":"18:00","fecha":"23:30"}]},
-           {"dia":3,"fechado":false,"faixas":[{"abre":"18:00","fecha":"23:30"}]},
-           {"dia":4,"fechado":false,"faixas":[{"abre":"18:00","fecha":"23:30"}]},
-           {"dia":5,"fechado":false,"faixas":[{"abre":"18:00","fecha":"23:30"}]},
-           {"dia":6,"fechado":false,"faixas":[{"abre":"18:00","fecha":"23:30"}]}
-         ]}'::jsonb);
+        'Pizzaria Exemplo', '{"primaria":"#c0392b"}'::jsonb);
+
+-- Disponibilidade com fonte unica nas tabelas normalizadas (regras-negocio/05): 18:00-23:30 todo dia.
+insert into public.horarios_funcionamento (loja_id, dia_semana, abre, fecha)
+select '00000000-0000-4000-8000-0000000000d1', dia, '18:00'::time, '23:30'::time
+  from generate_series(0, 6) as dia;
 
 insert into public.membros (conta_id, loja_id, user_id, papel)
 values ('00000000-0000-4000-8000-0000000000c1', null, '00000000-0000-4000-8000-0000000000a1', 'dono');

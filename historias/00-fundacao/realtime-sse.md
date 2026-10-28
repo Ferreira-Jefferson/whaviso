@@ -82,7 +82,7 @@ instância compartilham **uma** conexão `LISTEN`.
 
 ## Notas e decisões
 
-- **Implementacao (F5-agent):** `notificar(exec, evento)` e a conexao LISTEN (`criarEscuta`) vivem em `packages/shared/src/db/{notify,listen}.ts` (reexportados por `@whaviso/shared/db`); hub, permissoes por tipo e plugin SSE em `apps/api/src/shared/realtime/`; registrado em `app.ts` (nao em `routes.ts`, pois nao e modulo `/v1`). `DATABASE_URL_LISTEN` (opcional) adicionada a `envApiSchema`. Contratos de F1 reusados sem alteracao (o envelope nao tem `id`/`ref`: o id monotonico `<epoca>-<seq>` e atribuido pelo hub no SSE).
+- **Implementacao (F5-agent):** `notificar(exec, evento)` e a conexao LISTEN (`criarEscuta`) vivem em `packages/shared/src/db/{notify,listen}.ts` (reexportados por `@whaviso/shared/db`); hub, permissoes por tipo e plugin SSE em `apps/api/src/shared/realtime/`; registrado em `app.ts` (nao em `routes.ts`, pois nao e modulo `/v1`). `DATABASE_URL_LISTEN`  adicionada a `envApiSchema`. Contratos de F1 reusados sem alteracao (o envelope nao tem `id`/`ref`: o id monotonico `<epoca>-<seq>` e atribuido pelo hub no SSE).
 - Loja ativa: header `x-loja-id` validado pelo F3 (fora do escopo = 404); sem header, o stream cobre todas as lojas do usuario.
 - `exp` do token e lido do JWT ja verificado por `autenticar` (o `Verificador` devolve so `sub`); sem `exp` = 401 (fail closed). Timer unico ate o `exp` encerra o stream com `fim`.
 - LISTEN abre sob demanda no 1o cliente SSE (testes e instancias sem clientes nao tocam o banco).

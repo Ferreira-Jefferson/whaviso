@@ -62,7 +62,6 @@ export const ROTAS: readonly RotaModulo[] = [
   // Cardápio (o que você vende)
   { caminho: 'cardapio', rotulo: 'Cardápio', descricao: 'Categorias, itens e opções.', icone: UtensilsCrossed, grupo: 'cardapio', fixoNoMobile: true, pagina: lazy(() => import('@/modules/cardapio')) },
   { caminho: 'estoque', rotulo: 'Estoque', descricao: 'Insumos e fichas técnicas.', icone: Boxes, grupo: 'cardapio', pagina: lazy(() => import('@/modules/estoque')) },
-  { caminho: 'promocoes', rotulo: 'Promoções', descricao: 'Cupons e combos para vender mais.', icone: TicketPercent, grupo: 'cardapio', pagina: lazy(() => import('@/modules/promocoes')) },
   // Entrega
   { caminho: 'motoboys', rotulo: 'Motoboys', descricao: 'Cadastro de entregadores e fechamento do dia.', icone: Users, grupo: 'entrega', pagina: lazy(() => import('@/modules/motoboys')) },
   { caminho: 'zonas', rotulo: 'Zonas', descricao: 'Áreas e taxas de entrega.', icone: MapPinned, grupo: 'entrega', pagina: lazy(() => import('@/modules/zonas')) },
@@ -71,6 +70,7 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'clientes', fixoNoMobile: true, pagina: lazy(() => import('@/modules/clientes')) },
   // Clientes absorve o CRM (segmentos, ticket, frequência): mesma entidade cliente.
   { caminho: 'campanhas', rotulo: 'Campanhas', descricao: 'Mensagens de WhatsApp para quem já pediu.', icone: Megaphone, grupo: 'clientes', pagina: lazy(() => import('@/modules/campanhas')) },
+  { caminho: 'promocoes', rotulo: 'Promoções', descricao: 'Cupons e combos para vender mais.', icone: TicketPercent, grupo: 'clientes', pagina: lazy(() => import('@/modules/promocoes')) },
   { caminho: 'fidelidade', rotulo: 'Fidelidade', descricao: 'Pontos ou cashback para quem volta.', icone: Gift, grupo: 'clientes', pagina: lazy(() => import('@/modules/fidelidade')) },
   { caminho: 'avaliacoes', rotulo: 'Avaliações', descricao: 'O que os clientes acharam dos pedidos.', icone: Star, grupo: 'clientes', pagina: lazy(() => import('@/modules/avaliacoes')) },
   // Análise (os números)

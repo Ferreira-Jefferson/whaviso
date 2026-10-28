@@ -109,19 +109,16 @@ d('onboarding (integracao)', () => {
   })
 
   it('etapas refletem os dados reais; rascunho nao conta como pedido', async () => {
-    const horarios = {
-      fuso: 'America/Sao_Paulo',
-      dias: Array.from({ length: 7 }, (_, dia) =>
-        dia === 1
-          ? { dia, fechado: false, faixas: [{ abre: '10:00', fecha: '22:00' }] }
-          : { dia, fechado: true, faixas: [] },
-      ),
-    }
-    await poolSuper.query('update public.lojas set endereco = $2::jsonb, horarios = $3::jsonb where id = $1', [
+    await poolSuper.query('update public.lojas set endereco = $2::jsonb where id = $1', [
       lojaA,
       JSON.stringify({ rua: 'Rua A', numero: '1', bairro: 'Centro', cidade: 'SP', uf: 'SP', cep: '01000000' }),
-      JSON.stringify(horarios),
     ])
+    // horarios_ok deriva de uma faixa ativa em horarios_funcionamento (fonte unica, migration 0061).
+    await poolSuper.query(
+      `insert into public.horarios_funcionamento (loja_id, dia_semana, abre, fecha)
+       values ($1, 1, '10:00', '22:00')`,
+      [lojaA],
+    )
     await poolSuper.query(
       `insert into public.numeros_whatsapp (loja_id, phone_number_id, waba_id) values ($1, $2, 'waba')`,
       [lojaA, `pn-${randomUUID()}`],

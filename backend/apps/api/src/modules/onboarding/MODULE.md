@@ -10,11 +10,12 @@ metrica "tempo ate o 1o pedido". Read-model calculado de dados existentes; nada 
 
 ## Tabelas
 - escreve: nenhuma (sem migration).
-- le de: `lojas` (endereco, horarios, criado_em), `numeros_whatsapp` (so status/criado_em, nunca
-  `token_cifrado`), `itens`, `pedidos` (so status/criado_em).
+- le de: `lojas` (endereco, criado_em), `horarios_funcionamento` (so existencia de faixa ativa, para
+  `horarios_ok`), `numeros_whatsapp` (so status/criado_em, nunca `token_cifrado`), `itens`,
+  `pedidos` (so status/criado_em).
 
 ## Definicao de "etapa feita"
-- perfil: `endereco` preenchido e ao menos um dia aberto em `horarios`.
+- perfil: `endereco` preenchido e ao menos uma faixa ativa em `horarios_funcionamento`.
 - numero: algum numero com status `conectado`.
 - cardapio: algum item `ativo`.
 - primeiro_pedido: algum pedido fora de `rascunho`.

@@ -86,7 +86,7 @@ async function seed(papel: 'dono' | 'gerente' | 'atendente'): Promise<Fixtura> {
   return { contaId, userId, lojaId, outraLojaId }
 }
 
-/** Cria categoria + item de catalogo e (opcional) seu dado fiscal. Devolve o item_id. */
+/** Cria categoria + item de catalogo e  seu dado fiscal. Devolve o item_id. */
 async function itemCatalogo(lojaId: string, comFiscal: boolean): Promise<string> {
   const { rows: cat } = await poolSuper.query<{ id: string }>(
     `insert into public.categorias (loja_id, nome) values ($1,'Pizzas') returning id`,

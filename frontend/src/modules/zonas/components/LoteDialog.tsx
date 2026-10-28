@@ -84,10 +84,10 @@ function Formulario({ aoFechar }: { aoFechar: () => void }) {
           <Field label="Valor pago ao motoboy">
             <MoneyInput value={valorMotoboy} onChange={setValorMotoboy} />
           </Field>
-          <Field label="Pedido mínimo (opcional)">
+          <Field label="Pedido mínimo ">
             <MoneyInput value={minimo} onChange={setMinimo} />
           </Field>
-          <Field label="Frete grátis acima de (opcional)">
+          <Field label="Frete grátis acima de ">
             <MoneyInput value={freteGratis} onChange={setFreteGratis} />
           </Field>
         </div>

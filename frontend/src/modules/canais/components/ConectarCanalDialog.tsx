@@ -106,10 +106,10 @@ export function ConectarCanalDialog({ canal, atual, onFechar }: Props) {
             autoFocus
           />
         </Field>
-        <Field label="Identificação da loja no canal (opcional)" dica="Por exemplo, o código do restaurante no iFood.">
+        <Field label="Identificação da loja no canal " dica="Por exemplo, o código do restaurante no iFood.">
           <Input value={merchant} maxLength={64} onChange={(e) => setMerchant(e.target.value)} />
         </Field>
-        <Field label="Apelido (opcional)">
+        <Field label="Apelido ">
           <Input value={rotulo} maxLength={60} onChange={(e) => setRotulo(e.target.value)} />
         </Field>
       </form>

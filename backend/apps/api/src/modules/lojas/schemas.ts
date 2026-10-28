@@ -4,9 +4,6 @@ import { z } from 'zod'
 
 export {
   Cores,
-  FaixaHorario,
-  DiaHorario,
-  Horarios,
   Endereco,
   AreaEntrega,
   RAIO_KM_MAX,

@@ -81,7 +81,7 @@ export async function ingerirDocumento(deps: DepsIngestor, documentoId: string):
   const brutos = chunkPorUnidadeLogica(docIng)
   if (brutos.length === 0) return { documentoId, chunks: 0, comVetor: false, pulado: 'vazio' }
 
-  // Contextualizacao (opcional): prefixa cada chunk com uma linha de contexto; falha => sem prefixo.
+  // Contextualizacao : prefixa cada chunk com uma linha de contexto; falha => sem prefixo.
   const contextos = await Promise.all(
     brutos.map(async (c) => {
       if (!deps.contextualizador) return null

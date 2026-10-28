@@ -1,8 +1,11 @@
 // SQL parametrizado do modulo (SEC-080). Dono de escrita de `lojas`.
-// Leituras cruzadas (documentadas no MODULE.md): numeros_whatsapp (so contagem) e membros
-// (so para achar a conta do dono, pois o kernel de escopo exclui lojas inativas e conta sem loja).
-import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
-import type { Cores, Endereco, Horarios, AreaEntrega } from './schemas'
+// Leituras cruzadas (documentadas no MODULE.md): numeros_whatsapp (so contagem), membros
+// (so para achar a conta do dono, pois o kernel de escopo exclui lojas inativas e conta sem loja) e
+// a disponibilidade (horarios_funcionamento + excecoes_disponibilidade, so leitura) para derivar
+// `aberta_agora` pelo kernel, sem importar o modulo disponibilidade.
+import { consultar, consultarUm, sql, sqlBruto, type Executor } from '@whaviso/shared/db'
+import type { FaixaHorario, Excecao } from '@whaviso/shared/disponibilidade'
+import type { Cores, Endereco, AreaEntrega } from './schemas'
 
 export interface LojaLinha {
   id: string
@@ -11,7 +14,6 @@ export interface LojaLinha {
   logo_url: string | null
   cores: Cores
   endereco: Endereco | null
-  horarios: Horarios | null
   area_entrega: AreaEntrega | null
   ativo: boolean
   pausada: boolean
@@ -26,7 +28,7 @@ export interface LojaLinha {
 }
 
 const COLUNAS = sql`
-  l.id, l.conta_id, l.nome, l.logo_url, l.cores, l.endereco, l.horarios, l.area_entrega,
+  l.id, l.conta_id, l.nome, l.logo_url, l.cores, l.endereco, l.area_entrega,
   l.ativo, l.pausada, l.pausada_motivo, l.pausada_ate,
   l.capacidade_por_janela, l.capacidade_janela_minutos, l.criado_em, l.atualizado_em,
   coalesce(n.total, 0)::int as numeros_total, coalesce(n.conectados, 0)::int as numeros_conectados
@@ -54,6 +56,36 @@ export function buscar(ex: Executor, id: string, contaId: string) {
   )
 }
 
+// --- Disponibilidade (so leitura) para derivar `aberta_agora` pelo kernel, em LOTE (sem N+1).
+// time -> "HH:mm", date -> "YYYY-MM-DD"; a fonte unica da disponibilidade e o modulo disponibilidade,
+// aqui so lemos as tabelas compartilhadas (grant SELECT de whaviso_api, migration 0024).
+const HM = (col: string) => sqlBruto(`to_char(${col}, 'HH24:MI')`)
+const DATA = (col: string) => sqlBruto(`to_char(${col}, 'YYYY-MM-DD')`)
+
+export type FaixaDeLoja = FaixaHorario & { loja_id: string }
+export type ExcecaoDeLoja = Excecao & { loja_id: string }
+
+/** Faixas de horario ATIVAS das lojas informadas (uma query filtrando loja_id = any(...)). */
+export function faixasAtivas(ex: Executor, lojaIds: string[]) {
+  return consultar<FaixaDeLoja>(
+    ex,
+    sql`select loja_id, dia_semana, ${HM('abre')} as abre, ${HM('fecha')} as fecha
+          from public.horarios_funcionamento
+         where loja_id = any(${lojaIds}::uuid[]) and ativo`,
+  )
+}
+
+/** Excecoes ATIVAS das lojas numa data (America/Sao_Paulo); uma query filtrando loja_id = any(...). */
+export function excecoesNaData(ex: Executor, lojaIds: string[], data: string) {
+  return consultar<ExcecaoDeLoja>(
+    ex,
+    sql`select loja_id, ${DATA('data')} as data, fechado,
+               ${HM('abre')} as abre, ${HM('fecha')} as fecha
+          from public.excecoes_disponibilidade
+         where loja_id = any(${lojaIds}::uuid[]) and ativo and data = ${data}::date`,
+  )
+}
+
 /** Contas em que o usuario e dono de TODAS as lojas (membro dono ativo com loja_id nulo). */
 export async function contasDoDono(ex: Executor, userId: string): Promise<string[]> {
   const rows = await consultar<{ conta_id: string }>(
@@ -69,16 +101,14 @@ const json = (v: unknown): string | null => (v === undefined || v === null ? nul
 export interface NovaLoja {
   nome: string
   endereco?: Endereco | undefined
-  horarios: Horarios
   area_entrega?: AreaEntrega | undefined
 }
 
 export async function inserir(ex: Executor, contaId: string, n: NovaLoja): Promise<string> {
   const r = await consultarUm<{ id: string }>(
     ex,
-    sql`insert into public.lojas (conta_id, nome, endereco, horarios, area_entrega)
-        values (${contaId}, ${n.nome}, ${json(n.endereco)}::jsonb, ${json(n.horarios)}::jsonb,
-                ${json(n.area_entrega)}::jsonb)
+    sql`insert into public.lojas (conta_id, nome, endereco, area_entrega)
+        values (${contaId}, ${n.nome}, ${json(n.endereco)}::jsonb, ${json(n.area_entrega)}::jsonb)
         returning id`,
   )
   return r!.id
@@ -87,7 +117,6 @@ export async function inserir(ex: Executor, contaId: string, n: NovaLoja): Promi
 export interface Parcial {
   nome?: string | undefined
   endereco?: Endereco | null | undefined
-  horarios?: Horarios | null | undefined
   area_entrega?: AreaEntrega | null | undefined
   cores?: Cores | undefined
   logo_url?: string | null | undefined
@@ -101,7 +130,6 @@ export async function atualizar(ex: Executor, id: string, contaId: string, p: Pa
     sql`update public.lojas set
           nome = case when ${tem('nome')}::boolean then ${p.nome ?? null} else nome end,
           endereco = case when ${tem('endereco')}::boolean then ${json(p.endereco)}::jsonb else endereco end,
-          horarios = case when ${tem('horarios')}::boolean then ${json(p.horarios)}::jsonb else horarios end,
           area_entrega = case when ${tem('area_entrega')}::boolean then ${json(p.area_entrega)}::jsonb else area_entrega end,
           cores = case when ${tem('cores')}::boolean then ${json(p.cores) ?? '{}'}::jsonb else cores end,
           logo_url = case when ${tem('logo_url')}::boolean then ${p.logo_url ?? null} else logo_url end

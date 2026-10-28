@@ -1,4 +1,4 @@
-// API-lojas: unidade (contratos, horarios) + integracao contra o banco de teste (role whaviso_api).
+// API-lojas: unidade (contratos, aberta_agora derivado) + integracao contra o banco de teste (role whaviso_api).
 // SEC-001/002 (isolamento, corpo nao manda), SEC-030 (sem DELETE), SEC-081 (jsonb estrito).
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { randomUUID } from 'node:crypto'
@@ -18,19 +18,9 @@ import {
 } from '../../../test/db'
 import { verificadorFake } from '../../../test/app'
 import { criarLojasRoutes } from './routes'
-import { lojaAbertaAgora } from './horarios'
-import { logoPermitido, horariosVazios } from './service'
-import { AreaEntrega, Cores, Horarios, LojaCriarEntrada, LojaSaida } from './schemas'
-
-const dia = (d: number, faixas: { abre: string; fecha: string }[] = []) => ({
-  dia: d,
-  fechado: faixas.length === 0,
-  faixas,
-})
-const semana = (f: (d: number) => { abre: string; fecha: string }[]) => ({
-  fuso: 'America/Sao_Paulo' as const,
-  dias: Array.from({ length: 7 }, (_, d) => dia(d, f(d))),
-})
+import { logoPermitido, paraSaida } from './service'
+import type * as repo from './repo'
+import { AreaEntrega, Cores, LojaCriarEntrada, LojaSaida } from './schemas'
 
 describe('contratos de loja', () => {
   it('cor invalida, raio negativo/zero/enorme', () => {
@@ -44,26 +34,6 @@ describe('contratos de loja', () => {
     expect(AreaEntrega.safeParse({ modo: 'raio', raio_km: 0, centro }).success).toBe(false)
     expect(AreaEntrega.safeParse({ modo: 'raio', raio_km: 500, centro }).success).toBe(false)
     expect(AreaEntrega.safeParse({ modo: 'bairros', bairros: ['A', 'a'] }).success).toBe(false)
-  })
-
-  it('horarios: faixa cruzando meia-noite vale; sobreposicao, igual e dia fechado com faixa nao', () => {
-    expect(Horarios.safeParse(semana(() => [{ abre: '18:00', fecha: '02:00' }])).success).toBe(true)
-    // a virada de terca (ate 02:00 de quarta) invade a faixa de quarta que abre 01:00
-    expect(
-      Horarios.safeParse(
-        semana((d) => (d === 2 ? [{ abre: '18:00', fecha: '02:00' }] : d === 3 ? [{ abre: '01:00', fecha: '03:00' }] : [])),
-      ).success,
-    ).toBe(false)
-    expect(
-      Horarios.safeParse(semana((d) => (d === 2 ? [{ abre: '18:00', fecha: '02:00' }] : []))).success,
-    ).toBe(true)
-    expect(Horarios.safeParse(semana(() => [{ abre: '10:00', fecha: '14:00' }, { abre: '13:00', fecha: '18:00' }])).success).toBe(false)
-    expect(Horarios.safeParse(semana(() => [{ abre: '10:00', fecha: '10:00' }])).success).toBe(false)
-    expect(Horarios.safeParse(semana(() => [{ abre: '25:00', fecha: '10:00' }])).success).toBe(false)
-    const h = horariosVazios()
-    h.dias[0] = { dia: 0, fechado: true, faixas: [{ abre: '10:00', fecha: '12:00' }] }
-    expect(Horarios.safeParse(h).success).toBe(false)
-    expect(Horarios.safeParse({ ...horariosVazios(), fuso: 'UTC' }).success).toBe(false)
   })
 
   it('criar nega chaves fora do contrato (conta_id, id)', () => {
@@ -81,26 +51,51 @@ describe('contratos de loja', () => {
   })
 })
 
-describe('lojaAbertaAgora (America/Sao_Paulo)', () => {
-  // 2026-03-04 e quarta (dia 3). SP = UTC-3.
+describe('paraSaida: aberta_agora derivado da disponibilidade (America/Sao_Paulo)', () => {
+  // 2026-03-04 e quarta (dia 3). SP = UTC-3. Clock fixo para a derivacao ser determinista.
   const quartaSp = (hh: number, mm = 0) => new Date(Date.UTC(2026, 2, 4, hh + 3, mm))
-  const h = semana((d) => (d === 3 ? [{ abre: '10:00', fecha: '14:00' }, { abre: '18:00', fecha: '02:00' }] : []))
+  const linha = (): repo.LojaLinha => ({
+    id: 'loja-1',
+    conta_id: 'conta-1',
+    nome: 'Loja',
+    logo_url: null,
+    cores: {},
+    endereco: null,
+    area_entrega: null,
+    ativo: true,
+    pausada: false,
+    pausada_motivo: null,
+    pausada_ate: null,
+    capacidade_por_janela: null,
+    capacidade_janela_minutos: 30,
+    criado_em: new Date('2026-03-01T00:00:00Z'),
+    atualizado_em: new Date('2026-03-01T00:00:00Z'),
+    numeros_total: 0,
+    numeros_conectados: 0,
+  })
+  const faixa = (abre: string, fecha: string): repo.FaixaDeLoja => ({ loja_id: 'loja-1', dia_semana: 3, abre, fecha })
+  const comFaixa: repo.FaixaDeLoja[] = [faixa('10:00', '14:00')]
 
-  it('dentro, fora e limites da faixa', () => {
-    expect(lojaAbertaAgora(h, quartaSp(10))).toBe(true)
-    expect(lojaAbertaAgora(h, quartaSp(13, 59))).toBe(true)
-    expect(lojaAbertaAgora(h, quartaSp(14))).toBe(false)
-    expect(lojaAbertaAgora(h, quartaSp(9, 59))).toBe(false)
+  it('aberta dentro da faixa do dia', () => {
+    const dispo = { faixas: comFaixa, excecoes: [] }
+    expect(paraSaida(linha(), 'dono', dispo, quartaSp(10)).aberta_agora).toBe(true)
+    expect(paraSaida(linha(), 'dono', dispo, quartaSp(13, 59)).aberta_agora).toBe(true)
   })
-  it('faixa que cruza meia-noite abre o dia seguinte; dia fechado e false', () => {
-    expect(lojaAbertaAgora(h, quartaSp(23))).toBe(true)
-    expect(lojaAbertaAgora(h, new Date(Date.UTC(2026, 2, 5, 4, 30)))).toBe(true) // quinta 01:30 SP
-    expect(lojaAbertaAgora(h, new Date(Date.UTC(2026, 2, 5, 5, 0)))).toBe(false) // quinta 02:00 SP
-    expect(lojaAbertaAgora(h, new Date(Date.UTC(2026, 2, 5, 15, 0)))).toBe(false) // quinta 12:00 SP
+  it('fechada fora da faixa do dia', () => {
+    const dispo = { faixas: comFaixa, excecoes: [] }
+    expect(paraSaida(linha(), 'dono', dispo, quartaSp(14)).aberta_agora).toBe(false)
+    expect(paraSaida(linha(), 'dono', dispo, quartaSp(9, 59)).aberta_agora).toBe(false)
   })
-  it('usa o fuso nomeado: 23:30 UTC de quarta ainda e quarta 20:30 em SP', () => {
-    expect(lojaAbertaAgora(h, new Date(Date.UTC(2026, 2, 4, 23, 30)))).toBe(true)
-    expect(lojaAbertaAgora(null)).toBeNull()
+  it('null quando a loja nao tem faixa cadastrada', () => {
+    expect(paraSaida(linha(), 'dono', { faixas: [], excecoes: [] }, quartaSp(10)).aberta_agora).toBeNull()
+    expect(paraSaida(linha(), 'dono', undefined, quartaSp(10)).aberta_agora).toBeNull()
+  })
+  it('excecao fechando o dia vence a faixa (fechada, nao null)', () => {
+    const dispo = {
+      faixas: comFaixa,
+      excecoes: [{ loja_id: 'loja-1', data: '2026-03-04', fechado: true, abre: null, fecha: null }],
+    }
+    expect(paraSaida(linha(), 'dono', dispo, quartaSp(10)).aberta_agora).toBe(false)
   })
 })
 
@@ -208,22 +203,41 @@ d('lojas (integracao)', () => {
     expect(sem.statusCode).toBe(401)
   })
 
-  it('PATCH atualiza horarios, endereco e area; aberta_agora vem do servidor', async () => {
-    const sempre = semana(() => [{ abre: '00:00', fecha: '23:59' }])
+  it('PATCH atualiza endereco e area; campo ausente permanece', async () => {
     const r = await req(dono, 'PATCH', `/${lojaA}`, {
-      horarios: sempre,
       endereco: { logradouro: 'Rua A', numero: '10', bairro: 'Centro', cidade: 'Sao Paulo', uf: 'SP', cep: '01001000' },
       area_entrega: { modo: 'bairros', bairros: ['Centro', 'Vila Nova'] },
     })
     expect(r.statusCode).toBe(200)
-    expect(r.json().aberta_agora).toBe(true)
     expect(r.json().area_entrega.bairros).toHaveLength(2)
-    const f = await req(dono, 'PATCH', `/${lojaA}`, { horarios: horariosVazios() })
-    expect(f.json().aberta_agora).toBe(false)
-    const n = await req(dono, 'PATCH', `/${lojaA}`, { horarios: null, area_entrega: null })
-    expect(n.json().horarios).toBeNull()
-    expect(n.json().aberta_agora).toBeNull()
+    const n = await req(dono, 'PATCH', `/${lojaA}`, { area_entrega: null })
+    expect(n.json().area_entrega).toBeNull()
     expect(n.json().endereco.cidade).toBe('Sao Paulo') // campo ausente permanece
+  })
+
+  it('aberta_agora deriva de horarios_funcionamento + excecoes (seed direto); null sem faixa', async () => {
+    // Sem faixa cadastrada: null.
+    expect((await req(dono, 'GET', `/${lojaA}`)).json().aberta_agora).toBeNull()
+    // Faixa cobrindo as 24h da semana toda (duas faixas por dia, sem buraco na virada): aberta.
+    for (let d = 0; d < 7; d++) {
+      await poolSuper.query(
+        `insert into public.horarios_funcionamento (loja_id, dia_semana, abre, fecha)
+         values ($1,$2,'00:00','23:00'),($1,$2,'23:00','02:00')`,
+        [lojaA, d],
+      )
+    }
+    expect((await req(dono, 'GET', `/${lojaA}`)).json().aberta_agora).toBe(true)
+    // Excecao fechando HOJE (data em America/Sao_Paulo) vence a faixa: fechada, nao null.
+    await poolSuper.query(
+      `insert into public.excecoes_disponibilidade (loja_id, data, fechado)
+       values ($1, (now() at time zone 'America/Sao_Paulo')::date, true)`,
+      [lojaA],
+    )
+    expect((await req(dono, 'GET', `/${lojaA}`)).json().aberta_agora).toBe(false)
+    // Limpa o seed para nao afetar outros casos.
+    await poolSuper.query('delete from public.excecoes_disponibilidade where loja_id = $1', [lojaA])
+    await poolSuper.query('delete from public.horarios_funcionamento where loja_id = $1', [lojaA])
+    expect((await req(dono, 'GET', `/${lojaA}`)).json().aberta_agora).toBeNull()
   })
 
   it('SEC-002/081: id, conta_id, chaves extras e jsonb fora do contrato sao barrados', async () => {
@@ -232,8 +246,7 @@ d('lojas (integracao)', () => {
       { nome: 'X2', id: lojaB },
       { nome: 'X3', loja_id: lojaB },
       { nome: 'X4', ativo: false },
-      { horarios: { ...horariosVazios(), extra: 1 } },
-      { horarios: semana(() => [{ abre: '10:00', fecha: '14:00' }, { abre: '13:00', fecha: '15:00' }]) },
+      { nome: 'X5', horarios: { fuso: 'America/Sao_Paulo' } }, // coluna/campo legado nao existe mais
       { area_entrega: { modo: 'raio', raio_km: -2, centro: { lat: 0, lng: 0 } } },
       {},
     ]
@@ -287,8 +300,7 @@ d('lojas (integracao)', () => {
     expect(nova.nome).toBe('Filial Centro')
     expect(nova.ativo).toBe(true)
     expect(nova.papel).toBe('dono')
-    expect(Horarios.safeParse(nova.horarios).success).toBe(true)
-    expect(nova.aberta_agora).toBe(false)
+    expect(nova.aberta_agora).toBeNull() // loja nova nao tem faixa de horario cadastrada
     const { rows } = await poolSuper.query('select conta_id from public.lojas where id = $1', [nova.id])
     expect(rows[0].conta_id).toBe(contaA)
     const ev = await poolSuper.query('select tipo, ator, detalhes from public.eventos where entidade_id = $1', [nova.id])
@@ -391,7 +403,7 @@ d('lojas (integracao)', () => {
     try {
       await cli.query('begin')
       await cli.query('set local role whaviso_atendente')
-      const sel = await cli.query('select horarios, area_entrega from public.lojas where id = $1', [lojaA])
+      const sel = await cli.query('select nome, area_entrega from public.lojas where id = $1', [lojaA])
       expect(sel.rowCount).toBe(1)
       await expect(cli.query(`update public.lojas set nome = 'x' where id = $1`, [lojaA])).rejects.toThrow(/permission denied|permiss.o negada/)
     } finally {

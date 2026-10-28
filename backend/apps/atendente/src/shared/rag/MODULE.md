@@ -18,7 +18,7 @@ disponibilidade, status, taxa) **nunca** vira embedding nem cache: vem de consul
   sub-select e no join final** (RAG-ISO-001). Sem pgvector, degrada para BM25 sozinho; o isolamento
   nao muda. Reranker nulo por padrao.
 - `ingestor.ts` **`ingerirDocumento`**: so `status='aprovado'`; valida -> chunk -> contextualiza
-  (opcional) -> embeddia (plataforma) -> grava chunks com `loja_id` desnormalizado. Reindexa
+   -> embeddia (plataforma) -> grava chunks com `loja_id` desnormalizado. Reindexa
   (delete+insert), idempotente por documento.
 - `embeddings.ts` **`ClienteEmbeddings`**: embedding pela credencial da **plataforma** (`OPEN_ROUTER`),
   dimensao fixa (1536); grava `uso_llm` com `tipo_uso='embedding'`, `origem='plataforma'`. Geracao e

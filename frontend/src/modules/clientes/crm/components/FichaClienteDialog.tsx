@@ -181,7 +181,7 @@ function Consentimento({ id, consentimento }: { id: string; consentimento: CrmDe
       ) : (
         <div className="mt-3 flex flex-col gap-3">
           {!optOut && (
-            <Field label="Motivo (opcional)" erro={erro ?? undefined}>
+            <Field label="Motivo " erro={erro ?? undefined}>
               <Input
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}

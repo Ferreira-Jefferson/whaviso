@@ -235,7 +235,7 @@ function Formulario({ pessoa, aoFechar }: { pessoa: PessoaDetalhe | null; aoFech
             onChange={(e) => setObservacoes(e.target.value)}
             maxLength={500}
             rows={3}
-            placeholder="Anotações internas (opcional)"
+            placeholder="Anotações internas "
             className="w-full resize-y rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta placeholder:text-tinta-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
           />
         </Field>

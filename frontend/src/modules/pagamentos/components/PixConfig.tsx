@@ -127,7 +127,7 @@ export function PixConfig() {
           <Field label="Titular" erro={erros.titular} dica="Nome que aparece para quem paga, como está no banco.">
             <Input value={titular} onChange={(e) => setTitular(e.target.value)} maxLength={60} autoComplete="off" />
           </Field>
-          <Field label="Cidade (opcional)" erro={erros.cidade} dica="Cidade do titular, usada no código Pix.">
+          <Field label="Cidade " erro={erros.cidade} dica="Cidade do titular, usada no código Pix.">
             <Input value={cidade} onChange={(e) => setCidade(e.target.value)} maxLength={30} autoComplete="off" />
           </Field>
           <Button type="submit" loading={definir.isPending} className="max-md:w-full md:self-start">

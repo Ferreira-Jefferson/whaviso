@@ -35,7 +35,7 @@ async function dialogoFeliz(c: Cenario): Promise<string> {
   await turno(c, 'texto', '1') // escolhe categoria Lanches -> lista de itens
   await turno(c, 'texto', '1') // escolhe Burger -> pergunta Tamanho
   await turno(c, 'texto', '2') // escolhe Grande -> injeta Adicionais (dependente de Grande)
-  await turno(c, 'texto', '0') // pula Adicionais (opcional) -> resumo + confirmar
+  await turno(c, 'texto', '0') // pula Adicionais  -> resumo + confirmar
   await turno(c, 'interativo', 'conf:ok') // confirma -> endereco
   await turno(c, 'interativo', 'end:ultimo') // usa ultimo endereco -> pagamento
   return turno(c, 'interativo', 'pag:pix') // paga -> cria pedido novo + avisa

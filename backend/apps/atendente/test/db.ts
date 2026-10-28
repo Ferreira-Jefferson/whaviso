@@ -74,7 +74,6 @@ async function um<T = { id: string }>(sqlTexto: string, params: unknown[]): Prom
 }
 
 export interface OpcoesCenario {
-  horarios?: unknown
   /**
    * Nao semeia a disponibilidade padrao (loja aberta a semana toda). Com isso, sem horario de
    * atendimento nem agendamento, o modo do atendente deriva para `fechado` (simula loja fechada).
@@ -114,7 +113,7 @@ export async function semear(op: OpcoesCenario = {}): Promise<Cenario> {
   const userId = randomUUID()
   await poolSuper.query('insert into auth.users (id) values ($1)', [userId])
   const contaId = (await um('insert into public.contas (dono_user_id, nome) values ($1,$2) returning id', [userId, 'Conta teste'])).id
-  const lojaId = (await um('insert into public.lojas (conta_id, nome, horarios) values ($1,$2,$3) returning id', [contaId, 'Loja teste', op.horarios === undefined ? null : JSON.stringify(op.horarios)])).id
+  const lojaId = (await um('insert into public.lojas (conta_id, nome) values ($1,$2) returning id', [contaId, 'Loja teste'])).id
   const numeroId = (await um(
     `insert into public.numeros_whatsapp (loja_id, phone_number_id, waba_id, numero_hash, status)
      values ($1,$2,$3,$4,'conectado') returning id`,

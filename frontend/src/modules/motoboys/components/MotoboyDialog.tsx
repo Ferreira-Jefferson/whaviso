@@ -189,13 +189,13 @@ function Formulario({ motoboy, aoFechar }: { motoboy: Motoboy | null; aoFechar: 
         <Field label="Veículo">
           <Select ariaLabel="Veículo" value={veiculo} onChange={setVeiculo} options={OPCOES_VEICULO} />
         </Field>
-        <Field label="Placa (opcional)">
+        <Field label="Placa ">
           <Input value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} maxLength={12} placeholder="ABC1D23" autoComplete="off" />
         </Field>
       </div>
 
       <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium text-tinta">Chave Pix para o pagamento (opcional)</span>
+        <span className="text-sm font-medium text-tinta">Chave Pix para o pagamento </span>
         {ehEdicao && (
           <div className="flex items-center gap-2 text-xs text-tinta-2">
             <Lock className="size-3.5 flex-none" aria-hidden />

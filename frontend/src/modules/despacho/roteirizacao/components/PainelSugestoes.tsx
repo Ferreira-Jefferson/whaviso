@@ -81,7 +81,7 @@ export function PainelSugestoes() {
           }}
         >
           <div className="w-full sm:w-56">
-            <Field label="Motoboys disponíveis (opcional)" dica="Corridas além desse número aparecem como 'sem motoboy livre'. Vazio = sem limite.">
+            <Field label="Motoboys disponíveis " dica="Corridas além desse número aparecem como 'sem motoboy livre'. Vazio = sem limite.">
               <Input value={disponiveis} onChange={(e) => setDisponiveis(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="Sem limite" />
             </Field>
           </div>

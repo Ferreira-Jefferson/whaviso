@@ -416,7 +416,7 @@ export const listaClientesResposta = z.object({
 export type ListaClientesResposta = z.infer<typeof listaClientesResposta>
 
 // PATCH /v1/pessoas/:avisoId: renomear (telefone resolvido no servidor; nunca em rota/log).
-// `nome_atual` (opcional) escopa a um GRUPO de nome (H15.8); ausente = número inteiro.
+// `nome_atual`  escopa a um GRUPO de nome (H15.8); ausente = número inteiro.
 export const renomearClienteBody = z.object({
   nome: z.string().trim().min(1).max(120),
   nome_atual: z.string().trim().min(1).max(120).optional(),

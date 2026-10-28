@@ -201,10 +201,10 @@ function Formulario({ zona, aoFechar }: { zona: Zona | null; aoFechar: () => voi
         <div className="flex flex-col gap-4 border-t border-linha pt-4">
           <p className="text-sm font-medium text-tinta">Regras opcionais</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Pedido mínimo (opcional)" dica="Deixe vazio para não ter pedido mínimo.">
+            <Field label="Pedido mínimo " dica="Deixe vazio para não ter pedido mínimo.">
               <MoneyInput value={minimo} onChange={setMinimo} />
             </Field>
-            <Field label="Frete grátis acima de (opcional)" dica="Pedidos a partir deste valor não pagam a taxa. Deixe vazio para não ter frete grátis.">
+            <Field label="Frete grátis acima de " dica="Pedidos a partir deste valor não pagam a taxa. Deixe vazio para não ter frete grátis.">
               <MoneyInput value={freteGratis} onChange={setFreteGratis} />
             </Field>
           </div>

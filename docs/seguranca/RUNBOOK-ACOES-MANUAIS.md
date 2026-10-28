@@ -112,7 +112,7 @@ Itens do checklist de produção do Supabase que dependem do painel:
 - [ ] **Network Restrictions**: **risco aceito (2026-07-07), NÃO aplicar** por ora, o IPv4 do VPS muda (quebraria api/zap e o `db push`) e o comportamento com o pooler é inconsistente. Rever só com IP de saída estático.
 - [x] **MFA na conta Supabase**: ligado, **2 fatores TOTP** configurados. (2º owner na org: só se houver 2ª pessoa de confiança; senão o essencial, não perder acesso, está coberto pela recuperação do GitHub, que é o provedor de login da conta Supabase, garanta 2FA + recovery codes no GitHub.)
 - [x] **Backup diário** cobrindo o gap: ver passo 10 (instalado e no ar). **PITR/snapshots seguem indisponíveis no plano FREE.**
-- [ ] (Opcional) **CAPTCHA** nos fluxos de auth.
+- [ ]  **CAPTCHA** nos fluxos de auth.
 
 ---
 
