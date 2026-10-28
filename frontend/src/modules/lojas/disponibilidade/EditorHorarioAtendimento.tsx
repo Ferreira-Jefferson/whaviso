@@ -1,13 +1,14 @@
-// Editor dos horarios de funcionamento, uma lista por dia da semana. Cada faixa e uma linha
-// persistida no servidor (tem id): editar abre/fecha e PATCH; "Remover" desativa (nada e apagado);
-// faixa inativa pode ser reativada. Faixa que cruza a meia-noite tem fecha <= abre (ex.: 18:00 as 02:00).
-// Horas sao locais (America/Sao_Paulo); o backend decide, a tela so edita o cadastro.
+// Editor do horario de atendimento (pedido ao vivo), uma lista por dia da semana. Cada faixa e
+// uma linha persistida no servidor (tem id): editar abre/fecha e PATCH; "Remover" desativa (nada
+// e apagado); faixa inativa pode ser reativada. Faixa que cruza a meia-noite tem fecha <= abre
+// (ex.: 18:00 as 02:00). Este e o horario em que a loja aceita pedido ao vivo e o atendente abre
+// pedido imediato. Horas sao locais (America/Sao_Paulo); o backend decide, a tela so edita o cadastro.
 import { useState } from 'react'
 import { Plus, RotateCcw, X } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { Badge, Button, Input, cn, useToast } from '@/shared/ui'
-import { useAtualizarHorario, useCriarHorario, useDesativarHorario, type Horario } from '../api'
-import { DIAS_SEMANA, ORDEM_DIAS, rotuloFaixa } from '../estados'
+import { useAtualizarHorario, useCriarHorario, useDesativarHorario, type Horario } from './api'
+import { DIAS_SEMANA, ORDEM_DIAS, rotuloFaixa } from './estados'
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -15,7 +16,7 @@ function msgErro(e: unknown, padrao: string): string {
   return e instanceof ApiError ? e.message : padrao
 }
 
-export function EditorHorarios({ itens }: { itens: Horario[] }) {
+export function EditorHorarioAtendimento({ itens }: { itens: Horario[] }) {
   const { mostrarToast } = useToast()
   const criar = useCriarHorario()
   const atualizar = useAtualizarHorario()

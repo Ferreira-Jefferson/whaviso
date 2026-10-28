@@ -1,9 +1,17 @@
-// Cartao de estado derivado: a loja esta aceitando pedidos agora? O atendente pode responder?
-// Tudo decidido no servidor (fuso America/Sao_Paulo); aqui so exibimos o que a api devolveu.
-import { CheckCircle2, Clock, MessageSquareDot, MessageSquareOff, XCircle } from 'lucide-react'
+// Cartao de estado derivado: a loja aceita pedido ao vivo agora? Em que modo o atendente esta
+// (atendimento, agendamento ou fechado)? Tudo decidido no servidor (fuso America/Sao_Paulo);
+// aqui so exibimos o que a api devolveu. Fonte unica na loja: o atendente nao tem horario proprio.
+import { CalendarClock, CheckCircle2, Clock, MessageSquareDot, MessageSquareOff, XCircle } from 'lucide-react'
 import { Skeleton, cn } from '@/shared/ui'
 import { formatarHora } from '@/shared/format'
 import type { DisponibilidadeAgoraSaida } from '@/shared/contracts/_generated/disponibilidade'
+
+/** Rotulo e icone de cada modo do atendente (derivado no servidor). */
+const MODO = {
+  atendimento: { texto: 'Atendente respondendo', Icone: MessageSquareDot },
+  agendamento: { texto: 'Aceitando só agendamento', Icone: CalendarClock },
+  fechado: { texto: 'Atendente em silêncio', Icone: MessageSquareOff },
+} as const
 
 export function EstadoAgora({
   dados,
@@ -23,7 +31,8 @@ export function EstadoAgora({
   if (!dados) return null
 
   const aceita = dados.aceitando_agora
-  const atende = dados.atendente_pode_responder
+  const modo = MODO[dados.modo_atendente]
+  const ativo = dados.modo_atendente !== 'fechado'
 
   return (
     <div
@@ -53,15 +62,11 @@ export function EstadoAgora({
       <p
         className={cn(
           'inline-flex items-center gap-1.5 self-start rounded-pill px-3 py-1 text-sm font-medium sm:self-center',
-          atende ? 'bg-cartao text-salvia' : 'bg-cartao text-tinta-2',
+          ativo ? 'bg-cartao text-salvia' : 'bg-cartao text-tinta-2',
         )}
       >
-        {atende ? (
-          <MessageSquareDot className="size-4 flex-none" strokeWidth={1.75} aria-hidden />
-        ) : (
-          <MessageSquareOff className="size-4 flex-none" strokeWidth={1.75} aria-hidden />
-        )}
-        {atende ? 'Atendente respondendo' : 'Atendente em silêncio'}
+        <modo.Icone className="size-4 flex-none" strokeWidth={1.75} aria-hidden />
+        {modo.texto}
       </p>
     </div>
   )

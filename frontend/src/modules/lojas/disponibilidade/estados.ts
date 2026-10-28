@@ -1,5 +1,6 @@
-// Rotulos e helpers de apresentacao do modulo disponibilidade. Nada de regra de negocio:
-// a decisao de "aceitando agora" e do servidor; aqui so rotulamos dias e faixas de horario.
+// Rotulos e helpers de apresentacao da disponibilidade da loja. Nada de regra de negocio:
+// a decisao de "aceitando agora" e o modo do atendente sao do servidor; aqui so rotulamos
+// dias e faixas de horario. Vive dentro do modulo lojas (a disponibilidade e informacao da loja).
 
 /** Nome completo do dia da semana (0 = domingo ... 6 = sabado), na ordem do contrato. */
 export const DIAS_SEMANA = [

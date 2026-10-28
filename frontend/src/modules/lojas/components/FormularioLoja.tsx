@@ -15,16 +15,12 @@ import {
   AREA_VAZIA,
   areaParaForm,
   enderecoParaForm,
-  formParaHorarios,
-  horariosParaForm,
   montarArea,
   montarEndereco,
   type AreaForm,
   type EnderecoForm,
-  type HorariosForm,
 } from '../campos'
 import { EditorEndereco } from './EditorEndereco'
-import { EditorHorarios } from './EditorHorarios'
 import { EditorAreaEntrega } from './EditorAreaEntrega'
 
 function mensagemDeIssue(issue: { path: ReadonlyArray<PropertyKey>; message: string }): string {
@@ -32,10 +28,6 @@ function mensagemDeIssue(issue: { path: ReadonlyArray<PropertyKey>; message: str
   if (campo === 'nome') return 'Informe um nome de 2 a 100 caracteres.'
   if (campo === 'endereco')
     return 'Revise o endereço: rua, número, bairro, cidade, UF (2 letras) e CEP (8 dígitos) são obrigatórios.'
-  if (campo === 'horarios')
-    return issue.message === 'faixas de horario se sobrepoem'
-      ? 'Há horários que se sobrepõem no mesmo dia.'
-      : 'Revise os horários: toda faixa precisa de abertura e fechamento (diferentes entre si).'
   if (campo === 'area_entrega')
     return issue.message === 'bairros repetidos'
       ? 'Há bairros repetidos na área de entrega.'
@@ -51,7 +43,6 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
 
   const [nome, setNome] = useState(loja?.nome ?? '')
   const [endereco, setEndereco] = useState<EnderecoForm>(() => enderecoParaForm(loja?.endereco ?? null))
-  const [horarios, setHorarios] = useState<HorariosForm>(() => horariosParaForm(loja?.horarios ?? null))
   const [area, setArea] = useState<AreaForm>(() => (loja ? areaParaForm(loja.area_entrega) : { ...AREA_VAZIA }))
   const [erro, setErro] = useState<string | null>(null)
 
@@ -60,11 +51,10 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
     setErro(null)
     const nomeLimpo = nome.trim()
     const enderecoDto = montarEndereco(endereco)
-    const horariosDto = formParaHorarios(horarios)
     const areaDto = montarArea(area)
 
     if (ehEdicao) {
-      const corpo = { nome: nomeLimpo, endereco: enderecoDto, horarios: horariosDto, area_entrega: areaDto }
+      const corpo = { nome: nomeLimpo, endereco: enderecoDto, area_entrega: areaDto }
       const r = LojaAtualizarEntrada.safeParse(corpo)
       if (!r.success) return setErro(mensagemDeIssue(r.error.issues[0]!))
       atualizar.mutate(
@@ -77,7 +67,6 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
     const corpo = {
       nome: nomeLimpo,
       ...(enderecoDto ? { endereco: enderecoDto } : {}),
-      horarios: horariosDto,
       ...(areaDto ? { area_entrega: areaDto } : {}),
     }
     const r = LojaCriarEntrada.safeParse(corpo)
@@ -111,10 +100,6 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
 
         <Secao titulo="Endereço" descricao="Onde a loja fica. Deixe em branco se não quiser informar.">
           <EditorEndereco valor={endereco} onChange={setEndereco} />
-        </Secao>
-
-        <Secao titulo="Horários de funcionamento" descricao="Quando a loja está aberta. Fuso de São Paulo.">
-          <EditorHorarios valor={horarios} onChange={setHorarios} />
         </Secao>
 
         <Secao titulo="Área de entrega" descricao="Até onde a loja entrega, por raio ou por bairro.">

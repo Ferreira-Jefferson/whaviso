@@ -1,14 +1,15 @@
-// Calendario de excecoes / feriados: datas em que a loja fecha ou muda o horario. Numa data
-// marcada como fechada o sistema para de aceitar pedidos; marcada com horario especial, usa a
-// faixa informada no lugar do horario normal do dia. Desativar desfaz a excecao (nada e apagado).
-// Datas sao de negocio (YYYY-MM-DD, America/Sao_Paulo); o backend decide, a tela so edita o cadastro.
+// Calendario de excecoes / feriados: datas em que a loja fecha ou muda o horario de atendimento.
+// Numa data marcada como fechada o sistema para de aceitar pedido ao vivo; marcada com horario
+// especial, usa a faixa informada no lugar do horario normal do dia. Desativar desfaz a excecao
+// (nada e apagado). Datas sao de negocio (YYYY-MM-DD, America/Sao_Paulo); o backend decide, a
+// tela so edita o cadastro.
 import { useState, type ReactNode } from 'react'
 import { CalendarOff, CalendarClock, Plus, X } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { Badge, Banner, Button, DateInput, EmptyState, Field, Input, cn, useToast } from '@/shared/ui'
 import { dataPtBR, hojeIso } from '@/shared/format'
-import { useCriarExcecao, useDesativarExcecao, type Excecao } from '../api'
-import { rotuloFaixa } from '../estados'
+import { useCriarExcecao, useDesativarExcecao, type Excecao } from './api'
+import { rotuloFaixa } from './estados'
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 

@@ -1,7 +1,9 @@
-// Tipos, constantes e funcoes puras dos editores do perfil da loja (endereco, horarios, area).
+// Tipos, constantes e funcoes puras dos editores do perfil da loja (endereco, area de entrega).
+// O horario de atendimento e as excecoes vivem na disponibilidade (fonte unica na loja), fora deste
+// formulario.
 // Ficam fora dos arquivos de componente para o Fast Refresh (um arquivo = so componentes).
 // Montagem no formato do contrato e validacao ficam no FormularioLoja.
-import type { AreaEntrega, Endereco, Horarios } from '@/shared/contracts/_generated/lojas'
+import type { AreaEntrega, Endereco } from '@/shared/contracts/_generated/lojas'
 
 // --- Endereco ---
 export interface EnderecoForm {
@@ -53,46 +55,6 @@ export function montarEndereco(e: EnderecoForm): Endereco | null {
     cidade: e.cidade.trim(),
     uf: e.uf.trim(),
     cep: e.cep.trim(),
-  }
-}
-
-// --- Horarios ---
-export interface FaixaForm {
-  abre: string
-  fecha: string
-}
-export interface DiaForm {
-  fechado: boolean
-  faixas: FaixaForm[]
-}
-/** 7 posicoes, indice = dia (0 = domingo). */
-export type HorariosForm = DiaForm[]
-
-export function horariosVaziosForm(): HorariosForm {
-  return Array.from({ length: 7 }, () => ({ fechado: true, faixas: [] }))
-}
-
-/** Converte o DTO (ou null) para o estado do formulario. */
-export function horariosParaForm(h: Horarios | null): HorariosForm {
-  if (!h) return horariosVaziosForm()
-  return Array.from({ length: 7 }, (_, dia) => {
-    const d = h.dias.find((x) => x.dia === dia)
-    return {
-      fechado: d ? d.fechado : true,
-      faixas: d ? d.faixas.map((f) => ({ abre: f.abre, fecha: f.fecha })) : [],
-    }
-  })
-}
-
-/** Monta o DTO Horarios a partir do estado (dia fechado nunca leva faixas). */
-export function formParaHorarios(form: HorariosForm): Horarios {
-  return {
-    fuso: 'America/Sao_Paulo',
-    dias: form.map((d, dia) => ({
-      dia,
-      fechado: d.fechado,
-      faixas: d.fechado ? [] : d.faixas,
-    })),
   }
 }
 

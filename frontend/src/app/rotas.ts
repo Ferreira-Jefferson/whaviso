@@ -8,7 +8,6 @@ import {
   Bike,
   BookOpen,
   Boxes,
-  CalendarClock,
   CalendarDays,
   ChefHat,
   ClipboardList,
@@ -89,8 +88,7 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'fiscal', rotulo: 'Fiscal', descricao: 'Notas fiscais e emissor.', icone: FileText, grupo: 'financeiro', pagina: lazy(() => import('@/modules/fiscal')) },
   { caminho: 'fatura', rotulo: 'Minha fatura', descricao: 'Sua assinatura e faturas do Whaviso.', icone: ReceiptText, grupo: 'financeiro', pagina: lazy(() => import('@/modules/plataforma_cobranca').then((m) => ({ default: m.MinhaFaturaPage }))) },
   // Configuração (ajustes da loja, baixa frequência)
-  { caminho: 'lojas', rotulo: 'Lojas', descricao: 'Perfil, horários e área da loja.', icone: Store, grupo: 'config', pagina: lazy(() => import('@/modules/lojas')) },
-  { caminho: 'disponibilidade', rotulo: 'Horários', descricao: 'Quando a loja atende e aceita pedidos.', icone: CalendarClock, grupo: 'config', pagina: lazy(() => import('@/modules/disponibilidade')) },
+  { caminho: 'lojas', rotulo: 'Lojas', descricao: 'Perfil, horários, agendamento e área da loja.', icone: Store, grupo: 'config', pagina: lazy(() => import('@/modules/lojas')) },
   { caminho: 'agendamento', rotulo: 'Agenda', descricao: 'Pedidos agendados.', icone: CalendarDays, grupo: 'config', pagina: lazy(() => import('@/modules/agendamento')) },
   { caminho: 'pessoas', rotulo: 'Pessoas', descricao: 'Equipe, cargos e escalas.', icone: Contact, grupo: 'config', pagina: lazy(() => import('@/modules/pessoas')) },
   { caminho: 'numeros', rotulo: 'Números', descricao: 'Números de WhatsApp conectados.', icone: Smartphone, grupo: 'config', pagina: lazy(() => import('@/modules/numeros')) },

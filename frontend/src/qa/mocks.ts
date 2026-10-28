@@ -475,7 +475,7 @@ function insumoMovimentos() {
 }
 
 // ---------------------------------------------------------------- disponibilidade
-const dispAgora = { agora: iso(0), aceitando_agora: true, atendente_pode_responder: true }
+const dispAgora = { agora: iso(0), aceitando_agora: true, modo_atendente: 'atendimento' }
 
 const dispHorarios = {
   itens: [0, 1, 2, 3, 4, 5, 6].flatMap((dia) =>
@@ -487,8 +487,8 @@ const dispHorarios = {
   ),
 }
 
-const dispJanela = {
-  janela: { inicio: '17:00', fim: '23:59', dias: [0, 2, 3, 4, 5, 6], ativo: true, atualizado_em: iso(2000) },
+const dispAgendamento = {
+  agendamento: { modo: 'faixa', inicio: '17:00', fim: '23:59', dias: [0, 2, 3, 4, 5, 6], atualizado_em: iso(2000) },
 }
 
 const dispExcecoes = {
@@ -548,8 +548,8 @@ export function mockFor(path: string): unknown {
       return dispAgora
     case '/disponibilidade/horarios':
       return dispHorarios
-    case '/disponibilidade/janela':
-      return dispJanela
+    case '/disponibilidade/agendamento':
+      return dispAgendamento
     case '/disponibilidade/excecoes':
       return dispExcecoes
     default:

@@ -1,24 +1,27 @@
-// Camada de dados do modulo disponibilidade: quando a loja atende e aceita pedidos.
-// Estado de servidor via TanStack Query; dados so pelo api_client (prefixo /v1 + /disponibilidade).
-// Raiz de cache ['disponibilidade']: qualquer escrita a invalida (lista + estado "aceitando agora").
-// Horas sao locais (America/Sao_Paulo): o backend decide; a tela so edita o cadastro.
+// Camada de dados da disponibilidade da loja: horario de atendimento (pedido ao vivo), janela
+// de agendamento (desligado|faixa|24h) e excecoes. Fonte unica na loja; o atendente nao tem
+// horario proprio. Estado de servidor via TanStack Query; dados so pelo api_client (prefixo
+// /v1 + /disponibilidade). Raiz de cache ['disponibilidade']: qualquer escrita a invalida
+// (lista + estado "aceitando agora" + modo do atendente). Horas sao locais (America/Sao_Paulo):
+// o backend decide; a tela so edita o cadastro. Trocar de loja limpa o cache (TenantProvider),
+// e o api_client envia a loja ativa no header, entao nao keyamos por lojaId aqui.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api_client'
 import {
+  AgendamentoConfigSaida,
+  AgendamentoGetSaida,
   DisponibilidadeAgoraSaida,
   ExcecaoListaSaida,
   ExcecaoSaida,
   HorarioListaSaida,
   HorarioSaida,
-  JanelaAtendenteGetSaida,
-  JanelaAtendenteSaida,
+  type AgendamentoConfigSaida as Agendamento,
+  type AgendamentoEntrada,
   type ExcecaoEntrada,
   type ExcecaoSaida as Excecao,
   type HorarioEntrada,
   type HorarioPatch,
   type HorarioSaida as Horario,
-  type JanelaAtendenteEntrada,
-  type JanelaAtendenteSaida as Janela,
 } from '@/shared/contracts/_generated/disponibilidade'
 
 export const RAIZ = 'disponibilidade'
@@ -30,16 +33,17 @@ interface ListaHorarios {
 interface ListaExcecoes {
   itens: Excecao[]
 }
-interface JanelaGet {
-  janela: Janela | null
+interface AgendamentoGet {
+  agendamento: Agendamento
 }
 
 function invalidar(qc: ReturnType<typeof useQueryClient>) {
-  // Uma escrita em qualquer secao muda o derivado "aceitando agora": invalida a raiz toda.
+  // Uma escrita em qualquer secao muda os derivados "aceitando agora" e "modo do atendente":
+  // invalida a raiz toda.
   void qc.invalidateQueries({ queryKey: [RAIZ] })
 }
 
-// --- Estado derivado: a loja esta aceitando agora? (calculado no servidor) ---
+// --- Estado derivado: a loja aceita pedido ao vivo agora? Em que modo o atendente esta? ---
 /** GET /v1/disponibilidade/agora. Atualiza sozinho de minuto em minuto. */
 export function useAgora() {
   return useQuery({
@@ -53,7 +57,7 @@ export function useAgora() {
   })
 }
 
-// --- Horarios de funcionamento (varias faixas por dia) ---
+// --- Horarios de atendimento (varias faixas por dia; pedido ao vivo) ---
 /** GET /v1/disponibilidade/horarios. */
 export function useHorarios() {
   return useQuery({
@@ -92,22 +96,22 @@ export function useDesativarHorario() {
   })
 }
 
-// --- Janela do atendente (IA): fora dela o atendente nao responde ---
-/** GET /v1/disponibilidade/janela: `janela` e null quando ainda nao foi configurada. */
-export function useJanela() {
+// --- Janela de agendamento (modo desligado|faixa|24h): vale alem do horario de atendimento ---
+/** GET /v1/disponibilidade/agendamento: `agendamento` vem como desligado quando nunca configurado. */
+export function useAgendamento() {
   return useQuery({
-    queryKey: [RAIZ, 'janela'],
+    queryKey: [RAIZ, 'agendamento'],
     queryFn: ({ signal }) =>
-      apiClient.get<JanelaGet>(`${BASE}/janela`, { schema: JanelaAtendenteGetSaida, signal }),
-    select: (d) => d.janela,
+      apiClient.get<AgendamentoGet>(`${BASE}/agendamento`, { schema: AgendamentoGetSaida, signal }),
+    select: (d) => d.agendamento,
   })
 }
 
-/** PUT /v1/disponibilidade/janela: define (substitui) a janela do atendente. */
-export function useDefinirJanela() {
+/** PUT /v1/disponibilidade/agendamento: define (substitui) a janela de agendamento. */
+export function useDefinirAgendamento() {
   const qc = useQueryClient()
-  return useMutation<Janela, Error, JanelaAtendenteEntrada>({
-    mutationFn: (body) => apiClient.put<Janela>(`${BASE}/janela`, { body, schema: JanelaAtendenteSaida }),
+  return useMutation<Agendamento, Error, AgendamentoEntrada>({
+    mutationFn: (body) => apiClient.put<Agendamento>(`${BASE}/agendamento`, { body, schema: AgendamentoConfigSaida }),
     onSuccess: () => invalidar(qc),
   })
 }
@@ -141,4 +145,4 @@ export function useDesativarExcecao() {
   })
 }
 
-export type { Horario, Janela, Excecao }
+export type { Horario, Agendamento, Excecao }
