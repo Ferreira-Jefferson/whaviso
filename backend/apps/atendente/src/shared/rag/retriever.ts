@@ -114,9 +114,11 @@ function consultaHibrida(lojaId: string, consulta: string, qvec: string, k: numb
     ),
     fundido as (
       select id, sum(score) as score from (
-        select id, ${PESO_VETOR} / (${RRF_K} + rnk) as score from vetor
+        -- Os pesos vao como parametro; sem o ::float8 o Postgres infere o tipo do numerador
+        -- pelo rnk (bigint, de row_number) e rejeita 0.25 ("invalid input syntax for bigint").
+        select id, ${PESO_VETOR}::float8 / (${RRF_K} + rnk) as score from vetor
         union all
-        select id, ${PESO_LEXICO} / (${RRF_K} + rnk) as score from lexical
+        select id, ${PESO_LEXICO}::float8 / (${RRF_K} + rnk) as score from lexical
       ) u group by id
     )
     select ${SELECT_FINAL}, f.score as pontuacao
