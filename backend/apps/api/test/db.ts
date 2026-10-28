@@ -3,21 +3,11 @@
 //   - poolApi (whaviso_api): roda o LeitorEscopo sob o role de menor privilegio real.
 // Roda SEMPRE no Postgres LOCAL whaviso_dev (ver apps/api/vitest.config.ts). Se o banco
 // nao estiver acessivel, `bancoAcessivel()` devolve false e a suite se pula com aviso.
-import pg from 'pg'
 import { randomUUID } from 'node:crypto'
+import { criarPool, criarPoolSuper } from '../../../test-support/banco'
 
-const SENHA = process.env.POSTGRES_PASSWORD ?? 'postgres'
-const HOST = process.env.PGHOST ?? '127.0.0.1'
-const DB = process.env.PGDATABASE ?? 'whaviso_dev'
-
-export const poolSuper = new pg.Pool({
-  connectionString: `postgresql://postgres:${SENHA}@${HOST}:5432/${DB}`,
-  max: 3,
-})
-export const poolApi = new pg.Pool({
-  connectionString: `postgresql://whaviso_api:whaviso_api_dev@${HOST}:5432/${DB}`,
-  max: 3,
-})
+export const poolSuper = criarPoolSuper(3)
+export const poolApi = criarPool('whaviso_api', 'whaviso_api_dev', 3)
 
 export async function bancoAcessivel(): Promise<boolean> {
   try {

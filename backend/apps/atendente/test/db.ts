@@ -4,25 +4,15 @@
 // Roda no Postgres LOCAL (PGDATABASE; default whaviso_dev). Sem banco, os testes se pulam. Cada
 // cenario usa uma conta/loja nova (ids aleatorios): a limpeza e por conta (cascata) e as contagens
 // filtram por conversa/loja (isolado, seguro no whaviso_dev compartilhado do CI).
-import pg from 'pg'
 import { createHash, randomUUID } from 'node:crypto'
 import { criarCifra, type Cifra } from '@whaviso/shared/cifra'
-
-const SENHA = process.env.POSTGRES_PASSWORD ?? 'postgres'
-const HOST = process.env.PGHOST ?? '127.0.0.1'
-const DB = process.env.PGDATABASE ?? 'whaviso_dev'
+import { criarPool, criarPoolSuper } from '../../../test-support/banco'
 
 export const MASTER_KEY = 'chave-mestra-de-teste-com-32-caracteres-ok'
 export const cifra: Cifra = criarCifra(MASTER_KEY)
 
-export const poolSuper = new pg.Pool({
-  connectionString: `postgresql://postgres:${SENHA}@${HOST}:5432/${DB}`,
-  max: 4,
-})
-export const poolAtendente = new pg.Pool({
-  connectionString: `postgresql://whaviso_atendente:whaviso_atendente_dev@${HOST}:5432/${DB}`,
-  max: 4,
-})
+export const poolSuper = criarPoolSuper(4)
+export const poolAtendente = criarPool('whaviso_atendente', 'whaviso_atendente_dev', 4)
 
 export async function bancoAcessivel(): Promise<boolean> {
   try {
