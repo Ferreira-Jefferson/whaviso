@@ -118,7 +118,18 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
         </Secao>
 
         <Secao titulo="Área de entrega" descricao="Até onde a loja entrega, por raio ou por bairro.">
-          <EditorAreaEntrega valor={area} onChange={setArea} />
+          <EditorAreaEntrega
+            valor={area}
+            onChange={setArea}
+            endereco={{
+              logradouro: endereco.logradouro,
+              numero: endereco.numero,
+              bairro: endereco.bairro,
+              cidade: endereco.cidade,
+              uf: endereco.uf,
+              cep: endereco.cep,
+            }}
+          />
         </Secao>
 
         <div className="flex flex-col-reverse gap-2 border-t border-linha pt-6 sm:flex-row sm:justify-end">

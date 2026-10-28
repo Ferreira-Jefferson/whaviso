@@ -1,10 +1,21 @@
 // Editor da area de entrega. Dois modos (contrato AreaEntrega): raio em km a partir de um
 // ponto, ou lista de bairros atendidos. "Sem entrega" = loja so com retirada/balcao (nao envia area).
-// A montagem no formato do contrato e a validacao ficam no FormularioLoja.
-import { useState } from 'react'
+// No modo raio a area e desenhada no mapa (SeletorArea), sem digitar coordenada: o centro do mapa
+// vem do endereco do formulario geocodificado. A montagem no formato do contrato e a validacao
+// ficam no FormularioLoja.
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { Button, Field, Input, SegmentedControl, cn } from '@/shared/ui'
 import { RAIO_KM_MAX } from '@/shared/contracts/_generated/lojas'
+import {
+  SeletorArea,
+  useGeocodificarEndereco,
+  kmParaMetros,
+  metrosParaKm,
+  type AreaGeo,
+  type EnderecoParaGeocode,
+  type PontoMapa,
+} from '@/shared/mapa'
 import type { AreaForm, ModoArea } from '../campos'
 
 const OPCOES: { value: ModoArea; label: string }[] = [
@@ -13,15 +24,76 @@ const OPCOES: { value: ModoArea; label: string }[] = [
   { value: 'bairros', label: 'Por bairro' },
 ]
 
+// Arredonda para no maximo `casas` casas decimais (evita strings gigantes de coordenada/km).
+function arredondar(n: number, casas: number): number {
+  const f = 10 ** casas
+  return Math.round(n * f) / f
+}
+
+// Deriva a area do mapa (AreaGeo) do estado do formulario; null quando falta coordenada ou raio.
+function formParaAreaGeo(valor: AreaForm): AreaGeo | null {
+  if (valor.lat.trim() === '' || valor.lng.trim() === '' || valor.raioKm.trim() === '') return null
+  const lat = Number(valor.lat)
+  const lng = Number(valor.lng)
+  const km = Number(valor.raioKm)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(km)) return null
+  return { tipo: 'raio', centro: { lat, lng }, metros: kmParaMetros(km) }
+}
+
 export function EditorAreaEntrega({
   valor,
   onChange,
+  endereco,
 }: {
   valor: AreaForm
   onChange: (proximo: AreaForm) => void
+  endereco?: EnderecoParaGeocode
 }) {
   const [novoBairro, setNovoBairro] = useState('')
   const set = (parcial: Partial<AreaForm>) => onChange({ ...valor, ...parcial })
+
+  // Centro do mapa (icone da loja): geocodifica o endereco DESTE formulario (pode nao ser a loja
+  // ativa), com debounce. Degrada para null quando falta endereco ou o provedor esta indisponivel.
+  const { geocodificar } = useGeocodificarEndereco()
+  const [centro, setCentro] = useState<PontoMapa | null>(null)
+  const logradouro = endereco?.logradouro?.trim() ?? ''
+  const cidade = endereco?.cidade?.trim() ?? ''
+
+  useEffect(() => {
+    if (!logradouro || !cidade || !endereco) {
+      setCentro(null)
+      return
+    }
+    let cancelado = false
+    const t = setTimeout(() => {
+      void geocodificar(endereco).then((ponto) => {
+        if (!cancelado) setCentro(ponto)
+      })
+    }, 600)
+    return () => {
+      cancelado = true
+      clearTimeout(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    logradouro,
+    cidade,
+    endereco?.numero,
+    endereco?.bairro,
+    endereco?.uf,
+    endereco?.cep,
+    geocodificar,
+  ])
+
+  const areaGeo = formParaAreaGeo(valor)
+  const aplicarArea = (v: AreaGeo) => {
+    if (v.tipo !== 'raio') return
+    set({
+      raioKm: String(arredondar(metrosParaKm(v.metros), 2)),
+      lat: String(arredondar(v.centro.lat, 6)),
+      lng: String(arredondar(v.centro.lng, 6)),
+    })
+  }
 
   const adicionarBairro = () => {
     const b = novoBairro.trim()
@@ -40,34 +112,17 @@ export function EditorAreaEntrega({
       )}
 
       {valor.modo === 'raio' && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Raio (km)" dica={`Entre 0 e ${RAIO_KM_MAX} km a partir do ponto abaixo.`}>
-            <Input
-              value={valor.raioKm}
-              onChange={(e) => set({ raioKm: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })}
-              placeholder="Ex.: 5"
-              inputMode="decimal"
-              autoComplete="off"
-            />
-          </Field>
-          <Field label="Latitude" dica="Coordenada do ponto central (ex.: a loja).">
-            <Input
-              value={valor.lat}
-              onChange={(e) => set({ lat: e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.') })}
-              placeholder="-23.5610"
-              inputMode="decimal"
-              autoComplete="off"
-            />
-          </Field>
-          <Field label="Longitude">
-            <Input
-              value={valor.lng}
-              onChange={(e) => set({ lng: e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.') })}
-              placeholder="-46.6560"
-              inputMode="decimal"
-              autoComplete="off"
-            />
-          </Field>
+        <div className="flex flex-col gap-2">
+          <SeletorArea
+            modo="raio"
+            raioKmMax={RAIO_KM_MAX}
+            valor={areaGeo}
+            onChange={aplicarArea}
+            centroLoja={centro}
+          />
+          <p className="text-sm text-tinta-2">
+            Arraste o ponto da loja e a borda do círculo, ou digite os km.
+          </p>
         </div>
       )}
 
