@@ -30,6 +30,7 @@ export interface LinhaMatriz {
 // nao tem DELETE em nenhuma tabela de negocio/auditoria, exceto `templates` (config).
 // ---------------------------------------------------------------------------------------------
 export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }>> = {
+  acertos_motoboy: { apiDelete: 'negado' },
   assinaturas: { apiDelete: 'negado' },
   avaliacoes: { apiDelete: 'negado' },
   base_avaliacao: { apiDelete: 'negado' },

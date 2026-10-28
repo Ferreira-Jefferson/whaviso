@@ -92,11 +92,23 @@ definitivo, pagar é idempotente e exige o total visto, append-only em lançamen
 - Lane 2b (Fornecedores): backend do módulo contas a pagar para fornecedores (CRUD + lançamentos
   manuais) + front do cadastro de fornecedor.
 
-**Fase 3: acerto no Financeiro (subagentes).**
-- Lane 3a (backend acerto): mover `fechamentos`/`motoboy_lancamentos` e a lógica de cálculo para o
-  módulo contas a pagar, generalizando para o regime e para período. Materialização, pagar, ajuste.
-- Lane 3b (front Contas a pagar): página nova no Financeiro com abas **Pessoas** (acerto, motoboy
-  especial) e **Fornecedores** (lançamentos). Filtros por período.
+**Fase 3: acerto no Financeiro. Modelo CONFIRMADO pelo dono: acerto POR PERÍODO que o usuário
+escolhe (dia/semana/mês), nao mais por dia.**
+- Backend (orquestrador faz, e dinheiro): migration nova `acertos_motoboy` (loja_id, motoboy_id,
+  periodo_inicio, periodo_fim inclusivos, status aberto|pago, total_pago_centavos [snapshot no
+  pagamento], pago_em, pago_por_user_id). O ledger `motoboy_lancamentos` (entregas automaticas +
+  ajustes manuais) CONTINUA sendo a fonte; a materializacao de entregas passa a cobrir o periodo.
+  Calculo por motoboy no periodo: entregas_centavos = soma dos lancamentos de entrega; dias_trabalhados
+  = datas distintas com entrega; fixo_centavos = por_entrega -> 0; fixo/dia -> valor_fixo x
+  dias_trabalhados; fixo/mes -> valor_fixo x meses do periodo; total = (regime inclui fixo? fixo:0) +
+  (regime inclui entrega? entregas:0) + ajustes. Pagar [de,ate] de um motoboy: trava por advisory lock
+  do motoboy, recusa (409) se qualquer acerto PAGO do mesmo motoboy sobrepoe [de,ate] (anti dupla
+  contagem), snapshot do total, status=pago. Ajuste manual em periodo ja coberto por acerto pago = 409.
+  Novos contratos de acerto (periodo, regime, breakdown) no modulo contas_pagar; o contrato de
+  fechamento do motoboys fica so ate a fase 4. Construido ALADO do fechamento antigo (que morre na 4).
+- Front (subagente): a pagina Contas a pagar ganha a aba **Pessoas/Acerto** com seletor de periodo,
+  lista de motoboys com o total do periodo (breakdown fixo/entregas/ajustes), lancar ajuste e marcar
+  pago por periodo. Mantem as abas A pagar e Fornecedores da fase 2b.
 
 **Fase 4: eliminação (orquestrador).** Apagar `frontend/src/modules/motoboys/` + rota `/motoboys`
 (grupo Entrega do menu); dissolver o módulo backend `motoboys` (cadastro já foi para pessoas, acerto
