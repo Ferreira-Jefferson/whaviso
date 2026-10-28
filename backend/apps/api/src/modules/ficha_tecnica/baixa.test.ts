@@ -93,4 +93,22 @@ d('darBaixaPorVenda (integracao)', () => {
     const r = await darBaixaPorVenda(poolSuper, { item_id: semFicha, loja_id: lojaId, quantidade_vendida: 3, pedido_id: randomUUID() })
     expect(r).toEqual({ baixados: 0, jaRegistrados: 0 })
   })
+
+  it('corrida: duas baixas simultaneas do MESMO pedido: um movimento por insumo, decremento uma vez', async () => {
+    const pedido = randomUUID()
+    const antesA = await quantidadeAtual(insA)
+    // Duas baixas concorrentes do mesmo (pedido, item): o indice unico parcial (pedido_id, insumo_id)
+    // where tipo='consumo' barra a duplicata; o decremento perdido reverte com o statement que falha.
+    const [r1, r2] = await Promise.all([
+      darBaixaPorVenda(poolSuper, { item_id: itemId, loja_id: lojaId, quantidade_vendida: 1, pedido_id: pedido }),
+      darBaixaPorVenda(poolSuper, { item_id: itemId, loja_id: lojaId, quantidade_vendida: 1, pedido_id: pedido }),
+    ])
+    // Por insumo exatamente um lado registra; conta os totais, nao qual chamada venceu (2 linhas de ficha).
+    expect(r1.baixados + r2.baixados).toBe(2)
+    expect(r1.jaRegistrados + r2.jaRegistrados).toBe(2)
+    // insA decrementado UMA vez (0.25 * 1); um unico movimento 'consumo' por insumo.
+    expect(await quantidadeAtual(insA)).toBeCloseTo(antesA - 0.25, 3)
+    expect(await movimentosConsumo(pedido, insA)).toHaveLength(1)
+    expect(await movimentosConsumo(pedido, insB)).toHaveLength(1)
+  })
 })
