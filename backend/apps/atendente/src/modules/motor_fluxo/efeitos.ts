@@ -17,6 +17,7 @@ import { ErroMontagem, montarLinha, type LinhaSnapshot } from './cardapio'
 import { resumoCarrinho } from './resumo'
 import { BOTAO_CANCELAR, BOTAO_CONFIRMAR, BOTAO_MAIS } from './ids'
 import { lerBairroEndereco, lerZonas } from './repo_leitura'
+import { montarCobrancaPix, type PixDecifra } from './pix'
 import * as escrita from './repo_escrita'
 import { EstadoFluxo, type CardapioCtx, type LinhaCarrinho } from './tipos'
 
@@ -29,6 +30,8 @@ export interface DepsEfeito {
   destinatarioHash: string
   cardapio: CardapioCtx
   agora: Date
+  /** Decifra da chave Pix (grant 0058). Ausente: o nó de pix degrada com aviso ao cliente. */
+  pixDecifra?: PixDecifra
 }
 
 export interface ResultadoEfeitos {
@@ -61,6 +64,9 @@ export async function aplicarEfeitos(
       estado = await efetivarEndereco(deps, estado, efeito.dados)
     } else if (efeito.tipo === EFEITO.criarPedido) {
       estado = await criarPedido(deps, estado, mensagensExtra)
+    } else if (efeito.tipo === EFEITO.cobrancaPix) {
+      // So apos criarPedido (precisa do id/codigo/total). Nunca lanca: degrada com aviso.
+      await montarCobrancaPix(deps.tx, deps.lojaId, deps.pixDecifra, estado, mensagensExtra)
     } else if (efeito.tipo === EFEITO.handoff) {
       handoff = true
     } else if (efeito.tipo === EFEITO.encerrar) {

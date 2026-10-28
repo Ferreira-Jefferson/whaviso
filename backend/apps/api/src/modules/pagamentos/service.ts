@@ -4,7 +4,7 @@
 // ser cifrada (no cadastro) ou para montar o BR Code (na cobrança). Nunca é devolvida, logada
 // nem persistida em claro. Em repouso só ficam `chave_hash` (sha256) e `chave_cifrada` (cifra).
 import { comTransacao, ErroBanco, type Executor, type Pool } from '@whaviso/shared/db'
-import { gerarPayloadPixCopiaCola } from '@whaviso/shared/contracts'
+import { gerarPayloadPixCopiaCola } from '@whaviso/shared/pix'
 import type {
   ConciliarEntrada,
   CriarCobrancaEntrada,

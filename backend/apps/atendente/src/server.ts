@@ -9,7 +9,7 @@ import { criarLogger } from '@whaviso/shared/logger'
 import { envSchema } from './env'
 import { criarEntendedor } from './modules/entender_mensagem'
 import { drenarImportacoes } from './modules/importar_cardapio'
-import { criarRegistry, drenarInbound, type LlmMotor } from './modules/motor_fluxo'
+import { criarPixDecifra, criarRegistry, drenarInbound, type LlmMotor } from './modules/motor_fluxo'
 import { criarRegistroTools, ferramentasPadrao, selarConversaCtx } from './modules/tools'
 import { criarRepoHarness } from './shared/harness'
 import { criarServicoLlmProducao } from './shared/llm_client'
@@ -59,10 +59,14 @@ const llm: LlmMotor = {
   selar: selarConversaCtx,
 }
 
+// Decifra da chave Pix (grant 0058): mesma MASTER_KEY da api (a que cifrou `loja_pix`). Montada no
+// boot so se a var existe; sem ela, o nó de pix degrada com aviso ao cliente (nunca quebra o turno).
+const pixDecifra = env.MASTER_KEY ? criarPixDecifra(env.MASTER_KEY) : undefined
+
 const intervaloMs = Number(process.env.ATENDENTE_INTERVALO_MS ?? 5000)
 // Cada drenagem e independente e nunca lanca (falha fechada): uma nao trava as outras.
 const tick = async () => {
-  const resumo = await drenarInbound({ pool, logger, registry, llm })
+  const resumo = await drenarInbound({ pool, logger, registry, llm, pixDecifra })
   if (resumo.processadas || resumo.suprimidas) logger.info(resumo, 'dreno de inbound')
 
   const importacoes = await drenarImportacoes({ pool, servico: servicoLlm, logger })

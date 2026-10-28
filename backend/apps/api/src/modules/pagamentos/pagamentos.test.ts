@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import pg from 'pg'
-import { validarBrCode } from '@whaviso/shared/contracts'
+import { validarBrCode } from '@whaviso/shared/pix'
 import { construirApp } from '../../app'
 import { envSchema } from '../../env'
 import { verificadorFake } from '../../../test/app'
@@ -433,15 +433,22 @@ describe('conciliação / cancelamento / expiração', () => {
 })
 
 describe('matriz de privilégio por SET ROLE (SEC-030/032)', () => {
-  it('SEC-032: whaviso_atendente lê pagamentos mas NÃO a chave Pix (loja_pix.chave_cifrada)', async () => {
+  it('SEC-032: whaviso_atendente lê pagamentos e a chave Pix cifrada, mas NÃO escreve loja_pix', async () => {
     if (!disponivel) return
     // atendente tem select em pagamentos (grant 0008).
     await expect(
       sobRole('whaviso_atendente', (q) => q('select id, status from public.pagamentos limit 1')),
     ).resolves.toBeDefined()
-    // atendente NÃO tem grant na chave Pix hoje (BR Code em conversa ainda não habilitado).
+    // atendente LÊ a chave cifrada para gerar o BR Code na conversa (grant 0058, dono aprovou).
     await expect(
       sobRole('whaviso_atendente', (q) => q('select chave_cifrada from public.loja_pix limit 1')),
+    ).resolves.toBeDefined()
+    // ...mas não escreve a chave (set/rotate é só da api): UPDATE/DELETE negados por privilégio.
+    await expect(
+      sobRole('whaviso_atendente', (q) => q("update public.loja_pix set titular = 'x' where loja_id is null")),
+    ).rejects.toThrow()
+    await expect(
+      sobRole('whaviso_atendente', (q) => q('delete from public.loja_pix where loja_id is null')),
     ).rejects.toThrow()
   })
 

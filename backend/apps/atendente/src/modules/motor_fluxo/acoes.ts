@@ -8,6 +8,7 @@ export const EFEITO = {
   estado: 'estado',
   criarEndereco: 'criar_endereco',
   criarPedido: 'criar_pedido',
+  cobrancaPix: 'cobranca_pix',
   handoff: 'handoff',
   encerrar: 'encerrar',
 } as const
@@ -37,6 +38,11 @@ export function efeitoCriarEndereco(logradouro: string, bairro: string | null): 
 
 export function efeitoCriarPedido(): EfeitoProposto {
   return { tipo: EFEITO.criarPedido, dados: {} }
+}
+
+/** Efeito: gerar o BR Code do Pix do pedido recem-criado e enfileira-lo (so no pagamento = pix). */
+export function efeitoCobrancaPix(): EfeitoProposto {
+  return { tipo: EFEITO.cobrancaPix, dados: {} }
 }
 
 export function efeitoHandoff(): EfeitoProposto {

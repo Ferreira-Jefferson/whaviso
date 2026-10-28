@@ -12,7 +12,9 @@ Sem PSP na v1 (copia e cola estatico; conciliacao manual pelo dono).
 
 ## Especialistas consumidos
 - `@whaviso/shared/db` (consultar/sql/comTransacao: unica via de dados; ErroBanco p/ colisao de txid)
-- `@whaviso/shared/contracts` (`gerarPayloadPixCopiaCola`, `validarBrCode`, `tipoChavePix`)
+- `@whaviso/shared/pix` (`gerarPayloadPixCopiaCola`: builder PURO do BR Code, promovido ao kernel p/ o
+  atendente gerar o MESMO Pix na conversa sem importar este modulo; `validarBrCode` segue nos testes)
+- `@whaviso/shared/contracts` (`tipoChavePix`; o builder foi movido para `@whaviso/shared/pix`)
 - `@whaviso/shared/contracts/pagamentos` (DTOs do agregado)
 - `@whaviso/shared/cifra` (via `cripto.ts`), `shared/http_errors`, `shared/tokens` (`sha256Hex`)
 - `shared/auth` + `shared/tenant` (preHandlers `autenticar`/`escopoLoja`/`exigirPermissao('loja:gerir')`)

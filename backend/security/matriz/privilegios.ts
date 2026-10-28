@@ -77,6 +77,7 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   insumos: { apiDelete: 'negado' },
   item_grupos: { apiDelete: 'negado' },
   itens: { apiDelete: 'negado' },
+  itens_fiscais: { apiDelete: 'negado' },
   itens_pedido: { apiDelete: 'negado' },
   itens_pedido_opcoes: { apiDelete: 'negado' },
   janela_atendente: { apiDelete: 'negado' },
@@ -167,9 +168,16 @@ export const CASOS_ESPECIFICOS: readonly LinhaMatriz[] = [
   { role: 'whaviso_atendente', tabela: 'operadores', operacao: 'select', esperado: 'negado', sec: 'SEC-032' },
   { role: 'whaviso_atendente', tabela: 'prospectos', operacao: 'select', esperado: 'negado', sec: 'SEC-032' },
   { role: 'whaviso_atendente', tabela: 'prospecto_atividades', operacao: 'select', esperado: 'negado', sec: 'SEC-032' },
-  // loja_pix hoje NAO tem grant para atendente (o acesso ao BR Code sera habilitado no modulo
-  // de pagamentos, com revisao Opus). Enquanto isso, a negacao e o estado correto.
-  { role: 'whaviso_atendente', tabela: 'loja_pix', coluna: 'chave_cifrada', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'BR Code ainda nao habilitado para atendente' },
+  // loja_pix (0058, dono aprovou): o atendente LE as colunas minimas do BR Code para gerar o Pix
+  // na conversa (decifra a chave_cifrada em memoria). SELECT por coluna; NUNCA escreve (a chave e
+  // da api). Molde identico ao de credenciais_llm.chave_cifrada: unico role que le o segredo.
+  { role: 'whaviso_atendente', tabela: 'loja_pix', coluna: 'chave_cifrada', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le a cifra p/ montar o BR Code na conversa' },
+  { role: 'whaviso_atendente', tabela: 'loja_pix', coluna: 'titular', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'campo 59 do BR Code' },
+  { role: 'whaviso_atendente', tabela: 'loja_pix', coluna: 'cidade', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'campo 60 do BR Code' },
+  { role: 'whaviso_atendente', tabela: 'loja_pix', coluna: 'chave_hash', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'so a api precisa do hash (idempotencia de cadastro)' },
+  { role: 'whaviso_atendente', tabela: 'loja_pix', coluna: 'chave_cifrada', operacao: 'update', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so le; a chave e escrita pela api' },
+  { role: 'whaviso_atendente', tabela: 'loja_pix', operacao: 'insert', esperado: 'negado', sec: 'SEC-032', nota: 'atendente nao cadastra chave' },
+  { role: 'whaviso_atendente', tabela: 'loja_pix', operacao: 'delete', esperado: 'negado', sec: 'SEC-030' },
   // Espelhos de permissao: o escopo legitimo do atendente passa.
   { role: 'whaviso_atendente', tabela: 'itens', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'cardapio' },
   { role: 'whaviso_atendente', tabela: 'clientes', operacao: 'select', esperado: 'permitido', sec: 'SEC-032' },

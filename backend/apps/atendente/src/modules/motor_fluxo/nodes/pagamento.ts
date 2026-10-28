@@ -1,8 +1,8 @@
 // Node `pagamento`: forma de pagamento por botoes (Pix, dinheiro, cartao na entrega). Registrado
 // o metodo, propoe criar o pedido (o motor cria o pedido `novo`, calcula a taxa e avisa o cliente
 // com o codigo gerado; a geracao do BR Code do Pix e do modulo pagamentos, onda 3). SEM LLM.
-import type { NodeContract } from '@whaviso/shared/contracts'
-import { efeitoCriarPedido, efeitoEstado, saida } from '../acoes'
+import type { EfeitoProposto, NodeContract } from '@whaviso/shared/contracts'
+import { efeitoCobrancaPix, efeitoCriarPedido, efeitoEstado, saida } from '../acoes'
 import { promptPagamento, reapresentar } from '../comum'
 import { BOTAO_PAG_CARTAO, BOTAO_PAG_DINHEIRO, BOTAO_PAG_PIX } from '../ids'
 import { ConfigVazia, type EntradaTurno, type EstadoFluxo } from '../tipos'
@@ -24,7 +24,11 @@ export const pagamentoNode: NodeContract<ConfigVazia, EntradaTurno> = {
       return reapresentar(estado, promptPagamento())
     }
     const proximo: EstadoFluxo = { ...estado, etapa: 'acompanhar', pagamento: metodo, apresentados: [], falhas: 0 }
-    // O motor efetiva: cria o pedido `novo` (preco/taxa no servidor) e avisa com o codigo.
-    return saida('acompanhar', [], [efeitoEstado(proximo), efeitoCriarPedido()])
+    // O motor efetiva: cria o pedido `novo` (preco/taxa no servidor) e avisa com o codigo. No Pix,
+    // ainda gera o BR Code "copia e cola" do pedido (DETERMINISTICO; gerar BR Code nao e confirmar
+    // pagamento, SEC-061). A ordem importa: cobranca_pix roda DEPOIS de criar_pedido (usa id/total).
+    const efeitos: EfeitoProposto[] = [efeitoEstado(proximo), efeitoCriarPedido()]
+    if (metodo === 'pix') efeitos.push(efeitoCobrancaPix())
+    return saida('acompanhar', [], efeitos)
   },
 }

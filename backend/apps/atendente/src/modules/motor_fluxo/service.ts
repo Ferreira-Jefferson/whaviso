@@ -18,6 +18,7 @@ import { aplicarEfeitos } from './efeitos'
 import { configDaEtapa } from './fluxo_fonte'
 import { BOTAO_CANCELAR, BOTAO_CONFIRMAR, BOTAO_MAIS } from './ids'
 import { claimMensagem, lockConversa } from './repo_leitura'
+import type { PixDecifra } from './pix'
 import * as escrita from './repo_escrita'
 import { resumoCarrinho } from './resumo'
 import { consultarHarness, elegivelParaHarness, validarRascunho, type LlmMotor } from './texto_livre'
@@ -31,6 +32,8 @@ export interface DepsMotor {
   registry: NodeRegistry
   /** Caminho LLM do texto livre (harness). Ausente: o motor segue so por botoes e regras. */
   llm?: LlmMotor
+  /** Decifra da chave Pix (grant 0058), da MASTER_KEY. Ausente: o nó de pix degrada com aviso. */
+  pixDecifra?: PixDecifra
   /** relogio injetavel (testes). */
   agora?: () => Date
   /** restringe o claim a uma conversa (testes/drain direcionado); omitido = global. */
@@ -146,6 +149,7 @@ async function rodarTurno(deps: DepsMotor, tx: PoolClient, ctx: ContextoTurno, m
       destinatarioHash: ctx.destinatarioHash,
       cardapio: entrada.cardapio,
       agora: entrada.agora,
+      pixDecifra: deps.pixDecifra,
     },
     entrada.estado,
     saida.efeitos,

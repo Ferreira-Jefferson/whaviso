@@ -49,6 +49,12 @@ export interface Cardapio {
   grande: string
   bacon: string
 }
+export interface PixSeed {
+  tipo: string
+  chave: string
+  titular: string
+  cidade: string | null
+}
 export interface Cenario {
   contaId: string
   lojaId: string
@@ -58,6 +64,8 @@ export interface Cenario {
   enderecoId: string
   cardapio: Cardapio
   telefoneHash: string
+  /** Chave Pix semeada da loja (null quando `semPix`). O BR Code gerado embute `chave`/`titular`. */
+  pix: PixSeed | null
 }
 
 async function um<T = { id: string }>(sqlTexto: string, params: unknown[]): Promise<T> {
@@ -73,6 +81,27 @@ export interface OpcoesCenario {
   zonaBairro?: string
   taxaZonaCentavos?: number | null
   statusConversa?: 'ia' | 'humano' | 'encerrada'
+  /** Nao semeia `loja_pix` (simula loja sem Pix configurado, para a degradacao do nó de pix). */
+  semPix?: boolean
+  /** Chave Pix da loja. Default: uma chave `aleatoria` (UUID) UNICA por loja (isolamento). */
+  pix?: Partial<PixSeed>
+}
+
+/** Semeia a chave Pix cifrada da loja (grant 0058): mesma cifra/MASTER_KEY da api. Devolve o claro. */
+async function semearPix(lojaId: string, op: Partial<PixSeed> = {}): Promise<PixSeed> {
+  const pix: PixSeed = {
+    tipo: op.tipo ?? 'aleatoria',
+    chave: op.chave ?? randomUUID(), // UUID unico por loja: distingue uma loja da outra no BR Code
+    titular: op.titular ?? 'Recebedor Teste',
+    cidade: op.cidade ?? 'Sao Paulo',
+  }
+  const chaveHash = createHash('sha256').update(pix.chave).digest('hex')
+  await poolSuper.query(
+    `insert into public.loja_pix (loja_id, tipo, chave_hash, chave_cifrada, ultimos4, titular, cidade)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [lojaId, pix.tipo, chaveHash, cifra.cifrar(Buffer.from(pix.chave)), pix.chave.slice(-4), pix.titular, pix.cidade],
+  )
+  return pix
 }
 
 /** Semeia conta/loja/cardapio/cliente/conversa/endereco. Limpeza por `limpar(contaId)`. */
@@ -114,8 +143,10 @@ export async function semear(op: OpcoesCenario = {}): Promise<Cenario> {
     [lojaId, numeroId, clienteId, op.statusConversa ?? 'ia'],
   )).id
 
+  const pix = op.semPix ? null : await semearPix(lojaId, op.pix)
+
   const cardapio = await semearCardapio(lojaId)
-  return { contaId, lojaId, numeroId, clienteId, conversaId, enderecoId, cardapio, telefoneHash }
+  return { contaId, lojaId, numeroId, clienteId, conversaId, enderecoId, cardapio, telefoneHash, pix }
 }
 
 async function semearCardapio(lojaId: string): Promise<Cardapio> {

@@ -81,9 +81,13 @@ vive em `backend/**/test/security/` (vitest) mais os scripts de banco; roda no g
 - **SEC-031** `whaviso_zap` só escreve as colunas do outbox que lhe cabem (grant por coluna em
   `envios` e no estado de saúde de `numeros_whatsapp`). *Verde:* update fora dessas colunas falha.
 - **SEC-032** `whaviso_atendente` não toca billing/plataforma nem a credencial da Meta, e seu acesso a
-  segredo é **exatamente** a `chave_cifrada` de `credenciais_llm` e a coluna do BR Code em `loja_pix`,
-  nada além. *Verde:* a matriz por `SET ROLE` confirma esses dois SELECT por coluna e nega todo o resto
-  (billing, plataforma, `token_cifrado` da Meta). Revisão Opus ao habilitar o acesso ao `loja_pix`.
+  segredo é **exatamente** a `chave_cifrada` de `credenciais_llm` e as colunas mínimas do BR Code em
+  `loja_pix` (`loja_id, tipo, chave_cifrada, titular, cidade`), nada além. O acesso ao `loja_pix` está
+  **habilitado** (migration `0058`, aprovado pelo dono): o atendente lê a cifra para gerar o Pix "copia e
+  cola" na conversa, decifrando em memória com a mesma master key da api; continua sem insert/update/delete
+  na tabela (a chave é escrita só pela api). *Verde:* a matriz por `SET ROLE` confirma os SELECT por coluna
+  dos dois segredos e nega todo o resto (billing, plataforma, `token_cifrado` da Meta, e UPDATE/DELETE em
+  `loja_pix`).
 - **SEC-033** Trilhas append-only (`eventos`, `eventos_auth`, `*_lancamentos`, `uso_llm`) rejeitam
   UPDATE e não têm grant de DELETE. *Verde:* update dispara exceção; delete falha por privilégio.
 

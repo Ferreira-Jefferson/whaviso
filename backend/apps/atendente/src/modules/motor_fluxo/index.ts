@@ -3,5 +3,6 @@
 // index deve ser importado de outro lugar (fronteira do modulo).
 export { criarRegistry, ErroRegistry, NODES_COM_LLM } from './registry'
 export { processarProximaMensagem, drenarInbound, type Desfecho, type DepsMotor } from './service'
+export { criarPixDecifra, type PixDecifra } from './pix'
 export type { LlmMotor, EntendedorMotor } from './texto_livre'
 export { GRAFO } from './grafo'

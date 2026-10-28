@@ -3,7 +3,7 @@
 // presença dos campos obrigatórios do spec (GUI+chave no 26, moeda/país no 53/58,
 // nome/cidade no 59/60, CRC no 63).
 import { describe, expect, it } from 'vitest'
-import { gerarPayloadPixCopiaCola } from './pix'
+import { gerarPayloadPixCopiaCola } from '../pix'
 
 /**
  * Reimplementação INDEPENDENTE do CRC16/CCITT-FALSE (poly 0x1021, init 0xFFFF), só

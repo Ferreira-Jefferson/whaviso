@@ -1,6 +1,7 @@
 // Leitura do motor: SO via @whaviso/shared/db (sql parametrizado, SEC-080). Todas as leituras
 // filtram pela loja_id da conversa (SEC-001/002). Nunca projeta telefone/conteudo em log.
 import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
+import type { TipoChavePix } from '@whaviso/shared/contracts'
 
 /** Reivindica a proxima mensagem de ENTRADA nao processada (claim do inbound, FOR UPDATE SKIP LOCKED). */
 export interface MensagemClaim {
@@ -120,6 +121,36 @@ export async function lerStatusPedido(tx: Executor, lojaId: string, pedidoId: st
     sql`select status from public.pedidos where id = ${pedidoId} and loja_id = ${lojaId}`,
   )
   return linha?.status ?? null
+}
+
+/** Total do pedido (centavos) para fixar o valor do BR Code; filtra pela loja (SEC-001/002). */
+export async function lerTotalPedido(tx: Executor, lojaId: string, pedidoId: string): Promise<number | null> {
+  const linha = await consultarUm<{ total_centavos: number }>(
+    tx,
+    sql`select total_centavos from public.pedidos where id = ${pedidoId} and loja_id = ${lojaId}`,
+  )
+  return linha?.total_centavos ?? null
+}
+
+/**
+ * Chave Pix cifrada da loja para montar o BR Code na conversa (grant 0058, SELECT por coluna). SO
+ * as colunas minimas do BR Code; `chave_hash` fica de fora. A cifra e decifrada em memoria no
+ * service (nunca logada). Filtra pela loja da conversa (isolamento multi-tenant, SEC-001/002).
+ */
+export interface PixLoja {
+  tipo: TipoChavePix
+  chaveCifrada: Buffer
+  titular: string
+  cidade: string | null
+}
+export async function lerPixLoja(tx: Executor, lojaId: string): Promise<PixLoja | null> {
+  const linha = await consultarUm<{ tipo: TipoChavePix; chave_cifrada: Buffer; titular: string; cidade: string | null }>(
+    tx,
+    sql`select tipo, chave_cifrada, titular, cidade from public.loja_pix where loja_id = ${lojaId}`,
+  )
+  return linha
+    ? { tipo: linha.tipo, chaveCifrada: linha.chave_cifrada, titular: linha.titular, cidade: linha.cidade }
+    : null
 }
 
 // --- Cardapio vivo (seis leituras simples por loja; a montagem pura fica em montar_cardapio.ts) ---

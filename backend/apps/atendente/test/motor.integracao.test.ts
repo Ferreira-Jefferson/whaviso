@@ -4,20 +4,21 @@
 // duplicam); isolamento multi-tenant. Sem LLM, sem rede.
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { criarLogger, type Logger } from '@whaviso/shared/logger'
-import { criarRegistry, processarProximaMensagem, type DepsMotor } from '../src/modules/motor_fluxo'
+import { criarPixDecifra, criarRegistry, processarProximaMensagem, type DepsMotor } from '../src/modules/motor_fluxo'
 import { EstadoFluxo } from '../src/modules/motor_fluxo/tipos'
 import {
   bancoAcessivel, contexto, esgotarItem, fecharPools, inserirEntrada, lerEnderecos, lerEnvios, lerItens,
-  lerOpcoesItem, lerPedidos, limpar, processadaEm, resetProcessada, semear, setContexto, statusConversa,
-  poolAtendente, poolSuper, type Cenario,
+  lerOpcoesItem, lerPedidos, limpar, MASTER_KEY, processadaEm, resetProcessada, semear, setContexto,
+  statusConversa, poolAtendente, poolSuper, type Cenario,
 } from './db'
 
 const online = await bancoAcessivel()
 const logger: Logger = criarLogger('atendente-teste', 'silent')
 const registry = criarRegistry()
+const pixDecifra = criarPixDecifra(MASTER_KEY) // mesma MASTER_KEY que semeou a cifra em db.ts
 
 function deps(conversaId: string): DepsMotor {
-  return { pool: poolAtendente, logger, registry, conversaId }
+  return { pool: poolAtendente, logger, registry, conversaId, pixDecifra }
 }
 
 /** Insere uma entrada e processa um turno (claim restrito a esta conversa). */
@@ -73,9 +74,11 @@ describe.skipIf(!online)('motor_fluxo (integracao)', () => {
 
     const envios = await lerEnvios(c.conversaId)
     expect(envios.length).toBeGreaterThanOrEqual(7)
-    const ultimo = envios.at(-1)!.payload as { tipo: string; texto: string }
-    expect(ultimo.texto).toContain('Pedido')
-    expect(ultimo.texto).toContain(pedido.codigo)
+    const textos = envios.map((e) => (e.payload as { texto?: string }).texto ?? '')
+    // Aviso de pedido recebido com o codigo.
+    expect(textos.some((t) => t.includes('Pedido') && t.includes(pedido.codigo))).toBe(true)
+    // Pix na conversa: o BR Code "copia e cola" (payload EMV comeca em 000201) e enfileirado.
+    expect(textos.some((t) => t.startsWith('000201') && t.includes(c.pix!.chave))).toBe(true)
 
     const ctx = await contexto(c.conversaId)
     expect(ctx['etapa']).toBe('acompanhar')

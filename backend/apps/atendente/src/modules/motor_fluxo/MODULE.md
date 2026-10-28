@@ -20,8 +20,22 @@ O scheduler do app chama `drenarInbound`/`processarProximaMensagem`. Cada turno 
    `envios` do zap) + trava a conversa (`FOR UPDATE`): serializa o turno por conversa.
 2. conversa em `humano` (handoff) ou `encerrada`: **nao responde**, so marca processada.
 3. monta o contexto (loja/cliente/cardapio **vivo**/estado), roda o node de `estado.etapa`, aplica os
-   efeitos (estado, criar_endereco, criar_pedido, handoff, encerrar), enfileira as respostas em
-   `envios` (texto/interativo, janela de 24h) e registra as saidas, e marca a entrada processada.
+   efeitos (estado, criar_endereco, criar_pedido, cobranca_pix, handoff, encerrar), enfileira as
+   respostas em `envios` (texto/interativo, janela de 24h) e registra as saidas, e marca a entrada processada.
+
+## Pix na conversa (nó de pagamento = pix, grant 0058)
+
+Quando o cliente escolhe **Pix** no pagamento, o motor efetiva a cobranca de forma DETERMINISTICA
+(nunca o LLM; gerar um BR Code NAO e confirmar pagamento, SEC-061). Apos `criar_pedido` (precisa do
+id/total/codigo), o efeito `cobranca_pix` (`pix.ts`) le a chave cifrada da PROPRIA loja
+(`repo_leitura.lerPixLoja`, grant 0058 SELECT por coluna em `loja_pix`), DECIFRA em memoria com a
+MESMA `MASTER_KEY` da api (kernel `@whaviso/shared/cifra`), monta o "copia e cola" com a MESMA funcao
+pura da api (`@whaviso/shared/pix.gerarPayloadPixCopiaCola`) e enfileira o texto. A chave em claro vive
+so dentro de `montarCobrancaPix`, o tempo minimo: NUNCA e logada, devolvida nem persistida (SEC-024).
+Integracao so pelo banco: o motor nunca importa o modulo `pagamentos` da api, e o atendente NAO cria
+nem concilia linha em `pagamentos` (a conciliacao e manual, na api). `DepsMotor.pixDecifra` e injetado
+pelo app-root a partir de `MASTER_KEY`; **degradacao elegante** sem lancar: loja sem chave, decifra
+indisponivel ou valor invalido viram um aviso ao cliente (pagar na entrega ou falar com atendente).
 
 ## Texto livre pelo harness (texto_livre.ts)
 
@@ -102,7 +116,8 @@ mensagem e passa a conversa para humano, sem deixar o cliente sem resposta.
 ## Tabelas
 
 - **Le** (vivo, nunca cache): `lojas`, `clientes`, `enderecos`, `categorias`, `itens`, `grupos_opcoes`,
-  `opcoes`, `categoria_grupos`, `item_grupos`, `zonas_entrega`, `conversas`, `mensagens`, `pedidos`.
+  `opcoes`, `categoria_grupos`, `item_grupos`, `zonas_entrega`, `conversas`, `mensagens`, `pedidos`,
+  `loja_pix` (so as colunas minimas do BR Code, grant 0058; a cifra e decifrada em memoria, nunca logada).
 - **Escreve** (grant whaviso_atendente): `mensagens` (saida + `processada_em`), `conversas` (contexto
   e status), `enderecos`, `pedidos`/`itens_pedido`/`itens_pedido_opcoes`, `envios` (enfileira),
   `eventos` (append-only, sem PII). Preco e taxa calculados no servidor, centavos.

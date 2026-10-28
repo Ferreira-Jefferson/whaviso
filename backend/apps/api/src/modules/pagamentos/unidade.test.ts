@@ -1,7 +1,7 @@
 // Testes de UNIDADE do módulo pagamentos (puros, sem banco): kernel do BR Code (gerar/validar
 // + cidade), txid, cifra da chave Pix (sentinela de não vazamento) e validação da chave por tipo.
 import { describe, it, expect } from 'vitest'
-import { gerarPayloadPixCopiaCola, validarBrCode } from '@whaviso/shared/contracts'
+import { gerarPayloadPixCopiaCola, validarBrCode } from '@whaviso/shared/pix'
 import { LojaPixEntrada } from '@whaviso/shared/contracts'
 import { candidatoTxid, sanitizarTxid, MAX_TENTATIVAS_TXID } from './txid'
 import { criarCripto, ErroCifra } from './cripto'
