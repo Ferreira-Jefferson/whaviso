@@ -108,5 +108,25 @@ d('forma de pagamento, troco e guarda de aceite', () => {
       expect(cheio.status).toBe(409)
       expect(cheio.corpo.error.code).toBe('capacidade_excedida')
     })
+
+    it('corrida: mais criacoes simultaneas que as vagas; so as vagas viram 201, o resto 409', async () => {
+      // Teto = ocupacao atual + vagas: o advisory lock (travarAceiteLoja) serializa o aceite, entao
+      // exatamente `vagas` pedidos entram e os demais estouram, sem overcount. Conta, nao assume qual venceu.
+      const { rows } = await poolSuper.query<{ n: string }>(
+        `select count(*)::text as n from public.pedidos where loja_id = $1 and status <> 'rascunho'
+           and criado_em > now() - interval '60 minutes'`,
+        [m.A.loja],
+      )
+      const atual = Number(rows[0]!.n)
+      const vagas = 3
+      const total = 8
+      await setCapacidade(atual + vagas, 60)
+      const rs = await Promise.all(Array.from({ length: total }, () => criar({})))
+      const ok = rs.filter((r) => r.status === 201)
+      const cheios = rs.filter((r) => r.status === 409)
+      expect(ok).toHaveLength(vagas)
+      expect(cheios).toHaveLength(total - vagas)
+      expect(cheios.every((r) => r.corpo.error.code === 'capacidade_excedida')).toBe(true)
+    })
   })
 })
