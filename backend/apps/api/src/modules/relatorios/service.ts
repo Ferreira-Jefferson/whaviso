@@ -47,17 +47,20 @@ export function criarServicoRelatorios(pool: Pool) {
     async vendas(a: Ator, f: VendasFiltro): Promise<VendasSaida> {
       const p = periodoDe(f)
       const j = janela(a, p)
+      // `mesa` vem do salao: seu universo (totais) sao comandas fechadas, nao pedidos entregues.
+      const totalDe = f.agrupar_por === 'mesa' ? repo.totalComandas : repo.totalVendas
       const [linhas, tot] = await Promise.all([
         repo.vendasPorDimensao(pool, j, f.agrupar_por, f.limite),
-        repo.totalVendas(pool, j),
+        totalDe(pool, j),
       ])
-      const porItem = f.agrupar_por === 'item' || f.agrupar_por === 'categoria'
+      // Dimensoes de linha de item (receita da linha, nao do pedido): sem ticket, com unidades.
+      const porItem = f.agrupar_por === 'item' || f.agrupar_por === 'categoria' || f.agrupar_por === 'tamanho'
       return {
         periodo: saidaPeriodo(p),
         agrupar_por: f.agrupar_por,
         linhas: linhas.map((l) => ({
           chave: l.chave,
-          rotulo: rotulo(f.agrupar_por, l.chave),
+          rotulo: l.rotulo ?? rotulo(f.agrupar_por, l.chave),
           pedidos: l.pedidos,
           quantidade: l.quantidade,
           faturamento_centavos: l.faturamento,

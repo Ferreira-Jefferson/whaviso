@@ -111,6 +111,29 @@ d('modulo relatorios', () => {
       `insert into public.pagamentos (loja_id, pedido_id, status, valor_centavos, pago_em, criado_em)
        values ($1, $2, 'pago', 3000, '2026-03-10T15:20:00Z', '2026-03-10T15:05:00Z')`, [lojaA, p2])
 
+    // Entregador: o p3 sai com o motoboy; p1 e p2 ficam no balde "Sem motoboy".
+    const motoboy = (await poolSuper.query(
+      `insert into public.motoboys (loja_id, nome) values ($1, 'Ze Entregas') returning id`, [lojaA])).rows[0].id as string
+    await poolSuper.query('update public.pedidos set motoboy_id = $1 where id = $2', [motoboy, p3])
+
+    // Tamanho: grupo tipo 'tamanho' com a opcao 'Grande' escolhida no Burger do p1 (2 unidades, 4000).
+    const grpTam = (await poolSuper.query(
+      `insert into public.grupos_opcoes (loja_id, nome, tipo) values ($1, 'Tamanho', 'tamanho') returning id`, [lojaA])).rows[0].id as string
+    const opGrande = (await poolSuper.query(
+      `insert into public.opcoes (loja_id, grupo_id, nome) values ($1, $2, 'Grande') returning id`, [lojaA, grpTam])).rows[0].id as string
+    const ipBurger = (await poolSuper.query(
+      `select id from public.itens_pedido where pedido_id = $1 and nome_snapshot = 'Burger'`, [p1])).rows[0].id as string
+    await poolSuper.query(
+      `insert into public.itens_pedido_opcoes (item_pedido_id, loja_id, opcao_id, grupo_nome_snapshot, nome_snapshot)
+       values ($1, $2, $3, 'Tamanho', 'Grande')`, [ipBurger, lojaA, opGrande])
+
+    // Mesa: comanda FECHADA no periodo (fonte salao, fora de pedidos); abre e fecha em 10/03.
+    const mesa = (await poolSuper.query(
+      `insert into public.mesas (loja_id, nome) values ($1, 'Mesa 1') returning id`, [lojaA])).rows[0].id as string
+    await poolSuper.query(
+      `insert into public.comandas (loja_id, mesa_id, status, aberta_por_user_id, aberta_em, fechada_em, total_centavos)
+       values ($1, $2, 'fechada', $3, '2026-03-10T18:00:00Z', '2026-03-10T20:00:00Z', 4500)`, [lojaA, mesa, donoA])
+
     // Loja B: dado que A nunca pode ver.
     const pb = await pedido(lojaB, { status: 'entregue', total: 777777, criado: '2026-03-10T15:00:00Z' })
     await item(pb, lojaB, 'Segredo B', 5, 777777)
@@ -131,7 +154,12 @@ d('modulo relatorios', () => {
       await poolSuper.query('delete from public.pagamentos where loja_id = $1', [l]).catch(() => {})
       await poolSuper.query('delete from public.movimentos_caixa where loja_id = $1', [l]).catch(() => {})
       await poolSuper.query('delete from public.caixas where loja_id = $1', [l]).catch(() => {})
-      await poolSuper.query('delete from public.pedidos where loja_id = $1', [l]).catch(() => {})
+      await poolSuper.query('delete from public.comandas where loja_id = $1', [l]).catch(() => {})
+      await poolSuper.query('delete from public.mesas where loja_id = $1', [l]).catch(() => {})
+      await poolSuper.query('delete from public.pedidos where loja_id = $1', [l]).catch(() => {}) // cascateia itens_pedido(_opcoes)
+      await poolSuper.query('delete from public.motoboys where loja_id = $1', [l]).catch(() => {})
+      await poolSuper.query('delete from public.opcoes where loja_id = $1', [l]).catch(() => {})
+      await poolSuper.query('delete from public.grupos_opcoes where loja_id = $1', [l]).catch(() => {})
       await poolSuper.query('delete from public.clientes where loja_id = $1', [l]).catch(() => {})
       await poolSuper.query('delete from public.itens where loja_id = $1', [l]).catch(() => {})
       await poolSuper.query('delete from public.categorias where loja_id = $1', [l]).catch(() => {})
@@ -175,6 +203,35 @@ d('modulo relatorios', () => {
       .toEqual([['Lanches', 8000], ['Sem categoria', 2000]])
     const top1 = (await chamar(donoA, lojaA, `/vendas?agrupar_por=item&limite=1&${Q}`)).json()
     expect(top1.linhas).toHaveLength(1)
+  })
+
+  it('vendas por motoboy: entregador e balde "Sem motoboy", ticket por pedido', async () => {
+    const j = (await chamar(donoA, lojaA, `/vendas?agrupar_por=motoboy&${Q}`)).json()
+    expect(j.linhas.map((l: { rotulo: string; faturamento_centavos: number; pedidos: number }) =>
+      [l.rotulo, l.faturamento_centavos, l.pedidos]))
+      .toEqual([['Sem motoboy', 8000, 2], ['Ze Entregas', 2000, 1]])
+    expect(j.linhas[1].ticket_medio_centavos).toBe(2000)
+    expect(j.total_faturamento_centavos).toBe(10000)
+  })
+
+  it('vendas por tamanho: so opcao de grupo tipo tamanho, unidades e sem ticket', async () => {
+    const j = (await chamar(donoA, lojaA, `/vendas?agrupar_por=tamanho&${Q}`)).json()
+    expect(j.linhas).toHaveLength(1)
+    expect(j.linhas[0]).toMatchObject({
+      chave: 'Grande', rotulo: 'Grande', quantidade: 2, pedidos: 1, faturamento_centavos: 4000, ticket_medio_centavos: null,
+    })
+    expect(j.linhas[0].participacao).toBeCloseTo(1)
+  })
+
+  it('vendas por mesa: comandas fechadas do salao, universo proprio (nao pedidos)', async () => {
+    const j = (await chamar(donoA, lojaA, `/vendas?agrupar_por=mesa&${Q}`)).json()
+    expect(j.linhas.map((l: { rotulo: string; faturamento_centavos: number; pedidos: number }) =>
+      [l.rotulo, l.faturamento_centavos, l.pedidos]))
+      .toEqual([['Mesa 1', 4500, 1]])
+    expect(j.linhas[0].quantidade).toBeNull()
+    expect(j.linhas[0].ticket_medio_centavos).toBe(4500)
+    expect(j.total_pedidos).toBe(1)
+    expect(j.total_faturamento_centavos).toBe(4500) // comandas, nao os 10000 de pedidos
   })
 
   it('formas de pagamento: caixa + Pix online sem dupla contagem', async () => {

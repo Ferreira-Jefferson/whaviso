@@ -14,6 +14,8 @@ export interface Janela {
 
 export interface GrupoLinha {
   chave: string
+  /** Rotulo legivel quando a chave nao e exibivel (ex.: id do motoboy/mesa); null => o servico deriva. */
+  rotulo: string | null
   pedidos: number
   quantidade: number | null
   faturamento: number
@@ -39,7 +41,61 @@ export async function vendasPorDimensao(
 ): Promise<GrupoLinha[]> {
   const ordem = DIMENSOES_TEMPO.has(dim) ? sqlBruto('chave') : sqlBruto('faturamento desc, chave')
   let consulta: Consulta
-  if (dim === 'item' || dim === 'categoria') {
+  if (dim === 'mesa') {
+    // Fonte: salao. Comandas FECHADAS por mesa, periodo pela data de fechamento (venda realizada).
+    consulta = sql`with g as (
+        select me.id::text as chave, me.nome as rotulo,
+               count(*)::int as pedidos,
+               null::int as quantidade,
+               sum(c.total_centavos)::float8 as faturamento
+          from public.comandas c
+          join public.mesas me on me.id = c.mesa_id and me.loja_id = c.loja_id
+         where c.loja_id = ${j.lojaId} and c.status = 'fechada'
+           and c.fechada_em >= ${j.inicio} and c.fechada_em < ${j.fim}
+         group by 1, 2)
+      select chave, rotulo, pedidos, quantidade, faturamento, (sum(faturamento) over ())::float8 as total_grupo
+        from g order by ${ordem}`
+  } else if (dim === 'motoboy') {
+    // Pedidos entregues por entregador; sem motoboy (retirada/mesa) vira um balde "Sem motoboy".
+    consulta = sql`with g as (
+        select coalesce(m.id::text, 'sem') as chave,
+               coalesce(m.nome, 'Sem motoboy') as rotulo,
+               count(*)::int as pedidos,
+               null::int as quantidade,
+               sum(p.total_centavos)::float8 as faturamento
+          from public.pedidos p
+          left join public.motoboys m on m.id = p.motoboy_id and m.loja_id = p.loja_id
+         where p.loja_id = ${j.lojaId} and p.status = 'entregue'
+           and p.criado_em >= ${j.inicio} and p.criado_em < ${j.fim}
+         group by 1, 2)
+      select chave, rotulo, pedidos, quantidade, faturamento, (sum(faturamento) over ())::float8 as total_grupo
+        from g order by ${ordem}`
+  } else if (dim === 'tamanho') {
+    // Itens de pedidos entregues cuja opcao vem de um grupo tipo 'tamanho'. Uma unica opcao de
+    // tamanho por item (distinct on) evita contar o item duas vezes; a classificacao exige o
+    // vinculo a opcao de origem (snapshot sem opcao_id nao e classificavel => fica de fora).
+    consulta = sql`with tam as (
+          select distinct on (o.item_pedido_id) o.item_pedido_id, o.nome_snapshot as nome
+            from public.itens_pedido_opcoes o
+            join public.opcoes op on op.id = o.opcao_id and op.loja_id = o.loja_id
+            join public.grupos_opcoes gr on gr.id = op.grupo_id and gr.loja_id = o.loja_id and gr.tipo = 'tamanho'
+           where o.loja_id = ${j.lojaId}
+           order by o.item_pedido_id, o.criado_em
+        ), g as (
+          select tam.nome as chave,
+                 count(distinct p.id)::int as pedidos,
+                 sum(i.quantidade)::int as quantidade,
+                 sum(i.total_centavos)::float8 as faturamento
+            from tam
+            join public.itens_pedido i on i.id = tam.item_pedido_id
+            join public.pedidos p on p.id = i.pedido_id and p.loja_id = i.loja_id
+           where p.loja_id = ${j.lojaId} and p.status = 'entregue' and not i.cancelado
+             and p.criado_em >= ${j.inicio} and p.criado_em < ${j.fim}
+           group by 1)
+      select chave, null::text as rotulo, pedidos, quantidade, faturamento,
+             (sum(faturamento) over ())::float8 as total_grupo
+        from g order by ${ordem}`
+  } else if (dim === 'item' || dim === 'categoria') {
     const chave = dim === 'item' ? sqlBruto('i.nome_snapshot') : sqlBruto(`coalesce(c.nome, 'Sem categoria')`)
     consulta = sql`with g as (
         select ${chave} as chave,
@@ -53,7 +109,8 @@ export async function vendasPorDimensao(
          where p.loja_id = ${j.lojaId} and p.status = 'entregue' and not i.cancelado
            and p.criado_em >= ${j.inicio} and p.criado_em < ${j.fim}
          group by 1)
-      select chave, pedidos, quantidade, faturamento, (sum(faturamento) over ())::float8 as total_grupo
+      select chave, null::text as rotulo, pedidos, quantidade, faturamento,
+             (sum(faturamento) over ())::float8 as total_grupo
         from g order by ${ordem} limit ${limite}`
   } else {
     const chave = sqlBruto(CHAVE_PEDIDO[dim]!)
@@ -66,7 +123,8 @@ export async function vendasPorDimensao(
          where p.loja_id = ${j.lojaId} and p.status = 'entregue'
            and p.criado_em >= ${j.inicio} and p.criado_em < ${j.fim}
          group by 1)
-      select chave, pedidos, quantidade, faturamento, (sum(faturamento) over ())::float8 as total_grupo
+      select chave, null::text as rotulo, pedidos, quantidade, faturamento,
+             (sum(faturamento) over ())::float8 as total_grupo
         from g order by ${ordem}`
   }
   return consultar<GrupoLinha>(exec, consulta)
@@ -84,6 +142,18 @@ export async function totalVendas(exec: Executor, j: Janela): Promise<TotalVenda
           from public.pedidos
          where loja_id = ${j.lojaId} and status = 'entregue'
            and criado_em >= ${j.inicio} and criado_em < ${j.fim}`,
+  )
+  return r!
+}
+
+/** Universo da dimensao `mesa`: comandas fechadas no periodo (denominador proprio, nao pedidos). */
+export async function totalComandas(exec: Executor, j: Janela): Promise<TotalVendas> {
+  const r = await consultarUm<TotalVendas>(
+    exec,
+    sql`select count(*)::int as pedidos, coalesce(sum(total_centavos), 0)::float8 as faturamento
+          from public.comandas
+         where loja_id = ${j.lojaId} and status = 'fechada'
+           and fechada_em >= ${j.inicio} and fechada_em < ${j.fim}`,
   )
   return r!
 }

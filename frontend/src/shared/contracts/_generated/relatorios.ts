@@ -18,8 +18,13 @@ export const RelatorioPeriodo = z.strictObject({
 })
 export type RelatorioPeriodo = z.infer<typeof RelatorioPeriodo>
 
+// Dimensoes de agrupamento. A maioria agrega pedidos entregues; tres tem fonte propria:
+//   motoboy  = pedidos entregues por entregador (pedidos sem motoboy caem em "Sem motoboy");
+//   tamanho  = itens de pedidos entregues cuja opcao vem de um grupo tipo 'tamanho' (unidades);
+//   mesa     = comandas FECHADAS do salao por mesa (fonte: salao, nao pedidos).
 export const VendasDimensao = z.enum([
   'dia', 'semana', 'mes', 'hora', 'dia_semana', 'origem', 'modalidade', 'categoria', 'item',
+  'motoboy', 'tamanho', 'mesa',
 ])
 export type VendasDimensao = z.infer<typeof VendasDimensao>
 
@@ -36,17 +41,21 @@ export const VendasLinha = z.strictObject({
   /** Valor estavel da dimensao (ex.: '2026-03-10', '14', 'whatsapp', nome do item). */
   chave: z.string(),
   rotulo: z.string(),
+  /** Pedidos do grupo; em `mesa` conta comandas fechadas. */
   pedidos: Contagem,
-  /** Unidades vendidas; so em `categoria` e `item` (null nas demais). */
+  /** Unidades vendidas; so em `categoria`, `item` e `tamanho` (null nas demais). */
   quantidade: Contagem.nullable(),
   faturamento_centavos: Centavos,
-  /** faturamento / pedidos; null em `categoria` e `item` (receita da linha, nao do pedido). */
+  /** faturamento / pedidos; null em `categoria`, `item` e `tamanho` (receita da linha, nao do pedido). */
   ticket_medio_centavos: Centavos.nullable(),
   /** Fatia 0..1 do faturamento do grupo no total do periodo (null se total 0). */
   participacao: z.number().min(0).max(1).nullable(),
 })
 
-/** Vendas realizadas (pedidos `entregue`) agrupadas pela dimensao pedida. */
+/**
+ * Vendas realizadas agrupadas pela dimensao pedida. Em quase todas as dimensoes os totais
+ * sao de pedidos `entregue`; em `mesa` refletem comandas FECHADAS do salao.
+ */
 export const VendasSaida = z.strictObject({
   periodo: PeriodoRelatorio,
   agrupar_por: VendasDimensao,

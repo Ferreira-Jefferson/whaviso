@@ -19,6 +19,9 @@ const DIMENSOES: ReadonlyArray<{ value: VendasDimensao; label: string; coluna: s
   { value: 'modalidade', label: 'Entrega ou retirada', coluna: 'Modalidade' },
   { value: 'categoria', label: 'Por categoria do cardápio', coluna: 'Categoria' },
   { value: 'item', label: 'Por item (mais vendidos)', coluna: 'Item' },
+  { value: 'tamanho', label: 'Por tamanho', coluna: 'Tamanho' },
+  { value: 'motoboy', label: 'Por motoboy', coluna: 'Motoboy' },
+  { value: 'mesa', label: 'Por mesa (salão)', coluna: 'Mesa' },
 ]
 
 type Linha = VendasSaida['linhas'][number]
@@ -30,11 +33,14 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
   const q = useVendas(periodo, dimensao)
   const dim = DIMENSOES.find((d) => d.value === dimensao) ?? { value: dimensao, label: 'Por dia', coluna: 'Dia' }
   const d = q.data
-  const porItem = dimensao === 'categoria' || dimensao === 'item'
+  const porItem = dimensao === 'categoria' || dimensao === 'item' || dimensao === 'tamanho'
+  // Mesa vem do salão: a contagem são comandas fechadas, não pedidos entregues.
+  const mesa = dimensao === 'mesa'
+  const rotuloContagem = mesa ? 'Comandas' : 'Pedidos'
 
   const colunas: ColunaTabela<Linha>[] = [
     { chave: 'rotulo', titulo: dim.coluna, principal: true, render: (l) => <span className="font-medium">{l.rotulo}</span> },
-    { chave: 'pedidos', titulo: 'Pedidos', alinhar: 'direita', render: (l) => <span className="tabular">{l.pedidos}</span> },
+    { chave: 'pedidos', titulo: rotuloContagem, alinhar: 'direita', render: (l) => <span className="tabular">{l.pedidos}</span> },
     ...(porItem
       ? [{ chave: 'quantidade', titulo: 'Unidades', alinhar: 'direita' as const, render: (l: Linha) => <span className="tabular">{l.quantidade ?? '-'}</span> }]
       : [{ chave: 'ticket', titulo: 'Ticket médio', alinhar: 'direita' as const, render: (l: Linha) => <span className="tabular">{l.ticket_medio_centavos === null ? '-' : formatarCentavos(l.ticket_medio_centavos)}</span> }]),
@@ -64,8 +70,8 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Tile rotulo="Faturamento" carregando={q.isPending} valor={d ? formatarCentavos(d.total_faturamento_centavos) : null} tom="folha" icone={<Wallet className="size-4" aria-hidden />} detalhe="Pedidos entregues" />
-            <Tile rotulo="Pedidos entregues" carregando={q.isPending} valor={d ? String(d.total_pedidos) : null} icone={<ShoppingBag className="size-4" aria-hidden />} />
+            <Tile rotulo="Faturamento" carregando={q.isPending} valor={d ? formatarCentavos(d.total_faturamento_centavos) : null} tom="folha" icone={<Wallet className="size-4" aria-hidden />} detalhe={mesa ? 'Comandas fechadas' : 'Pedidos entregues'} />
+            <Tile rotulo={mesa ? 'Comandas fechadas' : 'Pedidos entregues'} carregando={q.isPending} valor={d ? String(d.total_pedidos) : null} icone={<ShoppingBag className="size-4" aria-hidden />} />
             <Tile rotulo="Ticket médio" carregando={q.isPending} valor={d ? (d.total_pedidos > 0 ? formatarCentavos(Math.round(d.total_faturamento_centavos / d.total_pedidos)) : '-') : null} icone={<Receipt className="size-4" aria-hidden />} />
           </div>
           <div className="grid gap-3">
@@ -81,7 +87,7 @@ export function SecaoVendas({ periodo }: { periodo: Periodo }) {
                   ))}
                 </div>
               ) : d && d.linhas.length === 0 ? (
-                <EmptyState icone={<ShoppingBag className="size-7" aria-hidden />} titulo="Sem vendas no período" descricao="Só pedidos entregues entram aqui. Experimente um período maior." />
+                <EmptyState icone={<ShoppingBag className="size-7" aria-hidden />} titulo="Sem vendas no período" descricao={mesa ? 'Só comandas fechadas entram aqui. Experimente um período maior.' : 'Só pedidos entregues entram aqui. Experimente um período maior.'} />
               ) : (
                 d && <TableResponsive legenda={`Vendas ${dim.label.toLowerCase()}`} colunas={colunas} linhas={d.linhas} chaveLinha={(l) => l.chave} />
               )}
