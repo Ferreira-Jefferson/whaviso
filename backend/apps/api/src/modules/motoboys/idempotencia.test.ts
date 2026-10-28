@@ -82,4 +82,19 @@ d('modulo motoboys (idempotencia do ajuste manual)', () => {
     // 900 + 100 + 100 = 1100.
     expect(f.corpo.linhas[0]).toMatchObject({ ajustes_centavos: 1100, total_centavos: 1100 })
   })
+
+  it('corrida: dois ajustes com a MESMA chave em paralelo: mesmo id, uma linha so', async () => {
+    const corpo = { data: DIA, valor_centavos: 300, descricao: 'Duplo-clique', chave_idempotencia: 'mb-aj-corrida' }
+    const [r1, r2] = await Promise.all([lancar(corpo), lancar(corpo)])
+    expect(r1.status, JSON.stringify(r1.corpo)).toBe(201)
+    expect(r2.status, JSON.stringify(r2.corpo)).toBe(201)
+    expect(r2.corpo.id).toBe(r1.corpo.id)
+
+    // Uma unica linha com essa chave e um unico evento; o indice unico parcial fecha a corrida.
+    const { rows } = await poolSuper.query<{ n: number }>(
+      'select count(*)::int as n from public.motoboy_lancamentos where loja_id = $1 and chave_idempotencia = $2',
+      [m.A.loja, 'mb-aj-corrida'])
+    expect(rows[0]!.n).toBe(1)
+    expect(await contarAjustes()).toBe(6) // 5 anteriores + 1 desta corrida
+  })
 })
