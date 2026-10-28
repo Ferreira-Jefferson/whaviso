@@ -25,10 +25,18 @@ interface Props {
   onMetros: (metros: number) => void
   /** Modo ponto: desenha o marcador so quando ha um ponto definido (clique define o primeiro). */
   mostrarPonto?: boolean
+  /**
+   * Centro/origem pode ser movido (arrastar o marcador ou clicar no mapa)? Padrao true. No modo raio
+   * fica false ate o usuario pedir explicitamente (evita mover o ponto de referencia por acidente).
+   * O handle do raio e sempre arrastavel: so o REPOSICIONAMENTO do centro depende disto.
+   */
+  centroEditavel?: boolean
   // --- poligono ---
   vertices: PontoMapa[]
   onAdicionarVertice: (p: PontoMapa) => void
   onMoverVertice: (indice: number, p: PontoMapa) => void
+  /** Clicar em cima de um vertice ja marcado remove ele. */
+  onRemoverVertice: (indice: number) => void
 }
 
 // Icone da loja: mesmo visual do MapaLeaflet (circulo verde #20322a com a lojinha em #faf7f0).
@@ -62,6 +70,8 @@ function iconeVertice(numero: number): L.DivIcon {
 
 export default function SeletorAreaLeaflet(props: Props) {
   const { modo, centroLoja, centro, metros, vertices, mostrarPonto } = props
+  // Por padrao o centro/origem e editavel (modo ponto); o modo raio passa false ate liberar.
+  const centroEditavel = props.centroEditavel ?? true
 
   const elRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -84,17 +94,21 @@ export default function SeletorAreaLeaflet(props: Props) {
   metrosRef.current = metros
   const verticesRef = useRef(vertices)
   verticesRef.current = vertices
+  const editavelRef = useRef(centroEditavel)
+  editavelRef.current = centroEditavel
   const cbRef = useRef({
     onCentro: props.onCentro,
     onMetros: props.onMetros,
     onAdicionarVertice: props.onAdicionarVertice,
     onMoverVertice: props.onMoverVertice,
+    onRemoverVertice: props.onRemoverVertice,
   })
   cbRef.current = {
     onCentro: props.onCentro,
     onMetros: props.onMetros,
     onAdicionarVertice: props.onAdicionarVertice,
     onMoverVertice: props.onMoverVertice,
+    onRemoverVertice: props.onRemoverVertice,
   }
 
   // Cria o mapa uma vez.
@@ -129,7 +143,7 @@ export default function SeletorAreaLeaflet(props: Props) {
 
     const centroMk = L.marker([c.lat, c.lng], {
       icon: iconeLoja(),
-      draggable: true,
+      draggable: editavelRef.current,
       keyboard: false,
       title: 'Centro da area (arraste para mover)',
     }).addTo(map)
@@ -174,8 +188,9 @@ export default function SeletorAreaLeaflet(props: Props) {
     centroMk.on('drag', aoArrastarCentro)
     centroMk.on('dragend', aoSoltarCentro)
 
-    // Clicar no mapa reposiciona o centro.
+    // Clicar no mapa reposiciona o centro, so quando o centro esta liberado para edicao.
     const aoClicar = (e: L.LeafletMouseEvent) => {
+      if (!editavelRef.current) return
       cbRef.current.onCentro({ lat: e.latlng.lat, lng: e.latlng.lng })
     }
     map.on('click', aoClicar)
@@ -191,16 +206,28 @@ export default function SeletorAreaLeaflet(props: Props) {
     }
   }, [modo])
 
-  // Modo raio: sincroniza a vista do circulo quando centro/metros mudam de fora (input de km, pai).
+  // Modo raio: libera/trava o arraste do marcador de centro quando o usuario marca/desmarca o ajuste.
+  useEffect(() => {
+    const centroMk = centroMkRef.current
+    if (modo !== 'raio' || !centroMk) return
+    if (centroEditavel) centroMk.dragging?.enable()
+    else centroMk.dragging?.disable()
+  }, [modo, centroEditavel])
+
+  // Modo raio: sincroniza a vista do circulo quando centro/metros mudam de fora (input de km, pai) e
+  // reenquadra o mapa no circulo. Assim o zoom acompanha o raio: raio maior afasta (mostra o entorno),
+  // raio menor aproxima. Nao roda durante o arraste (o pai so muda ao soltar/digitar), entao nao pula.
   useEffect(() => {
     const circulo = circuloRef.current
     const centroMk = centroMkRef.current
     const handle = handleMkRef.current
-    if (modo !== 'raio' || !circulo || !centroMk || !handle) return
+    const map = mapRef.current
+    if (modo !== 'raio' || !circulo || !centroMk || !handle || !map) return
     circulo.setLatLng([centro.lat, centro.lng])
     circulo.setRadius(metros)
     centroMk.setLatLng([centro.lat, centro.lng])
     handle.setLatLng([centro.lat, circulo.getBounds().getEast()])
+    if (metros > 0) map.fitBounds(circulo.getBounds(), { padding: [40, 40], maxZoom: 16 })
   }, [modo, centro.lat, centro.lng, metros])
 
   // Modo ponto: um unico marcador (icone da loja) arrastavel + clique para posicionar. O marcador so
@@ -310,7 +337,7 @@ export default function SeletorAreaLeaflet(props: Props) {
         icon: iconeVertice(i + 1),
         draggable: true,
         keyboard: false,
-        title: `Ponto ${i + 1} (arraste para ajustar)`,
+        title: `Ponto ${i + 1} (arraste para ajustar, clique para remover)`,
       }).addTo(grupo)
       mk.on('drag', () => {
         const poly = poligonoRef.current
@@ -324,6 +351,9 @@ export default function SeletorAreaLeaflet(props: Props) {
         const p = mk.getLatLng()
         cbRef.current.onMoverVertice(i, { lat: p.lat, lng: p.lng })
       })
+      // Clicar em cima de um vertice ja marcado remove ele (clique no marcador nao propaga ao mapa,
+      // entao nao adiciona outro ponto). Um clique coloca, clique em cima tira.
+      mk.on('click', () => cbRef.current.onRemoverVertice(i))
     })
     // verticesKey (derivado de vertices) e a dependencia real; vertices entra como snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -16,6 +16,7 @@ import {
   type AreaGeo,
   type PontoMapa,
 } from './tipos'
+import { useGeocodificarEndereco } from './useGeocodificarEndereco'
 
 const SeletorAreaLeaflet = lazy(() => import('./SeletorAreaLeaflet'))
 
@@ -99,6 +100,12 @@ function SeletorRaio({
   // Flag: o usuario ja mexeu (ou ja havia valor), entao nao recentramos quando a loja geocodificar.
   const interagiu = useRef(valor != null)
   const [kmTexto, setKmTexto] = useState(() => formatarKm(metrosParaKm(area.metros)))
+  // Mudar o ponto de origem e explicito (nao se move por acidente): so com o usuario marcando a opcao.
+  const [ajustarCentro, setAjustarCentro] = useState(false)
+  const [enderecoRef, setEnderecoRef] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [avisoEndereco, setAvisoEndereco] = useState<string | null>(null)
+  const { geocodificar } = useGeocodificarEndereco()
 
   // Valor vindo de fora (pai controlado): adota.
   useEffect(() => {
@@ -138,6 +145,17 @@ function SeletorRaio({
     if (km !== null) aplicar({ ...area, metros: kmParaMetros(clampKm(km)) })
   }
 
+  async function buscarEndereco() {
+    const texto = enderecoRef.trim()
+    if (texto === '' || buscando) return
+    setBuscando(true)
+    setAvisoEndereco(null)
+    const ponto = await geocodificar({ logradouro: texto })
+    setBuscando(false)
+    if (ponto) aplicar({ ...area, centro: ponto })
+    else setAvisoEndereco('Endereço não encontrado. Ajuste direto no mapa.')
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="max-w-40">
@@ -151,6 +169,48 @@ function SeletorRaio({
           />
         </Field>
       </div>
+
+      <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm text-tinta">
+        <input
+          type="checkbox"
+          checked={ajustarCentro}
+          onChange={(e) => setAjustarCentro(e.target.checked)}
+          className="size-4 accent-salvia"
+        />
+        Mudar o ponto de origem da entrega
+      </label>
+
+      {ajustarCentro && (
+        <div className="flex flex-col gap-2 rounded-input border border-linha bg-papel-2 p-3">
+          <p className="text-xs text-tinta-2">
+            Arraste o ponto da loja ou clique no mapa para mover o centro. A entrega passa a valer a
+            partir deste ponto, nao do endereco da loja.
+          </p>
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Field label="Buscar por endereço (opcional)">
+                <Input
+                  value={enderecoRef}
+                  onChange={(e) => setEnderecoRef(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void buscarEndereco()
+                    }
+                  }}
+                  placeholder="Ex.: Rua das Flores, 100, Centro"
+                  autoComplete="off"
+                />
+              </Field>
+            </div>
+            <Button type="button" variante="secondary" loading={buscando} disabled={enderecoRef.trim() === ''} onClick={() => void buscarEndereco()}>
+              Localizar
+            </Button>
+          </div>
+          {avisoEndereco && <p className="text-xs text-barro">{avisoEndereco}</p>}
+        </div>
+      )}
+
       <div className={moldura}>
         <Suspense fallback={carregando}>
           <SeletorAreaLeaflet
@@ -159,16 +219,20 @@ function SeletorRaio({
             centro={area.centro}
             metros={area.metros}
             raioMetrosMax={kmParaMetros(raioKmMax)}
+            centroEditavel={ajustarCentro}
             onCentro={(centro) => aplicar({ ...area, centro })}
             onMetros={(metros) => aplicar({ ...area, metros })}
             vertices={[]}
             onAdicionarVertice={() => undefined}
             onMoverVertice={() => undefined}
+            onRemoverVertice={() => undefined}
           />
         </Suspense>
       </div>
       <p className="text-sm text-tinta-2">
-        Clique para marcar o centro e arraste a borda para ajustar o raio.
+        {ajustarCentro
+          ? 'Arraste a borda do circulo para ajustar o raio; arraste o ponto da loja para mover o centro.'
+          : 'Arraste a borda do circulo para ajustar o raio. Para mover o centro, marque a opcao acima.'}
       </p>
     </div>
   )
@@ -205,6 +269,7 @@ export function SeletorPonto({
             vertices={[]}
             onAdicionarVertice={() => undefined}
             onMoverVertice={() => undefined}
+            onRemoverVertice={() => undefined}
           />
         </Suspense>
       </div>
@@ -258,6 +323,7 @@ function SeletorPoligono({
             vertices={vertices}
             onAdicionarVertice={(p) => aplicar([...vertices, p])}
             onMoverVertice={(i, p) => aplicar(vertices.map((v, j) => (j === i ? p : v)))}
+            onRemoverVertice={(i) => aplicar(vertices.filter((_, j) => j !== i))}
           />
         </Suspense>
       </div>
@@ -279,7 +345,8 @@ function SeletorPoligono({
           Limpar
         </Button>
         <p className="text-sm text-tinta-2">
-          Clique no mapa para desenhar a area; arraste os pontos para ajustar.
+          Clique no mapa para desenhar a area; arraste os pontos para ajustar e clique em um ponto para
+          remover.
         </p>
       </div>
     </div>
