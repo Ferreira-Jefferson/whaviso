@@ -213,23 +213,26 @@ export function criarServicoMotoboys(pool: Pool, cifra: Cifra) {
       const hoje = hojeSp()
       const data = e.data ?? hoje
       if (data > hoje) throw regraNegocio('data_futura', 'A data do lancamento nao pode ser futura')
-      const id = await comTransacao(pool, async (tx) => {
+      const lanc = await comTransacao(pool, async (tx) => {
         const status = await escrita.travarFechamentoDoDia(tx, a.lojaId, motoboyId, data)
         if (status === 'pago') {
           throw conflito('dia_ja_pago', 'Dia ja pago: faca o lancamento no dia corrente')
         }
-        const novo = await escrita.inserirLancamentoManual(tx, {
+        const { lancamento, criado } = await escrita.inserirLancamentoManual(tx, {
           lojaId: a.lojaId, motoboyId, data, valorCentavos: e.valor_centavos,
-          descricao: e.descricao, userId: a.userId,
+          descricao: e.descricao, userId: a.userId, chaveIdempotencia: e.chave_idempotencia ?? null,
         })
-        await evento(tx, a, 'motoboy.lancamento_manual', 'motoboy', motoboyId, {
-          lancamento_id: novo, data, valor_centavos: e.valor_centavos,
-        })
-        return novo
+        // Reenvio com a mesma chave (duplo-clique/retry): nada de novo gravado, nao registra evento.
+        if (criado) {
+          await evento(tx, a, 'motoboy.lancamento_manual', 'motoboy', motoboyId, {
+            lancamento_id: lancamento.id, data, valor_centavos: e.valor_centavos,
+          })
+        }
+        return lancamento
       })
       return {
-        id, data, tipo: 'ajuste', pedido_id: null, valor_centavos: e.valor_centavos,
-        descricao: e.descricao, criado_em: new Date().toISOString(),
+        id: lanc.id, data: lanc.data, tipo: 'ajuste', pedido_id: null,
+        valor_centavos: lanc.valor_centavos, descricao: lanc.descricao, criado_em: lanc.criado_em,
       }
     },
 

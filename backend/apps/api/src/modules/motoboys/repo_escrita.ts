@@ -102,18 +102,45 @@ export async function travarFechamentoDoDia(
   return r?.status ?? null
 }
 
+export interface LancamentoGravado {
+  id: string
+  data: string
+  valor_centavos: number
+  descricao: string | null
+  criado_em: string
+}
+
+/**
+ * Insere um ajuste manual. Com `chaveIdempotencia`, o reenvio da mesma chave (duplo-clique/retry) e
+ * no-op: o `on conflict do nothing` nao grava a 2a linha e o fallback devolve o lancamento original,
+ * tornando o ajuste idempotente. Sem chave, insere sempre (indice parcial nao se aplica a null).
+ */
 export async function inserirLancamentoManual(
   exec: Executor,
-  l: { lojaId: string; motoboyId: string; data: string; valorCentavos: number; descricao: string; userId: string },
-) {
-  const r = await consultarUm<{ id: string }>(
+  l: {
+    lojaId: string; motoboyId: string; data: string; valorCentavos: number
+    descricao: string; userId: string; chaveIdempotencia: string | null
+  },
+): Promise<{ lancamento: LancamentoGravado; criado: boolean }> {
+  const saida = sql`id::text as id, to_char(data, 'YYYY-MM-DD') as data, valor_centavos, descricao,
+                    to_char(criado_em at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as criado_em`
+  const inserido = await consultarUm<LancamentoGravado>(
     exec,
     sql`insert into public.motoboy_lancamentos
-          (loja_id, motoboy_id, data, tipo, valor_centavos, descricao, criado_por_user_id)
-        values (${l.lojaId}, ${l.motoboyId}, ${l.data}::date, 'ajuste', ${l.valorCentavos}, ${l.descricao}, ${l.userId})
-        returning id::text as id`,
+          (loja_id, motoboy_id, data, tipo, valor_centavos, descricao, criado_por_user_id, chave_idempotencia)
+        values (${l.lojaId}, ${l.motoboyId}, ${l.data}::date, 'ajuste', ${l.valorCentavos}, ${l.descricao},
+                ${l.userId}, ${l.chaveIdempotencia})
+        on conflict (loja_id, chave_idempotencia) where chave_idempotencia is not null do nothing
+        returning ${saida}`,
   )
-  return r!.id
+  if (inserido) return { lancamento: inserido, criado: true }
+  // Conflito: ja havia um ajuste com esta chave. Devolve o original (idempotente), sem novo evento.
+  const existente = await consultarUm<LancamentoGravado>(
+    exec,
+    sql`select ${saida} from public.motoboy_lancamentos
+         where loja_id = ${l.lojaId} and chave_idempotencia = ${l.chaveIdempotencia}`,
+  )
+  return { lancamento: existente!, criado: false }
 }
 
 /** Lock da linha do fechamento (id) para pagar sem corrida. */

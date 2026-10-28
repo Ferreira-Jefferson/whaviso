@@ -94,6 +94,9 @@ export const LancamentoManualEntrada = z.strictObject({
   descricao: texto(200),
   /** Dia de negocio do ajuste; padrao = hoje (SP). Nao pode ser futuro. */
   data: DataNegocio.optional(),
+  // Idempotencia: uma chave por acao do operador (ex.: uuid do clique). Reenviar o mesmo ajuste
+  // com a mesma chave e no-op (devolve o lancamento ja gravado), fechando o duplo-clique/retry.
+  chave_idempotencia: z.string().trim().regex(/^[A-Za-z0-9_.:-]{1,120}$/).optional(),
 })
 
 export const LancamentoSaida = z.strictObject({
