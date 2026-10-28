@@ -80,7 +80,7 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   itens_fiscais: { apiDelete: 'negado' },
   itens_pedido: { apiDelete: 'negado' },
   itens_pedido_opcoes: { apiDelete: 'negado' },
-  janela_atendente: { apiDelete: 'negado' },
+  agendamento_config: { apiDelete: 'negado' },
   loja_pix: { apiDelete: 'negado' },
   lojas: { apiDelete: 'negado' },
   membros: { apiDelete: 'negado' },
@@ -227,13 +227,13 @@ export const CASOS_ESPECIFICOS: readonly LinhaMatriz[] = [
 
   // disponibilidade (0024): api e dona do cadastro; atendente LE as tres para decidir atendimento; zap nao toca.
   { role: 'whaviso_api', tabela: 'horarios_funcionamento', operacao: 'insert', esperado: 'permitido', sec: 'SEC-032', nota: 'api dona do cadastro' },
-  { role: 'whaviso_api', tabela: 'janela_atendente', operacao: 'update', esperado: 'permitido', sec: 'SEC-032', nota: 'api dona do cadastro' },
+  { role: 'whaviso_api', tabela: 'agendamento_config', operacao: 'update', esperado: 'permitido', sec: 'SEC-032', nota: 'api dona do cadastro' },
   { role: 'whaviso_api', tabela: 'excecoes_disponibilidade', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'api dona do cadastro' },
   { role: 'whaviso_atendente', tabela: 'horarios_funcionamento', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le horario para decidir atendimento' },
-  { role: 'whaviso_atendente', tabela: 'janela_atendente', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le a janela de resposta' },
+  { role: 'whaviso_atendente', tabela: 'agendamento_config', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le a janela de agendamento' },
   { role: 'whaviso_atendente', tabela: 'excecoes_disponibilidade', operacao: 'select', esperado: 'permitido', sec: 'SEC-032', nota: 'le feriados/excecoes' },
   { role: 'whaviso_atendente', tabela: 'horarios_funcionamento', operacao: 'insert', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so le' },
-  { role: 'whaviso_atendente', tabela: 'janela_atendente', operacao: 'update', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so le' },
+  { role: 'whaviso_atendente', tabela: 'agendamento_config', operacao: 'update', esperado: 'negado', sec: 'SEC-032', nota: 'atendente so le' },
   { role: 'whaviso_zap', tabela: 'horarios_funcionamento', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'zap nao toca disponibilidade' },
   { role: 'whaviso_zap', tabela: 'excecoes_disponibilidade', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'zap nao toca disponibilidade' },
 

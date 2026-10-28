@@ -1,8 +1,8 @@
 // SQL parametrizado do modulo (SEC-080). Dono de escrita das tres tabelas de disponibilidade.
 // Toda consulta filtra por loja_id (multi-tenant). time -> "HH:mm"; date -> "YYYY-MM-DD"; ts -> UTC ISO.
 import { consultar, consultarUm, sql, sqlBruto, type Consulta, type Executor } from '@whaviso/shared/db'
-import type { HorarioSaida, ExcecaoSaida, JanelaAtendenteSaida } from './schemas'
-import type { FaixaHorario, Excecao } from './calculo'
+import type { FaixaHorario, Excecao } from '@whaviso/shared/disponibilidade'
+import type { HorarioSaida, ExcecaoSaida, AgendamentoConfigSaida } from './schemas'
 
 const TS = (col: string): Consulta =>
   sqlBruto(`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`)
@@ -79,45 +79,45 @@ export function desativarHorario(exec: Executor, lojaId: string, id: string) {
   )
 }
 
-// --- Janela do atendente (uma linha por loja) ---
-export async function obterJanela(
+// --- Janela de agendamento da loja (uma linha por loja; modo desligado|faixa|24h) ---
+const SAIDA_AG = sql`modo, ${HM('inicio')} as inicio, ${HM('fim')} as fim, dias,
+  ${TS('atualizado_em')} as atualizado_em`
+
+export async function obterAgendamento(
   exec: Executor,
   lojaId: string,
-): Promise<JanelaAtendenteSaida | null> {
+): Promise<AgendamentoConfigSaida | null> {
   const r = await consultarUm<Record<string, unknown>>(
     exec,
-    sql`select ${HM('inicio')} as inicio, ${HM('fim')} as fim, dias, ativo,
-               ${TS('atualizado_em')} as atualizado_em
-          from public.janela_atendente where loja_id = ${lojaId}`,
+    sql`select ${SAIDA_AG} from public.agendamento_config where loja_id = ${lojaId}`,
   )
-  return r ? mapJanela(r) : null
+  return r ? mapAgendamento(r) : null
 }
 
-function mapJanela(r: Record<string, unknown>): JanelaAtendenteSaida {
+function mapAgendamento(r: Record<string, unknown>): AgendamentoConfigSaida {
   return {
-    inicio: r['inicio'] as string,
-    fim: r['fim'] as string,
-    dias: r['dias'] as number[],
-    ativo: r['ativo'] as boolean,
+    modo: r['modo'] as AgendamentoConfigSaida['modo'],
+    inicio: (r['inicio'] as string | null) ?? null,
+    fim: (r['fim'] as string | null) ?? null,
+    dias: (r['dias'] as number[] | null) ?? [], // [] quando nao e faixa
     atualizado_em: r['atualizado_em'] as string,
   }
 }
 
-export async function upsertJanela(
+export async function upsertAgendamento(
   exec: Executor,
   lojaId: string,
-  j: { inicio: string; fim: string; dias: number[]; ativo: boolean },
-): Promise<JanelaAtendenteSaida> {
+  a: { modo: AgendamentoConfigSaida['modo']; inicio: string | null; fim: string | null; dias: number[] | null },
+): Promise<AgendamentoConfigSaida> {
   const r = await consultarUm<Record<string, unknown>>(
     exec,
-    sql`insert into public.janela_atendente (loja_id, inicio, fim, dias, ativo)
-        values (${lojaId}, ${j.inicio}::time, ${j.fim}::time, ${j.dias}::smallint[], ${j.ativo})
+    sql`insert into public.agendamento_config (loja_id, modo, inicio, fim, dias)
+        values (${lojaId}, ${a.modo}::modo_agendamento, ${a.inicio}::time, ${a.fim}::time, ${a.dias}::smallint[])
         on conflict (loja_id) do update
-          set inicio = excluded.inicio, fim = excluded.fim, dias = excluded.dias, ativo = excluded.ativo
-        returning ${HM('inicio')} as inicio, ${HM('fim')} as fim, dias, ativo,
-                  ${TS('atualizado_em')} as atualizado_em`,
+          set modo = excluded.modo, inicio = excluded.inicio, fim = excluded.fim, dias = excluded.dias
+        returning ${SAIDA_AG}`,
   )
-  return mapJanela(r!)
+  return mapAgendamento(r!)
 }
 
 // --- Excecoes / feriados ---

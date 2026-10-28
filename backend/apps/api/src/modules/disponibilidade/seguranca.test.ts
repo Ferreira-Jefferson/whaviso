@@ -80,10 +80,10 @@ d('modulo disponibilidade (seguranca)', () => {
 
   it('atendente le horarios/janela/excecoes mas NAO escreve (403)', async () => {
     expect((await chamar(atendA, lojaA, 'GET', '/horarios')).statusCode).toBe(200)
-    expect((await chamar(atendA, lojaA, 'GET', '/janela')).statusCode).toBe(200)
+    expect((await chamar(atendA, lojaA, 'GET', '/agendamento')).statusCode).toBe(200)
     expect((await chamar(atendA, lojaA, 'GET', '/excecoes')).statusCode).toBe(200)
     expect((await chamar(atendA, lojaA, 'POST', '/horarios', { dia_semana: 3, abre: '09:00', fecha: '18:00' })).statusCode).toBe(403)
-    expect((await chamar(atendA, lojaA, 'PUT', '/janela', { inicio: '08:00', fim: '20:00', dias: [1] })).statusCode).toBe(403)
+    expect((await chamar(atendA, lojaA, 'PUT', '/agendamento', { modo: 'faixa', inicio: '08:00', fim: '20:00', dias: [1] })).statusCode).toBe(403)
     expect((await chamar(atendA, lojaA, 'POST', '/excecoes', { data: '2026-11-15', fechado: true })).statusCode).toBe(403)
   })
 

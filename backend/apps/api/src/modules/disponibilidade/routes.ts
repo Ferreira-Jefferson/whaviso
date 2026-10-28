@@ -12,9 +12,9 @@ import {
   HorarioPatch,
   HorarioSaida,
   IdParams,
-  JanelaAtendenteEntrada,
-  JanelaAtendenteGetSaida,
-  JanelaAtendenteSaida,
+  AgendamentoEntrada,
+  AgendamentoGetSaida,
+  AgendamentoConfigSaida,
 } from './schemas'
 
 /** Loja efetiva = SO a do escopo resolvido (nunca corpo/query). */
@@ -53,14 +53,14 @@ export function criarDisponibilidadeRoutes(): FastifyPluginAsync {
       ...gerir, schema: { params: IdParams, response: { 200: HorarioSaida } },
     }, async (req) => svc.desativarHorario(ator(req), req.params.id))
 
-    // --- Janela do atendente ---
-    app.get('/janela', {
-      ...ler, schema: { response: { 200: JanelaAtendenteGetSaida } },
-    }, async (req) => svc.obterJanela(ator(req)))
+    // --- Janela de agendamento da loja ---
+    app.get('/agendamento', {
+      ...ler, schema: { response: { 200: AgendamentoGetSaida } },
+    }, async (req) => svc.obterAgendamento(ator(req)))
 
-    app.put('/janela', {
-      ...gerir, schema: { body: JanelaAtendenteEntrada, response: { 200: JanelaAtendenteSaida } },
-    }, async (req) => svc.definirJanela(ator(req), req.body))
+    app.put('/agendamento', {
+      ...gerir, schema: { body: AgendamentoEntrada, response: { 200: AgendamentoConfigSaida } },
+    }, async (req) => svc.definirAgendamento(ator(req), req.body))
 
     // --- Excecoes / feriados ---
     app.get('/excecoes', {

@@ -1,5 +1,5 @@
 // Integracao do modulo disponibilidade contra o Postgres local (role whaviso_api).
-// Cobre CRUD de horarios (com sobreposicao), janela do atendente, excecoes e o estado derivado.
+// Cobre CRUD de horarios (com sobreposicao), janela de agendamento, excecoes e o estado derivado.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { criarLogger } from '@whaviso/shared/logger'
 import {
@@ -115,17 +115,35 @@ d('modulo disponibilidade (integracao)', () => {
     expect(reusar.statusCode).toBe(201)
   })
 
-  // --- janela do atendente ---
-  it('janela: vazia vira null; PUT cria e depois atualiza (upsert)', async () => {
-    expect((await chamar(dono, lojaA, 'GET', '/janela')).json()).toEqual({ janela: null })
-    const posta = await chamar(dono, lojaA, 'PUT', '/janela', { inicio: '08:00', fim: '20:00', dias: [1, 2, 3] })
-    expect(posta.statusCode).toBe(200)
-    expect(posta.json()).toMatchObject({ inicio: '08:00', fim: '20:00', dias: [1, 2, 3], ativo: true })
-    const atual = await chamar(dono, lojaA, 'PUT', '/janela', { inicio: '10:00', fim: '18:00', dias: [5], ativo: false })
-    expect(atual.json()).toMatchObject({ inicio: '10:00', dias: [5], ativo: false })
-    expect((await chamar(dono, lojaA, 'GET', '/janela')).json().janela.inicio).toBe('10:00')
-    const ruim = await chamar(dono, lojaA, 'PUT', '/janela', { inicio: '10:00', fim: '18:00', dias: [] })
+  // --- janela de agendamento (modos desligado|faixa|24h) ---
+  it('agendamento: sem linha vira default desligado; PUT cobre os tres modos (upsert)', async () => {
+    const vazio = await chamar(dono, lojaA, 'GET', '/agendamento')
+    expect(vazio.statusCode).toBe(200)
+    expect(vazio.json().agendamento).toMatchObject({ modo: 'desligado', inicio: null, fim: null, dias: [] })
+    expect(vazio.json().agendamento.atualizado_em).toMatch(/Z$/)
+
+    // faixa: exige inicio/fim distintos e ao menos um dia.
+    const faixa = await chamar(dono, lojaA, 'PUT', '/agendamento', { modo: 'faixa', inicio: '08:00', fim: '20:00', dias: [1, 2, 3] })
+    expect(faixa.statusCode).toBe(200)
+    expect(faixa.json()).toMatchObject({ modo: 'faixa', inicio: '08:00', fim: '20:00', dias: [1, 2, 3] })
+
+    // 24h: inicio/fim/dias zerados (nao e faixa).
+    const h24 = await chamar(dono, lojaA, 'PUT', '/agendamento', { modo: '24h' })
+    expect(h24.statusCode).toBe(200)
+    expect(h24.json()).toMatchObject({ modo: '24h', inicio: null, fim: null, dias: [] })
+
+    // desligado: idem.
+    const off = await chamar(dono, lojaA, 'PUT', '/agendamento', { modo: 'desligado' })
+    expect(off.statusCode).toBe(200)
+    expect(off.json()).toMatchObject({ modo: 'desligado', inicio: null, fim: null, dias: [] })
+    expect((await chamar(dono, lojaA, 'GET', '/agendamento')).json().agendamento.modo).toBe('desligado')
+
+    // faixa sem dias: 400 (refine do contrato).
+    const ruim = await chamar(dono, lojaA, 'PUT', '/agendamento', { modo: 'faixa', inicio: '10:00', fim: '18:00', dias: [] })
     expect(ruim.statusCode).toBe(400)
+    // faixa sem inicio/fim: 400.
+    const ruim2 = await chamar(dono, lojaA, 'PUT', '/agendamento', { modo: 'faixa', dias: [1] })
+    expect(ruim2.statusCode).toBe(400)
   })
 
   // --- excecoes ---
@@ -153,12 +171,22 @@ d('modulo disponibilidade (integracao)', () => {
   })
 
   // --- estado derivado ---
-  it('GET /agora devolve os dois booleanos derivados e um instante UTC', async () => {
+  it('GET /agora devolve aceitando_agora, o modo_atendente derivado e um instante UTC', async () => {
     const r = await chamar(dono, lojaA, 'GET', '/agora')
     expect(r.statusCode).toBe(200)
     const s = r.json()
     expect(typeof s.aceitando_agora).toBe('boolean')
-    expect(typeof s.atendente_pode_responder).toBe('boolean')
+    expect(['atendimento', 'agendamento', 'fechado']).toContain(s.modo_atendente)
     expect(s.agora).toMatch(/Z$/)
+  })
+
+  it('GET /agora: fora do atendimento, agendamento 24h -> modo agendamento', async () => {
+    // Loja sem horario de atendimento ativo para agora (desativamos tudo acima; resta a faixa reusada
+    // 08:00-12:00 de segunda). Garante o cenario fechando o horario de atendimento via agendamento 24h:
+    // o resultado so prova que o modo deriva do agendamento quando a loja nao aceita pedido ao vivo.
+    await chamar(dono, lojaA, 'PUT', '/agendamento', { modo: '24h' })
+    const s = (await chamar(dono, lojaA, 'GET', '/agora')).json()
+    // Se a loja estiver aceitando pedido ao vivo agora, o modo e atendimento; senao, agendamento (nunca fechado com 24h).
+    expect(s.modo_atendente).toBe(s.aceitando_agora ? 'atendimento' : 'agendamento')
   })
 })

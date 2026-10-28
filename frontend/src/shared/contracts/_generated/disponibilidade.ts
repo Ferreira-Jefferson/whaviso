@@ -37,29 +37,37 @@ export const HorarioSaida = z.strictObject({
 export type HorarioSaida = z.infer<typeof HorarioSaida>
 export const HorarioListaSaida = z.strictObject({ itens: z.array(HorarioSaida) })
 
-// --- Janela do atendente (IA): fora dela o atendente nao responde ---
-export const JanelaAtendenteEntrada = z
-  .strictObject({
-    inicio: Hhmm,
-    fim: Hhmm,
-    dias: z.array(DiaSemana).min(1).max(7).refine((d) => new Set(d).size === d.length, {
-      message: 'dias repetidos',
-    }),
-    ativo: z.boolean().optional(),
-  })
-  .refine((j) => j.inicio !== j.fim, { message: 'inicio e fim nao podem ser iguais' })
-export type JanelaAtendenteEntrada = z.infer<typeof JanelaAtendenteEntrada>
+// --- Janela de agendamento da loja (fonte unica; o atendente nao tem horario proprio) ---
+/** Modo da janela de agendamento: desligado (so pedido ao vivo), faixa propria, ou 24h. */
+export const ModoAgendamento = z.enum(['desligado', 'faixa', '24h'])
+/** Modo derivado do atendente, computado no servidor a partir da disponibilidade da loja. */
+export const ModoAtendente = z.enum(['atendimento', 'agendamento', 'fechado'])
 
-export const JanelaAtendenteSaida = z.strictObject({
-  inicio: Hhmm,
-  fim: Hhmm,
-  dias: z.array(DiaSemana),
-  ativo: z.boolean(),
+export const AgendamentoEntrada = z
+  .strictObject({
+    modo: ModoAgendamento,
+    inicio: Hhmm.nullable().optional(),
+    fim: Hhmm.nullable().optional(),
+    dias: z.array(DiaSemana).max(7).optional(),
+  })
+  .refine(
+    (a) => a.modo !== 'faixa' || (!!a.inicio && !!a.fim && a.inicio !== a.fim && !!a.dias && a.dias.length >= 1),
+    { message: 'modo faixa exige inicio, fim distintos e ao menos um dia' },
+  )
+export type AgendamentoEntrada = z.infer<typeof AgendamentoEntrada>
+
+// Nome `AgendamentoConfigSaida` (nao `AgendamentoSaida`) para nao colidir com o contrato
+// `agendamento.ts` (pedido agendado), que ja exporta `AgendamentoSaida` no mesmo barrel.
+export const AgendamentoConfigSaida = z.strictObject({
+  modo: ModoAgendamento,
+  inicio: Hhmm.nullable(),
+  fim: Hhmm.nullable(),
+  dias: z.array(DiaSemana), // [] quando nao e faixa
   atualizado_em: DataHoraIso,
 })
-export type JanelaAtendenteSaida = z.infer<typeof JanelaAtendenteSaida>
-/** `janela` e null quando a loja ainda nao configurou a janela do atendente. */
-export const JanelaAtendenteGetSaida = z.strictObject({ janela: JanelaAtendenteSaida.nullable() })
+export type AgendamentoConfigSaida = z.infer<typeof AgendamentoConfigSaida>
+/** Default desligado quando a loja ainda nao configurou agendamento (nunca ha null). */
+export const AgendamentoGetSaida = z.strictObject({ agendamento: AgendamentoConfigSaida })
 
 // --- Excecoes / feriados ---
 export const ExcecaoEntrada = z
@@ -91,7 +99,7 @@ export const ExcecaoListaSaida = z.strictObject({ itens: z.array(ExcecaoSaida) }
 // --- Estado derivado (calculado no servidor; nunca persistido) ---
 export const DisponibilidadeAgoraSaida = z.strictObject({
   agora: DataHoraIso,
-  aceitando_agora: z.boolean(),
-  atendente_pode_responder: z.boolean(),
+  aceitando_agora: z.boolean(), // pedido ao vivo
+  modo_atendente: ModoAtendente, // atendimento|agendamento|fechado (substitui atendente_pode_responder)
 })
 export type DisponibilidadeAgoraSaida = z.infer<typeof DisponibilidadeAgoraSaida>

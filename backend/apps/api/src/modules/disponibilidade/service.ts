@@ -1,21 +1,25 @@
 // Regras do modulo disponibilidade. Sem Fastify aqui: recebe pool e dados ja validados na borda.
 // O estado "aceitando agora" / "atendente pode responder" e SEMPRE derivado (nunca persistido).
 import { comTransacao, type Pool } from '@whaviso/shared/db'
-import { naoEncontrado, regraNegocio } from '../../shared/http_errors'
-import * as repo from './repo'
 import {
-  atendentePodeResponder,
   faixasSobrepoem,
   lojaAceitandoAgora,
+  modoAtendente,
   momentoSp,
+  type Agendamento,
   type DadosDisponibilidade,
-} from './calculo'
+} from '@whaviso/shared/disponibilidade'
+import { naoEncontrado, regraNegocio } from '../../shared/http_errors'
+import * as repo from './repo'
 import type {
   THorarioEntrada,
   THorarioPatch,
-  TJanelaAtendenteEntrada,
+  TAgendamentoEntrada,
   TExcecaoEntrada,
 } from './schemas'
+
+/** Default desligado para o kernel quando a loja ainda nao configurou agendamento. */
+const AGENDAMENTO_DESLIGADO: Agendamento = { modo: 'desligado', dias: [], inicio: '00:00', fim: '00:00' }
 
 export interface Ator {
   lojaId: string
@@ -77,17 +81,28 @@ export function criarServicoDisponibilidade(pool: Pool) {
       return h
     },
 
-    // --- Janela do atendente ---
-    async obterJanela(a: Ator) {
-      return { janela: await repo.obterJanela(pool, a.lojaId) }
+    // --- Janela de agendamento da loja ---
+    async obterAgendamento(a: Ator) {
+      const atual = await repo.obterAgendamento(pool, a.lojaId)
+      // Sem linha: default desligado (nunca ha null). atualizado_em sintetico = agora.
+      return {
+        agendamento: atual ?? {
+          modo: 'desligado' as const, inicio: null, fim: null, dias: [],
+          atualizado_em: new Date().toISOString(),
+        },
+      }
     },
 
-    async definirJanela(a: Ator, e: TJanelaAtendenteEntrada) {
-      const janela = await repo.upsertJanela(pool, a.lojaId, {
-        inicio: e.inicio, fim: e.fim, dias: e.dias, ativo: e.ativo ?? true,
+    async definirAgendamento(a: Ator, e: TAgendamentoEntrada) {
+      const faixa = e.modo === 'faixa'
+      const agendamento = await repo.upsertAgendamento(pool, a.lojaId, {
+        modo: e.modo,
+        inicio: faixa ? e.inicio ?? null : null,
+        fim: faixa ? e.fim ?? null : null,
+        dias: faixa ? e.dias ?? null : null,
       })
-      await evento(a, 'disponibilidade.janela_alterada', 'janela_atendente', a.lojaId)
-      return janela
+      await evento(a, 'disponibilidade.agendamento_alterado', 'agendamento_config', a.lojaId)
+      return agendamento
     },
 
     // --- Excecoes / feriados ---
@@ -121,16 +136,24 @@ export function criarServicoDisponibilidade(pool: Pool) {
     // --- Estado derivado (nunca persistido): calculado a partir do fuso America/Sao_Paulo ---
     async agora(a: Ator, agora = new Date()) {
       const { data } = momentoSp(agora)
-      const [horarios, excecaoHoje, janela] = await Promise.all([
+      const [horarios, excecaoHoje, agendamento] = await Promise.all([
         repo.carregarHorariosAtivos(pool, a.lojaId),
         repo.excecaoAtivaNaData(pool, a.lojaId, data),
-        repo.obterJanela(pool, a.lojaId),
+        repo.obterAgendamento(pool, a.lojaId),
       ])
       const dados: DadosDisponibilidade = { horarios, excecoes: excecaoHoje ? [excecaoHoje] : [] }
+      const ag: Agendamento = agendamento
+        ? {
+            modo: agendamento.modo,
+            dias: agendamento.dias,
+            inicio: agendamento.inicio ?? '00:00',
+            fim: agendamento.fim ?? '00:00',
+          }
+        : AGENDAMENTO_DESLIGADO
       return {
         agora: agora.toISOString(),
         aceitando_agora: lojaAceitandoAgora(dados, agora),
-        atendente_pode_responder: atendentePodeResponder(janela, agora),
+        modo_atendente: modoAtendente(dados, ag, agora),
       }
     },
   }
