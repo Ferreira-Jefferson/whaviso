@@ -16,12 +16,13 @@ import {
 import { createPortal } from 'react-dom'
 import { cn } from './cn'
 
-export type ToastTom = 'info' | 'sucesso' | 'erro'
+export type ToastTom = 'info' | 'sucesso' | 'atencao' | 'erro'
 
 // Mesma paleta do Banner.tsx (tons reaproveitados para consistência visual).
 const TONS: Record<ToastTom, string> = {
   info: 'bg-salvia-claro text-salvia border-salvia/20',
   sucesso: 'bg-salvia-claro text-folha border-folha/20',
+  atencao: 'bg-ambar-claro text-ambar border-ambar/20',
   erro: 'bg-ambar-claro text-barro border-barro/20',
 }
 

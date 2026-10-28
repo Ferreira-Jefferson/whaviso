@@ -4,8 +4,8 @@
 // mostra carregando, erro ou o estado "sem loja".
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
-import { LogOut, MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
-import { useSessao } from '@/shared/auth'
+import { MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
+import { BotaoSair } from './BotaoSair'
 import { SeletorLoja, useTenant } from '@/shared/tenant'
 import { useEstadoRealtime } from '@/shared/realtime'
 import { BellLogo, EmptyState, ErrorState, Skeleton, cn } from '@/shared/ui'
@@ -64,6 +64,7 @@ function Sidebar({ onRecolher }: { onRecolher: () => void }) {
           ))}
         </nav>
       ))}
+      <BotaoSair className="mt-auto" />
     </aside>
   )
 }
@@ -124,6 +125,7 @@ function BarraInferior() {
                 </nav>
               )
             })}
+            <BotaoSair aoAbrir={() => setAberto(false)} className="mt-2 w-full border-t border-linha pt-3" />
           </div>
         </div>
       )}
@@ -222,7 +224,6 @@ function useLateralAberta() {
 }
 
 export function AppShell() {
-  const { signOut } = useSessao()
   const lateral = useLateralAberta()
   return (
     <div className={cn('grid min-h-dvh', lateral.aberta ? 'md:grid-cols-[248px_1fr]' : 'md:grid-cols-1')}>
@@ -247,14 +248,6 @@ export function AppShell() {
           </div>
           <span className="flex-1 max-md:hidden" />
           <EstadoAoVivo />
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            aria-label="Sair"
-            className={cn('flex size-11 flex-none items-center justify-center rounded-full border border-linha bg-cartao text-tinta-2 hover:text-tinta', FOCO)}
-          >
-            <LogOut className="size-5" strokeWidth={1.75} aria-hidden />
-          </button>
         </header>
         {/* Conteudo ocupa ~90% da largura util, com ~5% de respiro de cada lado no desktop
             (no mobile mantem a goteira de 16px). As margens iguais ja centralizam. */}

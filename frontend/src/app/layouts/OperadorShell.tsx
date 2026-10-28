@@ -3,8 +3,8 @@
 // (as telas usam apiClient semLoja). A guarda RequireOperador decide quem entra; a seguranca
 // real e a autorizacao por rota na api. Nav fixa: Painel, Clientes, Cobranca, Funil.
 import { NavLink, Outlet } from 'react-router'
-import { BarChart3, Filter, LogOut, Users, Wallet, type LucideIcon } from 'lucide-react'
-import { useSessao } from '@/shared/auth'
+import { BarChart3, Filter, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { BotaoSair } from './BotaoSair'
 import { BellLogo, cn } from '@/shared/ui'
 
 const FOCO = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia'
@@ -58,12 +58,12 @@ function Sidebar() {
           <ItemNav key={item.caminho} item={item} />
         ))}
       </nav>
+      <BotaoSair className="mt-auto" />
     </aside>
   )
 }
 
 export function OperadorShell() {
-  const { signOut } = useSessao()
   return (
     <div className="grid min-h-dvh md:grid-cols-[248px_1fr]">
       <Sidebar />
@@ -71,14 +71,6 @@ export function OperadorShell() {
         <header className="sticky top-0 z-20 flex h-[60px] items-center gap-3 border-b border-linha bg-papel/90 px-4 backdrop-blur md:px-6">
           <span className="font-display text-sm font-bold text-tinta-2">Console da plataforma</span>
           <span className="flex-1" />
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            aria-label="Sair"
-            className={cn('flex size-11 items-center justify-center rounded-full border border-linha bg-cartao text-tinta-2 hover:text-tinta', FOCO)}
-          >
-            <LogOut className="size-5" strokeWidth={1.75} aria-hidden />
-          </button>
         </header>
         {/* Mobile: nav horizontal rolavel (sem barra inferior; console e desktop-first). */}
         <nav
@@ -96,6 +88,7 @@ export function OperadorShell() {
               {item.rotulo}
             </NavLink>
           ))}
+          <BotaoSair aoAbrir={undefined} className="shrink-0" />
         </nav>
         <main className="w-full px-4 pb-12 pt-5 md:px-[5%] md:pt-7">
           <Outlet />
