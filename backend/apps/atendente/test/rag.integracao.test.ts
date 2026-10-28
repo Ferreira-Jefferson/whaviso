@@ -10,6 +10,7 @@ import {
   buscarConhecimento,
   consultarCache,
   criarClienteEmbeddingsPlataforma,
+  DIM_EMBEDDING,
   criarRerankerNulo,
   gravarCache,
   ingerirDocumento,
@@ -35,7 +36,9 @@ function fakeAdaptador(): AdaptadorProvedor {
     descreverImagem: falha as never,
     async embutir(e) {
       return ok({
-        vetores: e.textos.map(() => [0.1, 0.2, 0.3]),
+        // Vetor com a dimensao do indice (coluna vector(1536)); constante, entao o componente
+        // vetorial e neutro e o ranqueamento vem do BM25 (igual ao run local sem pgvector).
+        vetores: e.textos.map(() => new Array(DIM_EMBEDDING).fill(0.1) as number[]),
         uso: { tokensIn: 3, tokensOut: 0, custoEstimadoCentavos: 0 },
       })
     },

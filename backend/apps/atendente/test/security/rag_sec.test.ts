@@ -12,6 +12,7 @@ import {
   buscarConhecimento,
   consultarCache,
   criarClienteEmbeddingsPlataforma,
+  DIM_EMBEDDING,
   criarRerankerNulo,
   gravarCache,
   ingerirDocumento,
@@ -30,7 +31,7 @@ function embeddings(): ClienteEmbeddings {
   const ad = {
     provedor: 'openrouter',
     async embutir(e: { textos: string[] }) {
-      return ok({ vetores: e.textos.map(() => [0.1, 0.2, 0.3]), uso: { tokensIn: 1, tokensOut: 0, custoEstimadoCentavos: 0 } })
+      return ok({ vetores: e.textos.map(() => new Array(DIM_EMBEDDING).fill(0.1) as number[]), uso: { tokensIn: 1, tokensOut: 0, custoEstimadoCentavos: 0 } })
     },
   } as unknown as AdaptadorProvedor
   return criarClienteEmbeddingsPlataforma({ adaptador: ad, logger, obterChave: () => 'chave-teste' })
