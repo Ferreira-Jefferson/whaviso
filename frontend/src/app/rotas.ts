@@ -17,7 +17,6 @@ import {
   Gift,
   LayoutGrid,
   Link2,
-  MapPinned,
   Megaphone,
   MessageCircle,
   QrCode,
@@ -64,7 +63,7 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'estoque', rotulo: 'Estoque', descricao: 'Insumos e fichas técnicas.', icone: Boxes, grupo: 'cardapio', pagina: lazy(() => import('@/modules/estoque')) },
   // Entrega
   { caminho: 'motoboys', rotulo: 'Motoboys', descricao: 'Cadastro de entregadores e fechamento do dia.', icone: Users, grupo: 'entrega', pagina: lazy(() => import('@/modules/motoboys')) },
-  { caminho: 'zonas', rotulo: 'Zonas', descricao: 'Áreas e taxas de entrega.', icone: MapPinned, grupo: 'entrega', pagina: lazy(() => import('@/modules/zonas')) },
+  // Zonas de entrega agora moram no editor da loja (aba Entrega), não numa rota própria.
   // Despacho absorve a roteirização (mapa + sugestões de corrida): despachar é uma coisa só.
   // Clientes (relacionamento e marketing)
   { caminho: 'clientes', rotulo: 'Clientes', descricao: 'Quem pede na sua loja.', icone: Users, grupo: 'clientes', fixoNoMobile: true, pagina: lazy(() => import('@/modules/clientes')) },

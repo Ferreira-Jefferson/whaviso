@@ -1,4 +1,4 @@
-// Camada de dados do modulo zonas: zonas de entrega da loja ativa (taxa, valor do motoboy,
+// Camada de dados da entrega da loja (aba Entrega do editor): zonas de entrega da loja ativa (taxa, valor do motoboy,
 // pedido minimo e frete gratis). Estado de servidor via TanStack Query; dados so pelo
 // api_client. Raiz de cache ['zonas']. A loja efetiva vem do header x-loja-id, nunca do corpo.
 // Dinheiro sempre em centavos (inteiro).

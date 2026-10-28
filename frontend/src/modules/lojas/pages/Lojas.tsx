@@ -1,7 +1,6 @@
 // Gestao das lojas da conta (multi-tenant): uma conta pode ter varias lojas. Lista as lojas,
-// abre o perfil para criar/editar (nome, endereco, area de entrega), permite tornar uma loja a
-// ativa do painel e ativar/desativar (so o dono). Traz tambem a disponibilidade da loja ativa
-// (horario de atendimento, agendamento e excecoes; fonte unica na loja). Rota `/lojas`.
+// abre o editor da loja (perfil, entrega e horarios, em abas; ver FormularioLoja), permite tornar
+// uma loja a ativa do painel e ativar/desativar (so o dono). Rota `/lojas`.
 import { useMemo, useState } from 'react'
 import { Plus, Store } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
@@ -19,7 +18,6 @@ import type { LojaSaida as Loja } from '@/shared/contracts/_generated/lojas'
 import { useAlterarAtivo, useLojas } from '../api'
 import { CardLoja } from '../components/CardLoja'
 import { FormularioLoja } from '../components/FormularioLoja'
-import { PainelDisponibilidade } from '../disponibilidade/Painel'
 
 export default function Lojas() {
   const [incluirInativas, setIncluirInativas] = useState(false)
@@ -37,11 +35,6 @@ export default function Lojas() {
   const abertas = lojas.filter((l) => l.aberta_agora === true).length
   const conectados = lojas.reduce((s, l) => s + l.numeros_whatsapp.conectados, 0)
   const ocupadoId = alterar.isPending ? (alterar.variables?.id ?? null) : null
-
-  // Disponibilidade (horário de atendimento, agendamento, exceções) é da LOJA ATIVA do shell:
-  // o api_client envia a loja no header. Atendente não gere disponibilidade, só dono/gerente.
-  const lojaAtivaGestao = useMemo(() => lojas.find((l) => l.id === lojaAtiva?.id) ?? null, [lojas, lojaAtiva])
-  const podeGerirDisponibilidade = lojaAtivaGestao != null && lojaAtivaGestao.papel !== 'atendente'
 
   function alternarAtivo(loja: Loja) {
     if (loja.ativo) {
@@ -149,12 +142,6 @@ export default function Lojas() {
             )
           })}
         </ul>
-      )}
-
-      {consulta.isSuccess && podeGerirDisponibilidade && (
-        <div className="mt-8 border-t border-linha pt-6">
-          <PainelDisponibilidade nomeLoja={lojaAtivaGestao?.nome} />
-        </div>
       )}
 
       {form && <FormularioLoja key={form.loja?.id ?? 'nova'} loja={form.loja} onFechar={() => setForm(null)} />}

@@ -66,6 +66,19 @@ export async function obterCaixa(exec: Executor, lojaId: string, id: string) {
   )
 }
 
+/**
+ * Trava a linha do caixa na transacao e devolve o status atual. Rode ANTES de lancar um movimento:
+ * `fechar` tambem toca essa linha (UPDATE), entao os dois serializam no row lock e o movimento
+ * nunca cai num caixa fechado concorrentemente. Null = caixa inexistente.
+ */
+export async function travarCaixa(exec: Executor, lojaId: string, id: string) {
+  return consultarUm<{ status: 'aberto' | 'fechado' }>(
+    exec,
+    sql`select status from public.caixas
+         where id = ${id} and loja_id = ${lojaId} for update`,
+  )
+}
+
 export async function abrir(
   exec: Executor,
   lojaId: string,

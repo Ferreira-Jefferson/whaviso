@@ -1,7 +1,7 @@
 // Card de uma loja na lista de gestao. Mostra identidade (avatar/nome), situacao (aberta agora,
 // ativa/inativa, loja ativa no shell), resumo de endereco/entrega/numeros e acoes.
 // Numeros de WhatsApp aqui sao so a CONTAGEM (o cadastro vive no modulo Numeros).
-import { MapPin, Pencil, Power, Smartphone } from 'lucide-react'
+import { MapPin, Pencil, Smartphone } from 'lucide-react'
 import { AvatarLoja } from '@/shared/tenant'
 import { Badge, Button, Card, cn } from '@/shared/ui'
 import type { LojaSaida as Loja } from '@/shared/contracts/_generated/lojas'
@@ -10,14 +10,6 @@ function resumoEndereco(loja: Loja): string {
   const e = loja.endereco
   if (!e) return 'Sem endereço cadastrado'
   return `${e.bairro}, ${e.cidade}-${e.uf}`
-}
-
-function resumoEntrega(loja: Loja): string {
-  const a = loja.area_entrega
-  if (!a) return 'Só retirada no balcão'
-  if (a.modo === 'raio') return `Entrega em até ${a.raio_km} km`
-  const n = a.bairros.length
-  return `Entrega em ${n} ${n === 1 ? 'bairro' : 'bairros'}`
 }
 
 export function CardLoja({
@@ -70,10 +62,6 @@ export function CardLoja({
               ? 'Nenhum número de WhatsApp'
               : `${loja.numeros_whatsapp.conectados} de ${loja.numeros_whatsapp.total} número(s) conectado(s)`}
           </dd>
-        </div>
-        <div className="flex items-center gap-2">
-          <Power aria-hidden strokeWidth={1.75} className="size-4 flex-none" />
-          <dd className="min-w-0 truncate">{resumoEntrega(loja)}</dd>
         </div>
       </dl>
 

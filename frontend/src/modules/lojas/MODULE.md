@@ -1,11 +1,10 @@
 # lojas (frontend)
 
 ## Propósito
-Gestão das lojas da conta (multi-tenant: uma conta pode ter várias lojas). Lista as lojas,
-abre o perfil para criar/editar (nome, endereço e área de entrega), permite tornar uma loja a
-ativa do painel e ativar/desativar (só o dono da conta). Reúne também a disponibilidade da loja
-ativa (horário de atendimento, janela de agendamento e exceções; fonte única na loja, o atendente
-não tem horário próprio). Rota `/lojas`.
+Gestão das lojas da conta (multi-tenant: uma conta pode ter várias lojas). Lista as lojas e abre o
+editor de UMA loja, em abas: Perfil (nome e endereço), Entrega (zonas, em `entrega/`) e Horários
+(disponibilidade, em `disponibilidade/`). Permite tornar uma loja a ativa do painel e ativar/desativar
+(só o dono da conta). Rota `/lojas`.
 
 ## Entry points
 - `index.ts`: export default da página (para `lazy(() => import('@/modules/lojas'))` no registry de rotas).
@@ -23,12 +22,18 @@ não tem horário próprio). Rota `/lojas`.
 - Seleção da loja ativa reusa `@/shared/tenant` (`useTenant().selecionarLoja`); o shell já tem o seletor.
 
 ## Componentes
-- `FormularioLoja`: diálogo de criar/editar, com seções de endereço e área de entrega.
-- `EditorEndereco` / `EditorAreaEntrega`: editores controlados; montagem e validação no formato do
-  contrato ficam no `FormularioLoja`.
+- `FormularioLoja`: diálogo de criar/editar em abas (Perfil / Entrega / Horários). Abrir o editor
+  torna a loja ativa (`useTenant().selecionarLoja`) para que Entrega/Horários (apis escopadas por
+  header) operem nela. Loja nova: cria o perfil, torna a nova loja ativa e libera as abas no mesmo
+  editor (criar-depois-configurar); até lá, Entrega/Horários mostram uma dica.
+- `EditorEndereco`: editor controlado do endereço; montagem/validação no formato do contrato ficam
+  no `FormularioLoja`.
 - `CardLoja`: item da lista (reusa `AvatarLoja` de `@/shared/tenant`).
+- `entrega/`: subárea da loja (zonas de entrega, fonte única operacional; absorvida do antigo módulo
+  `zonas`). `GestaoEntrega` é o conteúdo da aba Entrega. Ver `entrega/MODULE.md`.
 - `disponibilidade/`: subárea da loja (fonte única). `Painel` compõe `EstadoAgora` + abas
-  `EditorHorarioAtendimento` / `EditorAgendamento` (3 modos) / `EditorExcecoes`, sobre a loja ativa.
+  `EditorHorarioAtendimento` / `EditorAgendamento` (3 modos) / `EditorExcecoes`, sobre a loja ativa;
+  é o conteúdo da aba Horários.
 
 ## Notas
 - Branding (cores/logo) e números de WhatsApp NÃO são editados aqui: têm fluxos próprios

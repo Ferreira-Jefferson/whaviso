@@ -1,9 +1,9 @@
-// Tipos, constantes e funcoes puras dos editores do perfil da loja (endereco, area de entrega).
-// O horario de atendimento e as excecoes vivem na disponibilidade (fonte unica na loja), fora deste
-// formulario.
+// Tipos, constantes e funcoes puras do editor de perfil da loja (endereco).
+// A entrega (zonas) vive na aba Entrega (modules/lojas/entrega) e o horario de atendimento na
+// disponibilidade (fonte unica na loja), ambos fora deste formulario.
 // Ficam fora dos arquivos de componente para o Fast Refresh (um arquivo = so componentes).
 // Montagem no formato do contrato e validacao ficam no FormularioLoja.
-import type { AreaEntrega, Endereco } from '@/shared/contracts/_generated/lojas'
+import type { Endereco } from '@/shared/contracts/_generated/lojas'
 
 // --- Endereco ---
 export interface EnderecoForm {
@@ -56,34 +56,4 @@ export function montarEndereco(e: EnderecoForm): Endereco | null {
     uf: e.uf.trim(),
     cep: e.cep.trim(),
   }
-}
-
-// --- Area de entrega ---
-export type ModoArea = 'nenhuma' | 'raio' | 'bairros'
-
-export interface AreaForm {
-  modo: ModoArea
-  raioKm: string
-  lat: string
-  lng: string
-  bairros: string[]
-}
-
-export const AREA_VAZIA: AreaForm = { modo: 'nenhuma', raioKm: '', lat: '', lng: '', bairros: [] }
-
-/** Converte o DTO (ou null) para o estado do formulario. */
-export function areaParaForm(a: AreaEntrega | null): AreaForm {
-  if (!a) return { ...AREA_VAZIA }
-  if (a.modo === 'raio') {
-    return { modo: 'raio', raioKm: String(a.raio_km), lat: String(a.centro.lat), lng: String(a.centro.lng), bairros: [] }
-  }
-  return { modo: 'bairros', raioKm: '', lat: '', lng: '', bairros: [...a.bairros] }
-}
-
-export function montarArea(a: AreaForm): AreaEntrega | null {
-  if (a.modo === 'nenhuma') return null
-  if (a.modo === 'raio') {
-    return { modo: 'raio', raio_km: Number(a.raioKm), centro: { lat: Number(a.lat), lng: Number(a.lng) } }
-  }
-  return { modo: 'bairros', bairros: a.bairros }
 }

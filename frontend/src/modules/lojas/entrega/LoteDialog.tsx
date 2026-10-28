@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { ApiError } from '@/shared/api_client'
 import { Banner, Button, Dialog, Field, MoneyInput, useToast } from '@/shared/ui'
-import { useCriarZonasEmLote } from '../api'
+import { useCriarZonasEmLote } from './api'
 
 interface Props {
   aberto: boolean

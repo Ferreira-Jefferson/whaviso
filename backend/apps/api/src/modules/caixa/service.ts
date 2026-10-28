@@ -111,6 +111,12 @@ export function criarServicoCaixa(pool: Pool) {
     }
 
     const m = await comTransacao(pool, async (tx) => {
+      // Re-trava e reconfere o status DENTRO da tx: a checagem acima foi fora dela, e o caixa pode
+      // ter sido fechado em concorrencia. Serializa com `fechar` pelo row lock do caixa.
+      const travado = await repo.travarCaixa(tx, a.lojaId, caixaId)
+      if (!travado || travado.status !== 'aberto') {
+        throw conflito('caixa_fechado', 'O caixa esta fechado; abra um novo para lancar')
+      }
       const mov = await repo.inserirMovimento(tx, a.lojaId, caixaId, {
         tipo: b.tipo,
         formaPagamento: b.tipo === 'venda' ? b.forma_pagamento! : null,

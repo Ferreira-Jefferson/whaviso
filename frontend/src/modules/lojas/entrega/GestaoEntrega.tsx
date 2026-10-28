@@ -1,6 +1,8 @@
-// /zonas: zonas de entrega da loja (bairro, polígono ou raio) com taxa do cliente, valor do
-// motoboy, pedido mínimo e frete grátis. Lista + cadastro/edição + importação de bairros.
-// Dinheiro em centavos (formatarCentavos). Estados loading/empty/error; mobile-first.
+// Gestao das zonas de entrega de UMA loja, como conteudo da aba "Entrega" do editor de loja.
+// Zonas (bairro, poligono ou raio) com taxa do cliente, valor do motoboy, pedido minimo e frete
+// gratis. Resumo + lista + cadastro/edicao + importacao de bairros. Dinheiro em centavos.
+// A api e escopada pela loja ativa do shell (header x-loja-id): o editor torna a loja ativa antes
+// de mostrar esta aba. Estados loading/empty/error; mobile-first.
 import { type ReactNode, useState } from 'react'
 import { Bike, Circle, Hexagon, ListPlus, MapPin, MapPinned, Plus, Wallet } from 'lucide-react'
 import {
@@ -9,17 +11,16 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  PageHeader,
   SegmentedControl,
   Skeleton,
   TableResponsive,
   type ColunaTabela,
 } from '@/shared/ui'
 import { formatarCentavos } from '@/shared/format'
-import { useZonas, type Zona } from '../api'
-import { ROTULO_TIPO, resumoDaArea } from '../estados'
-import { LoteDialog } from '../components/LoteDialog'
-import { ZonaDialog } from '../components/ZonaDialog'
+import { useZonas, type Zona } from './api'
+import { ROTULO_TIPO, resumoDaArea } from './estados'
+import { LoteDialog } from './LoteDialog'
+import { ZonaDialog } from './ZonaDialog'
 
 const ICONE_TIPO: Record<Zona['tipo'], ReactNode> = {
   bairro: <MapPin className="size-3" aria-hidden />,
@@ -143,7 +144,8 @@ function Resumo({ itens, incluirInativas }: { itens: ReadonlyArray<Zona>; inclui
   )
 }
 
-export default function Zonas() {
+/** Conteudo da aba Entrega: as zonas de entrega da loja ativa. */
+export function GestaoEntrega() {
   const [incluirInativas, setIncluirInativas] = useState(false)
   const [editando, setEditando] = useState<Zona | null>(null)
   const [criando, setCriando] = useState(false)
@@ -159,70 +161,70 @@ export default function Zonas() {
   }
 
   return (
-    <div className="animate-rise">
-      <PageHeader
-        titulo="Zonas de entrega"
-        descricao="Defina onde você entrega, quanto o cliente paga e quanto o motoboy recebe."
-        acoes={
-          <>
-            <Button variante="secondary" onClick={() => setImportando(true)}>
-              <ListPlus className="size-4" aria-hidden />
-              Importar bairros
-            </Button>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-display text-lg font-semibold text-tinta">Zonas de entrega</h3>
+          <p className="mt-0.5 text-sm text-tinta-2">
+            Defina onde a loja entrega, quanto o cliente paga e quanto o motoboy recebe.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variante="secondary" onClick={() => setImportando(true)}>
+            <ListPlus className="size-4" aria-hidden />
+            Importar bairros
+          </Button>
+          <Button onClick={() => setCriando(true)}>
+            <Plus className="size-4" aria-hidden />
+            Nova zona
+          </Button>
+        </div>
+      </div>
+
+      <SegmentedControl
+        ariaLabel="Filtrar por situação"
+        value={incluirInativas ? 'todas' : 'ativas'}
+        onChange={(v) => setIncluirInativas(v === 'todas')}
+        options={[
+          { value: 'ativas', label: 'Ativas' },
+          { value: 'todas', label: 'Todas' },
+        ]}
+      />
+
+      {lista.isPending && (
+        <div aria-busy="true" aria-label="Carregando zonas" className="flex flex-col gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </div>
+      )}
+      {lista.isError && <ErrorState aoTentarDeNovo={() => void lista.refetch()} />}
+
+      {lista.isSuccess && itens.length > 0 && <Resumo itens={itens} incluirInativas={incluirInativas} />}
+
+      {vazio && (
+        <EmptyState
+          icone={<MapPinned className="size-7" aria-hidden />}
+          titulo={incluirInativas ? 'Nenhuma zona cadastrada' : 'Ainda sem zonas ativas'}
+          descricao="Cadastre as zonas de entrega para cobrar a taxa certa e pagar o motoboy."
+          acao={
             <Button onClick={() => setCriando(true)}>
               <Plus className="size-4" aria-hidden />
               Nova zona
             </Button>
-          </>
-        }
-      />
-
-      <div className="flex flex-col gap-4">
-        <SegmentedControl
-          ariaLabel="Filtrar por situação"
-          value={incluirInativas ? 'todas' : 'ativas'}
-          onChange={(v) => setIncluirInativas(v === 'todas')}
-          options={[
-            { value: 'ativas', label: 'Ativas' },
-            { value: 'todas', label: 'Todas' },
-          ]}
+          }
         />
+      )}
 
-        {lista.isPending && (
-          <div aria-busy="true" aria-label="Carregando zonas" className="flex flex-col gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-14 w-full" />
-            ))}
-          </div>
-        )}
-        {lista.isError && <ErrorState aoTentarDeNovo={() => void lista.refetch()} />}
-
-        {lista.isSuccess && itens.length > 0 && <Resumo itens={itens} incluirInativas={incluirInativas} />}
-
-        {vazio && (
-          <EmptyState
-            icone={<MapPinned className="size-7" aria-hidden />}
-            titulo={incluirInativas ? 'Nenhuma zona cadastrada' : 'Ainda sem zonas ativas'}
-            descricao="Cadastre as zonas de entrega para cobrar a taxa certa e pagar o motoboy."
-            acao={
-              <Button onClick={() => setCriando(true)}>
-                <Plus className="size-4" aria-hidden />
-                Nova zona
-              </Button>
-            }
-          />
-        )}
-
-        {lista.isSuccess && itens.length > 0 && (
-          <TableResponsive
-            colunas={COLUNAS}
-            linhas={itens}
-            chaveLinha={(z) => z.id}
-            onRowClick={(z) => setEditando(z)}
-            legenda="Zonas de entrega"
-          />
-        )}
-      </div>
+      {lista.isSuccess && itens.length > 0 && (
+        <TableResponsive
+          colunas={COLUNAS}
+          linhas={itens}
+          chaveLinha={(z) => z.id}
+          onRowClick={(z) => setEditando(z)}
+          legenda="Zonas de entrega"
+        />
+      )}
 
       <ZonaDialog aberto={criando || editando != null} zona={editando} aoFechar={fechar} />
       <LoteDialog aberto={importando} aoFechar={() => setImportando(false)} />

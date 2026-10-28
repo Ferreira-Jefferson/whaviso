@@ -6,8 +6,8 @@ import { ApiError } from '@/shared/api_client'
 import { Banner, Button, ConfirmDialog, Dialog, Field, Input, MoneyInput, SegmentedControl, useToast } from '@/shared/ui'
 import { SeletorArea, useCentroLoja, type AreaGeo } from '@/shared/mapa'
 import type { ZonaNova, ZonaPatch } from '@/shared/contracts/_generated/zonas_entrega'
-import { useAlternarZona, useAtualizarZona, useCriarZona, type Zona } from '../api'
-import { DESCRICAO_TIPO, ROTULO_TIPO, type TipoZona } from '../estados'
+import { useAlternarZona, useAtualizarZona, useCriarZona, type Zona } from './api'
+import { DESCRICAO_TIPO, ROTULO_TIPO, type TipoZona } from './estados'
 
 interface Props {
   aberto: boolean

@@ -276,7 +276,6 @@ function loja(n: number, over: Record<string, unknown>) {
     cores: { primaria: '#3e7c5b' },
     endereco: { logradouro: 'Av. Paulista', numero: '1000', bairro: 'Bela Vista', cidade: 'Sao Paulo', uf: 'SP', cep: '01310100' },
     horarios: null,
-    area_entrega: null,
     ativo: true,
     papel: 'dono',
     aberta_agora: true,
@@ -474,6 +473,42 @@ function insumoMovimentos() {
   }
 }
 
+// ---------------------------------------------------------------- entrega (zonas)
+function zona(n: number, over: Record<string, unknown>) {
+  return {
+    id: u(8900 + n),
+    nome: 'Zona',
+    tipo: 'bairro',
+    bairro: 'Centro',
+    area: null,
+    taxa_cliente_centavos: 700,
+    valor_motoboy_centavos: 500,
+    pedido_minimo_centavos: null,
+    frete_gratis_acima_centavos: null,
+    ativo: true,
+    pedidos_em_aberto: 0,
+    criado_em: iso(50000),
+    atualizado_em: iso(100),
+    ...over,
+  }
+}
+
+const zonasLista = {
+  itens: [
+    zona(1, { nome: 'Centro', bairro: 'Centro', taxa_cliente_centavos: 600, valor_motoboy_centavos: 450 }),
+    zona(2, { nome: 'Bela Vista', bairro: 'Bela Vista', taxa_cliente_centavos: 800, valor_motoboy_centavos: 600, frete_gratis_acima_centavos: 8000 }),
+    zona(3, {
+      nome: 'Até 3 km',
+      tipo: 'raio',
+      bairro: null,
+      area: { centro: { lat: -23.561, lng: -46.656 }, metros: 3000 },
+      taxa_cliente_centavos: 1200,
+      valor_motoboy_centavos: 900,
+      pedido_minimo_centavos: 3000,
+    }),
+  ],
+}
+
 // ---------------------------------------------------------------- disponibilidade
 const dispAgora = { agora: iso(0), aceitando_agora: true, modo_atendente: 'atendimento' }
 
@@ -534,6 +569,8 @@ export function mockFor(path: string): unknown {
       return lojasLista
     case '/numeros':
       return numerosLista
+    case '/zonas':
+      return zonasLista
     case '/caixa/aberto':
       return caixaAberto
     case '/salao/mesas':

@@ -22,6 +22,11 @@ export function listarHorarios(exec: Executor, lojaId: string) {
 }
 
 /** Faixas ATIVAS de um dia (para a checagem de sobreposicao no service); pode excluir um id. */
+/** Serializa escritas de horario por loja (sobreposicao de faixas checada no service). */
+export async function travarHorarios(exec: Executor, lojaId: string): Promise<void> {
+  await consultar(exec, sql`select pg_advisory_xact_lock(hashtext(${'horario:' + lojaId}))`)
+}
+
 export function ativosDoDia(exec: Executor, lojaId: string, dia: number, exceto: string | null) {
   return consultar<FaixaHorario>(
     exec,

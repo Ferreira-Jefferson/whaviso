@@ -1,6 +1,6 @@
 // Regras do modulo disponibilidade. Sem Fastify aqui: recebe pool e dados ja validados na borda.
 // O estado "aceitando agora" / "atendente pode responder" e SEMPRE derivado (nunca persistido).
-import { comTransacao, type Pool } from '@whaviso/shared/db'
+import { comTransacao, type Executor, type Pool } from '@whaviso/shared/db'
 import {
   faixasSobrepoem,
   lojaAceitandoAgora,
@@ -30,8 +30,8 @@ export function criarServicoDisponibilidade(pool: Pool) {
   const evento = (a: Ator, tipo: string, entidade: string, entidadeId: string) =>
     repo.registrarEvento(pool, { lojaId: a.lojaId, tipo, entidade, entidadeId, userId: a.userId })
 
-  async function checarSobreposicao(lojaId: string, dia: number, faixa: { abre: string; fecha: string }, exceto: string | null) {
-    const ativos = await repo.ativosDoDia(pool, lojaId, dia, exceto)
+  async function checarSobreposicao(exec: Executor, lojaId: string, dia: number, faixa: { abre: string; fecha: string }, exceto: string | null) {
+    const ativos = await repo.ativosDoDia(exec, lojaId, dia, exceto)
     if (ativos.some((f) => faixasSobrepoem(f, faixa))) {
       throw regraNegocio('horario_sobreposto', 'A faixa se sobrepoe a outra do mesmo dia')
     }
@@ -45,8 +45,13 @@ export function criarServicoDisponibilidade(pool: Pool) {
 
     async criarHorario(a: Ator, e: THorarioEntrada) {
       const ativo = e.ativo ?? true
-      if (ativo) await checarSobreposicao(a.lojaId, e.dia_semana, e, null)
       const h = await comTransacao(pool, async (tx) => {
+        // Serializa por loja e checa a sobreposicao DENTRO da tx: duas faixas sobrepostas criadas
+        // em concorrencia nao passam ambas (o advisory lock faz a 2a enxergar a 1a).
+        if (ativo) {
+          await repo.travarHorarios(tx, a.lojaId)
+          await checarSobreposicao(tx, a.lojaId, e.dia_semana, e, null)
+        }
         const novo = await repo.inserirHorario(tx, a.lojaId, {
           dia_semana: e.dia_semana, abre: e.abre, fecha: e.fecha, ativo,
         })
@@ -60,18 +65,27 @@ export function criarServicoDisponibilidade(pool: Pool) {
     },
 
     async atualizarHorario(a: Ator, id: string, p: THorarioPatch) {
-      const atual = await repo.obterHorario(pool, a.lojaId, id)
-      if (!atual) throw naoEncontrado('Horario nao encontrado')
-      const ficaraAtivo = p.ativo ?? atual.ativo
-      if (ficaraAtivo) {
-        await checarSobreposicao(
-          a.lojaId, atual.dia_semana,
-          { abre: p.abre ?? atual.abre, fecha: p.fecha ?? atual.fecha }, id,
-        )
-      }
-      const h = await repo.atualizarHorario(pool, a.lojaId, id, p)
-      await evento(a, 'disponibilidade.horario_alterado', 'horario_funcionamento', id)
-      return h!
+      const h = await comTransacao(pool, async (tx) => {
+        // Trava por loja ANTES de reler o estado: a checagem e o update caem na mesma tx, sem
+        // janela entre decidir (nao sobrepoe) e gravar.
+        await repo.travarHorarios(tx, a.lojaId)
+        const atual = await repo.obterHorario(tx, a.lojaId, id)
+        if (!atual) throw naoEncontrado('Horario nao encontrado')
+        const ficaraAtivo = p.ativo ?? atual.ativo
+        if (ficaraAtivo) {
+          await checarSobreposicao(
+            tx, a.lojaId, atual.dia_semana,
+            { abre: p.abre ?? atual.abre, fecha: p.fecha ?? atual.fecha }, id,
+          )
+        }
+        const atualizado = await repo.atualizarHorario(tx, a.lojaId, id, p)
+        await repo.registrarEvento(tx, {
+          lojaId: a.lojaId, tipo: 'disponibilidade.horario_alterado',
+          entidade: 'horario_funcionamento', entidadeId: id, userId: a.userId,
+        })
+        return atualizado!
+      })
+      return h
     },
 
     async desativarHorario(a: Ator, id: string) {
