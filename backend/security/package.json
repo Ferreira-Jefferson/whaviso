@@ -6,6 +6,7 @@
   "description": "Trilho de testes de seguranca (F7): matriz de privilegio por role, redaction de log, dump, varredura de respostas e rastreabilidade do catalogo SEC.",
   "scripts": {
     "test:security": "vitest run",
+    "test:changed": "vitest run --changed --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

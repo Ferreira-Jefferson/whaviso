@@ -12,6 +12,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run lint && npm run typecheck",
     "test": "npm run test --workspaces --if-present",
+    "test:changed": "npm run test:changed --workspaces --if-present",
     "test:security": "npm run test:security -w @whaviso/security",
     "dev:api": "npm run dev -w @whaviso/api",
     "dev:zap": "npm run dev -w @whaviso/zap",
