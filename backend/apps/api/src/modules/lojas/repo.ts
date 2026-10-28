@@ -5,7 +5,7 @@
 // `aberta_agora` pelo kernel, sem importar o modulo disponibilidade.
 import { consultar, consultarUm, sql, sqlBruto, type Executor } from '@whaviso/shared/db'
 import type { FaixaHorario, Excecao } from '@whaviso/shared/disponibilidade'
-import type { Cores, Endereco, AreaEntrega } from './schemas'
+import type { Cores, Endereco } from './schemas'
 
 export interface LojaLinha {
   id: string
@@ -14,7 +14,6 @@ export interface LojaLinha {
   logo_url: string | null
   cores: Cores
   endereco: Endereco | null
-  area_entrega: AreaEntrega | null
   ativo: boolean
   pausada: boolean
   pausada_motivo: string | null
@@ -28,7 +27,7 @@ export interface LojaLinha {
 }
 
 const COLUNAS = sql`
-  l.id, l.conta_id, l.nome, l.logo_url, l.cores, l.endereco, l.area_entrega,
+  l.id, l.conta_id, l.nome, l.logo_url, l.cores, l.endereco,
   l.ativo, l.pausada, l.pausada_motivo, l.pausada_ate,
   l.capacidade_por_janela, l.capacidade_janela_minutos, l.criado_em, l.atualizado_em,
   coalesce(n.total, 0)::int as numeros_total, coalesce(n.conectados, 0)::int as numeros_conectados
@@ -101,14 +100,13 @@ const json = (v: unknown): string | null => (v === undefined || v === null ? nul
 export interface NovaLoja {
   nome: string
   endereco?: Endereco | undefined
-  area_entrega?: AreaEntrega | undefined
 }
 
 export async function inserir(ex: Executor, contaId: string, n: NovaLoja): Promise<string> {
   const r = await consultarUm<{ id: string }>(
     ex,
-    sql`insert into public.lojas (conta_id, nome, endereco, area_entrega)
-        values (${contaId}, ${n.nome}, ${json(n.endereco)}::jsonb, ${json(n.area_entrega)}::jsonb)
+    sql`insert into public.lojas (conta_id, nome, endereco)
+        values (${contaId}, ${n.nome}, ${json(n.endereco)}::jsonb)
         returning id`,
   )
   return r!.id
@@ -117,7 +115,6 @@ export async function inserir(ex: Executor, contaId: string, n: NovaLoja): Promi
 export interface Parcial {
   nome?: string | undefined
   endereco?: Endereco | null | undefined
-  area_entrega?: AreaEntrega | null | undefined
   cores?: Cores | undefined
   logo_url?: string | null | undefined
 }
@@ -130,7 +127,6 @@ export async function atualizar(ex: Executor, id: string, contaId: string, p: Pa
     sql`update public.lojas set
           nome = case when ${tem('nome')}::boolean then ${p.nome ?? null} else nome end,
           endereco = case when ${tem('endereco')}::boolean then ${json(p.endereco)}::jsonb else endereco end,
-          area_entrega = case when ${tem('area_entrega')}::boolean then ${json(p.area_entrega)}::jsonb else area_entrega end,
           cores = case when ${tem('cores')}::boolean then ${json(p.cores) ?? '{}'}::jsonb else cores end,
           logo_url = case when ${tem('logo_url')}::boolean then ${p.logo_url ?? null} else logo_url end
         where id = ${id} and conta_id = ${contaId}`,

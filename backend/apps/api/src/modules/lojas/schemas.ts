@@ -5,8 +5,6 @@ import { z } from 'zod'
 export {
   Cores,
   Endereco,
-  AreaEntrega,
-  RAIO_KM_MAX,
   LogoUrl,
   LojaCriarEntrada,
   LojaAtualizarEntrada,

@@ -5,7 +5,6 @@ import { lojaAceitandoAgora, momentoSp } from '@whaviso/shared/disponibilidade'
 import { Conflito, NaoEncontrado, Proibido, regraNegocio } from '../../shared/http_errors'
 import * as repo from './repo'
 import {
-  AreaEntrega,
   Cores,
   Endereco,
   type LojaAtualizarEntrada,
@@ -68,7 +67,6 @@ export function paraSaida(
     logo_url: l.logo_url,
     cores: ler<Cores>(Cores, l.cores) ?? {},
     endereco: l.endereco ? ler<Endereco>(Endereco, l.endereco) : null,
-    area_entrega: l.area_entrega ? ler<AreaEntrega>(AreaEntrega, l.area_entrega) : null,
     ativo: l.ativo,
     pausada: l.pausada,
     pausada_motivo: l.pausada_motivo,
@@ -136,7 +134,6 @@ export async function criar(pool: Pool, userId: string, entrada: LojaCriarEntrad
     const novo = await repo.inserir(tx, contaId, {
       nome: entrada.nome,
       endereco: entrada.endereco,
-      area_entrega: entrada.area_entrega,
     })
     await repo.registrarEvento(tx, novo, 'loja.criada', [])
     return novo

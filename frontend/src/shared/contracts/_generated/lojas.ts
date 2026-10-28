@@ -2,9 +2,11 @@
 // NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
 
 // Contratos de borda do modulo lojas (fonte unica; o codegen reemite para o front).
-// Todo jsonb do banco (cores, endereco, area_entrega) passa por estes schemas (SEC-081).
+// Todo jsonb do banco (cores, endereco) passa por estes schemas (SEC-081).
 // Disponibilidade/horarios tem fonte unica nas tabelas normalizadas (regras-negocio/05): nao
 // vive mais no perfil da loja (a coluna legada lojas.horarios foi removida na migration 0061).
+// Entrega tem fonte unica em zonas_entrega (por loja, operacional): a coluna legada lojas.area_entrega
+// foi removida na migration 0062.
 import { z } from 'zod'
 import { papelMembro } from './enums'
 import { DataHoraIso } from './primitivos'
@@ -30,29 +32,6 @@ export const Endereco = z.strictObject({
 })
 export type Endereco = z.infer<typeof Endereco>
 
-const Centro = z.strictObject({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-})
-export const RAIO_KM_MAX = 50
-export const AreaEntrega = z.discriminatedUnion('modo', [
-  z.strictObject({
-    modo: z.literal('raio'),
-    raio_km: z.number().positive().max(RAIO_KM_MAX),
-    centro: Centro,
-  }),
-  z.strictObject({
-    modo: z.literal('bairros'),
-    bairros: z
-      .array(z.string().trim().min(1).max(100))
-      .max(300)
-      .refine((l) => new Set(l.map((b) => b.toLowerCase())).size === l.length, {
-        message: 'bairros repetidos',
-      }),
-  }),
-])
-export type AreaEntrega = z.infer<typeof AreaEntrega>
-
 const NomeLoja = z.string().trim().min(2).max(100)
 // Esquema https e tamanho aqui; host allowlisted e checado no service.
 export const LogoUrl = z.url({ protocol: /^https$/ }).max(500)
@@ -60,7 +39,6 @@ export const LogoUrl = z.url({ protocol: /^https$/ }).max(500)
 export const LojaCriarEntrada = z.strictObject({
   nome: NomeLoja,
   endereco: Endereco.optional(),
-  area_entrega: AreaEntrega.optional(),
 })
 export type LojaCriarEntrada = z.infer<typeof LojaCriarEntrada>
 
@@ -68,7 +46,6 @@ export const LojaAtualizarEntrada = z
   .strictObject({
     nome: NomeLoja.optional(),
     endereco: Endereco.nullable().optional(),
-    area_entrega: AreaEntrega.nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'nenhum campo informado' })
 export type LojaAtualizarEntrada = z.infer<typeof LojaAtualizarEntrada>
@@ -91,7 +68,6 @@ export const LojaSaida = z.strictObject({
   logo_url: z.string().nullable(),
   cores: Cores,
   endereco: Endereco.nullable(),
-  area_entrega: AreaEntrega.nullable(),
   ativo: z.boolean(),
   // G7: pausa operacional (nao confundir com `ativo` nem com `suspensa` da cobranca) e capacidade.
   pausada: z.boolean(),

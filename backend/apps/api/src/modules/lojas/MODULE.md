@@ -1,9 +1,11 @@
 # lojas
 
 ## Proposito
-Perfil da loja dentro da conta: criar/editar loja, branding (cores e logo), endereco e area de
-atendimento (raio ou bairros). Horarios/disponibilidade NAO vivem aqui: tem fonte unica nas tabelas
-normalizadas (modulo `disponibilidade`, regras-negocio/05). Fonte: `historias/backend-api/lojas.md`.
+Perfil da loja dentro da conta: criar/editar loja, branding (cores e logo) e endereco.
+Horarios/disponibilidade NAO vivem aqui: tem fonte unica nas tabelas normalizadas (modulo
+`disponibilidade`, regras-negocio/05). Entrega tambem NAO vive aqui: tem fonte unica em
+`zonas_entrega` (por loja, operacional; a coluna legada `lojas.area_entrega` foi removida na
+migration 0062). Fonte: `historias/backend-api/lojas.md`.
 
 ## Entry points
 - `index.ts`: `lojasRoutes` (registrado em `src/routes.ts`) e `criarLojasRoutes({ hostsLogoExtras })`.
@@ -21,8 +23,9 @@ normalizadas (modulo `disponibilidade`, regras-negocio/05). Fonte: `historias/ba
 ## Tabelas
 - dono de: `lojas` (insert/update; desativar = `ativo=false`, sem DELETE). G7 acrescenta as colunas
   `pausada`/`pausada_motivo`/`pausada_ate` (pausa operacional, distinta de `ativo` e de `suspensa` da
-  cobranca) e `capacidade_por_janela`/`capacidade_janela_minutos` (migration 0053). A coluna legada
-  `horarios` foi removida (migration 0061); disponibilidade tem fonte unica no modulo `disponibilidade`.
+  cobranca) e `capacidade_por_janela`/`capacidade_janela_minutos` (migration 0053). As colunas legadas
+  `horarios` (migration 0061) e `area_entrega` (migration 0062) foram removidas; disponibilidade tem
+  fonte unica no modulo `disponibilidade` e entrega em `zonas_entrega`.
 - le de: `numeros_whatsapp` (so contagem total/conectados, nunca `token_cifrado`),
   `membros` (so `contasDoDono`: o kernel exclui lojas inativas e conta sem loja, entao criar,
   desativar e reativar resolvem a conta pelo vinculo de dono "todas as lojas"),
@@ -35,7 +38,7 @@ normalizadas (modulo `disponibilidade`, regras-negocio/05). Fonte: `historias/ba
 `schemas.ts`: `LojaCriarEntrada`, `LojaAtualizarEntrada`, `LojaBrandingEntrada`, `LojaPausarEntrada`,
 `LojaCapacidadeEntrada`, `LojaSaida` (mesma forma na lista e no detalhe; inclui `pausada`,
 `pausada_motivo`, `pausada_ate`, `capacidade_por_janela`, `capacidade_janela_minutos`), `Cores`,
-`Endereco`, `AreaEntrega`. Todo jsonb e lido/gravado por estes schemas estritos. `aberta_agora` e
+`Endereco`. Todo jsonb e lido/gravado por estes schemas estritos. `aberta_agora` e
 derivado no servidor de `horarios_funcionamento` + `excecoes_disponibilidade` pelo kernel
 `@whaviso/shared/disponibilidade` (`lojaAceitandoAgora`), carregado em lote; `null` sem faixa cadastrada.
 

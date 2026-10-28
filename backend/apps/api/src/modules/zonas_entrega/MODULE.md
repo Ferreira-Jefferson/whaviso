@@ -44,4 +44,5 @@ extra e rejeitado (400, strictObject). jsonb `area` e sempre lido por schema (SE
   no momento da criacao).
 - Geometria pura (`geo.ts`: ponto-em-poligono, haversine, normalizarBairro) fica no modulo ate
   haver segundo consumidor (roteirizacao/atendente), quando sobe para o kernel compartilhado.
-- Fora de escopo agora: aviso de zona fora de `lojas.area_entrega`.
+- As zonas sao a fonte unica da area de entrega da loja (a coluna legada `lojas.area_entrega` foi
+  removida na 0062): um endereco fora de qualquer zona ativa nao e atendido.

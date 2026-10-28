@@ -20,20 +20,14 @@ import { verificadorFake } from '../../../test/app'
 import { criarLojasRoutes } from './routes'
 import { logoPermitido, paraSaida } from './service'
 import type * as repo from './repo'
-import { AreaEntrega, Cores, LojaCriarEntrada, LojaSaida } from './schemas'
+import { Cores, LojaCriarEntrada, LojaSaida } from './schemas'
 
 describe('contratos de loja', () => {
-  it('cor invalida, raio negativo/zero/enorme', () => {
+  it('cor invalida barrada', () => {
     expect(Cores.safeParse({ primaria: '#12ab9F' }).success).toBe(true)
     expect(Cores.safeParse({ primaria: 'vermelho' }).success).toBe(false)
     expect(Cores.safeParse({ primaria: '#fff' }).success).toBe(false)
     expect(Cores.safeParse({ primaria: '#112233', x: '#112233' }).success).toBe(false)
-    const centro = { lat: -23.5, lng: -46.6 }
-    expect(AreaEntrega.safeParse({ modo: 'raio', raio_km: 5, centro }).success).toBe(true)
-    expect(AreaEntrega.safeParse({ modo: 'raio', raio_km: -1, centro }).success).toBe(false)
-    expect(AreaEntrega.safeParse({ modo: 'raio', raio_km: 0, centro }).success).toBe(false)
-    expect(AreaEntrega.safeParse({ modo: 'raio', raio_km: 500, centro }).success).toBe(false)
-    expect(AreaEntrega.safeParse({ modo: 'bairros', bairros: ['A', 'a'] }).success).toBe(false)
   })
 
   it('criar nega chaves fora do contrato (conta_id, id)', () => {
@@ -61,7 +55,6 @@ describe('paraSaida: aberta_agora derivado da disponibilidade (America/Sao_Paulo
     logo_url: null,
     cores: {},
     endereco: null,
-    area_entrega: null,
     ativo: true,
     pausada: false,
     pausada_motivo: null,
@@ -203,15 +196,15 @@ d('lojas (integracao)', () => {
     expect(sem.statusCode).toBe(401)
   })
 
-  it('PATCH atualiza endereco e area; campo ausente permanece', async () => {
+  it('PATCH atualiza endereco; campo ausente permanece', async () => {
     const r = await req(dono, 'PATCH', `/${lojaA}`, {
       endereco: { logradouro: 'Rua A', numero: '10', bairro: 'Centro', cidade: 'Sao Paulo', uf: 'SP', cep: '01001000' },
-      area_entrega: { modo: 'bairros', bairros: ['Centro', 'Vila Nova'] },
     })
     expect(r.statusCode).toBe(200)
-    expect(r.json().area_entrega.bairros).toHaveLength(2)
-    const n = await req(dono, 'PATCH', `/${lojaA}`, { area_entrega: null })
-    expect(n.json().area_entrega).toBeNull()
+    expect(r.json().endereco.cidade).toBe('Sao Paulo')
+    // outra PATCH mexendo so no nome: o endereco (ausente) permanece
+    const n = await req(dono, 'PATCH', `/${lojaA}`, { nome: 'Pizzaria do Gerente' })
+    expect(n.json().nome).toBe('Pizzaria do Gerente')
     expect(n.json().endereco.cidade).toBe('Sao Paulo') // campo ausente permanece
   })
 
@@ -247,7 +240,7 @@ d('lojas (integracao)', () => {
       { nome: 'X3', loja_id: lojaB },
       { nome: 'X4', ativo: false },
       { nome: 'X5', horarios: { fuso: 'America/Sao_Paulo' } }, // coluna/campo legado nao existe mais
-      { area_entrega: { modo: 'raio', raio_km: -2, centro: { lat: 0, lng: 0 } } },
+      { nome: 'X6', area_entrega: { modo: 'bairros', bairros: ['Centro'] } }, // campo legado removido (migration 0062)
       {},
     ]
     for (const a of ataques) {
@@ -403,7 +396,7 @@ d('lojas (integracao)', () => {
     try {
       await cli.query('begin')
       await cli.query('set local role whaviso_atendente')
-      const sel = await cli.query('select nome, area_entrega from public.lojas where id = $1', [lojaA])
+      const sel = await cli.query('select nome from public.lojas where id = $1', [lojaA])
       expect(sel.rowCount).toBe(1)
       await expect(cli.query(`update public.lojas set nome = 'x' where id = $1`, [lojaA])).rejects.toThrow(/permission denied|permiss.o negada/)
     } finally {
