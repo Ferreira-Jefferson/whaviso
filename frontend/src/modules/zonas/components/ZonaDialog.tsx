@@ -4,9 +4,10 @@
 import { useState } from 'react'
 import { ApiError } from '@/shared/api_client'
 import { Banner, Button, ConfirmDialog, Dialog, Field, Input, MoneyInput, SegmentedControl, useToast } from '@/shared/ui'
+import { SeletorArea, useCentroLoja, type AreaGeo } from '@/shared/mapa'
 import type { ZonaNova, ZonaPatch } from '@/shared/contracts/_generated/zonas_entrega'
 import { useAlternarZona, useAtualizarZona, useCriarZona, type Zona } from '../api'
-import { DESCRICAO_TIPO, ROTULO_TIPO, lerDecimal, lerPoligono, poligonoParaTexto, type TipoZona } from '../estados'
+import { DESCRICAO_TIPO, ROTULO_TIPO, type TipoZona } from '../estados'
 
 interface Props {
   aberto: boolean
@@ -43,10 +44,12 @@ function Formulario({ zona, aoFechar }: { zona: Zona | null; aoFechar: () => voi
   const [bairro, setBairro] = useState(zona?.bairro ?? '')
   const areaRaio = zona?.area && 'metros' in zona.area ? zona.area : null
   const areaPoligono = zona?.area && 'coordinates' in zona.area ? zona.area : null
-  const [lat, setLat] = useState(areaRaio ? String(areaRaio.centro.lat) : '')
-  const [lng, setLng] = useState(areaRaio ? String(areaRaio.centro.lng) : '')
-  const [metros, setMetros] = useState(areaRaio ? String(areaRaio.metros) : '')
-  const [pontos, setPontos] = useState(areaPoligono ? poligonoParaTexto(areaPoligono.coordinates[0] ?? []) : '')
+  const [area, setArea] = useState<AreaGeo | null>(() => {
+    if (areaRaio) return { tipo: 'raio', centro: areaRaio.centro, metros: areaRaio.metros }
+    if (areaPoligono) return { tipo: 'poligono', anel: areaPoligono.coordinates[0] ?? [] }
+    return null
+  })
+  const centro = useCentroLoja().data
   const [taxa, setTaxa] = useState<number | null>(zona?.taxa_cliente_centavos ?? null)
   const [valorMotoboy, setValorMotoboy] = useState<number | null>(zona?.valor_motoboy_centavos ?? null)
   const [minimo, setMinimo] = useState<number | null>(zona?.pedido_minimo_centavos ?? null)
@@ -63,20 +66,15 @@ function Formulario({ zona, aoFechar }: { zona: Zona | null; aoFechar: () => voi
   /** Monta a area geometrica do tipo atual, ou devolve a mensagem de erro de validacao. */
   function lerArea(): AreaLida {
     if (tipo === 'raio') {
-      const la = lerDecimal(lat)
-      const lo = lerDecimal(lng)
-      const m = metros.trim() === '' ? null : Number(metros)
-      if (la == null || lo == null || la < -90 || la > 90 || lo < -180 || lo > 180) {
-        return { erro: 'Informe a latitude e a longitude do ponto central.' }
-      }
-      if (m == null || !Number.isInteger(m) || m < 1 || m > 100_000) {
-        return { erro: 'Informe o raio em metros (inteiro, de 1 a 100000).' }
-      }
-      return { raio: { centro: { lat: la, lng: lo }, metros: m } }
+      if (!area || area.tipo !== 'raio') return { erro: 'Defina o centro e o raio no mapa.' }
+      const m = Math.round(area.metros)
+      if (!Number.isInteger(m) || m < 1) return { erro: 'Defina um raio de ao menos 1 metro no mapa.' }
+      return { raio: { centro: area.centro, metros: m } }
     }
-    const r = lerPoligono(pontos)
-    if ('erro' in r) return r
-    return { poligono: { type: 'Polygon', coordinates: [r.anel] } }
+    if (!area || area.tipo !== 'poligono' || area.anel.length < 4) {
+      return { erro: 'Desenhe a área no mapa (ao menos 3 pontos).' }
+    }
+    return { poligono: { type: 'Polygon', coordinates: [area.anel] } }
   }
 
   function salvar() {
@@ -175,33 +173,16 @@ function Formulario({ zona, aoFechar }: { zona: Zona | null; aoFechar: () => voi
           </Field>
         )}
 
-        {tipo === 'raio' && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label="Latitude do centro">
-              <Input value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" placeholder="-23.5505" />
-            </Field>
-            <Field label="Longitude do centro">
-              <Input value={lng} onChange={(e) => setLng(e.target.value)} inputMode="decimal" placeholder="-46.6333" />
-            </Field>
-            <Field label="Raio (metros)">
-              <Input value={metros} onChange={(e) => setMetros(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="3000" />
-            </Field>
-          </div>
-        )}
-
-        {tipo === 'poligono' && (
+        {tipo !== 'bairro' && (
           <Field
-            label="Pontos da área"
-            dica="Um ponto por linha, como latitude, longitude (decimais com ponto). Use ao menos 3 pontos, em ordem ao redor da área. O polígono é fechado automaticamente."
+            label={tipo === 'raio' ? 'Área de entrega (raio)' : 'Área de entrega (polígono)'}
+            dica={
+              tipo === 'raio'
+                ? 'Arraste a borda do círculo ou digite os km.'
+                : 'Clique no mapa para desenhar a área.'
+            }
           >
-            <textarea
-              value={pontos}
-              onChange={(e) => setPontos(e.target.value)}
-              rows={5}
-              spellCheck={false}
-              placeholder={'-23.5505, -46.6333\n-23.5600, -46.6400\n-23.5650, -46.6200'}
-              className="w-full resize-y rounded-input border border-linha bg-cartao px-3 py-2.5 font-mono text-sm text-tinta placeholder:text-tinta-2/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-            />
+            <SeletorArea modo={tipo} valor={area} onChange={setArea} centroLoja={centro} />
           </Field>
         )}
 
