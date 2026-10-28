@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { ApiError } from '@/shared/api_client'
 import { Banner, Button, Card, ErrorState, Field, Input, Skeleton, useToast } from '@/shared/ui'
+import { SeletorPonto, useCentroLoja, type PontoMapa } from '@/shared/mapa'
 import { useConfig, useSalvarConfig, type Config } from '../api'
 
 export function PainelConfig() {
@@ -34,8 +35,12 @@ function Formulario({ config }: { config: Config }) {
   const [maxPedidos, setMaxPedidos] = useState(String(config.max_pedidos_corrida))
   const [janela, setJanela] = useState(String(config.janela_saida_min))
   const [desvio, setDesvio] = useState(String(config.desvio_max_min))
-  const [lat, setLat] = useState(config.origem_lat == null ? '' : String(config.origem_lat))
-  const [lng, setLng] = useState(config.origem_lng == null ? '' : String(config.origem_lng))
+  const [origem, setOrigem] = useState<PontoMapa | null>(
+    config.origem_lat != null && config.origem_lng != null
+      ? { lat: config.origem_lat, lng: config.origem_lng }
+      : null,
+  )
+  const centroLoja = useCentroLoja().data
   const [volta, setVolta] = useState(config.volta_a_loja)
   const [velocidade, setVelocidade] = useState(String(config.velocidade_media_kmh))
   const [erro, setErro] = useState<string | null>(null)
@@ -49,8 +54,6 @@ function Formulario({ config }: { config: Config }) {
     const jn = numero(janela)
     const dv = numero(desvio)
     const vl = numero(velocidade)
-    const la = numero(lat)
-    const lo = numero(lng)
     const inteiro = (n: number | null, min: number, max: number) => n != null && Number.isInteger(n) && n >= min && n <= max
 
     if (!inteiro(pb, 0, 120)) return setErro('Preparo base: inteiro de 0 a 120 minutos.')
@@ -59,10 +62,6 @@ function Formulario({ config }: { config: Config }) {
     if (!inteiro(jn, 0, 120)) return setErro('Janela de saída: inteiro de 0 a 120 minutos.')
     if (!inteiro(dv, 0, 120)) return setErro('Desvio máximo: inteiro de 0 a 120 minutos.')
     if (!inteiro(vl, 5, 120)) return setErro('Velocidade média: inteiro de 5 a 120 km/h.')
-    if ((la == null) !== (lo == null)) return setErro('Informe latitude e longitude da origem juntas, ou deixe as duas vazias.')
-    if (la != null && lo != null && (la < -90 || la > 90 || lo < -180 || lo > 180)) {
-      return setErro('Latitude ou longitude da origem fora do intervalo válido.')
-    }
     setErro(null)
     salvar.mutate(
       {
@@ -71,8 +70,8 @@ function Formulario({ config }: { config: Config }) {
         max_pedidos_corrida: mp!,
         janela_saida_min: jn!,
         desvio_max_min: dv!,
-        origem_lat: la,
-        origem_lng: lo,
+        origem_lat: origem?.lat ?? null,
+        origem_lng: origem?.lng ?? null,
         volta_a_loja: volta,
         velocidade_media_kmh: vl!,
       },
@@ -135,13 +134,24 @@ function Formulario({ config }: { config: Config }) {
         <fieldset>
           <legend className="font-display text-lg text-salvia">Origem e mapa</legend>
           <p className="mt-1 text-sm text-tinta-2">De onde as corridas saem e como estimar a rota sem o provedor de mapas.</p>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label="Latitude da loja" dica="Ponto de saída das corridas. Sem origem, usamos o centro das paradas.">
-              <Input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="-23.5505" {...numerico} />
-            </Field>
-            <Field label="Longitude da loja">
-              <Input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="-46.6333" {...numerico} />
-            </Field>
+          <div className="mt-4 flex flex-col gap-3">
+            <span className="text-sm font-medium text-tinta">Origem das corridas (a loja)</span>
+            <SeletorPonto valor={origem} onChange={setOrigem} centroLoja={centroLoja} />
+            <div className="flex flex-wrap gap-2">
+              {centroLoja && (
+                <Button type="button" variante="secondary" onClick={() => setOrigem(centroLoja)}>
+                  Usar o endereço da loja
+                </Button>
+              )}
+              {origem && (
+                <Button type="button" variante="ghost" onClick={() => setOrigem(null)}>
+                  Remover origem
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-tinta-2">Sem origem marcada, usamos o centro das paradas.</p>
+          </div>
+          <div className="mt-4 max-w-xs">
             <Field label="Velocidade média (km/h)" dica="Usada só quando o provedor de mapas está fora do ar e a rota é estimada em linha reta.">
               <Input value={velocidade} onChange={(e) => setVelocidade(e.target.value)} {...numerico} />
             </Field>

@@ -175,6 +175,47 @@ function SeletorRaio({
 }
 
 // ---------------------------------------------------------------------------------------------
+// Ponto unico (ex.: origem das corridas). O usuario clica/arrasta um marcador, sem digitar
+// coordenada. `valor` null = ainda nao ha ponto (o primeiro clique no mapa define).
+// ---------------------------------------------------------------------------------------------
+export function SeletorPonto({
+  valor,
+  onChange,
+  centroLoja,
+}: {
+  valor: PontoMapa | null
+  onChange: (p: PontoMapa) => void
+  /** Sugestao de ponto (loja geocodificada) usada so para centrar o mapa quando nao ha valor. */
+  centroLoja: PontoMapa | null
+}) {
+  const centro = valor ?? centroLoja ?? CENTRO_PADRAO
+  return (
+    <div className="flex flex-col gap-3">
+      <div className={moldura}>
+        <Suspense fallback={carregando}>
+          <SeletorAreaLeaflet
+            modo="ponto"
+            centroLoja={centroLoja}
+            centro={centro}
+            mostrarPonto={valor != null}
+            metros={0}
+            raioMetrosMax={0}
+            onCentro={onChange}
+            onMetros={() => undefined}
+            vertices={[]}
+            onAdicionarVertice={() => undefined}
+            onMoverVertice={() => undefined}
+          />
+        </Suspense>
+      </div>
+      <p className="text-sm text-tinta-2">
+        Clique no mapa para marcar o ponto, ou arraste para ajustar.
+      </p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
 // Modo poligono
 // ---------------------------------------------------------------------------------------------
 function SeletorPoligono({

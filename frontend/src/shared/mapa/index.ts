@@ -1,6 +1,6 @@
 // Seletor de area de entrega (shared, reutilizavel): o usuario desenha a area no mapa, sem digitar
 // coordenada. Pode ser importado por qualquer modulo (shared nao importa de modules).
-export { SeletorArea } from './SeletorArea'
+export { SeletorArea, SeletorPonto } from './SeletorArea'
 export { useGeocodificarEndereco, useCentroLoja, type EnderecoParaGeocode } from './useGeocodificarEndereco'
 export {
   CENTRO_PADRAO,

@@ -14,15 +14,17 @@ const TILES_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const TILES_ATRIB = '&copy; OpenStreetMap'
 
 interface Props {
-  modo: 'raio' | 'poligono'
+  modo: 'raio' | 'poligono' | 'ponto'
   /** Ponto da loja (referencia visual); null quando a loja nao tem endereco/geocode. */
   centroLoja: PontoMapa | null
-  // --- raio ---
+  // --- raio e ponto ---
   centro: PontoMapa
   metros: number
   raioMetrosMax: number
   onCentro: (p: PontoMapa) => void
   onMetros: (metros: number) => void
+  /** Modo ponto: desenha o marcador so quando ha um ponto definido (clique define o primeiro). */
+  mostrarPonto?: boolean
   // --- poligono ---
   vertices: PontoMapa[]
   onAdicionarVertice: (p: PontoMapa) => void
@@ -59,7 +61,7 @@ function iconeVertice(numero: number): L.DivIcon {
 }
 
 export default function SeletorAreaLeaflet(props: Props) {
-  const { modo, centroLoja, centro, metros, vertices } = props
+  const { modo, centroLoja, centro, metros, vertices, mostrarPonto } = props
 
   const elRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -67,6 +69,8 @@ export default function SeletorAreaLeaflet(props: Props) {
   const circuloRef = useRef<L.Circle | null>(null)
   const centroMkRef = useRef<L.Marker | null>(null)
   const handleMkRef = useRef<L.Marker | null>(null)
+  // Camada do modo ponto.
+  const pontoMkRef = useRef<L.Marker | null>(null)
   // Camadas do modo poligono.
   const grupoRef = useRef<L.LayerGroup | null>(null)
   const poligonoRef = useRef<L.Polygon | null>(null)
@@ -199,6 +203,49 @@ export default function SeletorAreaLeaflet(props: Props) {
     handle.setLatLng([centro.lat, circulo.getBounds().getEast()])
   }, [modo, centro.lat, centro.lng, metros])
 
+  // Modo ponto: um unico marcador (icone da loja) arrastavel + clique para posicionar. O marcador so
+  // aparece quando ha ponto definido (mostrarPonto); o primeiro clique no mapa define o ponto.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || modo !== 'ponto') return
+
+    const c = centroRef.current
+    map.setView([c.lat, c.lng], 14)
+
+    let marcador: L.Marker | null = null
+    if (mostrarPonto) {
+      marcador = L.marker([c.lat, c.lng], {
+        icon: iconeLoja(),
+        draggable: true,
+        keyboard: false,
+        title: 'Origem (arraste para mover)',
+      }).addTo(map)
+      marcador.on('dragend', () => {
+        const p = marcador!.getLatLng()
+        cbRef.current.onCentro({ lat: p.lat, lng: p.lng })
+      })
+    }
+    pontoMkRef.current = marcador
+
+    const aoClicar = (e: L.LeafletMouseEvent) => {
+      cbRef.current.onCentro({ lat: e.latlng.lat, lng: e.latlng.lng })
+    }
+    map.on('click', aoClicar)
+
+    return () => {
+      map.off('click', aoClicar)
+      marcador?.remove()
+      pontoMkRef.current = null
+    }
+  }, [modo, mostrarPonto])
+
+  // Modo ponto: move o marcador quando o ponto muda de fora (ex.: "usar o endereco da loja").
+  useEffect(() => {
+    const mk = pontoMkRef.current
+    if (modo !== 'ponto' || !mk) return
+    mk.setLatLng([centro.lat, centro.lng])
+  }, [modo, centro.lat, centro.lng])
+
   // Modo poligono: grupo de camadas + clique para adicionar vertice.
   useEffect(() => {
     const map = mapRef.current
@@ -287,7 +334,13 @@ export default function SeletorAreaLeaflet(props: Props) {
       ref={elRef}
       className="size-full"
       role="application"
-      aria-label={modo === 'raio' ? 'Mapa para definir o raio de entrega' : 'Mapa para desenhar a area de entrega'}
+      aria-label={
+        modo === 'raio'
+          ? 'Mapa para definir o raio de entrega'
+          : modo === 'ponto'
+            ? 'Mapa para marcar a origem das corridas'
+            : 'Mapa para desenhar a area de entrega'
+      }
     />
   )
 }
