@@ -4,16 +4,46 @@
 // mostra carregando, erro ou o estado "sem loja".
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
-import { MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
+import { ChevronRight, MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { SeletorLoja, useTenant } from '@/shared/tenant'
 import { useEstadoRealtime } from '@/shared/realtime'
 import { BellLogo, EmptyState, ErrorState, Skeleton, cn } from '@/shared/ui'
-import { ROTAS, ROTULO_GRUPO, type GrupoNav, type RotaModulo } from '../rotas'
-
-const GRUPOS: GrupoNav[] = ['painel', 'entrega', 'config']
+import { GRUPOS_NAV, ROTAS, type GrupoNav, type RotaModulo } from '../rotas'
 
 const FOCO = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia'
+
+/** Grupo do item cuja rota casa com o caminho atual (para manter a seção aberta). */
+function useGrupoAtivo(): GrupoNav | undefined {
+  const { pathname } = useLocation()
+  return ROTAS.find((r) => pathname === `/${r.caminho}` || pathname.startsWith(`/${r.caminho}/`))?.grupo
+}
+
+/** Estado aberto/fechado de cada seção do menu, por visitante (tolera storage bloqueado). */
+function useGruposAbertos() {
+  const [abertos, setAbertos] = useState<Record<string, boolean>>(() => {
+    const padrao = Object.fromEntries(GRUPOS_NAV.map((g) => [g.id, g.abertoPadrao ?? false]))
+    try {
+      const salvo = localStorage.getItem('whaviso:nav-grupos')
+      if (salvo) return { ...padrao, ...(JSON.parse(salvo) as Record<string, boolean>) }
+    } catch {
+      /* storage indisponivel: usa o padrao */
+    }
+    return padrao
+  })
+  function alternar(id: GrupoNav) {
+    setAbertos((prev) => {
+      const nova = { ...prev, [id]: !prev[id] }
+      try {
+        localStorage.setItem('whaviso:nav-grupos', JSON.stringify(nova))
+      } catch {
+        /* storage indisponivel: so nao persiste */
+      }
+      return nova
+    })
+  }
+  return { abertos, alternar }
+}
 
 function ItemNav({ rota, onNavegar }: { rota: RotaModulo; onNavegar?: () => void }) {
   const Icone = rota.icone
@@ -37,7 +67,40 @@ function ItemNav({ rota, onNavegar }: { rota: RotaModulo; onNavegar?: () => void
   )
 }
 
+/** Uma seção recolhível do menu lateral: cabeçalho (chevron + rótulo) + lista de itens.
+ *  A seção da rota atual fica sempre aberta, para o usuário nunca "perder" onde está. */
+function GrupoSecao({ id, rotulo, aberto, ativo, onAlternar }: { id: GrupoNav; rotulo: string; aberto: boolean; ativo: boolean; onAlternar: (id: GrupoNav) => void }) {
+  const itens = ROTAS.filter((r) => r.grupo === id)
+  if (itens.length === 0) return null
+  const expandido = aberto || ativo
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => onAlternar(id)}
+        aria-expanded={expandido}
+        className={cn(
+          'flex min-h-9 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider text-tinta-2 hover:bg-black/5 hover:text-tinta',
+          FOCO,
+        )}
+      >
+        <ChevronRight className={cn('size-3.5 flex-none transition-transform', expandido && 'rotate-90')} strokeWidth={2.5} aria-hidden />
+        {rotulo}
+      </button>
+      {expandido && (
+        <nav aria-label={rotulo} className="flex flex-col gap-0.5 pb-1">
+          {itens.map((r) => (
+            <ItemNav key={r.caminho} rota={r} />
+          ))}
+        </nav>
+      )}
+    </div>
+  )
+}
+
 function Sidebar({ onRecolher }: { onRecolher: () => void }) {
+  const { abertos, alternar } = useGruposAbertos()
+  const grupoAtivo = useGrupoAtivo()
   return (
     <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-linha bg-papel-2 px-3 py-4 md:flex">
       <div className="flex items-center gap-2.5 px-2.5 pb-4 font-display text-xl font-bold">
@@ -54,16 +117,11 @@ function Sidebar({ onRecolher }: { onRecolher: () => void }) {
           <PanelLeftClose className="size-5" strokeWidth={1.75} aria-hidden />
         </button>
       </div>
-      {GRUPOS.map((g) => (
-        <nav key={g} aria-label={ROTULO_GRUPO[g]} className="flex flex-col gap-0.5">
-          {g !== 'painel' && (
-            <p className="px-3 pb-1.5 pt-4 text-xs font-bold uppercase tracking-wider text-tinta-2">{ROTULO_GRUPO[g]}</p>
-          )}
-          {ROTAS.filter((r) => r.grupo === g).map((r) => (
-            <ItemNav key={r.caminho} rota={r} />
-          ))}
-        </nav>
-      ))}
+      <div className="flex flex-col gap-0.5">
+        {GRUPOS_NAV.map((g) => (
+          <GrupoSecao key={g.id} id={g.id} rotulo={g.rotulo} aberto={abertos[g.id] ?? false} ativo={grupoAtivo === g.id} onAlternar={alternar} />
+        ))}
+      </div>
       <BotaoSair className="mt-auto" />
     </aside>
   )
@@ -113,12 +171,12 @@ function BarraInferior() {
             aria-label="Mais áreas"
             className="animate-sheet absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-[20px] border-t border-linha bg-papel p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]"
           >
-            {GRUPOS.map((g) => {
-              const itens = resto.filter((r) => r.grupo === g)
+            {GRUPOS_NAV.map((g) => {
+              const itens = resto.filter((r) => r.grupo === g.id)
               if (itens.length === 0) return null
               return (
-                <nav key={g} aria-label={ROTULO_GRUPO[g]} className="mb-2 flex flex-col gap-0.5">
-                  <p className="px-3 pb-1 pt-2 text-xs font-bold uppercase tracking-wider text-tinta-2">{ROTULO_GRUPO[g]}</p>
+                <nav key={g.id} aria-label={g.rotulo} className="mb-2 flex flex-col gap-0.5">
+                  <p className="px-3 pb-1 pt-2 text-xs font-bold uppercase tracking-wider text-tinta-2">{g.rotulo}</p>
                   {itens.map((r) => (
                     <ItemNav key={r.caminho} rota={r} onNavegar={() => setAberto(false)} />
                   ))}
