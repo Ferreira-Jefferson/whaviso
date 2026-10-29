@@ -465,3 +465,34 @@ Botão "Nova chave":
   Validade: 31/12/2026 (ou "sem validade")
   Depois de criar: copiar a chave uma vez (não aparece de novo)
 ```
+
+---
+
+## 17. Gestão da Meta fica na plataforma; criação de fluxo é compartilhada
+
+**Local:** console da plataforma (nova seção de WhatsApp/Meta). E a criação de fluxo, hoje
+em `frontend/src/modules/llm/fluxo/`, que passa a usar essa gestão. Transporte com a Meta:
+`backend/apps/zap/src/shared/meta_client/`. Números: `modules/numeros_whatsapp` e `canais`.
+
+**Como está:** não existe uma seção única, na plataforma, que faça a comunicação com a Meta
+para o atendimento. Os pedaços estão espalhados: `campanhas` usa template, `numeros_whatsapp`
+e `canais` cuidam do número, e o `meta_client` no zap é só o transporte. Falta o lugar que
+define template, envia para aprovação e cuida do que o atendimento do WhatsApp precisa.
+
+**Como deveria:** a plataforma tem uma seção que faz a gestão fina da Meta: define template,
+envia para aprovação, acompanha o status e habilita o que o atendimento precisa. Essa gestão
+é só da plataforma (a equipe Whaviso). A criação de fluxo usa essa gestão e vale para os dois
+lados, loja e plataforma: cada um monta o fluxo dele, mas ambos escolhem template a partir do
+catálogo aprovado que a plataforma gere. Depende do motor de atendimento compartilhado (ver
+item 15 e o escopo genérico loja/plataforma).
+
+**Exemplo:**
+
+```
+Plataforma > seção "WhatsApp/Meta":
+  define template, envia para aprovação, vê status (aprovado, recusado, em análise)
+  habilita o número e o que o atendimento precisa
+
+Criação de fluxo (loja e plataforma):
+  passo que manda template escolhe um template JÁ aprovado pela plataforma
+```
