@@ -3,13 +3,13 @@ import rateLimit from '@fastify/rate-limit'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
 import {
-  serializerCompiler,
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod'
 import type { Pool } from '@whaviso/shared/db'
 import { consultar, sqlBruto } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
+import { serializerCompilerRapido } from './shared/serializacao'
 import { tratadorDeErros, tratadorNaoEncontrado } from './shared/http_errors'
 import { registrarModulos, type ModuloRota } from './routes'
 import { criarAdminSupabase, type AdminSupabase } from './shared/supabase_admin'
@@ -57,7 +57,8 @@ export async function construirApp(deps: DepsApi) {
   }).withTypeProvider<ZodTypeProvider>()
 
   app.setValidatorCompiler(validatorCompiler)
-  app.setSerializerCompiler(serializerCompiler)
+  // fast-json-stringify (so emite campos declarados = whitelist de PII) com fallback ao serializer zod.
+  app.setSerializerCompiler(serializerCompilerRapido)
   app.setErrorHandler(tratadorDeErros)
   app.setNotFoundHandler(tratadorNaoEncontrado)
 
