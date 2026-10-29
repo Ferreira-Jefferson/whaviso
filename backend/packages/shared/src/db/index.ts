@@ -36,7 +36,9 @@ export function criarPool(opcoes: OpcoesPool): Pool {
   return new pg.Pool({
     connectionString: opcoes.connectionString,
     max: opcoes.max,
-    idleTimeoutMillis: opcoes.idleTimeoutMs ?? 30_000,
+    idleTimeoutMillis: opcoes.idleTimeoutMs ?? 600_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     connectionTimeoutMillis: opcoes.connectTimeoutMs ?? 10_000,
     statement_timeout: opcoes.statementTimeoutMs ?? 15_000,
   })

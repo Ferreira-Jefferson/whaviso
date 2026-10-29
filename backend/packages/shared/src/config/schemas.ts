@@ -14,7 +14,7 @@ export const envBaseSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
   DB_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(100).default(10_000),
-  DB_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30_000),
+  DB_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1000).default(600_000),
   DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(15_000),
 })
 
