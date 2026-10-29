@@ -177,6 +177,35 @@ d('modulo clientes (integracao)', () => {
     expect(itens.find((i) => i.id === clienteId)?.pedidos_total).toBe(2)
   })
 
+  it('read-model: rascunho nao conta; ao virar efetivo entra na contagem e sobe (trigger 0083)', async () => {
+    const criado = await chamar(donoA, lojaA1, 'POST', '', { telefone: '(11) 97777-2222', nome: 'Bia' })
+    expect(criado.statusCode).toBe(201)
+    const novoId = criado.json().id as string
+    const pedidoId = randomUUID()
+
+    // rascunho inserido: NAO deve contar nem mover o cliente (read-model so conta efetivo).
+    await poolSuper.query(
+      `insert into public.pedidos (id, loja_id, cliente_id, codigo, status, subtotal_centavos, total_centavos)
+       values ($1,$2,$3,'RM1','rascunho',1500,1500)`,
+      [pedidoId, lojaA1, novoId],
+    )
+    const antes = await chamar(donoA, lojaA1, 'GET', '')
+    const itensAntes = antes.json().itens as { id: string; pedidos_total: number }[]
+    expect(itensAntes.find((i) => i.id === novoId)?.pedidos_total).toBe(0)
+
+    // rascunho -> novo (efetivacao): o trigger passa a contar e bump de ultimo_pedido_em leva ao topo.
+    await poolSuper.query(`update public.pedidos set status = 'novo' where id = $1`, [pedidoId])
+    const depois = await chamar(donoA, lojaA1, 'GET', '')
+    const itens = depois.json().itens as { id: string; pedidos_total: number }[]
+    expect(itens.find((i) => i.id === novoId)?.pedidos_total).toBe(1)
+    expect(itens[0]?.id).toBe(novoId)
+
+    // Limpa o que este teste criou (a suite compartilha estado via beforeAll): remove o pedido e o
+    // cliente para nao alterar a contagem de clientes que os testes seguintes assumem.
+    await poolSuper.query(`delete from public.pedidos where id = $1`, [pedidoId])
+    await poolSuper.query(`delete from public.clientes where id = $1`, [novoId])
+  })
+
   it('paginacao por cursor sem repetir nem pular', async () => {
     const p1 = (await chamar(donoA, lojaA1, 'GET', '?limite=1')).json()
     expect(p1.itens).toHaveLength(1)

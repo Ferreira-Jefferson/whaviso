@@ -33,26 +33,21 @@ export async function listar(exec: Executor, lojaId: string, f: FiltroLista) {
     ? sql` and c.nome ilike ${`%${escaparLike(f.nome)}%`} escape ${'\\'}`
     : sqlBruto('')
   const porHash = f.hash ? sql` and c.telefone_hash = ${f.hash}` : sqlBruto('')
+  // Read-model: pedidos_total e ordenado_em sao colunas prontas (mantidas por trigger no pedidos,
+  // migration 0083), entao a listagem nao faz mais o lateral por linha. `ordenado_em` (coluna gerada
+  // = greatest(criado_em, coalesce(ultimo_pedido_em, criado_em))) tem indice que serve o order by +
+  // o cursor direto. A saida e identica a de antes (campos pedidos_total e ultima).
   const cursor = f.cursor
-    ? sql` where (b.ultima, b.id) < (${f.cursor.ts}::timestamptz, ${f.cursor.id}::uuid)`
+    ? sql` and (c.ordenado_em, c.id) < (${f.cursor.ts}::timestamptz, ${f.cursor.id}::uuid)`
     : sqlBruto('')
   return consultar<ClienteListaLinha>(
     exec,
-    sql`with b as (
-      select c.id, c.nome, c.telefone_cifrado, c.criado_em, p.n as pedidos_total,
-             greatest(c.criado_em, coalesce(p.ultimo, c.criado_em)) as ultima
-        from public.clientes c
-        left join lateral (
-          select count(*)::int as n, max(criado_em) as ultimo
-            from public.pedidos where cliente_id = c.id and status <> 'rascunho'
-        ) p on true
-       where c.loja_id = ${lojaId}${porNome}${porHash}
-    )
-    select b.id, b.nome, b.telefone_cifrado, b.pedidos_total, ${TS('b.criado_em')} as criado_em,
-           ${TS('b.ultima')} as ultima
-      from b${cursor}
-     order by b.ultima desc, b.id desc
-     limit ${f.limite + 1}`,
+    sql`select c.id, c.nome, c.telefone_cifrado, c.pedidos_total,
+               ${TS('c.criado_em')} as criado_em, ${TS('c.ordenado_em')} as ultima
+          from public.clientes c
+         where c.loja_id = ${lojaId}${porNome}${porHash}${cursor}
+         order by c.ordenado_em desc, c.id desc
+         limit ${f.limite + 1}`,
   )
 }
 
