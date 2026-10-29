@@ -6,7 +6,7 @@ import { AppShell } from './layouts/AppShell'
 import { OperadorShell } from './layouts/OperadorShell'
 import { LegalLayout } from './layouts/LegalLayout'
 import { AppError } from './AppError'
-import { RedirectSeLogado, RequireAuth, RequireOperador } from './guards'
+import { RedirectSeLogado, RequireAcessoApp, RequireAuth, RequireOperador } from './guards'
 import { ROTAS } from './rotas'
 import { PaginaSlot } from './pages/PaginaSlot'
 import Entrar from './pages/Entrar'
@@ -56,7 +56,9 @@ export const rotas: RouteObject[] = [
       {
         element: (
           <RequireAuth>
-            <AppShell />
+            <RequireAcessoApp>
+              <AppShell />
+            </RequireAcessoApp>
           </RequireAuth>
         ),
         children: ROTAS.map((r) => {

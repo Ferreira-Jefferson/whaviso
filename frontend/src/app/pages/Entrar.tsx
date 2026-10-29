@@ -1,12 +1,20 @@
 // Entrar: login único por conta Google (GIS + signInWithIdToken). O supabase-js só
 // devolve o JWT; a sessão resultante move o app pela RedirectSeLogado. O login por
 // WhatsApp/OTP foi removido (decisão 2026-10-29): uma conta por pessoa, sempre com e-mail.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BellLogo, Banner } from '@/shared/ui'
 import { GoogleLoginButton } from '@/modules/auth'
+import { consumirAcessoNegado } from '../sonda_acesso'
 
 export default function Entrar() {
   const [erro, setErro] = useState<string | null>(null)
+
+  // Veio barrado do shell por falta de acesso: mostra o aviso uma vez (o sinal se consome).
+  useEffect(() => {
+    if (consumirAcessoNegado()) {
+      setErro('Acesso não permitido. Se você deveria ter acesso, entre em contato com o suporte.')
+    }
+  }, [])
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4 py-10">
