@@ -48,12 +48,16 @@ export const AssinaturaDTO = z.strictObject({
 })
 export type AssinaturaDTO = z.infer<typeof AssinaturaDTO>
 
-/** Criacao: so 'trial' ou 'ativa' (suspensa/cancelada nunca nascem de uma criacao). */
+/** Criacao: so 'trial' ou 'ativa' (suspensa/cancelada nunca nascem de uma criacao).
+ * plano_id e OPCIONAL. Com plano e sem valor explicito, o valor do plano e COPIADO (congelado) na
+ * assinatura; reajuste futuro do plano nao muda a fatura de quem ja assina. Valor informado
+ * manualmente continua valendo; sem plano nem valor, o servidor aplica o padrao. */
 export const AssinaturaCriar = z.strictObject({
   conta_id: UuidSchema,
   loja_id: UuidSchema.nullable().optional(),
   status: z.enum(['trial', 'ativa']).default('trial'),
-  valor_mensal_centavos: Centavos.default(70000),
+  plano_id: UuidSchema.optional(),
+  valor_mensal_centavos: Centavos.optional(),
   dia_vencimento: DiaVencimento.default(10),
   /** Fim do trial (so faz sentido quando status = 'trial'). */
   trial_ate: DataHoraIso.optional(),
@@ -62,18 +66,22 @@ export type AssinaturaCriar = z.infer<typeof AssinaturaCriar>
 
 /**
  * Alteracao de assinatura. `status` dispara transicao (suspender/reativar/cancelar, validada no
- * servico); valor/vencimento valem para faturas FUTURAS (fatura emitida e imutavel no valor).
- * Pelo menos um campo e obrigatorio.
+ * servico); plano/valor/vencimento valem para faturas FUTURAS (fatura emitida e imutavel no valor).
+ * Trocar o plano recopia o valor do plano, salvo valor manual. Pelo menos um campo e obrigatorio.
  */
 export const AssinaturaPatch = z
   .strictObject({
     status: statusAssinatura.optional(),
+    plano_id: UuidSchema.optional(),
     valor_mensal_centavos: Centavos.optional(),
     dia_vencimento: DiaVencimento.optional(),
   })
-  .refine((v) => v.status !== undefined || v.valor_mensal_centavos !== undefined || v.dia_vencimento !== undefined, {
-    message: 'informe ao menos um campo para alterar',
-  })
+  .refine(
+    (v) =>
+      v.status !== undefined || v.plano_id !== undefined || v.valor_mensal_centavos !== undefined
+      || v.dia_vencimento !== undefined,
+    { message: 'informe ao menos um campo para alterar' },
+  )
 export type AssinaturaPatch = z.infer<typeof AssinaturaPatch>
 
 export const AssinaturasLista = z.array(AssinaturaDTO)

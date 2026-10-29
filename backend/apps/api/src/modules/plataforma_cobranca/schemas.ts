@@ -2,10 +2,12 @@
 // @whaviso/shared/contracts/plataforma_cobranca (o codegen reemite para o front quando o barrel
 // passar a reexportar o agregado). Aqui ficam so o parametro de rota :id e os filtros de query.
 import { z } from 'zod'
-import { Centavos, CompetenciaMes, DiaVencimento, statusAssinatura, statusFatura } from '@whaviso/shared/contracts'
+import { Centavos, CompetenciaMes, statusAssinatura, statusFatura } from '@whaviso/shared/contracts'
 
 export {
   AssinaturaDTO,
+  AssinaturaCriar,
+  AssinaturaPatch,
   AssinaturasLista,
   FaturaDTO,
   FaturasLista,
@@ -37,36 +39,6 @@ export const FaturasQuery = z.strictObject({
   conta_id: z.uuid().optional(),
 })
 export type FaturasQuery = z.infer<typeof FaturasQuery>
-
-// ---- Assinatura com plano (extensao local dos contratos compartilhados) ---------------------
-// plano_id e OPCIONAL. Com plano e sem valor explicito, o valor do plano e COPIADO para a
-// assinatura (valor_mensal_centavos): reajuste futuro do plano nao muda a fatura de quem assina.
-// Valor informado manualmente continua valendo (comportamento anterior preservado).
-
-export const AssinaturaCriar = z.strictObject({
-  conta_id: z.uuid(),
-  loja_id: z.uuid().nullable().optional(),
-  status: z.enum(['trial', 'ativa']).default('trial'),
-  plano_id: z.uuid().optional(),
-  valor_mensal_centavos: Centavos.optional(),
-  dia_vencimento: DiaVencimento.default(10),
-  trial_ate: z.iso.datetime({ offset: true }).optional(),
-})
-export type AssinaturaCriar = z.infer<typeof AssinaturaCriar>
-
-export const AssinaturaPatch = z
-  .strictObject({
-    status: statusAssinatura.optional(),
-    plano_id: z.uuid().optional(),
-    valor_mensal_centavos: Centavos.optional(),
-    dia_vencimento: DiaVencimento.optional(),
-  })
-  .refine(
-    (v) => v.status !== undefined || v.plano_id !== undefined || v.valor_mensal_centavos !== undefined
-      || v.dia_vencimento !== undefined,
-    { message: 'informe ao menos um campo para alterar' },
-  )
-export type AssinaturaPatch = z.infer<typeof AssinaturaPatch>
 
 // ---- Planos (catalogo; admin) ---------------------------------------------------------------
 

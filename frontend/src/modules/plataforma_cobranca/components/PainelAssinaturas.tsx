@@ -23,14 +23,15 @@ import {
   type ColunaTabela,
   type SelectOption,
 } from '@/shared/ui'
-import { formatarData } from '@/shared/format'
+import { formatarCentavos, formatarData } from '@/shared/format'
 import {
   statusAssinatura,
   type AssinaturaDTO,
   type AssinaturaPatch,
   type StatusAssinatura,
 } from '@/shared/contracts/_generated/plataforma_cobranca'
-import { useAlterarAssinatura, useAssinaturas, useCriarAssinatura, useNomesContas } from '../api'
+import { useAlterarAssinatura, useAssinaturas, useCriarAssinatura, useNomesContas, usePlanos } from '../api'
+import type { PlanoDTO } from '../planos'
 import {
   ACAO_TRANSICAO,
   ROTULO_STATUS_ASSINATURA,
@@ -60,6 +61,36 @@ function diaValido(texto: string): number | null {
   if (!/^\d{1,2}$/.test(texto.trim())) return null
   const n = Number(texto)
   return n >= 1 && n <= 28 ? n : null
+}
+
+/** Seletor opcional de plano. Ao escolher um plano, o pai copia o valor do plano para o campo de
+ * valor (o operador ainda pode ajustar; o valor fica congelado na assinatura). GET /planos exige
+ * `planos:gerir`: um papel sem essa permissao recebe 403, e entao (ou quando nao ha plano ativo) o
+ * seletor nao aparece e o valor segue manual, como antes. */
+function SeletorPlano({
+  value,
+  onEscolher,
+}: {
+  value: string
+  onEscolher: (planoId: string, valorCentavos: number | null) => void
+}) {
+  const planos = usePlanos()
+  const ativos: PlanoDTO[] = (planos.data ?? []).filter((p) => p.ativo)
+  if (ativos.length === 0) return null
+  const opcoes: SelectOption<string>[] = [
+    { value: '', label: 'Sem plano (valor manual)' },
+    ...ativos.map((p) => ({ value: p.id, label: `${p.nome} (${formatarCentavos(p.valor_centavos)})` })),
+  ]
+  return (
+    <Field label="Plano" dica="Ao escolher um plano, o valor dele entra no campo abaixo. Dá para ajustar.">
+      <Select
+        ariaLabel="Plano"
+        value={value}
+        onChange={(id) => onEscolher(id, ativos.find((p) => p.id === id)?.valor_centavos ?? null)}
+        options={opcoes}
+      />
+    </Field>
+  )
 }
 
 export function PainelAssinaturas() {
@@ -159,6 +190,7 @@ function FormCriar({ aoFechar }: { aoFechar: () => void }) {
   const [tipo, setTipo] = useState<'trial' | 'ativa'>('trial')
   const [trialAte, setTrialAte] = useState('')
   const [valor, setValor] = useState<number | null>(VALOR_PADRAO_CENTAVOS)
+  const [planoId, setPlanoId] = useState('')
   const [dia, setDia] = useState(String(DIA_PADRAO))
   const [erro, setErro] = useState<string | null>(null)
   const criar = useCriarAssinatura()
@@ -175,6 +207,7 @@ function FormCriar({ aoFechar }: { aoFechar: () => void }) {
       {
         conta_id: conta.id,
         status: tipo,
+        ...(planoId ? { plano_id: planoId } : {}),
         valor_mensal_centavos: valor,
         dia_vencimento: diaNum,
         // Fim do dia em Sao Paulo (UTC-3, sem horario de verao desde 2019).
@@ -217,6 +250,13 @@ function FormCriar({ aoFechar }: { aoFechar: () => void }) {
           <DateInput value={trialAte} onChange={(e) => setTrialAte(e.target.value)} />
         </Field>
       )}
+      <SeletorPlano
+        value={planoId}
+        onEscolher={(id, valorCentavos) => {
+          setPlanoId(id)
+          if (valorCentavos != null) setValor(valorCentavos)
+        }}
+      />
       <Field label="Valor mensal">
         <MoneyInput value={valor} onChange={setValor} />
       </Field>
@@ -238,6 +278,7 @@ function FormCriar({ aoFechar }: { aoFechar: () => void }) {
 
 function FormEditar({ assinatura, aoFechar }: { assinatura: AssinaturaDTO; aoFechar: () => void }) {
   const [valor, setValor] = useState<number | null>(assinatura.valor_mensal_centavos)
+  const [planoId, setPlanoId] = useState('')
   const [dia, setDia] = useState(String(assinatura.dia_vencimento))
   const [erro, setErro] = useState<string | null>(null)
   const [transicao, setTransicao] = useState<StatusAssinatura | null>(null)
@@ -269,7 +310,8 @@ function FormEditar({ assinatura, aoFechar }: { assinatura: AssinaturaDTO; aoFec
     const diaNum = diaValido(dia)
     if (valor === null || valor <= 0) return setErro('Informe o valor mensal.')
     if (diaNum === null) return setErro('O dia de vencimento vai de 1 a 28.')
-    const patch: { valor_mensal_centavos?: number; dia_vencimento?: number } = {}
+    const patch: { plano_id?: string; valor_mensal_centavos?: number; dia_vencimento?: number } = {}
+    if (planoId) patch.plano_id = planoId
     if (valor !== assinatura.valor_mensal_centavos) patch.valor_mensal_centavos = valor
     if (diaNum !== assinatura.dia_vencimento) patch.dia_vencimento = diaNum
     if (Object.keys(patch).length === 0) return aoFechar()
@@ -285,13 +327,20 @@ function FormEditar({ assinatura, aoFechar }: { assinatura: AssinaturaDTO; aoFec
 
       {!encerrada && (
         <>
+          <SeletorPlano
+            value={planoId}
+            onEscolher={(id, valorCentavos) => {
+              setPlanoId(id)
+              if (valorCentavos != null) setValor(valorCentavos)
+            }}
+          />
           <Field label="Valor mensal">
             <MoneyInput value={valor} onChange={setValor} />
           </Field>
           <Field label="Dia de vencimento" dica="De 1 a 28.">
             <Input inputMode="numeric" value={dia} onChange={(e) => setDia(e.target.value)} maxLength={2} />
           </Field>
-          <p className="text-xs text-tinta-2">Mudanças de valor e vencimento valem só para as próximas faturas. A fatura já emitida não muda.</p>
+          <p className="text-xs text-tinta-2">Mudanças de plano, valor e vencimento valem só para as próximas faturas. A fatura já emitida não muda.</p>
         </>
       )}
       {encerrada && <Banner tom="info">Assinatura cancelada não muda mais. Para voltar a cobrar, crie uma nova.</Banner>}
