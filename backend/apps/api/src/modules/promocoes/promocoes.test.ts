@@ -194,6 +194,23 @@ d('modulo promocoes (integracao)', () => {
     expect(v3.valido).toBe(true)
   })
 
+  it('uso: ignora desconto forjado no corpo e grava o valor recomputado pela regra', async () => {
+    // Cupom de 10% sobre um pedido de subtotal 10000 => desconto real = 1000, independente do corpo.
+    const cr = (await chamar(dono, lojaA, 'POST', '/', cupom({ codigo: 'FORJADO', valor: 10 }))).json()
+    const ped = await criarPedido(lojaA, clienteA)
+    const u = await chamar(atend, lojaA, 'POST', '/usos', {
+      promocao_id: cr.id, pedido_id: ped, cliente_id: clienteA, desconto_centavos: 999999,
+    })
+    expect(u.statusCode).toBe(201)
+    expect(u.json().desconto_centavos).toBe(1000)
+    // Confere direto no banco que o valor forjado nao foi persistido.
+    const linha = await poolSuper.query(
+      'select desconto_centavos from public.promocao_usos where promocao_id = $1 and pedido_id = $2',
+      [cr.id, ped],
+    )
+    expect(linha.rows[0].desconto_centavos).toBe(1000)
+  })
+
   it('combo: cria com itens da loja, rejeita item de outra loja, aplica sobre as linhas', async () => {
     const ruim = await chamar(dono, lojaA, 'POST', '/', {
       nome: 'Combo ruim', tipo: 'combo', valor: 1000, itens: [{ item_id: itemLojaB, quantidade: 1 }],

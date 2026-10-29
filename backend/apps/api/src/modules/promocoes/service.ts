@@ -180,9 +180,12 @@ export function criarServicoPromocoes(pool: Pool, agora: () => Date = () => new 
      */
     async registrarUso(
       a: Ator,
-      e: { promocao_id: string; pedido_id: string; cliente_id?: string; desconto_centavos: number },
+      // `desconto_centavos` do corpo e IGNORADO: o desconto gravado e recomputado no servidor pela
+      // regra da promocao (mesma engine do validar/aplicar), sobre o subtotal/linhas reais do pedido.
+      e: { promocao_id: string; pedido_id: string; cliente_id?: string },
     ) {
-      if (!(await repo.pedidoExiste(pool, a.lojaId, e.pedido_id))) throw naoEncontrado('Pedido nao encontrado')
+      const pedido = await repo.obterPedido(pool, a.lojaId, e.pedido_id)
+      if (!pedido) throw naoEncontrado('Pedido nao encontrado')
       if (e.cliente_id && !(await repo.clienteExiste(pool, a.lojaId, e.cliente_id))) {
         throw naoEncontrado('Cliente nao encontrado')
       }
@@ -200,11 +203,33 @@ export function criarServicoPromocoes(pool: Pool, agora: () => Date = () => new 
         if (e.cliente_id && p.limite_por_cliente !== null && usos.cliente >= p.limite_por_cliente) {
           throw regraNegocio('cupom_cliente_esgotado', MENSAGENS.cupom_cliente_esgotado)
         }
+        // Recomputa o desconto pela regra (combo usa as linhas reais do pedido); nunca confia no corpo.
+        const linhas =
+          p.tipo === 'combo'
+            ? (await repo.linhasDoPedido(tx, a.lojaId, e.pedido_id))
+                .filter((l): l is { item_id: string; quantidade: number; preco_unitario_centavos: number } =>
+                  l.item_id !== null,
+                )
+                .map((l) => ({
+                  item_id: l.item_id,
+                  quantidade: l.quantidade,
+                  preco_unitario_centavos: l.preco_unitario_centavos,
+                }))
+            : undefined
+        const calc = calcularPromocao(await regraDe(a, p), {
+          agora: agora(),
+          subtotal_centavos: pedido.subtotal_centavos,
+          linhas,
+          usos_total: usos.total,
+          usos_cliente: usos.cliente,
+          tem_cliente: Boolean(e.cliente_id),
+        })
+        const desconto = calc.valido ? calc.desconto_centavos : 0
         const id = await repo.inserirUso(tx, {
           promocaoId: p.id, lojaId: a.lojaId, pedidoId: e.pedido_id,
-          clienteId: e.cliente_id ?? null, desconto: e.desconto_centavos,
+          clienteId: e.cliente_id ?? null, desconto,
         })
-        return { id, promocao_id: p.id, pedido_id: e.pedido_id, desconto_centavos: e.desconto_centavos, criado: true }
+        return { id, promocao_id: p.id, pedido_id: e.pedido_id, desconto_centavos: desconto, criado: true }
       })
     },
   }

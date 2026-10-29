@@ -89,8 +89,21 @@ export async function clienteExiste(exec: Executor, lojaId: string, id: string) 
   return (await consultarUm(exec, sql`select 1 as ok from public.clientes where id = ${id} and loja_id = ${lojaId}`)) !== null
 }
 
-export async function pedidoExiste(exec: Executor, lojaId: string, id: string) {
-  return (await consultarUm(exec, sql`select 1 as ok from public.pedidos where id = ${id} and loja_id = ${lojaId}`)) !== null
+/** Le o pedido da loja (subtotal usado para recomputar o desconto do uso; null = inexistente). */
+export async function obterPedido(exec: Executor, lojaId: string, id: string) {
+  return consultarUm<{ subtotal_centavos: number }>(
+    exec,
+    sql`select subtotal_centavos from public.pedidos where id = ${id} and loja_id = ${lojaId}`,
+  )
+}
+
+/** Linhas ativas do pedido (para recompor o desconto de combo pela regra da promocao). */
+export async function linhasDoPedido(exec: Executor, lojaId: string, pedidoId: string) {
+  return consultar<{ item_id: string | null; quantidade: number; preco_unitario_centavos: number }>(
+    exec,
+    sql`select item_id, quantidade, preco_unitario_centavos from public.itens_pedido
+         where loja_id = ${lojaId} and pedido_id = ${pedidoId} and cancelado = false`,
+  )
 }
 
 export interface NovaPromocao {
