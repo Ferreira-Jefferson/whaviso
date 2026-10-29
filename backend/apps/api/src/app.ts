@@ -14,7 +14,7 @@ import { tratadorDeErros, tratadorNaoEncontrado } from './shared/http_errors'
 import { registrarModulos, type ModuloRota } from './routes'
 import { criarAdminSupabase, type AdminSupabase } from './shared/supabase_admin'
 import { autenticarPlugin, criarVerificadorSupabase, type Verificador } from './shared/auth'
-import { escopoLojaPlugin, criarLeitorEscopoSql } from './shared/tenant'
+import { escopoLojaPlugin, criarLeitorEscopoSql, comCoalescencia } from './shared/tenant'
 import { escopoOperadorPlugin } from './shared/operador'
 import { realtimePlugin } from './shared/realtime'
 import type { EnvApi } from './env'
@@ -101,7 +101,9 @@ export async function construirApp(deps: DepsApi) {
   // F3: autenticacao primeiro; os dois escopos dependem de 'whaviso-autenticar'.
   const verificador =
     deps.verificador ?? criarVerificadorSupabase({ supabaseUrl: deps.env.SUPABASE_URL })
-  const leitor = criarLeitorEscopoSql(deps.pool)
+  // Coalesce o burst concorrente de resolucoes de escopo da mesma pagina numa ida so, sem janela
+  // de staleness (ver cache_escopo.ts). Um leitor compartilhado pelos dois plugins de escopo.
+  const leitor = comCoalescencia(criarLeitorEscopoSql(deps.pool))
   await app.register(autenticarPlugin, { verificador })
   await app.register(escopoLojaPlugin, { leitor, auditoria: deps.pool })
   await app.register(escopoOperadorPlugin, { leitor })

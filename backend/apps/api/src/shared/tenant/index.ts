@@ -5,6 +5,7 @@ export {
   type OperadorResolvido,
   criarLeitorEscopoSql,
 } from './leitor_escopo'
+export { comCoalescencia } from './cache_escopo'
 export { montarEscopoLoja, ErroEscopoAmbiguo } from './escopo'
 export {
   fragmentoLojaIds,

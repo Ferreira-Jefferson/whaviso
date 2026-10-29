@@ -1,8 +1,9 @@
-// Cache curto de escopo: colapsa o burst de leituras do mesmo usuario numa so ida ao banco,
-// respeita o TTL (revogacao volta a valer depois) e NUNCA cacheia falha (mantem fail-closed).
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// Coalescencia de escopo: colapsa o burst SIMULTANEO de leituras do mesmo usuario numa so ida ao
+// banco, sem janela de staleness (chamadas sequenciais releem, revogacao imediata) e sem cachear
+// falha (mantem fail-closed).
+import { describe, expect, it } from 'vitest'
 import type { LeitorEscopo, OperadorResolvido, VinculoLoja } from './leitor_escopo'
-import { comCacheCurto, TTL_ESCOPO_MS } from './cache_escopo'
+import { comCoalescencia } from './cache_escopo'
 
 interface LeitorFake extends LeitorEscopo {
   chamadasLojas: number
@@ -28,13 +29,10 @@ function leitorFake(
   return fake
 }
 
-beforeEach(() => vi.useFakeTimers())
-afterEach(() => vi.useRealTimers())
-
-describe('comCacheCurto', () => {
+describe('comCoalescencia', () => {
   it('coalesce o burst paralelo do mesmo usuario numa chamada so', async () => {
     const base = leitorFake()
-    const cache = comCacheCurto(base)
+    const cache = comCoalescencia(base)
     await Promise.all([
       cache.lojasDoUsuario('u1'),
       cache.lojasDoUsuario('u1'),
@@ -43,28 +41,18 @@ describe('comCacheCurto', () => {
     expect(base.chamadasLojas).toBe(1)
   })
 
-  it('serve do cache chamadas sequenciais dentro do TTL', async () => {
+  it('nao reusa entre chamadas sequenciais: rele o banco (revogacao imediata, sem staleness)', async () => {
     const base = leitorFake()
-    const cache = comCacheCurto(base)
+    const cache = comCoalescencia(base)
     await cache.lojasDoUsuario('u1')
-    await cache.lojasDoUsuario('u1')
-    expect(base.chamadasLojas).toBe(1)
-  })
-
-  it('rele o banco depois que o TTL expira (revogacao volta a valer)', async () => {
-    const base = leitorFake()
-    const cache = comCacheCurto(base)
-    await cache.lojasDoUsuario('u1')
-    vi.advanceTimersByTime(TTL_ESCOPO_MS + 1)
     await cache.lojasDoUsuario('u1')
     expect(base.chamadasLojas).toBe(2)
   })
 
-  it('nao compartilha cache entre usuarios distintos', async () => {
+  it('nao compartilha a chamada em voo entre usuarios distintos', async () => {
     const base = leitorFake()
-    const cache = comCacheCurto(base)
-    await cache.lojasDoUsuario('u1')
-    await cache.lojasDoUsuario('u2')
+    const cache = comCoalescencia(base)
+    await Promise.all([cache.lojasDoUsuario('u1'), cache.lojasDoUsuario('u2')])
     expect(base.chamadasLojas).toBe(2)
   })
 
@@ -75,17 +63,16 @@ describe('comCacheCurto', () => {
       if (tentativa === 1) throw new Error('falha transitoria')
       return []
     })
-    const cache = comCacheCurto(base)
+    const cache = comCoalescencia(base)
     await expect(cache.lojasDoUsuario('u1')).rejects.toThrow('falha transitoria')
     await expect(cache.lojasDoUsuario('u1')).resolves.toEqual([])
     expect(base.chamadasLojas).toBe(2)
   })
 
-  it('tem cache independente por metodo', async () => {
+  it('coalesce cada metodo de forma independente', async () => {
     const base = leitorFake()
-    const cache = comCacheCurto(base)
-    await cache.lojasDoUsuario('u1')
-    await cache.operadorDoUsuario('u1')
+    const cache = comCoalescencia(base)
+    await Promise.all([cache.lojasDoUsuario('u1'), cache.operadorDoUsuario('u1')])
     expect(base.chamadasLojas).toBe(1)
     expect(base.chamadasOperador).toBe(1)
   })
