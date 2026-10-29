@@ -496,3 +496,435 @@ Plataforma > seção "WhatsApp/Meta":
 Criação de fluxo (loja e plataforma):
   passo que manda template escolhe um template JÁ aprovado pela plataforma
 ```
+
+---
+
+# Corte para São Paulo e performance (anotado em 2026-10-29)
+
+Esta parte nasceu de uma investigação de lentidão. O app demora para carregar as
+páginas mesmo com o banco quase vazio. Quatro análises (banco, conexão, api, front)
+chegaram na mesma causa: **o banco está em us-east-1 (Virgínia) e o app roda no
+Brasil**. Cada ida ao banco custa de 110 a 160 ms de rede. Cada página faz de 10 a 15
+idas em série. Dá de 1 a 2 segundos só de rede, sem depender de volume de dados.
+
+A correção maior é mover o banco para São Paulo. O projeto novo já foi criado. O resto
+é cortar o número de idas ao banco (cache, paralelizar, agregar). Os dois efeitos se
+somam.
+
+Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
+`secrets/production.env` (gitignored). Este arquivo é versionado; nunca cole senha nele.
+
+**Ordem recomendada quando as outras sessões fecharem:**
+1. Itens 18, 19, 20, 21: terminar o corte para São Paulo (migrations, senhas, apontar
+   dev e VPS, Auth). É o maior ganho e destrava o resto.
+2. Itens 22, 23, 24: cache de escopo, pool quente, LISTEN. Beneficiam toda requisição.
+3. Itens 25, 26, 27: cortar o waterfall de boot e o polling no front.
+4. Itens 28 a 31: endpoint agregado, índices, read-model, serialização.
+5. Item 32: limpezas. Item 33: coordenar as sessões e corrigir a memória.
+
+**Índice dos fixes de performance (o "programa de eliminação"), por impacto:**
+
+| Fix | Item | Camada | Status |
+|-----|------|--------|--------|
+| Cache de escopo por processo | 22 | API | escrito e testado; ligação revertida por outra sessão, re-ligar |
+| Pool quente (idle alto + keepalive) | 23 | API/db | pronto p/ fazer |
+| Boot: semear x-loja-id + destravar Outlet | 25 | Front | pronto |
+| Token em memória (fetch síncrono) | 26 | Front | pronto |
+| Cortar refetchInterval + resync seletivo | 27 | Front | pronto |
+| Endpoint /bootstrap + dashboard num só | 28 | API+Front | maior, planejar |
+| DATABASE_URL_LISTEN (corrige cache/realtime) | 24 | config | no production.env; falta dev e VPS |
+| Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | pronto (precisa db push) |
+| Read-model de clientes (B5) | 30 | DB | só dói com volume, depois |
+| Serialização p/ listas grandes | 31 | API | depois |
+
+Lembrete: o maior ganho de todos é mover o banco pra São Paulo (itens 18 a 21). Os
+fixes acima cortam o número de idas ao banco e se somam a esse ganho.
+
+**Progresso (2026-10-29, no fim desta sessão):**
+- Projeto novo em São Paulo criado. Data API e auto-expose desligados; auto-RLS desligado.
+- **Item 18 FEITO:** `supabase db push` aplicou as 66 migrations (3 roles criados, 85
+  tabelas, RLS em todas, templates com 7 linhas; `planos` vazio, que é esperado). As
+  senhas dos 3 roles foram ROTACIONADAS (as antigas vazaram no transcript desta conversa)
+  e gravadas no `backend/.env` e no `secrets/production.env`. Os 3 roles conectam.
+- **Item 19 RESOLVIDO:** a senha do banco conecta.
+- **Item 20 (dev) FEITO:** `backend/.env` e `frontend/.env` apontam pro projeto novo
+  (host sa-east-1, porta 5432, sslmode=require, `DATABASE_URL_LISTEN` presente). FALTA a
+  parte da VPS (`/etc/whaviso/*.env`).
+- **Item 21 (Google) FEITO no painel** (provider ligado, Client ID certo, nonce check
+  off). Falta confirmar o Site URL e o Send SMS Hook do OTP.
+- **Ganho medido:** RTT ao banco caiu de ~110-160 ms (Virgínia) para ~8.6 ms (São Paulo).
+- **FALTA:** item 20 (VPS), item 21 (OTP), e os fixes de performance 22 a 31 (o 22
+  precisa ser RE-LIGADO, foi revertido por outra sessão).
+
+---
+
+## 18. Banco novo em São Paulo: criar o schema e casar as senhas dos roles
+
+**Local:** Supabase cloud, projeto `yrwkwgmikjbkiplvjtyx` (sa-east-1). Fonte de env:
+`secrets/production.env`. Migrations: `backend/supabase/migrations`.
+
+**Como está:** o projeto novo em São Paulo está criado e vazio (0 tabelas, os roles
+`whaviso_*` ainda não existem). Já conferi por psql. O runtime (dev e prod) ainda
+aponta para o projeto antigo em us-east-1, que é a causa da lentidão.
+
+**Como deveria:** rodar as migrations no projeto novo e setar as senhas dos roles de
+serviço para casar com o `production.env`. Depois apontar tudo para o novo (item 20).
+Manter o projeto antigo vivo até validar; só então apagar.
+
+**Exemplo (nesta ordem):**
+
+```
+1. supabase db push usando MIGRATIONS_DB_URL (porta 5432, session pooler).
+   Cria schema + catálogo (planos etc.). O seed NÃO roda no cloud.
+2. Setar as senhas dos roles via ALTER ROLE, com os valores que já estão no
+   secrets/production.env (API_DATABASE_URL, ZAP_DATABASE_URL, ATENDENTE_DATABASE_URL):
+     ALTER ROLE whaviso_api       PASSWORD '<senha do whaviso_api no production.env>';
+     ALTER ROLE whaviso_zap       PASSWORD '<senha do whaviso_zap no production.env>';
+     ALTER ROLE whaviso_atendente PASSWORD '<senha do whaviso_atendente no production.env>';
+3. Conferir: select rolname from pg_roles where rolname like 'whaviso%';  -> 3 linhas
+```
+
+Autorização: aplicar migrations no cloud já está liberado (memória
+[[feedback-pode-aplicar-migrations-cloud-para-testar]]).
+
+---
+
+## 19. A senha do banco novo não bate
+
+**Local:** `secrets/production.env` e painel Supabase (Database > Settings).
+
+**Como está (resolvido em 2026-10-29):** a senha do `MIGRATIONS_DB_URL` agora AUTENTICA
+no banco novo (testado por psql, sem exibir o valor). Falta só um detalhe: o campo
+`SUPABASE_DB_PASSWORD` ficou com um valor DIFERENTE da senha de dentro da
+`MIGRATIONS_DB_URL`. Esse campo é só conveniência; nenhum serviço o lê (o que conecta é a
+URL), então não quebra nada.
+
+**Como deveria:** alinhar o `SUPABASE_DB_PASSWORD` com a senha da URL (sem exibir o
+valor), só para não confundir quem ler o arquivo depois.
+
+**Exemplo:**
+
+```
+psql "host=aws-1-sa-east-1.pooler.supabase.com port=5432 \
+      user=postgres.yrwkwgmikjbkiplvjtyx dbname=postgres sslmode=require" -c "select 1"
+(deve conectar com a senha escolhida)
+```
+
+Observação: enquanto a senha do banco for igual à do root da VPS, há reuso. Trocar uma
+das duas. Se vazar uma, vaza o acesso aos dois sistemas.
+
+---
+
+## 20. Apontar o dev e a VPS para o banco novo
+
+**Local:** `backend/.env` (dev), `frontend/.env` (dev) e, na VPS,
+`/etc/whaviso/api.env`, `/etc/whaviso/zap.env`, `/etc/whaviso/atendente.env`.
+
+**Como está:** `backend/.env` e `frontend/.env` ainda apontam para o projeto antigo
+(`exxczsyjvgjsxmwlrwww`). A VPS também. Dev e prod usam o MESMO cloud (decisão do corte,
+memória [[whaviso-prod-cutover]]).
+
+**Como deveria:** trocar `SUPABASE_URL`, as chaves e as connection strings para o
+projeto novo (`yrwkwgmikjbkiplvjtyx`) em todos esses arquivos. Usar porta 5432 (session
+pooler), nunca 6543. Incluir `DATABASE_URL_LISTEN` (item 24). Todos os valores já estão
+no `secrets/production.env` (fonte única, já limpo e organizado).
+
+**Exemplo:**
+
+```
+backend/.env (dev):   API_DATABASE_URL, ZAP_DATABASE_URL, SUPABASE_URL,
+                      VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY -> projeto novo
+frontend/.env (dev):  VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY -> projeto novo
+VPS:                  api.env, zap.env, atendente.env -> strings do production.env
+```
+
+---
+
+## 21. Reconfigurar o Auth no projeto novo
+
+**Local:** painel Supabase do projeto novo (Authentication).
+
+**Como está:** o Auth do projeto novo está vazio. Configuração de auth não migra
+sozinha. Usuários de teste também não migram (são de teste, logam de novo).
+
+**Como deveria:** reconfigurar no painel: provider Google OAuth (client id, secret e
+redirect URLs), provider Phone, e o Send SMS Hook (tipo HTTPS) apontando para
+`https://api.whaviso.com/hooks/send-code`, com o `SEND_CODE_HOOK_SECRET` igual nos dois
+lados. Conferir os templates do OTP na Meta (já aprovados, memória
+[[whaviso-auth-login]]).
+
+**Exemplo:**
+
+```
+Authentication > Providers:   Google (client id + secret), Phone (ligado)
+Authentication > Hooks:       Send SMS hook -> HTTPS
+                              URL  https://api.whaviso.com/hooks/send-code
+                              secret = SEND_CODE_HOOK_SECRET (mesmo no zap)
+```
+
+---
+
+## 22. Ligar o cache de escopo por processo (já escrito, foi revertido)
+
+**Local:** `backend/apps/api/src/shared/tenant/cache_escopo.ts` (novo, já existe) e a
+ligação em `backend/apps/api/src/app.ts` e no `shared/tenant/index.ts`.
+
+**Como está:** toda requisição resolve o escopo (`lojasDoUsuario`) com 1 ida ao banco,
+sem cache, por decisão explícita (`shared/tenant/leitor_escopo.ts:22`, usado em
+`shared/tenant/plugin.ts:81` e `shared/operador/plugin.ts:63`). Cada página dispara de
+5 a 7 requisições e cada uma repaga esse round-trip. O arquivo `cache_escopo.ts` já foi
+escrito e testado (6 testes verdes em `cache_escopo.test.ts`), MAS a ligação em
+`app.ts` (`comCacheCurto`) e o export no `index.ts` foram REVERTIDOS por outra sessão.
+Então o cache não está ativo.
+
+**Como deveria:** reaplicar a ligação. Em `app.ts`, envolver
+`criarLeitorEscopoSql(deps.pool)` com `comCacheCurto(...)`. No `shared/tenant/index.ts`,
+exportar `comCacheCurto` e `TTL_ESCOPO_MS`. O TTL curto (3s) junta o burst da página
+numa ida só. Falha não é cacheada (mantém fail-closed). Rodar o gate antes de commitar.
+
+**Exemplo:**
+
+```
+// app.ts
+const leitor = comCacheCurto(criarLeitorEscopoSql(deps.pool))
+// shared/tenant/index.ts
+export { comCacheCurto, TTL_ESCOPO_MS } from './cache_escopo'
+```
+
+Suposição assumida: uma janela de revogação de uns 3 segundos é aceitável (um membro
+removido perde acesso em até 3s, não na hora). Se não for, baixar o TTL.
+
+---
+
+## 23. Manter o pool do banco quente
+
+**Local:** `backend/packages/shared/src/config/schemas.ts` (`DB_IDLE_TIMEOUT_MS`,
+padrão 30s) e o client pg em `backend/packages/shared/src/db/index.ts`.
+
+**Como está:** o pool pg não tem `min` e fecha conexão ociosa em 30s. Em tráfego baixo,
+quase toda navegação cai em conexão fria e repaga TCP e TLS, somando de 400 a 600 ms.
+
+**Como deveria:** subir `DB_IDLE_TIMEOUT_MS` para alguns minutos e ligar keepalive, para
+não repagar o TLS a cada página. Com o banco em São Paulo o custo cai, mas o pool quente
+ainda ajuda.
+
+**Exemplo:**
+
+```
+DB_IDLE_TIMEOUT_MS=600000   (10 minutos)
+pg.Pool({ ..., keepAlive: true })
+```
+
+---
+
+## 24. DATABASE_URL_LISTEN em todo lugar (corrige realtime e cache)
+
+**Local:** `backend/.env` (dev), `/etc/whaviso/api.env` (prod), uso em
+`backend/apps/api/src/app.ts:111`.
+
+**Como está:** o transaction pooler 6543 não suporta LISTEN/NOTIFY, e
+`DATABASE_URL_LISTEN` não estava setado. Então a invalidação do cache da grade por
+NOTIFY e o SSE do realtime degradam (a grade cai no TTL; o painel pode mostrar Offline,
+ver item 7).
+
+**Como deveria:** setar `DATABASE_URL_LISTEN` com uma conexão de sessão (porta 5432) do
+`whaviso_api`. Com as strings já em 5432, o LISTEN volta a funcionar. Já está no
+`secrets/production.env`; falta no `backend/.env` de dev e na VPS.
+
+**Exemplo:**
+
+```
+DATABASE_URL_LISTEN=postgresql://whaviso_api.<ref>:<senha>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+---
+
+## 25. Front: acabar com o waterfall de boot
+
+**Local:** `frontend/src/app/` (`TenantProvider.tsx:30` e `:62`, `AppShell.tsx:247` e
+`:279`, `tenant/armazenamento.ts:5`).
+
+**Como está:** a página só monta depois que `GET /lojas` responde. O Outlet fica
+bloqueado e o header `x-loja-id` só existe depois de `/lojas`. Cada carga paga
+RTT(/lojas) mais RTT(dados) em série.
+
+**Como deveria:** semear o `x-loja-id` com a loja salva no localStorage (`lerLojaSalva`
+já existe) e deixar o Outlet montar. Assim os dados da página correm em paralelo com
+`/lojas`. Reconciliar depois (o `resetQueries` já existe em `TenantProvider.tsx:62`).
+
+**Exemplo:**
+
+```
+Hoje:    sessão -> /lojas -> (monta) -> dados     (em série)
+Deveria: sessão -> (monta com loja salva) -> dados e /lojas juntos
+```
+
+---
+
+## 26. Front: ler o token de acesso em memória
+
+**Local:** `frontend/src/.../api_client/instancia.ts:7`, `client.ts:116`,
+`supabase/client.ts:101`, `AuthProvider.tsx:23`.
+
+**Como está:** antes de cada fetch o app chama `supabase.auth.getSession()`, que é async
+e usa `navigator.locks`. Com N queries paralelas, elas disputam o lock e serializam o
+início.
+
+**Como deveria:** guardar o access token em memória via `onAuthStateChange` (já existe)
+e ler síncrono. Deixar `getSession` só como plano B.
+
+---
+
+## 27. Front: cortar polling e deixar o resync seletivo
+
+**Local:** `dashboard/api.ts:18`, `despacho/api.ts:40`,
+`lojas/disponibilidade/api.ts:56`, `RealtimeProvider.tsx:36`.
+
+**Como está:** há `refetchInterval` mesmo com o SSE já invalidando por evento (dashboard
+60s nas 5 queries, despacho 20s). No resync, o provider faz `invalidateQueries()` sem
+filtro, o que vira uma tempestade de refetch.
+
+**Como deveria:** tirar o `refetchInterval` do dashboard, afrouxar o do despacho, e no
+resync invalidar só as raízes afetadas.
+
+---
+
+## 28. Endpoint agregado de boot e dashboard numa chamada
+
+**Local:** api (novo endpoint) e front (boot e dashboard).
+
+**Como está:** o boot faz várias chamadas (sessão, `/lojas`, `/plataforma-painel/eu`) e
+o dashboard são 5 endpoints separados (`/resumo`, `/serie-diaria`, `/por-hora`,
+`/top-itens`, `/atendimento`). Cada chamada repaga o escopo.
+
+**Como deveria:** um endpoint `/bootstrap` (identidade mais lojas mais flag de operador
+em 1 ida) e um dashboard num endpoint só (`Promise.all` no servidor, que já é usado em
+`dashboard/service.ts:86`). Colapsa várias idas numa.
+
+---
+
+## 29. Índices do banco (só pesam com volume, baratos de adicionar)
+
+**Local:** nova migration em `backend/supabase/migrations`. Aplicar no cloud com db push
+(usar `CREATE INDEX CONCURRENTLY` no cloud).
+
+**Como está:** faltam índices para filtro por janela de tempo e busca por texto. Com
+banco vazio não pesa; com volume, pesa. O resto do schema está bem indexado.
+
+**Como deveria:** adicionar os índices abaixo.
+
+**Exemplo:**
+
+```
+create index pedidos_loja_tempo on public.pedidos (loja_id, criado_em)
+  where status <> 'rascunho';                 -- dashboard/repo.ts:52,80,107; relatorios/repo.ts:261,307
+create index movimentos_caixa_loja_tempo on public.movimentos_caixa (loja_id, tipo, criado_em);
+                                              -- relatorios/repo.ts:231 (troca o movimentos_caixa_loja puro)
+create index comandas_loja_fechada on public.comandas (loja_id, fechada_em)
+  where status = 'fechada';                   -- relatorios/repo.ts:156,171
+create index conversas_loja_atualizado on public.conversas (loja_id, atualizado_em desc, id desc);
+                                              -- conversas/repo.ts:80 (aba "todas")
+create extension if not exists pg_trgm;
+create index clientes_nome_trgm on public.clientes using gin (nome gin_trgm_ops);
+                                              -- busca ILIKE: clientes/repo.ts:33, conversas/repo.ts:72,
+                                              --               plataforma_clientes/repo.ts:67
+```
+
+---
+
+## 30. Read-model de clientes (lateral join caro)
+
+**Local:** `backend/apps/api/src/modules/clientes/repo.ts:41-55`.
+
+**Como está:** a listagem de clientes faz left join lateral com count e max em pedidos
+para cada cliente, e ordena por coluna computada. Com volume, o Postgres calcula tudo
+antes de ordenar; o cursor não evita o trabalho.
+
+**Como deveria:** materializar `ultimo_pedido_em` e `pedidos_total` no cliente (por
+trigger ou read-model). Assim a listagem não faz o lateral por linha.
+
+---
+
+## 31. Serialização de resposta para listas grandes
+
+**Local:** `backend/apps/api/src/app.ts:60` (serializerCompiler do
+fastify-type-provider-zod).
+
+**Como está:** toda resposta passa por `zod.safeParse` mais `JSON.stringify`.
+fast-json-stringify está desligado. Pequeno com banco vazio, pesa em listas grandes
+(cardápio, pedidos, conversas).
+
+**Como deveria:** usar fast-json-stringify nas rotas de payload grande, ou pular a
+validação de resposta em produção.
+
+---
+
+## 32. Limpezas encontradas no caminho
+
+**Local:** vários arquivos.
+
+**Como está e como deveria (lista):**
+
+```
+- push_secrets.sh tem alvo "vercel" (não usamos Vercel). Limpar, ou reaproveitar para
+  empurrar os envs para /etc/whaviso da VPS por ssh. backend/.env.example também cita
+  Vercel (ver deploy/README.md:460).
+- As strings de banco usam sslmode=require. Avaliar sslmode=verify-full (mais seguro)
+  com a CA do sistema na VPS.
+- GET /lojas é chamado 2x na página Lojas (TenantProvider e modules/lojas/api.ts:21).
+  De-duplicar.
+- staleTime maior (5 a 10 min) para dados de catálogo (lojas, acessos, enums).
+- secrets/production.env.example: a limpeza que foi feita (tirar Vercel, pôr as chaves
+  certas) foi revertida por outra sessão. Refazer junto com o item 33.
+```
+
+---
+
+## 33. Sessões concorrentes revertendo trabalho; corrigir a memória do pooler
+
+**Local:** o checkout `c:/Users/Jeffe/Documents/study/whaviso` e as memórias do projeto.
+
+**Como está:** durante este trabalho havia 3 outras sessões de trabalho ativas no mesmo
+checkout. Uma fez `git checkout` ou `stash` e reverteu arquivos rastreados não
+commitados: `app.ts`, `shared/tenant/index.ts` e `secrets/production.env.example`. O
+`cache_escopo.ts` (não rastreado) sobreviveu, mas a ligação se perdeu (ver item 22).
+Além disso, a memória [[whaviso-dev-db]] e o CLAUDE.md dizem "session pooler 5432", mas
+o prod estava no transaction pooler 6543, que é errado para LISTEN e para o claim com
+FOR UPDATE SKIP LOCKED.
+
+**Como deveria:** antes de reaplicar as mudanças de código, esperar as outras sessões
+fecharem (ou combinar), e commitar de forma atômica assim que o gate ficar verde.
+Corrigir a memória e o CLAUDE.md para dizer 5432 (session pooler) como a porta do app.
+
+**Exemplo:**
+
+```
+git status            -> working tree limpo das outras sessões antes de reaplicar
+reaplicar item 22 (ligação do cache) -> gate (lint, typecheck, test) -> commit atômico
+```
+
+---
+
+## 34. Padronizar os nomes e prefixos de environment (opcional, só com a árvore limpa)
+
+**Local:** `backend/.env` (prefixos `API_`/`ZAP_`), os `backend/apps/*/src/env.ts`,
+`backend/packages/shared/src/config/schemas.ts`, `backend/apps/api/src/server.ts` (o
+alias), `secrets/production.env(.example)`, `backend/scripts/push_secrets.sh`,
+`deploy/README.md` e as units em `/etc/whaviso`.
+
+**Como está:** os nomes funcionam, mas são mistos. O dev usa um arquivo único com prefixo
+por serviço (`API_*`, `ZAP_*`), e o `server.ts` faz alias só de `PORT`, `HOST` e
+`DATABASE_URL`. O prod usa nome sem prefixo, um env por host. O `production.env` mistura
+as duas convenções. O `DATABASE_URL_LISTEN` entrou sem prefixo (a api lê direto).
+
+**Como deveria:** escolher uma convenção e alinhar em todos os lugares, mantendo o app
+funcionando. Fazer como tarefa isolada, com a árvore limpa (sem as sessões concorrentes
+revertendo), rodando o gate e commitando atômico. NÃO fazer no meio do corte.
+
+**Exemplo:**
+
+```
+Decidir: prefixo por serviço no arquivo único de dev; nome puro no env por host em prod.
+Alinhar: schemas.ts + server.ts (alias) + production.env(.example) + push_secrets.sh +
+         deploy/README + units. Rodar lint/typecheck/test. Commit atômico.
+```
