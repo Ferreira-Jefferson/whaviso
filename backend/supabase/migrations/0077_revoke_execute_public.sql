@@ -1,0 +1,12 @@
+-- Revoga EXECUTE default de PUBLIC em funcoes FUTURAS do schema public (defesa em profundidade).
+--
+-- A 0001 (0001_roles_rls.sql:58-64) ja tira o teto de anon/authenticated e, via default privileges,
+-- impede que objetos futuros nascam com grant para esses dois roles. Mas CREATE FUNCTION concede
+-- EXECUTE a PUBLIC por padrao, e PUBLIC inclui anon/authenticated: o `revoke ... from anon,
+-- authenticated` NAO anula o EXECUTE herdado via PUBLIC. Ou seja, cada funcao nova nasce executavel
+-- pela anon key (publica no bundle do front) a menos que alguem revogue de PUBLIC manualmente.
+--
+-- Esta linha fecha esse furo para funcoes FUTURAS criadas pelo mesmo role: elas passam a nascer sem
+-- EXECUTE para PUBLIC. NAO mexe nas funcoes JA existentes (revoga-las poderia quebrar runtime): elas
+-- seguem com EXECUTE a PUBLIC como antes. Por isso o validate_migrations continua aplicando limpo.
+alter default privileges in schema public revoke execute on functions from public;

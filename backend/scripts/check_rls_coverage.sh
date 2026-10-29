@@ -53,3 +53,52 @@ if [ -n "$faltantes" ]; then
 fi
 
 echo ">> OK: todas as tabelas de public tem RLS habilitado"
+
+# (b) GRANT a anon/authenticated/public em tabela do public. O RLS so vale como defesa se o teto
+# (o GRANT) tambem estiver fechado para esses roles: a anon key e publica no bundle do front. A 0001
+# revoga o teto e o default privileges, mas uma migration nova pode reconceder por engano. Este check
+# le os ACLs reais (pg_class.relacl via aclexplode) e FALHA se achar qualquer privilegio concedido a
+# anon, authenticated ou PUBLIC (grantee oid 0) em tabela base/particionada do public.
+echo ">> grants a anon/authenticated/public em '$DB' (schema public)"
+grants_proibidos=$(psql -Atq -d "$DB" -c "
+  select c.relname || ' -> ' || coalesce(r.rolname, 'PUBLIC') || ' (' || a.privilege_type || ')'
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    cross join lateral aclexplode(c.relacl) a
+    left join pg_roles r on r.oid = a.grantee
+   where n.nspname = 'public'
+     and c.relkind in ('r','p')
+     and (a.grantee = 0 or r.rolname in ('anon','authenticated'))
+   order by 1;
+" | tr -d '\r')
+
+if [ -n "$grants_proibidos" ]; then
+  echo "FALHA: grants a anon/authenticated/PUBLIC em tabelas de public:" >&2
+  printf '%s\n' "$grants_proibidos" | sed 's/^/  - /' >&2
+  echo "Revogue com: revoke all on public.<tabela> from anon, authenticated, public;" >&2
+  exit 1
+fi
+
+echo ">> OK: nenhuma tabela de public concede privilegio a anon/authenticated/public"
+
+# (c) Policy de RLS que inclua anon/authenticated/public entre os roles. As policies devem valer so
+# para os roles de servico (whaviso_api/zap/atendente); uma policy em anon/authenticated/public
+# abriria a tabela para a anon key mesmo com o teto fechado. pg_policies.roles traz os nomes dos
+# roles (ou {0}/'public' quando a policy vale para todos). FALHA se algum desses tres aparecer.
+echo ">> policies de RLS para anon/authenticated/public em '$DB' (schema public)"
+policies_proibidas=$(psql -Atq -d "$DB" -c "
+  select tablename || ' -> ' || policyname || ' (' || array_to_string(roles, ',') || ')'
+    from pg_policies
+   where schemaname = 'public'
+     and roles && array['anon','authenticated','public']::name[]
+   order by 1;
+" | tr -d '\r')
+
+if [ -n "$policies_proibidas" ]; then
+  echo "FALHA: policies de RLS que incluem anon/authenticated/public:" >&2
+  printf '%s\n' "$policies_proibidas" | sed 's/^/  - /' >&2
+  echo "Troque o role da policy para os roles de servico (whaviso_api/zap/atendente)." >&2
+  exit 1
+fi
+
+echo ">> OK: nenhuma policy de RLS inclui anon/authenticated/public"
