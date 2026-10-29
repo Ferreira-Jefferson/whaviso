@@ -621,7 +621,7 @@ das duas. Se vazar uma, vaza o acesso aos dois sistemas.
 `/etc/whaviso/api.env`, `/etc/whaviso/zap.env`, `/etc/whaviso/atendente.env`.
 
 **Como está:** `backend/.env` e `frontend/.env` ainda apontam para o projeto antigo
-(`exxczsyjvgjsxmwlrwww`). A VPS também. Dev e prod usam o MESMO cloud (decisão do corte,
+(`yrwkwgmikjbkiplvjtyx`). A VPS também. Dev e prod usam o MESMO cloud (decisão do corte,
 memória [[whaviso-prod-cutover]]).
 
 **Como deveria:** trocar `SUPABASE_URL`, as chaves e as connection strings para o
