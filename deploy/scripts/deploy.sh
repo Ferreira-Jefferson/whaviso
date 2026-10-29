@@ -20,6 +20,20 @@ npm ci
 echo ">> frontend: instalando deps e buildando a SPA"
 cd "$APP/frontend"
 npm ci
+# As VITE_* sao assadas no bundle em build-time. Exportamos aqui (env de processo tem
+# precedencia maxima no Vite) para o build NAO depender de nenhum .env solto no servidor:
+# um .env gitignorado antigo ja envenenou o build uma vez, apontando para um projeto
+# Supabase ja deletado, e deixou producao sem login. Fonte: /etc/whaviso/frontend.env se
+# existir (root, fora do repo), senao o default versionado em deploy/ (valores publicos,
+# ja embarcados na SPA). Falha o deploy se nenhum existir, em vez de assar um bundle quebrado.
+FRONTEND_ENV=/etc/whaviso/frontend.env
+[ -f "$FRONTEND_ENV" ] || FRONTEND_ENV="$APP/deploy/whaviso-frontend.env"
+if [ ! -f "$FRONTEND_ENV" ]; then
+  echo "ERRO: env de build do frontend nao encontrado ($FRONTEND_ENV)" >&2
+  exit 1
+fi
+echo ">> frontend: env de build = $FRONTEND_ENV"
+set -a; . "$FRONTEND_ENV"; set +a
 npm run build
 
 echo ">> publicando a SPA de forma atomica em $WEBROOT"
