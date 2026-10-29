@@ -19,6 +19,22 @@ import { contaRoutes } from './routes'
 
 export { poolSuper, novoCenario }
 
+/**
+ * Da um e-mail ao usuario e o aprova na allowlist (migration 0082), para que ele passe o
+ * gate de acesso do bootstrap de conta (POST /v1/conta exige e-mail aprovado). O gate
+ * resolve o e-mail via plataforma_auth_info, por isso setamos em auth.users.
+ */
+export async function aprovarAcesso(userId: string): Promise<string> {
+  const email = `bootstrap.${userId.slice(0, 8)}@exemplo.com`
+  await poolSuper.query('update auth.users set email = $2 where id = $1', [userId, email])
+  await poolSuper.query(
+    `insert into public.acessos_permitidos (email, status, origem, aprovado_em)
+     values ($1, 'aprovado', 'admin', now()) on conflict (lower(email)) do nothing`,
+    [email],
+  )
+  return email
+}
+
 export const env = envSchema.parse({
   DATABASE_URL: 'postgres://ignorado',
   SUPABASE_URL: 'https://exemplo.supabase.co',

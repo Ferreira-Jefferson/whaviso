@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { bancoAcessivel, fecharPools, limpar } from '../../../test/db'
 import {
+  aprovarAcesso,
   criarAppConta,
   type App,
   criarChamador,
@@ -33,6 +34,7 @@ d('conta e membros (integracao)', () => {
   describe('bootstrap', () => {
     it('cria conta + dono (loja_id NULL), audita e e idempotente', async () => {
       const u = await criarUsuario(c)
+      await aprovarAcesso(u)
       const r1 = await chamar(u, 'POST', '/', { nome: 'Pizzaria' })
       expect(r1.statusCode).toBe(201)
       const conta = r1.json()
@@ -51,6 +53,7 @@ d('conta e membros (integracao)', () => {
 
     it('criacoes concorrentes do mesmo usuario geram uma conta so', async () => {
       const u = await criarUsuario(c)
+      await aprovarAcesso(u)
       const rs = await Promise.all([1, 2, 3].map(() => chamar(u, 'POST', '/', { nome: 'X' })))
       const ids = new Set(rs.map((r) => r.json().id))
       expect(ids.size).toBe(1)
