@@ -1,8 +1,15 @@
 # Pendências pós corte de produção
 
-Anotações do que falta fazer. Nada aqui foi implementado ainda.
+Anotações do que falta fazer.
 
 Data do corte: 2026-10-28 (a `main` recebeu o pivô do restaurante e subiu em produção).
+
+> AVISO (2026-10-29): esta lista está PARCIALMENTE DESATUALIZADA. Vários itens de 1 a 17 já
+> foram implementados e commitados na `development` depois que o texto foi escrito (por exemplo:
+> os itens 1, 2 e 3 estão no commit 2d51dcf, com a migration 0069). Antes de trabalhar em
+> qualquer item desta seção, CONFIRME o estado real no código, não confie só no texto. Fonte do
+> que ainda falta: a memória do projeto e a verificação direta no repo. O bloco de progresso da
+> seção "Corte para São Paulo e performance" (mais abaixo) está atualizado.
 
 ---
 
@@ -526,16 +533,27 @@ Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
 
 | Fix | Item | Camada | Status |
 |-----|------|--------|--------|
-| Cache de escopo por processo | 22 | API | escrito e testado; ligação revertida por outra sessão, re-ligar |
-| Pool quente (idle alto + keepalive) | 23 | API/db | pronto p/ fazer |
-| Boot: semear x-loja-id + destravar Outlet | 25 | Front | pronto |
-| Token em memória (fetch síncrono) | 26 | Front | pronto |
-| Cortar refetchInterval + resync seletivo | 27 | Front | pronto |
+| Cache de escopo por processo | 22 | API | ADIADO. Ver nota abaixo: cache por TTL servia escopo velho e quebrava correção e gate. |
+| Pool quente (idle alto + keepalive) | 23 | API/db | FEITO (commit 42fc3b2) |
+| Boot: semear x-loja-id + destravar Outlet | 25 | Front | FEITO (commit c959b76) |
+| Token em memória (fetch síncrono) | 26 | Front | FEITO (commit c959b76) |
+| Cortar refetchInterval + resync seletivo | 27 | Front | FEITO (commit c959b76) |
 | Endpoint /bootstrap + dashboard num só | 28 | API+Front | maior, planejar |
-| DATABASE_URL_LISTEN (corrige cache/realtime) | 24 | config | no production.env; falta dev e VPS |
-| Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | pronto (precisa db push) |
+| DATABASE_URL_LISTEN (corrige cache/realtime) | 24 | config | no production.env e no backend/.env dev; falta VPS |
+| Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | FEITO em código (migration 0081, validada local); falta db push no cloud |
 | Read-model de clientes (B5) | 30 | DB | só dói com volume, depois |
 | Serialização p/ listas grandes | 31 | API | depois |
+
+**Nota do item 22 (por que foi ADIADO, 2026-10-29):** religar o cache de escopo por TTL de 3s
+quebrou 3 testes de integração, e a causa é uma regressão de correção real, não um artefato de
+teste: com o cache, a loja recém-criada fica invisível por 3s (o escopo vem cacheado) e um
+operador desativado continua com acesso por 3s (devia dar 403 na hora, fere o invariante do
+último admin). O ganho que o item 22 buscava já foi em boa parte capturado pelo corte do banco
+para São Paulo (RTT caiu de ~130 ms para ~8.6 ms por ida). Para religar com segurança, o cache
+precisa invalidar a entrada do usuário nas mutações que mudam o escopo dele: criar/desativar/
+reativar loja (modules/lojas) e criar/trocar papel/desativar operador (modules/plataforma_clientes),
+chamando uma `invalidarEscopo(userId)` exportada do shared/tenant. Até lá, o `cache_escopo.ts` e
+seu teste ficam no repo, mas a ligação em app.ts e o export em index.ts permanecem desligados.
 
 Lembrete: o maior ganho de todos é mover o banco pra São Paulo (itens 18 a 21). Os
 fixes acima cortam o número de idas ao banco e se somam a esse ganho.
@@ -553,8 +571,23 @@ fixes acima cortam o número de idas ao banco e se somam a esse ganho.
 - **Item 21 (Google) FEITO no painel** (provider ligado, Client ID certo, nonce check
   off). Falta confirmar o Site URL e o Send SMS Hook do OTP.
 - **Ganho medido:** RTT ao banco caiu de ~110-160 ms (Virgínia) para ~8.6 ms (São Paulo).
-- **FALTA:** item 20 (VPS), item 21 (OTP), e os fixes de performance 22 a 31 (o 22
-  precisa ser RE-LIGADO, foi revertido por outra sessão).
+
+**Onda de performance (2026-10-29, nesta sessão):** integrados e commitados na `development`:
+- **Item 23 FEITO** (commit 42fc3b2): pool do banco quente (idle 10 min + keepAlive).
+- **Item 29 FEITO em código** (commit 355d3db): migration 0081 com os índices + pg_trgm,
+  validada no banco de DEV local (todas as migrations OK). FALTA aplicar no cloud (db push).
+- **Itens 25, 26, 27 FEITOS** (commit c959b76): boot do front sem waterfall (semeia x-loja-id da
+  loja salva e destrava o Outlet), token de acesso lido em memória, e corte de polling redundante
+  com resync seletivo. Gate verde (front e back: typecheck, lint, 1057 testes de api passando).
+- **Item 22 ADIADO** (ver a nota no índice acima): o cache de escopo por TTL quebrava correção e
+  gate; precisa de invalidação na mutação antes de religar.
+
+- **FALTA (código):** item 22 feito direito (com invalidação), item 28 (/bootstrap), item 30
+  (read-model), item 31 (serialização), item 32 (limpezas).
+- **FALTA (fora do código / precisa de você ou da VPS):** db push do 0081 (e das demais migrations
+  pendentes) no cloud COMPARTILHADO de prod; item 20 (VPS *.env); item 21 (OTP hook); item 24 na
+  VPS; itens 5, 6, 8, 35 (VPS); e verificar os restos de 13 (seletor de plano), 14 (granularidade
+  de permissão nos módulos de atendimento), 15 Fase B e 17 (Meta).
 
 ---
 
