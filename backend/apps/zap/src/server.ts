@@ -7,6 +7,7 @@ import { criarApp } from './app'
 import { criarClienteWhatsMeta } from './shared/meta_client'
 import { iniciarScheduler } from './scheduler'
 import { drenarEnvios } from './modules/enviar'
+import { drenarEmails, criarClienteResend } from './modules/enviar_email'
 
 // Fonte unica local: o .env da raiz traz vars prefixadas por servico (ZAP_*).
 // Em prod o host pode definir PORT/DATABASE_URL direto; o alias so preenche se faltarem.
@@ -62,6 +63,21 @@ const tick = cifra
   : async () => undefined
 const scheduler = iniciarScheduler({ logger, intervaloMs: env.SCHEDULER_INTERVAL_MS, tick })
 
+// Dreno da outbox de e-mail (Resend): independente da cifra (e-mail nao usa MASTER_KEY). Sem
+// ZAP_RESEND_API_KEY o cliente fica indefinido e o dreno fica idle (os e-mails ficam na fila).
+const clienteEmail = env.ZAP_RESEND_API_KEY
+  ? criarClienteResend({ apiKey: env.ZAP_RESEND_API_KEY, remetente: env.ZAP_RESEND_REMETENTE, logger })
+  : undefined
+if (!clienteEmail) logger.warn('ZAP_RESEND_API_KEY ausente: dreno de e-mail idle (fila retida)')
+const schedulerEmail = iniciarScheduler({
+  logger,
+  intervaloMs: env.SCHEDULER_INTERVAL_MS,
+  tick: async () => {
+    const r = await drenarEmails({ pool, logger, cliente: clienteEmail })
+    if (r.reivindicados || r.orfaos) logger.info(r, 'dreno de e-mail')
+  },
+})
+
 // Encerramento limpo e idempotente: para o scheduler antes de fechar o pool (senao um tick em
 // voo usa o pool ja encerrado). SIGINT e SIGTERM podem chegar ambos; so roda 1x.
 let encerrando = false
@@ -69,6 +85,7 @@ const encerrar = async () => {
   if (encerrando) return
   encerrando = true
   scheduler.parar()
+  schedulerEmail.parar()
   await app.close().catch(() => undefined)
   await pool.end().catch(() => undefined)
   process.exit(0)
