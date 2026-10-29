@@ -209,7 +209,8 @@ export async function agenda(exec: Executor, d: { limite: Date; responsavelId: s
               where c.prospecto_id = a.prospecto_id
                 and substring(c.descricao from '^\\{"conclui":([0-9]+)') = a.id::text
            )${filtroResp}
-         order by a.agendada_para, a.id`,
+         order by a.agendada_para, a.id
+         limit 200`,
   )
 }
 

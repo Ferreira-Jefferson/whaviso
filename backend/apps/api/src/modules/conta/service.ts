@@ -124,7 +124,7 @@ export async function alterarMembro(
       throw regraNegocio('dono_todas_lojas', 'Dono vale para todas as lojas da conta')
     }
 
-    const novo = await atualizarMembro(tx, alvo.id, papel, ativo)
+    const novo = await atualizarMembro(tx, alvo.id, ator.contaId, papel, ativo)
     if (papel !== alvo.papel) {
       await auditar(tx, {
         tipo: 'membro.papel_alterado',

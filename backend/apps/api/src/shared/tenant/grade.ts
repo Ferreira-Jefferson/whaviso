@@ -28,6 +28,8 @@ let fonte: Executor | null = null
 let explicitas = new Map<string, boolean>()
 let carregadaEm = 0
 let recarga: Promise<void> | null = null
+// Numero da leitura mais recente: uma leitura lenta e antiga nunca sobrescreve uma mais nova.
+let geracao = 0
 
 const k = (escopo: string, papel: string, chave: string) => `${escopo}|${papel}|${chave}`
 
@@ -47,6 +49,7 @@ export function configurarFonteGrade(exec: Executor | null): void {
   explicitas = new Map()
   carregadaEm = 0
   recarga = null
+  geracao++
 }
 
 interface LinhaGrade {
@@ -59,12 +62,14 @@ interface LinhaGrade {
 /** Relê a grade do banco agora (apos save). Propaga o erro; o cache so e trocado em sucesso. */
 export async function recarregarGrade(): Promise<void> {
   if (!fonte) return
+  const ger = ++geracao
   const linhas = await consultar<LinhaGrade>(
     fonte,
     sqlBruto('select escopo, papel, permissao_chave, permitido from public.papel_permissoes'),
   )
   const novo = new Map<string, boolean>()
   for (const l of linhas) novo.set(k(l.escopo, l.papel, l.permissao_chave), l.permitido)
+  if (ger !== geracao) return // chegou uma leitura mais nova (ou invalidacao) no meio: descarta esta
   explicitas = novo
   carregadaEm = Date.now()
 }
@@ -72,14 +77,20 @@ export async function recarregarGrade(): Promise<void> {
 /** Garante cache fresco (TTL). Best effort: erro de leitura mantem o cache anterior. */
 export async function garantirGradeFresca(): Promise<void> {
   if (!fonte || Date.now() - carregadaEm < TTL_MS) return
-  recarga ??= recarregarGrade()
+  await (recarga ?? recarregarSingleFlight())
+}
+
+/** Uma recarga por vez para os chamadores concorrentes (TTL e listener). Erro mantem o cache. */
+function recarregarSingleFlight(): Promise<void> {
+  const voo: Promise<void> = recarregarGrade()
     .catch(() => {
       carregadaEm = Date.now() // falhou: mantem o cache e so tenta de novo apos o TTL
     })
     .finally(() => {
-      recarga = null
+      if (recarga === voo) recarga = null
     })
-  await recarga
+  recarga = voo
+  return voo
 }
 
 /** Volta aos padroes e solta a fonte (isolamento de testes). */
@@ -89,6 +100,7 @@ export function resetarGrade(): void {
 
 /** Invalida o cache AGORA (sincrono): a proxima decisao relê o banco antes de decidir. */
 export function invalidarGrade(): void {
+  geracao++ // leituras em voo comecaram antes desta invalidacao: nao podem gravar o cache
   carregadaEm = 0
 }
 
@@ -107,7 +119,9 @@ export interface OpcoesEscutaGrade {
 export function iniciarEscutaGrade(opcoes: OpcoesEscutaGrade): Escuta {
   const recarregar = () => {
     invalidarGrade()
-    void recarregarGrade().catch(() => undefined) // falhou: cache anterior + TTL cobrem
+    // Mesma via do TTL (registra em `recarga`, sem corrida). Sempre le de novo (nao junta a um voo
+    // antigo, que poderia ter lido antes da mudanca). Falhou: cache anterior + TTL cobrem.
+    void recarregarSingleFlight()
   }
   const escuta = criarEscuta({
     connectionString: opcoes.connectionString,

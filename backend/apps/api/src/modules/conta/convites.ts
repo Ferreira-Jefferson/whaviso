@@ -140,7 +140,7 @@ export async function aceitar(pool: Pool, userId: string, token: string): Promis
       throw new Conflito('Convite ja utilizado', 'convite_ja_aceito')
     }
     const membro = exato
-      ? await atualizarMembro(tx, exato.id, convite.papel, true)
+      ? await atualizarMembro(tx, exato.id, convite.conta_id, convite.papel, true)
       : await inserirMembro(tx, {
           contaId: convite.conta_id,
           lojaId: convite.loja_id,

@@ -177,12 +177,14 @@ export async function contarDonosAtivos(
 export async function atualizarMembro(
   exec: Executor,
   id: string,
+  contaId: string,
   papel: PapelMembro,
   ativo: boolean,
 ): Promise<MembroLinha> {
   const r = await consultarUm<Bruto<MembroLinha>>(
     exec,
-    sql`update public.membros set papel = ${papel}, ativo = ${ativo} where id = ${id}
+    sql`update public.membros set papel = ${papel}, ativo = ${ativo}
+          where id = ${id} and conta_id = ${contaId}
          returning id, conta_id, user_id, loja_id, papel, ativo, criado_em`,
   )
   return mapMembro(r!)

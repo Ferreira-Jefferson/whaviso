@@ -104,7 +104,8 @@ export async function listarAssinaturas(
     sql`select ${SAIDA_ASSINATURA} from public.assinaturas
          where (${conta}::uuid is null or conta_id = ${conta}::uuid)
            and (${status}::status_assinatura is null or status = ${status}::status_assinatura)
-         order by criado_em desc, id`,
+         order by criado_em desc, id
+         limit 200`,
   )
 }
 
@@ -189,7 +190,8 @@ export async function listarFaturas(
          where (${status}::status_fatura is null or status = ${status}::status_fatura)
            and (${competencia}::date is null or competencia = ${competencia}::date)
            and (${conta}::uuid is null or conta_id = ${conta}::uuid)
-         order by vencimento desc, id`,
+         order by vencimento desc, id
+         limit 200`,
   )
 }
 

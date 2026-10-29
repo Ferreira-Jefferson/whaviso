@@ -105,6 +105,17 @@ export async function pedidoJaImportado(exec: Executor, canalLojaId: string, idE
   return l !== null
 }
 
+/** Dos ids externos informados, quais ja foram importados neste canal (uma ida ao banco). */
+export async function idsJaImportados(exec: Executor, canalLojaId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set()
+  const linhas = await consultar<{ id_externo: string }>(
+    exec,
+    sql`select id_externo from public.canal_pedidos
+         where canal_loja_id = ${canalLojaId} and id_externo = any(${ids}::text[])`,
+  )
+  return new Set(linhas.map((l) => l.id_externo))
+}
+
 export interface NovoPedido {
   lojaId: string
   codigo: string
@@ -131,15 +142,24 @@ export async function criarPedido(exec: Executor, p: NovoPedido): Promise<string
   return l!.id
 }
 
-export async function criarItem(
+/** Insere todos os itens do pedido numa unica query (unnest preserva a ordem). */
+export async function criarItens(
   exec: Executor,
-  d: { pedidoId: string; lojaId: string; nome: string; preco: number; qtd: number; total: number; obs: string | null },
+  d: {
+    pedidoId: string
+    lojaId: string
+    itens: { nome: string; preco: number; qtd: number; total: number; obs: string | null }[]
+  },
 ): Promise<void> {
+  if (d.itens.length === 0) return
   await consultar(
     exec,
     sql`insert into public.itens_pedido
           (pedido_id, loja_id, nome_snapshot, preco_unitario_centavos, quantidade, total_centavos, observacao)
-        values (${d.pedidoId}, ${d.lojaId}, ${d.nome}, ${d.preco}, ${d.qtd}, ${d.total}, ${d.obs})`,
+        select ${d.pedidoId}::uuid, ${d.lojaId}::uuid, t.nome, t.preco, t.qtd, t.total, t.obs
+          from unnest(${d.itens.map((i) => i.nome)}::text[], ${d.itens.map((i) => i.preco)}::int[],
+                      ${d.itens.map((i) => i.qtd)}::int[], ${d.itens.map((i) => i.total)}::int[],
+                      ${d.itens.map((i) => i.obs)}::text[]) as t(nome, preco, qtd, total, obs)`,
   )
 }
 

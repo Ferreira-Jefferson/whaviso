@@ -32,7 +32,8 @@ export async function listar(exec: Executor, status?: AcessoStatus): Promise<Ace
     exec,
     sql`select ${SAIDA} from public.acessos_permitidos
          where (${s}::acesso_status is null or status = ${s}::acesso_status)
-         order by criado_em desc, id`,
+         order by criado_em desc, id
+         limit 200`,
   )
 }
 

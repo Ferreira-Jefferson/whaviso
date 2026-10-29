@@ -135,9 +135,11 @@ export interface UsoRotuloLinha {
   custo: number
 }
 
+// Faixa crua sobre `criado_em` (coluna sem funcao) para usar o indice uso_llm_loja_tempo. Os
+// limites sao o inicio do mes corrente e do proximo em America/Sao_Paulo, de volta a timestamptz.
 const FILTRO_MES = sqlBruto(
-  `date_trunc('month', (criado_em at time zone 'America/Sao_Paulo'))
-     = date_trunc('month', (now() at time zone 'America/Sao_Paulo'))`,
+  `criado_em >= (date_trunc('month', (now() at time zone 'America/Sao_Paulo')) at time zone 'America/Sao_Paulo')
+     and criado_em < ((date_trunc('month', (now() at time zone 'America/Sao_Paulo')) + interval '1 month') at time zone 'America/Sao_Paulo')`,
 )
 
 /** Total do mes corrente (America/Sao_Paulo): custo em centavos e tokens. */

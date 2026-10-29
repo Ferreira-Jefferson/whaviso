@@ -88,8 +88,8 @@ const codigoAleatorio = (canal: CanalTipo) =>
 type Importacao = 'importado' | 'duplicado'
 
 /** Importa UM pedido numa transacao propria (idempotente por canal_loja + id_externo). */
-async function importarUm(pool: Pool, lojaId: string, canalLojaId: string, canal: CanalTipo, p: PedidoExterno): Promise<Importacao> {
-  if (await repo.pedidoJaImportado(pool, canalLojaId, p.id_externo)) return 'duplicado'
+async function importarUm(pool: Pool, lojaId: string, canalLojaId: string, canal: CanalTipo, p: PedidoExterno, jaImportado: boolean): Promise<Importacao> {
+  if (jaImportado) return 'duplicado'
   for (let tentativa = 0; tentativa < 5; tentativa++) {
     try {
       await comTransacao(pool, async (tx) => {
@@ -104,17 +104,17 @@ async function importarUm(pool: Pool, lojaId: string, canalLojaId: string, canal
           observacao: p.observacao ?? null,
           criadoEm: p.criado_em,
         })
-        for (const i of p.itens) {
-          await repo.criarItem(tx, {
-            pedidoId,
-            lojaId,
+        await repo.criarItens(tx, {
+          pedidoId,
+          lojaId,
+          itens: p.itens.map((i) => ({
             nome: i.nome,
             preco: i.preco_unitario_centavos,
             qtd: i.quantidade,
             total: i.preco_unitario_centavos * i.quantidade,
             obs: i.observacao ?? null,
-          })
-        }
+          })),
+        })
         await repo.mapear(tx, { lojaId, canalLojaId, idExterno: p.id_externo, pedidoId })
       })
       return 'importado'
@@ -158,16 +158,25 @@ export async function sincronizar(pool: Pool, deps: DepsCanais, lojaId: string, 
   }
 
   const saida = { importados: 0, duplicados: 0, rejeitados: 0 }
-  for (const bruto of r.valor) {
+  // Valida tudo primeiro e checa duplicados em lote (uma query), em vez de uma por pedido.
+  const validos = r.valor.map((bruto) => {
     const v = PedidoExterno.safeParse(bruto)
-    if (!v.success || !totaisConferem(v.data)) {
+    return v.success && totaisConferem(v.data) ? v.data : null
+  })
+  const jaImportados = await repo.idsJaImportados(
+    pool,
+    c.id,
+    validos.filter((p): p is PedidoExterno => p !== null).map((p) => p.id_externo),
+  )
+  for (const p of validos) {
+    if (!p) {
       saida.rejeitados++
       continue
     }
-    const res = await importarUm(pool, lojaId, c.id, canal, v.data)
+    const res = await importarUm(pool, lojaId, c.id, canal, p, jaImportados.has(p.id_externo))
     if (res === 'importado') saida.importados++
     else saida.duplicados++
-    await cliente.confirmar(cred, v.data.id_externo)
+    await cliente.confirmar(cred, p.id_externo)
   }
 
   await repo.marcarSincronizacao(pool, c.id, null)
