@@ -31,6 +31,7 @@ export interface LinhaMatriz {
 // ---------------------------------------------------------------------------------------------
 export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }>> = {
   acertos_motoboy: { apiDelete: 'negado' },
+  acessos_permitidos: { apiDelete: 'negado' },
   assinaturas: { apiDelete: 'negado' },
   avaliacoes: { apiDelete: 'negado' },
   base_avaliacao: { apiDelete: 'negado' },
@@ -50,15 +51,20 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   clientes: { apiDelete: 'negado' },
   comanda_itens: { apiDelete: 'negado' },
   comandas: { apiDelete: 'negado' },
+  config_plataforma: { apiDelete: 'negado' },
   contas: { apiDelete: 'negado' },
   conversas: { apiDelete: 'negado' },
   convites: { apiDelete: 'negado' },
   corridas: { apiDelete: 'negado' },
   contas_pagar: { apiDelete: 'negado' },
   credenciais_llm: { apiDelete: 'negado' },
+  // Credencial do PSP (nivel plataforma): chave_cifrada e segredo; api escreve/le a cifra, nunca DELETE.
+  credenciais_psp: { apiDelete: 'negado' },
   despacho_config: { apiDelete: 'negado' },
   documentos: { apiDelete: 'negado' },
   documentos_fiscais: { apiDelete: 'negado' },
+  // Outbox de e-mail (0082): mesmo molde de `envios`; zap so atualiza as colunas de drain, api sem DELETE.
+  emails_outbox: { apiDelete: 'negado' },
   enderecos: { apiDelete: 'negado' },
   envios: { apiDelete: 'negado' },
   escalas: { apiDelete: 'negado' },
@@ -85,6 +91,7 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   itens_pedido: { apiDelete: 'negado' },
   itens_pedido_opcoes: { apiDelete: 'negado' },
   agendamento_config: { apiDelete: 'negado' },
+  loja_pagamento_config: { apiDelete: 'negado' },
   loja_pix: { apiDelete: 'negado' },
   lojas: { apiDelete: 'negado' },
   membros: { apiDelete: 'negado' },
@@ -109,6 +116,8 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   promocoes: { apiDelete: 'negado' },
   prospecto_atividades: { apiDelete: 'negado' },
   prospectos: { apiDelete: 'negado' },
+  // Subconta da loja no PSP (0086/0087): api_key_cifrada e segredo; api escreve/le a cifra, nunca DELETE.
+  psp_subcontas: { apiDelete: 'negado' },
   rag_feedback: { apiDelete: 'negado' },
   tarifas_meta: { apiDelete: 'negado' },
   // Unica excecao documentada (SEC-030): templates e configuracao, nao auditoria.
