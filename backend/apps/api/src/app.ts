@@ -88,7 +88,7 @@ export async function construirApp(deps: DepsApi) {
     // Funcao (nao string): origem estranha NAO recebe Access-Control-Allow-Origin.
     origin: (origem, cb) => cb(null, origem === undefined || origem === deps.env.APP_URL),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['authorization', 'content-type', 'x-loja-id', 'last-event-id'],
+    allowedHeaders: ['authorization', 'content-type', 'x-loja-id', 'last-event-id', 'cache-control'],
   })
   // SEC-101: limite global por IP configuravel por env; por rota via
   // `config: { rateLimit: { max, timeWindow } }` (ver AGENTS.md).
