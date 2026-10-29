@@ -42,6 +42,10 @@ export interface ItemCardapio {
   nome: string
   preco_centavos: number
   ativo: boolean
+  esgotado_ate: Date | null
+  // Contador de estoque do item (historia 03): saldo zerado = esgotado, nao pode ser lancado.
+  controla_estoque: boolean
+  quantidade_disponivel: number | null
 }
 
 const MESA_COMANDA = sql`left join lateral (
@@ -113,7 +117,8 @@ export async function itensDaComanda(exec: Executor, lojaId: string, comandaId: 
 export async function itemDoCardapio(exec: Executor, lojaId: string, itemId: string): Promise<ItemCardapio | null> {
   return consultarUm<ItemCardapio>(
     exec,
-    sql`select id, nome, preco_centavos, ativo from public.itens
+    sql`select id, nome, preco_centavos, ativo, esgotado_ate, controla_estoque, quantidade_disponivel
+          from public.itens
          where loja_id = ${lojaId} and id = ${itemId}`,
   )
 }

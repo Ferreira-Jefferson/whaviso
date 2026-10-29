@@ -27,7 +27,9 @@ export function buscarItens(
   return consultar<ItemLinha>(
     exec,
     sql`select i.id, i.nome, i.descricao, c.nome as categoria, i.preco_centavos,
-               (i.esgotado_ate is null or i.esgotado_ate <= now()) as disponivel
+               ((i.esgotado_ate is null or i.esgotado_ate <= now())
+                and not (i.controla_estoque and i.quantidade_disponivel is not null
+                         and i.quantidade_disponivel <= 0)) as disponivel
           from public.itens i
           join public.categorias c on c.id = i.categoria_id and c.loja_id = i.loja_id
          where i.loja_id = ${lojaId} and i.ativo and c.ativo
@@ -51,7 +53,9 @@ export function itensDaLoja(exec: Executor, lojaId: string, ids: string[]): Prom
           from public.itens i
           join public.categorias c on c.id = i.categoria_id and c.loja_id = i.loja_id
          where i.loja_id = ${lojaId} and i.id = any(${ids}::uuid[]) and i.ativo and c.ativo
-           and (i.esgotado_ate is null or i.esgotado_ate <= now())`,
+           and (i.esgotado_ate is null or i.esgotado_ate <= now())
+           and not (i.controla_estoque and i.quantidade_disponivel is not null
+                    and i.quantidade_disponivel <= 0)`,
   )
 }
 

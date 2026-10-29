@@ -183,6 +183,32 @@ export async function registrarEvento(
   )
 }
 
+export interface SaldoItem {
+  id: string
+  controla_estoque: boolean
+  quantidade_disponivel: number | null
+}
+
+/**
+ * Trava as linhas de item (FOR UPDATE) e devolve o saldo de contagem de cada uma. ORDER BY id =
+ * a MESMA ordem em que o trigger de baixa (0080) adquire os locks, para nao gerar deadlock entre a
+ * recusa preventiva e a baixa, nem entre efetivacoes concorrentes. Base da recusa por estoque na
+ * efetivacao do pedido (historia 03, regra 3). So os itens da loja ativa.
+ */
+export async function travarSaldoItens(
+  exec: Executor,
+  lojaId: string,
+  itemIds: readonly string[],
+): Promise<SaldoItem[]> {
+  if (itemIds.length === 0) return []
+  return consultar<SaldoItem>(
+    exec,
+    sql`select id, controla_estoque, quantidade_disponivel from public.itens
+         where loja_id = ${lojaId} and id = any(${[...itemIds]}::uuid[])
+         order by id for update`,
+  )
+}
+
 /** Trava a linha do pedido na transacao (FOR UPDATE) e devolve o status atual. */
 export async function travarPedido(exec: Executor, lojaId: string, id: string) {
   return consultarUm<{ status: StatusPedido }>(

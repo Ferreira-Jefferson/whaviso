@@ -24,7 +24,7 @@ d('modulo salao (seguranca)', () => {
       chamar(m, m.donoB, m.B.loja, metodo, url, corpo)
     expect((await B('GET', `/comandas/${comandaId}`)).status).toBe(404)
     expect((await B('POST', `/comandas/${comandaId}/itens`, { item_id: m.B.cardapio.burger, quantidade: 1 })).status).toBe(404)
-    expect((await B('POST', `/comandas/${comandaId}/fechar`)).status).toBe(404)
+    expect((await B('POST', `/comandas/${comandaId}/fechar`, { forma_pagamento: 'dinheiro' })).status).toBe(404)
     expect((await B('PATCH', `/mesas/${mesaId}`, { nome: 'Invasor' })).status).toBe(404)
     const mesasB = await B('GET', '/mesas')
     expect(mesasB.corpo.itens.map((x: { id: string }) => x.id)).not.toContain(mesaId)
@@ -70,7 +70,7 @@ d('modulo salao (seguranca)', () => {
       ['GET', '/mesas'], ['POST', '/mesas', { nome: 'Z' }], ['PATCH', `/mesas/${mesaId}`, { nome: 'Z' }],
       ['POST', '/comandas', { mesa_id: mesaId }], ['GET', `/comandas/${comandaId}`],
       ['POST', `/comandas/${comandaId}/itens`, { item_id: m.A.cardapio.burger, quantidade: 1 }],
-      ['POST', `/comandas/${comandaId}/fechar`],
+      ['POST', `/comandas/${comandaId}/fechar`, { forma_pagamento: 'dinheiro' }],
     ]
     for (const [met, url, corpo] of chamadas) {
       const r = await chamar(m, m.operador, m.A.loja, met, url, corpo)

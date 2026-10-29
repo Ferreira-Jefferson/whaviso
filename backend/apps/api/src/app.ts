@@ -14,7 +14,7 @@ import { tratadorDeErros, tratadorNaoEncontrado } from './shared/http_errors'
 import { registrarModulos, type ModuloRota } from './routes'
 import { criarAdminSupabase, type AdminSupabase } from './shared/supabase_admin'
 import { autenticarPlugin, criarVerificadorSupabase, type Verificador } from './shared/auth'
-import { escopoLojaPlugin, criarLeitorEscopoSql } from './shared/tenant'
+import { escopoLojaPlugin, criarLeitorEscopoSql, comCacheCurto } from './shared/tenant'
 import { escopoOperadorPlugin } from './shared/operador'
 import { realtimePlugin } from './shared/realtime'
 import type { EnvApi } from './env'
@@ -101,7 +101,9 @@ export async function construirApp(deps: DepsApi) {
   // F3: autenticacao primeiro; os dois escopos dependem de 'whaviso-autenticar'.
   const verificador =
     deps.verificador ?? criarVerificadorSupabase({ supabaseUrl: deps.env.SUPABASE_URL })
-  const leitor = criarLeitorEscopoSql(deps.pool)
+  // Cache curto por processo: colapsa as varias leituras de escopo do mesmo usuario que uma
+  // pagina dispara em paralelo numa so ida ao banco (RTT remoto). TTL curto preserva revogacao.
+  const leitor = comCacheCurto(criarLeitorEscopoSql(deps.pool))
   await app.register(autenticarPlugin, { verificador })
   await app.register(escopoLojaPlugin, { leitor, auditoria: deps.pool })
   await app.register(escopoOperadorPlugin, { leitor })

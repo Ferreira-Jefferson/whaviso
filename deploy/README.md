@@ -240,7 +240,7 @@ chmod 640 /etc/whaviso/api.env /etc/whaviso/zap.env
 
 ```bash
 cat > /opt/whaviso/app/frontend/.env.production <<'EOF'
-VITE_SUPABASE_URL=https://exxczsyjvgjsxmwlrwww.supabase.co
+VITE_SUPABASE_URL=https://yrwkwgmikjbkiplvjtyx.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=COLE_A_PUBLISHABLE_KEY
 VITE_API_URL=https://api.whaviso.com
 EOF
@@ -431,8 +431,8 @@ Avisos:
 A conexao **direta** do Supabase (`db.<ref>.supabase.co:5432`) resolve **so por IPv6**. Teste no VPS:
 
 ```bash
-getent ahosts db.exxczsyjvgjsxmwlrwww.supabase.co
-nc -6 -vz db.exxczsyjvgjsxmwlrwww.supabase.co 5432
+getent ahosts db.yrwkwgmikjbkiplvjtyx.supabase.co
+nc -6 -vz db.yrwkwgmikjbkiplvjtyx.supabase.co 5432
 ```
 
 - **Tem IPv6 e conectou:** use as strings diretas que ja estao no `secrets/production.env`.

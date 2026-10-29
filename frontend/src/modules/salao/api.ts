@@ -8,6 +8,7 @@ import type { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
   ComandaAbrirEntrada,
+  ComandaFecharEntrada,
   ComandaItemEntrada,
   ComandaSaida,
   MesaAtualizarEntrada,
@@ -26,6 +27,7 @@ type CriarMesaBody = z.input<typeof MesaCriarEntrada>
 type AtualizarMesaBody = z.input<typeof MesaAtualizarEntrada>
 type AbrirComandaBody = z.input<typeof ComandaAbrirEntrada>
 type LancarItemBody = z.input<typeof ComandaItemEntrada>
+type FecharComandaBody = z.input<typeof ComandaFecharEntrada>
 
 type ListaMesas = z.infer<typeof MesaListaSaida>
 

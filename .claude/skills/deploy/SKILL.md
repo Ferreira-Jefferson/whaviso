@@ -66,7 +66,7 @@ vazia e dá SASL auth fail). Primeiro o dry-run para ver o que subiria:
 cd backend
 set -a; . ./.env; set +a
 npx --yes supabase db push \
-  --db-url "postgresql://postgres.exxczsyjvgjsxmwlrwww:${SUPABASE_PASSWORD}@aws-1-us-east-1.pooler.supabase.com:5432/postgres" \
+  --db-url "postgresql://postgres.yrwkwgmikjbkiplvjtyx:${SUPABASE_PASSWORD}@aws-1-us-east-1.pooler.supabase.com:5432/postgres" \
   --dry-run
 ```
 

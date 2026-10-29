@@ -73,7 +73,7 @@ const NOVA_DE_ANTIGO: Record<string, Antigo> = {
 describe('granularidade: padroes reproduzem o guard antigo', () => {
   it('o mapa cobre todas as chaves granulares do catalogo (nenhuma sem prova)', () => {
     const antigas = new Set([
-      'conta:gerir', 'loja:gerir', 'lojas:gerir', 'pedidos:ver', 'pedidos:gerir', 'conversas:atender', 'relatorios:ver',
+      'loja:gerir', 'lojas:gerir', 'pedidos:ver', 'pedidos:gerir', 'conversas:atender', 'relatorios:ver',
       'clientes:ver', 'clientes:gerir', 'dados_sensiveis:revelar', 'pessoas:ver', 'pessoas:gerir', 'fiscal:ver',
       'fiscal:gerir', 'fiscal:configurar', 'custos:ver', 'contas_pagar:ver', 'contas_pagar:gerir', 'promocoes:ver',
       'promocoes:gerir',

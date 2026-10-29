@@ -6,7 +6,7 @@ Manifesto do Chrome QA Loop: mapeia **rota do painel -> doc dono -> cenarios** e
 
 ## Estado do ambiente (ler antes de rodar)
 
-- O dev local (5173 -> api 3001) aponta para o **Supabase cloud rebaseado para o restaurante** (projeto `exxczsyjvgjsxmwlrwww`, migrations 0001-0051). **Read-only continua obrigatorio.**
+- O dev local (5173 -> api 3001) aponta para o **Supabase cloud rebaseado para o restaurante** (projeto `yrwkwgmikjbkiplvjtyx`, migrations 0001-0051). **Read-only continua obrigatorio.**
 - Login e **manual** (Google OAuth ou OTP por WhatsApp), feito a mao na janela do Chrome conectada ao MCP. O explorador nao automatiza login.
 - O cloud nasceu **sem conta/loja do restaurante**: no primeiro login a api cria a conta via `POST /v1/conta`, e a loja some ate ser criada (o shell mostra "Vamos criar sua primeira loja"). Para QA com dados, logar e **ter uma loja com cardapio** (criada pela UI ou semeada).
 - Worker IA (atendente) ainda nao roda contra o cloud: telas de IA (Atendente/Conhecimento/Fluxo) exibem config, mas a conversa ao vivo nao processa.

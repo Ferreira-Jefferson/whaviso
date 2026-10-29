@@ -59,7 +59,7 @@ describe('montarLinha (preco e snapshot)', () => {
 function rawBase(): CardapioRaw {
   return {
     categorias: [{ id: 'c1', nome: 'Lanches', ativo: true, programacao: null, ordem: 0 }],
-    itens: [{ id: 'i1', categoria_id: 'c1', nome: 'Burger', preco_centavos: 2000, ativo: true, esgotado_ate: null, ordem: 0 }],
+    itens: [{ id: 'i1', categoria_id: 'c1', nome: 'Burger', preco_centavos: 2000, ativo: true, esgotado_ate: null, ordem: 0, controla_estoque: false, quantidade_disponivel: null }],
     grupos: [],
     opcoes: [],
     vinculosCategoria: [],
@@ -80,6 +80,25 @@ describe('montarCardapio (disponibilidade e programacao)', () => {
     raw.itens[0]!.esgotado_ate = new Date('2026-12-31T00:00:00Z')
     const c = montarCardapio(raw, HOJE)
     expect(c.itensPorId.has('i1')).toBe(false)
+  })
+
+  it('item com contador zerado some do cardapio (historia 03)', () => {
+    const raw = rawBase()
+    raw.itens[0]!.controla_estoque = true
+    raw.itens[0]!.quantidade_disponivel = 0
+    const c = montarCardapio(raw, HOJE)
+    expect(c.itensPorId.has('i1')).toBe(false)
+  })
+
+  it('item com contador e saldo > 0 continua no cardapio; ilimitado tambem', () => {
+    const comSaldo = rawBase()
+    comSaldo.itens[0]!.controla_estoque = true
+    comSaldo.itens[0]!.quantidade_disponivel = 3
+    expect(montarCardapio(comSaldo, HOJE).itensPorId.has('i1')).toBe(true)
+    const ilimitado = rawBase()
+    ilimitado.itens[0]!.controla_estoque = true
+    ilimitado.itens[0]!.quantidade_disponivel = null
+    expect(montarCardapio(ilimitado, HOJE).itensPorId.has('i1')).toBe(true)
   })
 
   it('categoria fora do horario programado nao aparece', () => {

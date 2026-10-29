@@ -2,7 +2,7 @@
 
 Automatize avisos de pagamento por WhatsApp e controle tudo pelo painel: o que está pendente, o que já recebeu, o que ainda vai pagar.
 
-> **Fonte da verdade do produto/negócio: a pasta [historias/](historias/).** Toda regra de negócio (estados e transições, fluxos receber/pagar, convite e aceite, ciclo de lembretes, interação do devedor, confirmação de pagamento, painel, notificações, planos/limites, templates, linguagem e compliance) vive nas histórias de usuário, já verificadas e aprovadas. Este CLAUDE.md cobre **apenas** arquitetura, comandos e ferramentas de desenvolvimento, e **não define regra de negócio**. Se algo aqui contradisser uma história, a história vence. Na dúvida sobre comportamento do produto, leia `historias/` (comece por [historias/README.md](historias/README.md)), não este arquivo.
+> **Fonte de informação primária do produto/negócio: a pasta [historias/](historias/), mas NÃO é verdade absoluta.** Toda regra de negócio (estados e transições, fluxos receber/pagar, convite e aceite, ciclo de lembretes, interação do devedor, confirmação de pagamento, painel, notificações, planos/limites, templates, linguagem e compliance) está descrita nas histórias de usuário. Use-as como ponto de partida e como intenção declarada do produto. **Porém as histórias podem estar desatualizadas:** o dono às vezes faz ajustes e melhorias direto no código ou no banco sem atualizar a história correspondente. Por isso, antes de afirmar qualquer comportamento do produto ou basear uma decisão nele, **confirme no código e/ou no ponto específico que está analisando** (módulo, migration, schema, rota), não só na história. Quando história e código/banco divergirem, investigue qual reflete a intenção atual: se o código mudou deliberadamente e a história ficou para trás, **a história é que deve ser atualizada** (peça ou faça a atualização); se a história está certa e o código não a cumpre, é um bug a corrigir. Este CLAUDE.md cobre **apenas** arquitetura, comandos e ferramentas de desenvolvimento, e **não define regra de negócio**.
 
 **Layout (dois projetos independentes, um checkout, deploy numa VPS, sem Vercel):**
 - **`backend/`**: monorepo Node: `apps/api` (REST p/ SPA, :3001) · `apps/zap` (scheduler + webhook WhatsApp, :3002) · `packages/shared` (`@whaviso/shared`) · `supabase/` (migrations + seed) · `scripts/`. Workspace e install próprios.
@@ -10,7 +10,7 @@ Automatize avisos de pagamento por WhatsApp e controle tudo pelo painel: o que e
 
 As três peças (frontend, `api`, `zap`) são **independentes**: o front só consome a API REST (nunca conhece implementação do backend); `api` e `zap` se integram pelo **banco Supabase compartilhado** (outbox), nunca importando um ao outro.
 
-Leia sob demanda: regras de produto/negócio → [historias/](historias/) (fonte da verdade) · fronteiras/especialistas do backend → [backend/AGENTS.md](backend/AGENTS.md) · visão de produto (referência, pode estar desatualizada) → [PROJETO.md](PROJETO.md).
+Leia sob demanda: regras de produto/negócio → [historias/](historias/) (fonte de informação primária, sempre confirmar no código/banco) · fronteiras/especialistas do backend → [backend/AGENTS.md](backend/AGENTS.md) · visão de produto (referência, pode estar desatualizada) → [PROJETO.md](PROJETO.md).
 
 ## Comandos (sempre verifique o trabalho)
 

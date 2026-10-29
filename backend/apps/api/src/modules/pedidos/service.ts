@@ -74,6 +74,30 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
     }
   }
 
+  /**
+   * Barra a efetivacao de um pedido que excederia o saldo de algum item com contador (historia 03).
+   * Agrega a quantidade pedida por item, trava as linhas de item (FOR UPDATE, ordem de id) e recusa
+   * com 409 `estoque_insuficiente` listando os itens sem saldo. Itens sem controle ou com contagem
+   * ilimitada (quantidade null) nao barram. Roda na transacao da criacao, sob os mesmos locks da baixa.
+   */
+  async function garantirEstoqueSuficiente(exec: Executor, lojaId: string, linhas: readonly LinhaMontada[]): Promise<void> {
+    const pedidoPorItem = new Map<string, number>()
+    const nomePorItem = new Map<string, string>()
+    for (const l of linhas) {
+      pedidoPorItem.set(l.item_id, (pedidoPorItem.get(l.item_id) ?? 0) + l.quantidade)
+      if (!nomePorItem.has(l.item_id)) nomePorItem.set(l.item_id, l.nome_snapshot)
+    }
+    const saldos = await escrita.travarSaldoItens(exec, lojaId, [...pedidoPorItem.keys()])
+    const semSaldo: string[] = []
+    for (const s of saldos) {
+      if (!s.controla_estoque || s.quantidade_disponivel == null) continue // sem controle ou ilimitado
+      if (s.quantidade_disponivel < (pedidoPorItem.get(s.id) ?? 0)) semSaldo.push(nomePorItem.get(s.id) ?? s.id)
+    }
+    if (semSaldo.length > 0) {
+      throw conflito('estoque_insuficiente', `Sem estoque suficiente para: ${[...new Set(semSaldo)].join(', ')}`)
+    }
+  }
+
   async function detalhe(a: Ator, id: string): Promise<PedidoDetalheSaida> {
     const p = await repo.obterPedido(pool, a.lojaId, id)
     if (!p) throw naoEncontrado('Pedido nao encontrado')
@@ -145,6 +169,10 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
           // Corrida: outra tx com a mesma chave ganhou entre a checagem acima e o insert. Devolve o
           // pedido dela sem reprocessar (nao insere itens/evento, nao dispara a baixa duas vezes).
           if (!criado) return pedidoId
+          // Recusa preventiva por estoque (historia 03, regra 3): trava as linhas de item e barra o
+          // pedido que excederia o saldo de um item com contador, ANTES de efetivar. Na mesma tx e
+          // sob os mesmos locks que o trigger de baixa usa no COMMIT (nunca vai a negativo).
+          await garantirEstoqueSuficiente(tx, a.lojaId, p.linhas)
           for (const l of p.linhas) await escrita.inserirLinha(tx, a.lojaId, pedidoId, l)
           if (p.enderecoId) await escrita.marcarUsoEndereco(tx, a.lojaId, p.enderecoId)
           await escrita.registrarEvento(tx, { lojaId: a.lojaId, tipo: 'pedido.criado', pedidoId, detalhes: p.evento })

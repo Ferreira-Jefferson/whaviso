@@ -26,7 +26,8 @@ function agrupar<T>(linhas: readonly T[], chave: (l: T) => string): Map<string, 
 export async function lerCardapio(exec: Executor, lojaId: string, itemIds: string[]): Promise<CardapioLido> {
   const itens = await consultar<ItemRow>(
     exec,
-    sql`select id, categoria_id, nome, preco_centavos, ativo, esgotado_ate
+    sql`select id, categoria_id, nome, preco_centavos, ativo, esgotado_ate,
+               controla_estoque, quantidade_disponivel
           from public.itens where loja_id = ${lojaId} and id = any(${itemIds}::uuid[])`,
   )
   const catIds = [...new Set(itens.map((i) => i.categoria_id))]

@@ -3,8 +3,8 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { HttpError } from '../../shared/http_errors'
 import { criarServicoSalao, type Ator } from './service'
 import {
-  ComandaAbrirEntrada, ComandaItemEntrada, ComandaSaida, IdParams, MesaAtualizarEntrada,
-  MesaCriarEntrada, MesaListaSaida, MesaSaida,
+  ComandaAbrirEntrada, ComandaFecharEntrada, ComandaItemEntrada, ComandaSaida, IdParams,
+  MesaAtualizarEntrada, MesaCriarEntrada, MesaListaSaida, MesaSaida,
 } from './schemas'
 
 /** Loja efetiva = SO a do escopo resolvido (nunca corpo/query). */
@@ -58,8 +58,8 @@ export function criarSalaoRoutes(): FastifyPluginAsync {
 
     app.post('/comandas/:id/fechar', {
       ...loja(), preHandler: operar,
-      schema: { params: IdParams, response: { 200: ComandaSaida } },
-    }, async (req) => svc.fecharComanda(ator(req), req.params.id))
+      schema: { params: IdParams, body: ComandaFecharEntrada, response: { 200: ComandaSaida } },
+    }, async (req) => svc.fecharComanda(ator(req), req.params.id, req.body))
   }
 }
 

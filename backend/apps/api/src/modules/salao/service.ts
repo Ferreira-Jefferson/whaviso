@@ -5,7 +5,8 @@ import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import * as repo from './repo'
 import * as escrita from './repo_escrita'
 import type {
-  ComandaAbrirEntrada, ComandaItemEntrada, ComandaSaida, MesaCriarEntrada, MesaAtualizarEntrada, MesaSaida,
+  ComandaAbrirEntrada, ComandaFecharEntrada, ComandaItemEntrada, ComandaSaida, MesaCriarEntrada,
+  MesaAtualizarEntrada, MesaSaida,
 } from './schemas'
 
 export interface Ator {
@@ -137,6 +138,14 @@ export function criarServicoSalao(pool: Pool) {
       const item = await repo.itemDoCardapio(pool, a.lojaId, b.item_id)
       if (!item) throw naoEncontrado('Item nao encontrado')
       if (!item.ativo) throw regraNegocio('item_inativo', 'Item desativado nao pode ser lancado')
+      // Item esgotado nao e lancado (historia 07, regra 3): por horario (esgotado_ate no futuro) ou
+      // por contador de estoque zerado (historia 03). Contagem ilimitada/sem controle nao esgota.
+      const agora = new Date()
+      const esgotadoPorHorario = item.esgotado_ate != null && item.esgotado_ate.getTime() > agora.getTime()
+      const esgotadoPorSaldo = item.controla_estoque && item.quantidade_disponivel != null && item.quantidade_disponivel <= 0
+      if (esgotadoPorHorario || esgotadoPorSaldo) {
+        throw regraNegocio('item_esgotado', 'Item esgotado nao pode ser lancado')
+      }
       await comTransacao(pool, async (tx) => {
         const atual = await escrita.travarComanda(tx, a.lojaId, comandaId)
         if (!atual) throw naoEncontrado('Comanda nao encontrada')
@@ -153,14 +162,26 @@ export function criarServicoSalao(pool: Pool) {
       return montarComanda(a, comandaId)
     },
 
-    async fecharComanda(a: Ator, comandaId: string): Promise<ComandaSaida> {
+    async fecharComanda(a: Ator, comandaId: string, b: ComandaFecharEntrada): Promise<ComandaSaida> {
       await comTransacao(pool, async (tx) => {
         const atual = await escrita.travarComanda(tx, a.lojaId, comandaId)
         if (!atual) throw naoEncontrado('Comanda nao encontrada')
         if (atual.status !== 'aberta') throw conflito('comanda_fechada', 'Comanda ja fechada')
+        // O recebimento da comanda entra no caixa aberto (historia 07, regra 6): exige um caixa
+        // aberto. Trava o caixa aqui para serializar com o fechamento do caixa.
+        const caixa = await escrita.caixaAbertoId(tx, a.lojaId)
+        if (!caixa) throw conflito('caixa_fechado', 'Abra um caixa antes de fechar a comanda')
+        // Fecha (dispara a baixa de estoque de item e insumo na mesma transacao, via trigger 0080).
         const r = await escrita.fecharComanda(tx, a.lojaId, comandaId)
         if (!r) throw conflito('comanda_fechada', 'Comanda ja fechada')
-        await evento(tx, a, 'salao.comanda_fechada', 'comanda', comandaId)
+        // Lanca o recebimento no caixa, idempotente por comanda (reprocessar o fechamento nao duplica).
+        const lancado = await escrita.lancarVendaNoCaixa(tx, {
+          lojaId: a.lojaId, caixaId: caixa.id, formaPagamento: b.forma_pagamento,
+          valor: r.total_centavos, userId: a.userId, chave: `comanda:${comandaId}`,
+        })
+        await evento(tx, a, 'salao.comanda_fechada', 'comanda', comandaId, {
+          caixa_id: caixa.id, forma_pagamento: b.forma_pagamento, lancado_no_caixa: lancado,
+        })
       })
       return montarComanda(a, comandaId)
     },

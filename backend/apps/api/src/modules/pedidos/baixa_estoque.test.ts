@@ -116,14 +116,19 @@ d('baixa de estoque na efetivacao (trigger 0055)', () => {
     expect(await movsVenda(p.id, s.ilimitado)).toBe(0)
   })
 
-  it('estoque insuficiente: trava em zero, nunca negativo', async () => {
-    const p = await pedir(s.insuf, 3) // so ha 1
+  it('oversell: pedido que excede o saldo do item e recusado (409), saldo intacto', async () => {
+    // so ha 1 unidade; pedir 3 nao efetiva nem decrementa (historia 03, regra 3).
+    const r = await chamar(m, m.dono, m.A.loja, 'POST', '/', {
+      cliente_id: m.A.cliente, modalidade: 'retirada', taxa_entrega_centavos: 0,
+      itens: [{ item_id: s.insuf, quantidade: 3 }],
+    })
+    expect(r.status, JSON.stringify(r.corpo)).toBe(409)
+    expect(r.corpo.error.code).toBe('estoque_insuficiente')
+    expect(await qtdItem(s.insuf)).toBe(1) // intacto
+    // vender exatamente o saldo ainda passa e zera o item.
+    const ok = await pedir(s.insuf, 1)
     expect(await qtdItem(s.insuf)).toBe(0)
-    const mov = await uma<{ q: number }>(
-      `select quantidade_resultante as q from public.movimentos_item_estoque where pedido_id = $1 and item_id = $2`,
-      [p.id, s.insuf],
-    )
-    expect(mov.q).toBe(0)
+    expect(await movsVenda(ok.id, s.insuf)).toBe(1)
   })
 
   it('idempotencia: UPDATE que mantem novo nao da baixa em dobro', async () => {

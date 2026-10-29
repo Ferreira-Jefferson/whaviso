@@ -99,14 +99,53 @@ export async function recalcularTotal(exec: Executor, lojaId: string, comandaId:
   )
 }
 
-/** Fecha a comanda se ainda aberta. null = ja fechada (corrida) ou inexistente. */
+/**
+ * Fecha a comanda se ainda aberta e devolve id + total (centavos). null = ja fechada (corrida) ou
+ * inexistente. O UPDATE dispara o trigger de baixa de estoque (0080) na mesma transacao; se faltar
+ * saldo de algum item com contador, a baixa erra a transacao e o fechamento inteiro reverte.
+ */
 export async function fecharComanda(exec: Executor, lojaId: string, id: string) {
-  return consultarUm<{ id: string }>(
+  return consultarUm<{ id: string; total_centavos: number }>(
     exec,
     sql`update public.comandas set status = 'fechada', fechada_em = now()
          where id = ${id} and loja_id = ${lojaId} and status = 'aberta'
+        returning id, total_centavos`,
+  )
+}
+
+/** Caixa aberto da loja, travado na transacao (FOR UPDATE: serializa com o fechamento do caixa). */
+export async function caixaAbertoId(exec: Executor, lojaId: string): Promise<{ id: string } | null> {
+  return consultarUm<{ id: string }>(
+    exec,
+    sql`select id from public.caixas where loja_id = ${lojaId} and status = 'aberto' for update`,
+  )
+}
+
+/**
+ * Lanca o recebimento da comanda no caixa (movimento de venda), idempotente por chave derivada da
+ * comanda: reprocessar o fechamento nao duplica o lancamento (`on conflict do nothing`). Devolve se
+ * gravou agora (false = ja existia). movimentos_caixa e append-only; whaviso_api tem insert nela.
+ */
+export async function lancarVendaNoCaixa(
+  exec: Executor,
+  d: {
+    lojaId: string
+    caixaId: string
+    formaPagamento: string
+    valor: number
+    userId: string
+    chave: string
+  },
+): Promise<boolean> {
+  const r = await consultarUm<{ id: string }>(
+    exec,
+    sql`insert into public.movimentos_caixa
+          (loja_id, caixa_id, tipo, forma_pagamento, valor_centavos, criado_por_user_id, chave_idempotencia)
+        values (${d.lojaId}, ${d.caixaId}, 'venda', ${d.formaPagamento}, ${d.valor}, ${d.userId}, ${d.chave})
+        on conflict (loja_id, chave_idempotencia) where chave_idempotencia is not null do nothing
         returning id`,
   )
+  return r != null
 }
 
 /** Auditoria sem PII (tabela eventos). `detalhes` so com ids e user_id. */

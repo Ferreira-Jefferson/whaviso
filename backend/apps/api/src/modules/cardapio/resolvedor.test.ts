@@ -138,6 +138,15 @@ describe('estaDisponivel', () => {
     expect(estaDisponivel({ ativo: true, esgotado_ate: new Date(agora) }, agora)).toBe(true))
   it('sem esgotado_ate = disponivel', () =>
     expect(estaDisponivel({ ativo: true, esgotado_ate: null }, agora)).toBe(true))
+  // Contador de estoque (historia 03): saldo zero esgota e tira o item da oferta.
+  it('contador zerado = indisponivel', () =>
+    expect(estaDisponivel({ ativo: true, esgotado_ate: null, controla_estoque: true, quantidade_disponivel: 0 }, agora)).toBe(false))
+  it('contador com saldo > 0 = disponivel', () =>
+    expect(estaDisponivel({ ativo: true, esgotado_ate: null, controla_estoque: true, quantidade_disponivel: 3 }, agora)).toBe(true))
+  it('contador ilimitado (quantidade null) = disponivel', () =>
+    expect(estaDisponivel({ ativo: true, esgotado_ate: null, controla_estoque: true, quantidade_disponivel: null }, agora)).toBe(true))
+  it('sem controle de estoque ignora a contagem = disponivel', () =>
+    expect(estaDisponivel({ ativo: true, esgotado_ate: null, controla_estoque: false, quantidade_disponivel: 0 }, agora)).toBe(true))
 })
 
 describe('dentroDaProgramacao (America/Sao_Paulo)', () => {
