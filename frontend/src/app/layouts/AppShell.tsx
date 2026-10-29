@@ -9,8 +9,9 @@ import { BotaoSair } from './BotaoSair'
 import { SeletorLoja, useTenant } from '@/shared/tenant'
 import { useEstadoRealtime } from '@/shared/realtime'
 import { BellLogo, EmptyState, ErrorState, Skeleton, cn } from '@/shared/ui'
-import { GRUPOS_NAV, ROTAS, type GrupoNav, type RotaModulo } from '../rotas'
+import { GRUPOS_NAV, ROTAS, podeVerRota, type GrupoNav, type RotaModulo } from '../rotas'
 import { useEhOperador } from '../sonda_operador'
+import { useMinhasPermissoes } from '@/modules/lojas/api'
 
 const FOCO = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia'
 
@@ -18,6 +19,16 @@ const FOCO = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visib
 function useGrupoAtivo(): GrupoNav | undefined {
   const { pathname } = useLocation()
   return ROTAS.find((r) => pathname === `/${r.caminho}` || pathname.startsWith(`/${r.caminho}/`))?.grupo
+}
+
+/** Permissoes ':ver' do usuario na loja ativa. Devolve null enquanto a grade ainda nao chegou:
+ *  nesse caso o menu mostra tudo, para nao esconder itens antes de saber. O servidor segue sendo a
+ *  autoridade do acesso (nega com 403); isto so adapta o menu ao papel. */
+function usePermissoesLojaAtiva(): Set<string> | null {
+  const { lojaAtiva } = useTenant()
+  const { data } = useMinhasPermissoes()
+  if (!data || !lojaAtiva) return null
+  return new Set(data[lojaAtiva.id] ?? [])
 }
 
 /** Estado aberto/fechado de cada seção do menu, por visitante (tolera storage bloqueado). */
@@ -70,8 +81,8 @@ function ItemNav({ rota, onNavegar }: { rota: RotaModulo; onNavegar?: () => void
 
 /** Uma seção recolhível do menu lateral: cabeçalho (chevron + rótulo) + lista de itens.
  *  A seção da rota atual fica sempre aberta, para o usuário nunca "perder" onde está. */
-function GrupoSecao({ id, rotulo, aberto, ativo, onAlternar }: { id: GrupoNav; rotulo: string; aberto: boolean; ativo: boolean; onAlternar: (id: GrupoNav) => void }) {
-  const itens = ROTAS.filter((r) => r.grupo === id && !r.ocultoNoMenu)
+function GrupoSecao({ id, rotulo, aberto, ativo, onAlternar, granted }: { id: GrupoNav; rotulo: string; aberto: boolean; ativo: boolean; onAlternar: (id: GrupoNav) => void; granted: Set<string> | null }) {
+  const itens = ROTAS.filter((r) => r.grupo === id && !r.ocultoNoMenu && podeVerRota(r, granted))
   if (itens.length === 0) return null
   const expandido = aberto || ativo
   return (
@@ -118,6 +129,7 @@ function LinkConsole({ onNavegar }: { onNavegar?: () => void }) {
 function Sidebar({ onRecolher }: { onRecolher: () => void }) {
   const { abertos, alternar } = useGruposAbertos()
   const grupoAtivo = useGrupoAtivo()
+  const granted = usePermissoesLojaAtiva()
   return (
     <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-linha bg-papel-2 px-3 py-4 md:flex">
       <div className="flex items-center gap-2.5 px-2.5 pb-4 font-display text-xl font-bold">
@@ -136,7 +148,7 @@ function Sidebar({ onRecolher }: { onRecolher: () => void }) {
       </div>
       <div className="flex flex-col gap-0.5">
         {GRUPOS_NAV.map((g) => (
-          <GrupoSecao key={g.id} id={g.id} rotulo={g.rotulo} aberto={abertos[g.id] ?? false} ativo={grupoAtivo === g.id} onAlternar={alternar} />
+          <GrupoSecao key={g.id} id={g.id} rotulo={g.rotulo} aberto={abertos[g.id] ?? false} ativo={grupoAtivo === g.id} onAlternar={alternar} granted={granted} />
         ))}
       </div>
       <div className="mt-auto flex flex-col gap-0.5">
@@ -165,8 +177,10 @@ function EstadoAoVivo() {
 function BarraInferior() {
   const [aberto, setAberto] = useState(false)
   const { pathname } = useLocation()
-  const fixas = ROTAS.filter((r) => r.fixoNoMobile).slice(0, 4)
-  const resto = ROTAS.filter((r) => !fixas.includes(r) && !r.ocultoNoMenu)
+  const granted = usePermissoesLojaAtiva()
+  const visiveis = ROTAS.filter((r) => !r.ocultoNoMenu && podeVerRota(r, granted))
+  const fixas = visiveis.filter((r) => r.fixoNoMobile).slice(0, 4)
+  const resto = visiveis.filter((r) => !fixas.includes(r))
   const restoAtivo = resto.some((r) => pathname.startsWith(`/${r.caminho}`))
   const painel = useRef<HTMLDivElement>(null)
 
