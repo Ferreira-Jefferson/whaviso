@@ -157,7 +157,8 @@ export async function upsertVinculoCategoria(
     exec,
     sql`insert into public.categoria_grupos (categoria_id, grupo_id, loja_id, ordem)
         values (${categoriaId}, ${grupoId}, ${lojaId}, ${ordem})
-        on conflict (categoria_id, grupo_id) do update set ordem = excluded.ordem`,
+        on conflict (categoria_id, grupo_id) do update set ordem = excluded.ordem
+        where public.categoria_grupos.loja_id = ${lojaId}`,
   )
 }
 
@@ -191,7 +192,8 @@ export async function upsertVinculoItem(
     exec,
     sql`insert into public.item_grupos (item_id, grupo_id, loja_id, incluir, ordem)
         values (${itemId}, ${e.grupo_id}, ${lojaId}, ${e.incluir}, ${e.ordem})
-        on conflict (item_id, grupo_id) do update set incluir = excluded.incluir, ordem = excluded.ordem`,
+        on conflict (item_id, grupo_id) do update set incluir = excluded.incluir, ordem = excluded.ordem
+        where public.item_grupos.loja_id = ${lojaId}`,
   )
 }
 

@@ -91,7 +91,7 @@ export function criarServicoFidelidade(pool: Pool) {
       const clienteId = pedido.cliente_id
       return comTransacao(pool, async (tx) => {
         await repo.travarCliente(tx, clienteId)
-        const desconto = await repo.descontoDoResgate(tx, pedido.id)
+        const desconto = await repo.descontoDoResgate(tx, a.lojaId, pedido.id)
         const valor = calcularAcumulo(programa, pedido.subtotal_centavos - desconto)
         if (valor <= 0) throw regraNegocio('sem_valor_a_acumular', 'Este pedido nao gera acumulo')
         const saldo = await repo.saldoDe(tx, a.lojaId, clienteId)

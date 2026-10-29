@@ -70,10 +70,14 @@ export async function inserir(
   return r!
 }
 
-export async function listar(exec: Executor, lojaId: string): Promise<ImportacaoLinha[]> {
-  return consultar<ImportacaoLinha>(
+// Listagem nao le o `rascunho` (jsonb grande; o resumo da lista nao o devolve).
+const COLS_LISTA = sql`id, status::text as status, tipo_arquivo::text as tipo_arquivo, tamanho_bytes, erro,
+  tentativas, ${TS('criado_em')} as criado_em, ${TS('atualizado_em')} as atualizado_em`
+
+export async function listar(exec: Executor, lojaId: string): Promise<Omit<ImportacaoLinha, 'rascunho'>[]> {
+  return consultar<Omit<ImportacaoLinha, 'rascunho'>>(
     exec,
-    sql`select ${COLS} from public.importacoes_cardapio
+    sql`select ${COLS_LISTA} from public.importacoes_cardapio
          where loja_id = ${lojaId}
          order by criado_em desc, id desc
          limit 50`,

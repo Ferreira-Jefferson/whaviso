@@ -172,20 +172,20 @@ export async function atualizar(
   await consultar(exec, sql`update public.promocoes set ${set} where id = ${id} and loja_id = ${lojaId}`)
 }
 
-export async function contarUsos(exec: Executor, promocaoId: string, clienteId: string | null) {
+export async function contarUsos(exec: Executor, lojaId: string, promocaoId: string, clienteId: string | null) {
   const r = await consultarUm<{ total: number; cliente: number }>(
     exec,
     sql`select count(*)::int as total,
                (count(*) filter (where ${clienteId}::uuid is not null and cliente_id = ${clienteId}::uuid))::int as cliente
-          from public.promocao_usos where promocao_id = ${promocaoId}`,
+          from public.promocao_usos where promocao_id = ${promocaoId} and loja_id = ${lojaId}`,
   )
   return { total: r?.total ?? 0, cliente: r?.cliente ?? 0 }
 }
 
-export async function usoExistente(exec: Executor, promocaoId: string, pedidoId: string) {
+export async function usoExistente(exec: Executor, lojaId: string, promocaoId: string, pedidoId: string) {
   return consultarUm<{ id: string; desconto_centavos: number }>(
     exec,
-    sql`select id, desconto_centavos from public.promocao_usos where promocao_id = ${promocaoId} and pedido_id = ${pedidoId}`,
+    sql`select id, desconto_centavos from public.promocao_usos where promocao_id = ${promocaoId} and pedido_id = ${pedidoId} and loja_id = ${lojaId}`,
   )
 }
 

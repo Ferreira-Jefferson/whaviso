@@ -68,7 +68,7 @@ export function criarServicoPromocoes(pool: Pool, agora: () => Date = () => new 
     }
     const l = await repo.obterPorCodigo(pool, a.lojaId, e.codigo)
     if (!l) return { promocao: null, resultado: { valido: false as const, motivo: 'cupom_inexistente' as const } }
-    const usos = await repo.contarUsos(pool, l.id, e.cliente_id ?? null)
+    const usos = await repo.contarUsos(pool, a.lojaId, l.id, e.cliente_id ?? null)
     const resultado = calcularPromocao(await regraDe(a, l), {
       agora: agora(),
       subtotal_centavos: e.subtotal_centavos,
@@ -192,11 +192,11 @@ export function criarServicoPromocoes(pool: Pool, agora: () => Date = () => new 
       return comTransacao(pool, async (tx) => {
         const p = await repo.obter(tx, a.lojaId, e.promocao_id, true)
         if (!p) throw naoEncontrado('Promocao nao encontrada')
-        const ja = await repo.usoExistente(tx, p.id, e.pedido_id)
+        const ja = await repo.usoExistente(tx, a.lojaId, p.id, e.pedido_id)
         if (ja) {
           return { id: ja.id, promocao_id: p.id, pedido_id: e.pedido_id, desconto_centavos: ja.desconto_centavos, criado: false }
         }
-        const usos = await repo.contarUsos(tx, p.id, e.cliente_id ?? null)
+        const usos = await repo.contarUsos(tx, a.lojaId, p.id, e.cliente_id ?? null)
         if (p.limite_total !== null && usos.total >= p.limite_total) {
           throw regraNegocio('cupom_esgotado', MENSAGENS.cupom_esgotado)
         }

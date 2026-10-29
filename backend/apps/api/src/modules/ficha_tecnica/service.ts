@@ -67,18 +67,15 @@ export async function darBaixaPorVenda(
   p: { item_id: string; loja_id: string; quantidade_vendida: number; pedido_id: string },
 ): Promise<{ baixados: number; jaRegistrados: number }> {
   const linhas = await repo.linhasAtivas(exec, p.loja_id, p.item_id)
-  let baixados = 0
-  let jaRegistrados = 0
-  for (const l of linhas) {
-    const consumo = l.quantidade * p.quantidade_vendida
-    const registrou = await repo.baixarConsumo(exec, {
-      lojaId: p.loja_id,
-      insumoId: l.insumo_id,
-      consumo,
-      pedidoId: p.pedido_id,
-    })
-    if (registrou) baixados += 1
-    else jaRegistrados += 1
-  }
+  const linhasBaixa = linhas.map((l) => ({
+    insumoId: l.insumo_id,
+    consumo: l.quantidade * p.quantidade_vendida,
+  }))
+  const baixados = await repo.baixarConsumo(exec, {
+    lojaId: p.loja_id,
+    pedidoId: p.pedido_id,
+    linhas: linhasBaixa,
+  })
+  const jaRegistrados = linhasBaixa.length - baixados
   return { baixados, jaRegistrados }
 }

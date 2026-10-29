@@ -32,7 +32,8 @@ export async function listarComControle(
     exec,
     sql`select ${SAIDA_ITEM} from public.itens
          where loja_id = ${lojaId} and controla_estoque${baixos}
-         order by quantidade_disponivel asc nulls last, nome, id`,
+         order by quantidade_disponivel asc nulls last, nome, id
+         limit 1000`,
   )
 }
 

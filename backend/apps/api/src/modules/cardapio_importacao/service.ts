@@ -36,7 +36,7 @@ function mensagemErro(codigo: string | null): string | null {
   return MENSAGENS_ERRO[codigo] ?? MENSAGEM_ERRO_GENERICA
 }
 
-function resumo(l: repo.ImportacaoLinha) {
+function resumo(l: Omit<repo.ImportacaoLinha, 'rascunho'>) {
   return {
     id: l.id,
     status: l.status,

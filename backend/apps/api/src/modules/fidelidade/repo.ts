@@ -82,21 +82,23 @@ export async function travarCliente(exec: Executor, clienteId: string) {
   await consultar(exec, sql`select pg_advisory_xact_lock(hashtextextended(${'fidelidade:' + clienteId}, 0))`)
 }
 
-/** Saldo derivado do livro (acumulos menos resgates), na unidade do programa. */
+/** Saldo do cliente = `saldo_apos` do ultimo movimento do livro (O(1) pelo indice por seq desc).
+ *  Consistente porque as escritas sao serializadas por `travarCliente`. */
 export async function saldoDe(exec: Executor, lojaId: string, clienteId: string) {
   const r = await consultarUm<{ saldo: number }>(
     exec,
-    sql`select coalesce(sum(case tipo when 'acumulo' then valor else -valor end), 0)::int as saldo
-          from public.fidelidade_movimentos where loja_id = ${lojaId} and cliente_id = ${clienteId}`,
+    sql`select saldo_apos as saldo from public.fidelidade_movimentos
+         where loja_id = ${lojaId} and cliente_id = ${clienteId}
+         order by seq desc limit 1`,
   )
   return r?.saldo ?? 0
 }
 
-export async function descontoDoResgate(exec: Executor, pedidoId: string) {
+export async function descontoDoResgate(exec: Executor, lojaId: string, pedidoId: string) {
   const r = await consultarUm<{ desconto_centavos: number }>(
     exec,
     sql`select desconto_centavos from public.fidelidade_movimentos
-         where pedido_id = ${pedidoId} and tipo = 'resgate'`,
+         where pedido_id = ${pedidoId} and tipo = 'resgate' and loja_id = ${lojaId}`,
   )
   return r?.desconto_centavos ?? 0
 }
