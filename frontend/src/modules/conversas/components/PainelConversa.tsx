@@ -81,10 +81,14 @@ export function PainelConversa({ conversaId, aoVoltar, className }: Props) {
 
   const aoEnviar = useCallback(
     (texto: string) => {
-      enviar.mutate(texto, {
-        onError: (err) =>
-          mostrarToast(err instanceof ApiError ? err.message : 'Não foi possível enviar a mensagem.', { tom: 'erro' }),
-      })
+      // UUID por submissao (reusado em retry): idempotencia de request contra o duplo envio.
+      enviar.mutate(
+        { texto, chaveIdempotencia: crypto.randomUUID() },
+        {
+          onError: (err) =>
+            mostrarToast(err instanceof ApiError ? err.message : 'Não foi possível enviar a mensagem.', { tom: 'erro' }),
+        },
+      )
     },
     [enviar, mostrarToast],
   )

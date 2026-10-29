@@ -1,4 +1,5 @@
 // Integracao (Postgres LOCAL whaviso_dev_conversas): resposta humana via outbox, janela, encerrar, eventos e rate limit.
+import { randomUUID } from 'node:crypto'
 import { describe, it, expect } from 'vitest'
 import { bancoAcessivel, poolSuper } from '../../../test/db'
 import { criarHarness, bearer, horas } from './tests/harness'
@@ -51,6 +52,46 @@ d('conversas: escrita (responder e encerrar)', () => {
       payload: { conversa_id: c, loja_id: m.lojaId, direcao: 'saida', autor: 'humano' },
     })
     expect(JSON.stringify(h.eventos)).not.toContain('segredo-xyz')
+  })
+
+  it('responder: idempotencia de request (mesma chave) nao cria segunda mensagem nem segundo envio', async () => {
+    const m = await h.novo()
+    const cli = await criarCliente(m.lojaId, 'Ivo')
+    const c = await criarConversa(m, cli.id, { ultimaEntrada: new Date(Date.now() - horas(1)), atendidoPor: m.membroId })
+    await h.montar()
+    const chave = randomUUID()
+    const enviar = () =>
+      h.app.inject({
+        method: 'POST',
+        url: `/v1/conversas/${c}/mensagens`,
+        headers: bearer(m.userId),
+        payload: { texto: 'tem combo hoje?', chave_idempotencia: chave },
+      })
+    const r1 = await enviar()
+    const r2 = await enviar()
+    expect(r1.statusCode).toBe(201)
+    expect(r2.statusCode).toBe(201)
+    // Mesma resposta nas duas chamadas (a segunda devolve a original, nao cria outra).
+    expect(r2.json().mensagem.id).toBe(r1.json().mensagem.id)
+    expect(r2.json().envio_id).toBe(r1.json().envio_id)
+
+    const { rows: msgs } = await poolSuper.query('select 1 from public.mensagens where conversa_id=$1', [c])
+    expect(msgs).toHaveLength(1)
+    const { rows: envs } = await poolSuper.query('select dedupe_chave from public.envios where conversa_id=$1', [c])
+    expect(envs).toHaveLength(1)
+    expect(envs[0].dedupe_chave).toBe('conversa_resp:' + chave)
+
+    // Chave diferente para o mesmo texto cria um novo par mensagem+envio (nao e o mesmo request).
+    const r3 = await h.app.inject({
+      method: 'POST',
+      url: `/v1/conversas/${c}/mensagens`,
+      headers: bearer(m.userId),
+      payload: { texto: 'tem combo hoje?', chave_idempotencia: randomUUID() },
+    })
+    expect(r3.statusCode).toBe(201)
+    expect(r3.json().envio_id).not.toBe(r1.json().envio_id)
+    const { rows: envs2 } = await poolSuper.query('select 1 from public.envios where conversa_id=$1', [c])
+    expect(envs2).toHaveLength(2)
   })
 
   it('responder: rollback desfaz mensagem E nao emite evento quando o outbox falha', async () => {

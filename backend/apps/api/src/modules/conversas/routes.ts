@@ -118,6 +118,7 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
           usuarioDaRequisicao(req),
           req.body.texto,
           agora(),
+          req.body.chave_idempotencia,
         )
         return reply.status(201).send(saida)
       },

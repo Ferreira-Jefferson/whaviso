@@ -18,6 +18,7 @@ import {
   enfileirarTextoLivre,
   inserirMensagemHumana,
   registrarEvento,
+  respostaJaEnfileirada,
   tocarConversa,
   travarConversa,
 } from './repo_escrita'
@@ -153,10 +154,19 @@ export async function responder(
   userId: string,
   texto: string,
   agora: Date,
+  chaveIdempotencia?: string,
 ) {
   return comTransacao(pool, async (tx) => {
     const c = await travarConversa(tx, lojaId, conversaId)
     if (!c) throw naoAchou()
+    // Idempotencia de request: o lock de travarConversa serializa dois POSTs iguais (duplo clique
+    // ou retry) na MESMA conversa; o segundo so chega aqui depois do commit do primeiro. Se a
+    // resposta desta chave ja foi enfileirada, devolve a original sem criar segunda mensagem/envio.
+    const dedupeChave = chaveIdempotencia ? 'conversa_resp:' + chaveIdempotencia : undefined
+    if (dedupeChave) {
+      const previa = await respostaJaEnfileirada(tx, lojaId, conversaId, c.numero_whatsapp_id, dedupeChave)
+      if (previa) return { mensagem: paraMensagem(previa.mensagem), envio_id: previa.envioId }
+    }
     if (c.status === 'encerrada') throw new Conflito('Conversa encerrada', 'conversa_encerrada')
     if (c.status === 'ia' || c.status === 'aguardando') {
       throw new Conflito('A conversa esta com a automacao; assuma o atendimento antes de responder', 'conversa_com_ia')
@@ -188,7 +198,11 @@ export async function responder(
       destinatarioHash: c.telefone_hash,
       texto,
       mensagemId: msg.id,
+      dedupeChave,
     })
+    // Com dedupeChave, o `do nothing` pode nao retornar id so se ja houvesse envio com a chave;
+    // o pre-check acima ja teria curto-circuitado, entao aqui envioId sempre existe.
+    if (!envioId) throw new Conflito('Resposta ja enfileirada', 'resposta_duplicada')
     await tocarConversa(tx, lojaId, conversaId)
     await registrarEvento(tx, {
       lojaId,

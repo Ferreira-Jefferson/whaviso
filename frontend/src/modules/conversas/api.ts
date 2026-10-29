@@ -83,13 +83,17 @@ export function mensagensEmOrdem(paginas: ReadonlyArray<Mensagens> | undefined) 
   return [...paginas].reverse().flatMap((p) => p.itens)
 }
 
-/** POST /v1/conversas/:id/mensagens: responde como humano (so com a conversa em 'humano'). */
+/**
+ * POST /v1/conversas/:id/mensagens: responde como humano (so com a conversa em 'humano').
+ * Envia uma `chave_idempotencia` por submissao (reusada no retry): dois POSTs iguais nao
+ * criam duas mensagens nem disparam o texto duas vezes para o cliente.
+ */
 export function useEnviarMensagem(conversaId: string) {
   const qc = useQueryClient()
-  return useMutation<MensagemEnviada, Error, string>({
-    mutationFn: (texto) =>
+  return useMutation<MensagemEnviada, Error, { texto: string; chaveIdempotencia: string }>({
+    mutationFn: ({ texto, chaveIdempotencia }) =>
       apiClient.post<MensagemEnviada>(`/conversas/${conversaId}/mensagens`, {
-        body: { texto },
+        body: { texto, chave_idempotencia: chaveIdempotencia },
         schema: MensagemEnviadaSaida,
       }),
     onSuccess: () => {

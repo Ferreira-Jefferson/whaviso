@@ -51,7 +51,13 @@ export async function inserirMensagemHumana(
   return linha!
 }
 
-/** Enfileira no outbox (texto livre = template_chave NULL). O zap drena; a api nunca fala com a Meta. */
+/**
+ * Enfileira no outbox (texto livre = template_chave NULL). O zap drena; a api nunca fala com a Meta.
+ * `dedupeChave`: quando o request traz chave de idempotencia, a chave vem derivada dela
+ * (`conversa_resp:<chave>`); sem ela, cai no padrao por mensagem (`conversa_msg:<id>`), que e sempre
+ * unico. O `on conflict ... do nothing` e rede de seguranca: dois enfileiramentos com a mesma chave
+ * sao no-op (a serializacao pelo lock da conversa ja impede o caminho duplo chegar aqui).
+ */
 export async function enfileirarTextoLivre(
   exec: Executor,
   c: {
@@ -62,18 +68,53 @@ export async function enfileirarTextoLivre(
     destinatarioHash: string
     texto: string
     mensagemId: string
+    dedupeChave?: string
   },
-): Promise<string> {
+): Promise<string | null> {
   const payload = JSON.stringify({ tipo: 'texto', texto: c.texto })
+  const dedupe = c.dedupeChave ?? 'conversa_msg:' + c.mensagemId
   const [linha] = await consultar<{ id: string }>(
     exec,
     sql`insert into public.envios (loja_id, numero_whatsapp_id, cliente_id, destinatario_hash, template_chave,
                                    payload, conversa_id, dedupe_chave)
         values (${c.lojaId}, ${c.numeroId}, ${c.clienteId}, ${c.destinatarioHash}, null,
-                ${payload}::jsonb, ${c.conversaId}, ${'conversa_msg:' + c.mensagemId})
+                ${payload}::jsonb, ${c.conversaId}, ${dedupe})
+        on conflict (numero_whatsapp_id, dedupe_chave) where dedupe_chave is not null do nothing
         returning id`,
   )
-  return linha!.id
+  return linha?.id ?? null
+}
+
+/**
+ * Resposta ja enfileirada para esta chave de idempotencia? Retorna a mensagem + o envio originais
+ * (para devolver a mesma resposta no retry), ou null. O vinculo envio->mensagem vem do evento de
+ * auditoria `conversa.resposta_enviada` (gravado na mesma transacao do par mensagem+envio).
+ */
+export async function respostaJaEnfileirada(
+  exec: Executor,
+  lojaId: string,
+  conversaId: string,
+  numeroId: string,
+  dedupeChave: string,
+): Promise<{ envioId: string; mensagem: LinhaMensagem } | null> {
+  const linha = await consultarUm<LinhaMensagem & { envio_id: string }>(
+    exec,
+    sql`select e.id as envio_id, ${sqlBruto(COLS_MSG)}
+          from public.envios e
+          join public.eventos ev on ev.loja_id = e.loja_id
+            and ev.tipo = 'conversa.resposta_enviada'
+            and ev.entidade_id = e.conversa_id
+            and ev.detalhes->>'envio_id' = e.id::text
+          join public.mensagens m on m.id = (ev.detalhes->>'mensagem_id')::uuid
+         where e.loja_id = ${lojaId}
+           and e.conversa_id = ${conversaId}
+           and e.numero_whatsapp_id = ${numeroId}
+           and e.dedupe_chave = ${dedupeChave}
+         limit 1`,
+  )
+  if (!linha) return null
+  const { envio_id, ...mensagem } = linha
+  return { envioId: envio_id, mensagem }
 }
 
 /** Dispara o trigger de atualizado_em para a conversa subir na lista. */
