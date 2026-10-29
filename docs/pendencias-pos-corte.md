@@ -928,3 +928,27 @@ Decidir: prefixo por serviço no arquivo único de dev; nome puro no env por hos
 Alinhar: schemas.ts + server.ts (alias) + production.env(.example) + push_secrets.sh +
          deploy/README + units. Rodar lint/typecheck/test. Commit atômico.
 ```
+
+## 35. Verificar se o VPS tem um PostgreSQL servidor ocioso (só ocupa espaço)
+
+**Local:** VPS Hostinger (`/home/deploy`, serviço do app). Fora do checkout.
+
+**Como está:** em produção o único banco usado é o **Supabase cloud**; o app (api/zap/
+atendente) conecta no cloud, nunca num Postgres local do VPS. O Postgres local desta
+máquina de dev é só banco de TESTE (whaviso_dev e clones por worker), não existe o
+equivalente em prod. Se o VPS tiver um **servidor** PostgreSQL instalado/rodando, ele
+está ocioso e só consome disco e memória.
+
+**Como deveria:** conferir no VPS se há um `postgresql` servidor instalado/ativo
+(`systemctl status postgresql`, `dpkg -l | grep postgresql`) e, se estiver ocioso,
+remover o PACOTE do servidor para liberar espaço. ATENCAO: manter o cliente `pg_dump`
+(o backup diário do cloud depende dele, ver [[whaviso-backup-banco]]); remover só o
+servidor, nunca o client. Verificar depois, com calma; não é urgente.
+
+**Exemplo:**
+
+```
+No VPS: systemctl status postgresql ; dpkg -l | grep -i postgres
+Se servidor ocioso: parar/desabilitar + remover postgresql-<versao> (manter postgresql-client).
+Confirmar que o backup (pg_dump do cloud) segue funcionando.
+```
