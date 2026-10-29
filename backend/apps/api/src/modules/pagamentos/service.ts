@@ -17,7 +17,19 @@ import { Conflito, NaoEncontrado, regraNegocio } from '../../shared/http_errors'
 import { sha256Hex } from '../../shared/tokens'
 import type { Cripto } from './cripto'
 import * as repo from './repo'
+import type { PagamentoConfigDTO, PagamentoConfigPatch } from './schemas'
 import { candidatoTxid, MAX_TENTATIVAS_TXID } from './txid'
+
+const CONFIG_PAGAMENTO_PADRAO: PagamentoConfigDTO = {
+  pix_modo: 'chave_propria',
+  encargo_modo: 'absorve',
+  cartao_habilitado: false,
+  atualizado_em: null,
+}
+
+function isoData(v: Date | string): string {
+  return v instanceof Date ? v.toISOString() : String(v)
+}
 
 export interface DepsPagamentos {
   cripto: Cripto
@@ -190,4 +202,37 @@ export async function cancelar(pool: Pool, lojaId: string, id: string): Promise<
     throw new Conflito('Cobranca mudou de estado; tente de novo', 'transicao_invalida')
   }
   return cancelada
+}
+
+// ---- Config de pagamento da loja (modo do Pix + quem paga a taxa) ----------------------------
+
+/** Config atual da loja; devolve o default (Pix chave propria, loja absorve, sem cartao) se nao salva. */
+export async function obterConfigPagamento(exec: Executor, lojaId: string): Promise<PagamentoConfigDTO> {
+  const l = await repo.obterPagamentoConfig(exec, lojaId)
+  if (!l) return CONFIG_PAGAMENTO_PADRAO
+  return {
+    pix_modo: l.pix_modo,
+    encargo_modo: l.encargo_modo,
+    cartao_habilitado: l.cartao_habilitado,
+    atualizado_em: isoData(l.atualizado_em),
+  }
+}
+
+/** Salva (upsert parcial) a config de pagamento da loja. */
+export async function definirConfigPagamento(
+  exec: Executor,
+  lojaId: string,
+  patch: PagamentoConfigPatch,
+): Promise<PagamentoConfigDTO> {
+  const l = await repo.upsertPagamentoConfig(exec, lojaId, {
+    pixModo: patch.pix_modo ?? null,
+    encargoModo: patch.encargo_modo ?? null,
+    cartaoHabilitado: patch.cartao_habilitado ?? null,
+  })
+  return {
+    pix_modo: l.pix_modo,
+    encargo_modo: l.encargo_modo,
+    cartao_habilitado: l.cartao_habilitado,
+    atualizado_em: isoData(l.atualizado_em),
+  }
 }

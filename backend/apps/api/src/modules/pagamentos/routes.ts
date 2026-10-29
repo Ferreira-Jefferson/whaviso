@@ -7,6 +7,8 @@ import {
   ListaPagamentosSaida,
   LojaPixEntrada,
   LojaPixEstadoResposta,
+  PagamentoConfigDTO,
+  PagamentoConfigPatch,
   pagamentoIdParam,
   PagamentosFiltro,
   PagamentoSaida,
@@ -45,6 +47,21 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void 
     config: { acesso: ACESSO_LOJA, rateLimit: LIMITE_SENSIVEL },
     preHandler: guardaGerir(app),
   }
+
+  // GET /pagamentos/config: modo do Pix e quem paga a taxa (default se a loja nao salvou ainda).
+  r.get('/config', { ...loja, schema: { response: { 200: PagamentoConfigDTO } } },
+    async (req) => service.obterConfigPagamento(app.pool, lojaAtiva(req)))
+
+  // PUT /pagamentos/config: salva a config de pagamento da loja (dono/gerente).
+  r.put('/config', { ...lojaGerir, schema: { body: PagamentoConfigPatch, response: { 200: PagamentoConfigDTO } } },
+    async (req) => {
+      const cfg = await service.definirConfigPagamento(app.pool, lojaAtiva(req), req.body)
+      req.log.info(
+        { loja_id: lojaAtiva(req), pix_modo: cfg.pix_modo, encargo_modo: cfg.encargo_modo, cartao_habilitado: cfg.cartao_habilitado, acao: 'pagamento_config' },
+        'config de pagamento salva',
+      )
+      return cfg
+    })
 
   // GET /pagamentos/pix: metadado da chave Pix da loja (nunca a chave em claro nem a cifra).
   r.get('/pix', { ...loja, schema: { response: { 200: LojaPixEstadoResposta } } }, async (req) => ({

@@ -511,3 +511,69 @@ describe('SEC-024: a chave Pix nunca entra em log', () => {
     expect(viu429).toBe(true)
   })
 })
+
+describe('GET/PUT /pagamentos/config (modo do Pix + encargo)', () => {
+  it('GET devolve o default antes de salvar; PUT salva e GET reflete', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('dono'))
+    const app = await montarApp()
+    const h = auth(f.userId, f.lojaId)
+    const antes = await app.inject({ method: 'GET', url: '/v1/pagamentos/config', headers: h })
+    expect(antes.statusCode, antes.body).toBe(200)
+    expect(antes.json()).toMatchObject({
+      pix_modo: 'chave_propria', encargo_modo: 'absorve', cartao_habilitado: false, atualizado_em: null,
+    })
+
+    const put = await app.inject({
+      method: 'PUT', url: '/v1/pagamentos/config', headers: h,
+      payload: { pix_modo: 'intermediado', encargo_modo: 'repassa', cartao_habilitado: true },
+    })
+    expect(put.statusCode, put.body).toBe(200)
+    expect(put.json()).toMatchObject({ pix_modo: 'intermediado', encargo_modo: 'repassa', cartao_habilitado: true })
+    expect(put.json().atualizado_em).not.toBeNull()
+
+    const depois = await app.inject({ method: 'GET', url: '/v1/pagamentos/config', headers: h })
+    await app.close()
+    expect(depois.json()).toMatchObject({ pix_modo: 'intermediado', encargo_modo: 'repassa', cartao_habilitado: true })
+  })
+
+  it('PUT parcial preserva os demais campos (upsert por coalesce)', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('gerente'))
+    const app = await montarApp()
+    const h = auth(f.userId, f.lojaId)
+    await app.inject({
+      method: 'PUT', url: '/v1/pagamentos/config', headers: h,
+      payload: { pix_modo: 'intermediado', cartao_habilitado: true },
+    })
+    const so = await app.inject({
+      method: 'PUT', url: '/v1/pagamentos/config', headers: h, payload: { encargo_modo: 'repassa' },
+    })
+    await app.close()
+    expect(so.json()).toMatchObject({ pix_modo: 'intermediado', encargo_modo: 'repassa', cartao_habilitado: true })
+  })
+
+  it('atendente NAO altera a config (403, pagamentos:gerir)', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('atendente'))
+    const app = await montarApp()
+    const res = await app.inject({
+      method: 'PUT', url: '/v1/pagamentos/config', headers: auth(f.userId, f.lojaId),
+      payload: { pix_modo: 'intermediado' },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('enum invalido e 400 (strict)', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('dono'))
+    const app = await montarApp()
+    const res = await app.inject({
+      method: 'PUT', url: '/v1/pagamentos/config', headers: auth(f.userId, f.lojaId),
+      payload: { pix_modo: 'foo' },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(400)
+  })
+})

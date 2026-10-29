@@ -103,6 +103,53 @@ export async function lerChaveParaBrCode(
     : null
 }
 
+// ---- loja_pagamento_config (modo do Pix + encargo) ------------------------------------------
+
+export interface PagamentoConfigLinha {
+  pix_modo: 'chave_propria' | 'intermediado'
+  encargo_modo: 'absorve' | 'repassa'
+  cartao_habilitado: boolean
+  atualizado_em: Date | string
+}
+
+/** Config de pagamento da loja, ou null se ainda nao salva (o service aplica o default). */
+export async function obterPagamentoConfig(
+  exec: Executor,
+  lojaId: string,
+): Promise<PagamentoConfigLinha | null> {
+  return consultarUm<PagamentoConfigLinha>(
+    exec,
+    sql`select pix_modo, encargo_modo, cartao_habilitado, atualizado_em
+          from public.loja_pagamento_config where loja_id = ${lojaId}`,
+  )
+}
+
+/** Upsert parcial: coalesce mantem o valor atual (ou o default do schema) em campo nao informado. */
+export async function upsertPagamentoConfig(
+  exec: Executor,
+  lojaId: string,
+  c: {
+    pixModo: 'chave_propria' | 'intermediado' | null
+    encargoModo: 'absorve' | 'repassa' | null
+    cartaoHabilitado: boolean | null
+  },
+): Promise<PagamentoConfigLinha> {
+  const linha = await consultarUm<PagamentoConfigLinha>(
+    exec,
+    sql`insert into public.loja_pagamento_config (loja_id, pix_modo, encargo_modo, cartao_habilitado)
+        values (${lojaId},
+                coalesce(${c.pixModo}::pix_modo, 'chave_propria'),
+                coalesce(${c.encargoModo}::encargo_modo, 'absorve'),
+                coalesce(${c.cartaoHabilitado}::boolean, false))
+        on conflict (loja_id) do update set
+          pix_modo = coalesce(${c.pixModo}::pix_modo, public.loja_pagamento_config.pix_modo),
+          encargo_modo = coalesce(${c.encargoModo}::encargo_modo, public.loja_pagamento_config.encargo_modo),
+          cartao_habilitado = coalesce(${c.cartaoHabilitado}::boolean, public.loja_pagamento_config.cartao_habilitado)
+        returning pix_modo, encargo_modo, cartao_habilitado, atualizado_em`,
+  )
+  return linha!
+}
+
 // ---- pedidos (read-model) -------------------------------------------------------------------
 
 export interface PedidoParaCobranca {
