@@ -112,8 +112,12 @@ d('modulo acessos (grade editavel)', () => {
   const comoLoja = { 'x-loja-id': '' }
 
   it('paridade: catalogo e grade semeados na migration == catalogo TS (padroes)', async () => {
+    // COLLATE "C": ordena por code-point, igual ao `.sort((a,b)=>a.chave<b.chave)` do JS abaixo.
+    // Sem isso, o SQL ordena pela collation do banco (varia por ambiente: Windows local vs glibc do
+    // CI), que trata ':' e '_' de forma diferente e troca a posicao de pares como custos:ver /
+    // custos_plataforma:ver, quebrando o toEqual mesmo com os dados identicos.
     const perms = await poolSuper.query<{ chave: string; escopo: string; rotulo: string; ordem: number }>(
-      'select chave, escopo, rotulo, ordem from public.permissoes order by chave',
+      'select chave, escopo, rotulo, ordem from public.permissoes order by chave collate "C"',
     )
     expect(perms.rows).toEqual(
       CATALOGO.map((p) => ({ chave: p.chave, escopo: p.escopo, rotulo: p.rotulo, ordem: p.ordem }))
