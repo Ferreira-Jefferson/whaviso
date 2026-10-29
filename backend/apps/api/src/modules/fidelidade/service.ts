@@ -123,13 +123,17 @@ export function criarServicoFidelidade(pool: Pool) {
         throw regraNegocio('resgate_abaixo_do_minimo', 'Valor abaixo do resgate minimo do programa')
       }
       const desconto = valorEmCentavos(programa, entrada.valor)
-      const teto = Math.floor((pedido.subtotal_centavos * programa.max_resgate_bps) / 10000)
-      if (desconto > teto) {
-        throw regraNegocio('resgate_acima_do_limite', 'Resgate acima do limite do programa para este pedido')
-      }
       const clienteId = pedido.cliente_id
       return comTransacao(pool, async (tx) => {
         await repo.travarCliente(tx, clienteId)
+        // Teto conferido dentro da transacao com o subtotal fresco (pedido travado FOR UPDATE):
+        // se as linhas cairem em paralelo (cancelar linha), o teto acompanha e nao vaza desconto.
+        const subtotalAtual = await repo.travarSubtotalPedido(tx, a.lojaId, pedido.id)
+        if (subtotalAtual === null) throw naoEncontrado('Pedido nao encontrado')
+        const teto = Math.floor((subtotalAtual * programa.max_resgate_bps) / 10000)
+        if (desconto > teto) {
+          throw regraNegocio('resgate_acima_do_limite', 'Resgate acima do limite do programa para este pedido')
+        }
         const saldo = await repo.saldoDe(tx, a.lojaId, clienteId)
         if (saldo < entrada.valor) throw regraNegocio('saldo_insuficiente', 'Saldo de fidelidade insuficiente')
         const id = await repo.inserirMovimento(tx, {

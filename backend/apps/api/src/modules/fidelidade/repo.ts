@@ -58,6 +58,17 @@ export async function obterPedido(exec: Executor, lojaId: string, pedidoId: stri
   )
 }
 
+/** Trava a linha do pedido na transacao (FOR UPDATE) e devolve o subtotal atual: serializa
+ *  contra o recalculo de totais (cancelar linha) para o teto de resgate ser conferido fresco. */
+export async function travarSubtotalPedido(exec: Executor, lojaId: string, pedidoId: string) {
+  const r = await consultarUm<{ subtotal_centavos: number }>(
+    exec,
+    sql`select subtotal_centavos from public.pedidos
+          where id = ${pedidoId} and loja_id = ${lojaId} for update`,
+  )
+  return r?.subtotal_centavos ?? null
+}
+
 export async function clienteExiste(exec: Executor, lojaId: string, clienteId: string) {
   const r = await consultarUm<{ id: string }>(
     exec,

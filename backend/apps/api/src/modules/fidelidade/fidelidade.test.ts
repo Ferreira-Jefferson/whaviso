@@ -263,6 +263,33 @@ d('modulo fidelidade (integracao)', () => {
     expect(ruim.json().error.code).toBe('cursor_invalido')
   })
 
+  it('teto revalidado na tx: subtotal que cai em paralelo barra o resgate acima do novo teto', async () => {
+    // saldo de clienteA = 175 (cashback 1:1, minimo 100, max 50%). Pedido novo com subtotal alto.
+    const pid = await pedido(lojaA, clienteA, 'A10', 'novo', 10000)
+    const c = await poolSuper.connect()
+    let resposta: Awaited<ReturnType<typeof chamar>>
+    let confirmado = false
+    try {
+      await c.query('begin')
+      // Simula o recalculo de totais (cancelar linha) baixando o subtotal e segurando a linha FOR UPDATE.
+      await c.query('update public.pedidos set subtotal_centavos = 200, total_centavos = 200 where id = $1', [pid])
+      // valor 150 caberia no subtotal antigo (teto 5000) mas estoura o teto do subtotal novo (100).
+      const pendente = chamar(atendA, lojaA, 'POST', '/resgatar', { pedido_id: pid, valor: 150 })
+      await new Promise((r) => setTimeout(r, 150)) // deixa o resgate bloquear no FOR UPDATE do pedido
+      await c.query('commit')
+      confirmado = true
+      resposta = await pendente
+    } finally {
+      if (!confirmado) await c.query('rollback').catch(() => {})
+      c.release()
+    }
+    expect(resposta.statusCode).toBe(422)
+    expect(resposta.json().error.code).toBe('resgate_acima_do_limite')
+    // saldo intacto: nada foi gravado.
+    const s = (await chamar(atendA, lojaA, 'GET', `/clientes/${clienteA}/saldo`)).json()
+    expect(s.saldo).toBe(175)
+  })
+
   it('isolamento: outra loja nao ve saldo/extrato nem movimenta pedido alheio', async () => {
     await chamar(donoB, lojaB, 'PUT', '/programa', CASHBACK)
     expect((await chamar(donoB, lojaB, 'GET', `/clientes/${clienteA}/saldo`)).statusCode).toBe(404)

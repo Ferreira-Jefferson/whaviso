@@ -31,5 +31,7 @@ e derivado de um livro append-only por cliente. Tudo escopado por loja.
   (`max_resgate_bps` do subtotal); sem saldo = 422 `saldo_insuficiente`.
 - O resgate NAO altera o pedido: devolve `desconto_centavos` para o fluxo de pedidos aplicar.
 - Modo travado (`modo_travado`) depois do primeiro movimento da loja (a unidade do saldo mudaria).
-- Concorrencia: `pg_advisory_xact_lock` por cliente serializa saldo_apos.
+- Concorrencia: `pg_advisory_xact_lock` por cliente serializa saldo_apos. O teto de resgate e
+  reconferido dentro da transacao com o subtotal lido `FOR UPDATE` (serializa contra o recalculo
+  de totais do pedido), para nao gravar desconto acima do teto se as linhas cairem em paralelo.
 - Configurar: `loja:gerir`. Saldo, extrato, acumular e resgatar: `pedidos:gerir`.
