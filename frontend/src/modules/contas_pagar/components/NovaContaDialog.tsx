@@ -54,12 +54,15 @@ function Formulario({ aoFechar }: { aoFechar: () => void }) {
     if (!credorEfetivo) return setErro(`Escolha ${credorTipo === 'fornecedor' ? 'o fornecedor' : 'a pessoa'}.`)
     if (!descLimpa) return setErro('Informe uma descricao.')
     if (!valor || valor <= 0) return setErro('Informe um valor maior que zero.')
+    // Uma chave por submit: um retry da MESMA submissao reusa a mesma chave (o React Query reenvia
+    // as mesmas variaveis), entao duplo-clique/retry nao cria lancamento duplicado.
     const corpo: ContaPagarNovo = {
       credor_tipo: credorTipo,
       credor_id: credorEfetivo,
       descricao: descLimpa,
       valor_centavos: valor,
       ...(vencimento ? { vencimento } : {}),
+      chave_idempotencia: crypto.randomUUID(),
     }
     criar.mutate(corpo, {
       onSuccess: () => {

@@ -40,11 +40,14 @@ export function MovimentoDialog({ aberto, tipo, carregando, erro, onConfirmar, o
   function enviar() {
     if (!podeEnviar) return
     const motivoLimpo = motivo.trim()
+    // Uma chave por clique: um retry da MESMA submissao reusa a mesma chave (o React Query reenvia
+    // as mesmas variaveis), entao duplo-clique/retry nao cria movimento duplicado.
     onConfirmar({
       tipo,
       valor_centavos: valor,
       forma_pagamento: cfg.comForma ? forma : undefined,
       motivo: motivoLimpo.length > 0 ? motivoLimpo : undefined,
+      chave_idempotencia: crypto.randomUUID(),
     })
   }
 
