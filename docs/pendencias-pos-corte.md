@@ -533,7 +533,7 @@ Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
 
 | Fix | Item | Camada | Status |
 |-----|------|--------|--------|
-| Cache de escopo por processo | 22 | API | ADIADO. Ver nota abaixo: cache por TTL servia escopo velho e quebrava correção e gate. |
+| Coalescência de escopo por processo | 22 | API | FEITO (commit 20e60da) como single-flight, não cache por TTL. Ver nota abaixo. |
 | Pool quente (idle alto + keepalive) | 23 | API/db | FEITO (commit 42fc3b2) |
 | Boot: semear x-loja-id + destravar Outlet | 25 | Front | FEITO (commit c959b76) |
 | Token em memória (fetch síncrono) | 26 | Front | FEITO (commit c959b76) |
@@ -544,16 +544,18 @@ Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
 | Read-model de clientes (B5) | 30 | DB | só dói com volume, depois |
 | Serialização p/ listas grandes | 31 | API | depois |
 
-**Nota do item 22 (por que foi ADIADO, 2026-10-29):** religar o cache de escopo por TTL de 3s
-quebrou 3 testes de integração, e a causa é uma regressão de correção real, não um artefato de
-teste: com o cache, a loja recém-criada fica invisível por 3s (o escopo vem cacheado) e um
-operador desativado continua com acesso por 3s (devia dar 403 na hora, fere o invariante do
-último admin). O ganho que o item 22 buscava já foi em boa parte capturado pelo corte do banco
-para São Paulo (RTT caiu de ~130 ms para ~8.6 ms por ida). Para religar com segurança, o cache
-precisa invalidar a entrada do usuário nas mutações que mudam o escopo dele: criar/desativar/
-reativar loja (modules/lojas) e criar/trocar papel/desativar operador (modules/plataforma_clientes),
-chamando uma `invalidarEscopo(userId)` exportada do shared/tenant. Até lá, o `cache_escopo.ts` e
-seu teste ficam no repo, mas a ligação em app.ts e o export em index.ts permanecem desligados.
+**Nota do item 22 (FEITO como single-flight, 2026-10-29):** a 1a tentativa foi um cache por TTL de
+3s, que quebrou 3 testes de integração por uma regressão de correção real (loja recém-criada
+invisível por 3s; operador desativado com acesso por 3s). Em vez de religar esse TTL com uma
+`invalidarEscopo(userId)` em cada mutação de escopo (superfície grande e, com mais de 1 processo,
+ainda stale por falta de NOTIFY), o `cache_escopo.ts` virou **single-flight (coalescência)**: a
+entrada vive só enquanto a Promise está em voo e some assim que ela assenta. Isso colapsa o burst
+concorrente de 5 a 7 requisições da mesma página numa ida só (o desperdício que o item descrevia),
+com ZERO janela de staleness: qualquer requisição não concorrente relê fresco, a revogação segue
+imediata e a falha nunca fica cacheada. Ligado em `app.ts` (um leitor compartilhado pelos dois
+plugins de escopo) e exportado como `comCoalescencia` do `shared/tenant`. Gate cheio verde (os 3
+testes que quebravam no TTL passam, pois são sequenciais). O corte do banco para São Paulo (RTT de
+~130 ms para ~8.6 ms) já havia capturado a maior parte do ganho; isto remove o resto sem risco.
 
 Lembrete: o maior ganho de todos é mover o banco pra São Paulo (itens 18 a 21). Os
 fixes acima cortam o número de idas ao banco e se somam a esse ganho.
@@ -598,10 +600,14 @@ fixes acima cortam o número de idas ao banco e se somam a esse ganho.
   Acessos já existiam; isto é só o gating de UI que faltava. Gating de BOTÕES de ação dentro das telas
   fica como follow-up.
 
-- **FALTA (código, baixa prioridade):** item 22 feito direito (com invalidação; ganho pequeno pós-SP),
-  item 30 (read-model, só dói com volume), item 31 (serialização, idem), e as sobras do item 32
-  (de-dup de `/lojas` NÃO compensa: são duas queries de formas diferentes; `staleTime` de catálogo;
-  alvo `vercel` do push_secrets).
+- **FEITO depois (2026-10-29, baixa prioridade sem contra):** item 22 como single-flight (commit
+  20e60da); `staleTime` de 5 min no catálogo de lojas (commit d3ec479); alvo `vercel` morto removido
+  do push_secrets e notas (commit 93691c5).
+- **FALTA (código, baixa prioridade, tem contra real):** item 30 (read-model de clientes: exige
+  migration + trigger de sincronização, superfície de correção nova; só dói com volume) e item 31
+  (serialização: ou remove a validação de resposta em prod, tirando a rede de segurança do contrato,
+  ou fia fast-json-stringify por rota; só dói com volume). O de-dup de `/lojas` NÃO compensa (são
+  duas queries de formas diferentes).
 - **FALTA (fora do código / precisa de você, da VPS ou da Meta):** db push do 0081 (e das demais
   migrations pendentes) no cloud COMPARTILHADO de prod (combinar no deploy); item 21 (OTP hook);
   itens 6, 8, 35 (VPS); 15 Fase B e 17 (Meta). O item 20/24 (VPS *.env) e o item 5 (serviço atendente)
@@ -716,9 +722,12 @@ Authentication > Hooks:       Send SMS hook -> HTTPS
 
 ---
 
-## 22. Ligar o cache de escopo por processo (já escrito, foi revertido)
+## 22. Coalescer a resolução de escopo por processo (FEITO, single-flight)
 
-**Local:** `backend/apps/api/src/shared/tenant/cache_escopo.ts` (novo, já existe) e a
+> FEITO em 2026-10-29 (commit 20e60da) como single-flight, não como cache por TTL. Ver a
+> "Nota do item 22" no índice de performance acima para o porquê e o contrato de segurança.
+
+**Local:** `backend/apps/api/src/shared/tenant/cache_escopo.ts` (`comCoalescencia`) e a
 ligação em `backend/apps/api/src/app.ts` e no `shared/tenant/index.ts`.
 
 **Como está:** toda requisição resolve o escopo (`lojasDoUsuario`) com 1 ida ao banco,
@@ -918,16 +927,14 @@ validação de resposta em produção.
 **Como está e como deveria (lista):**
 
 ```
-- push_secrets.sh tem alvo "vercel" (não usamos Vercel). Limpar, ou reaproveitar para
-  empurrar os envs para /etc/whaviso da VPS por ssh. backend/.env.example também cita
-  Vercel (ver deploy/README.md:460).
-- As strings de banco usam sslmode=require. Avaliar sslmode=verify-full (mais seguro)
-  com a CA do sistema na VPS.
-- GET /lojas é chamado 2x na página Lojas (TenantProvider e modules/lojas/api.ts:21).
-  De-duplicar.
-- staleTime maior (5 a 10 min) para dados de catálogo (lojas, acessos, enums).
-- secrets/production.env.example: a limpeza que foi feita (tirar Vercel, pôr as chaves
-  certas) foi revertida por outra sessão. Refazer junto com o item 33.
+- [FEITO, commit 93691c5] push_secrets.sh tinha alvo "vercel" (não usamos Vercel):
+  removido, junto com as notas de Vercel em backend/.env.example e deploy/README.md.
+- [FEITO por outra sessão, commit 762ad49] sslmode=verify-full com CA pinada na VPS.
+- [NÃO compensa] GET /lojas 2x na página Lojas: são duas queries de formas diferentes
+  (TenantProvider = LojaResumo[]; modules/lojas/api.ts = {itens} com incluir_inativas).
+- [FEITO, commit d3ec479] staleTime de 5 min no catálogo de lojas. Enums não é query
+  (são tipos z.enum em compile-time) e acessos é staleTime 0 de propósito (grade do gating).
+- [FEITO, commit e6ad2d6] secrets/production.env.example alinhado (sem Vercel).
 ```
 
 ---
