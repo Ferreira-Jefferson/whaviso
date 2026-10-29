@@ -68,7 +68,9 @@ dados de um cliente dos de outro.
    domínios (cardápio, pedidos, equipe, estoque, caixa, salão, disponibilidade).
 2. **Escopo do membro define o acesso:** o que um membro vê e faz é determinado pelo seu papel (dono,
    gerente, operador) e pelas lojas do seu escopo, resolvido pelo servidor. Conta e loja vêm do escopo,
-   nunca do corpo da requisição.
+   nunca do corpo da requisição. O detalhe de qual papel pode cada tela vive na grade de permissões
+   editável (ver `10-acessos-permissoes.md`); a administração da conta e a desativação de loja ficam fora
+   dessa grade, fixas de dono.
 3. **Pedir recurso fora do escopo não confirma existência:** acessar uma loja ou conta fora do escopo
    responde como inexistente, para não revelar que o recurso existe.
 4. **Visão geral da rede é do cliente:** o dono da conta vê o consolidado das suas lojas. Essa visão não

@@ -114,6 +114,13 @@ de segurança multi-tenant: toda feature a consome.
 - Mapa de permissões por papel (dono/gerente/atendente) é decisão de produto mínima: dono tudo na conta,
   gerente tudo na loja exceto conta/membros/cobrança, atendente só conversas/pedidos. Os módulos
   `API-conta` e demais refinam; este módulo fornece o mecanismo, não a política fina.
+- **Motor de acessos editável (refino posterior):** a política por papel deixou de ser padrão fixo no
+  código e virou uma grade de permissões por papel, editável pela plataforma na tela de Acessos, lida em
+  runtime pelo mesmo mecanismo de guarda deste módulo. As regras de produto dessa grade (convenção de
+  chaves `:ver`/`:gerir`/`:configurar`, papéis fixos, o que fica fora da grade por ser fixo de dono como a
+  administração da conta e a desativação de loja, e os padrões notáveis) estão em
+  `../regras-negocio/10-acessos-permissoes.md`. Os padrões semeados reproduzem este mapa, sem regredir
+  acesso.
 - Signup/abertura de conta (SEC-042) e rate limit (SEC-101) são de `API-conta`/F4; aqui só o mecanismo
   de auditoria.
 - Login em si (Google/OTP) acontece no Supabase Auth no front (F6); a api só valida o JWT.

@@ -114,3 +114,9 @@ expira; tudo isolado por loja.
   na criação.
 - Valor da cobrança sempre `pedidos.total_centavos` lido no instante da criação; alteração posterior do
   pedido exige cancelar e gerar nova cobrança.
+- **Permissão de rotacionar a chave Pix:** cadastrar e trocar a chave Pix é gerir pagamentos
+  (`pagamentos:gerir`, por padrão gerente), e não uma permissão de dono exclusiva. Isso difere das
+  credenciais de provedor externo (emissor fiscal, provedor de IA, canal de venda), que são por padrão só
+  do dono (chave `:configurar`): a chave Pix é um dado da própria loja, não um segredo de terceiro, então
+  cabe na gestão de pagamentos da loja. A grade de acessos pode ajustar esse padrão
+  (ver `../regras-negocio/10-acessos-permissoes.md`).
