@@ -6,7 +6,6 @@ import {
   type ClienteWhats,
   type EnviarInterativoEntrada,
   type EnviarMidiaEntrada,
-  type EnviarTemplateAutenticacaoEntrada,
   type EnviarTemplateEntrada,
   type EnviarTextoEntrada,
   type MarcarLidaEntrada,
@@ -16,7 +15,6 @@ import {
 export type OperacaoWhats =
   | 'enviarTexto'
   | 'enviarTemplate'
-  | 'enviarTemplateAutenticacao'
   | 'enviarInterativo'
   | 'enviarMidia'
   | 'baixarMidia'
@@ -77,9 +75,6 @@ export class FakeClienteWhats implements ClienteWhats {
   }
   enviarTemplate(e: EnviarTemplateEntrada) {
     return this.#envio('enviarTemplate', e)
-  }
-  enviarTemplateAutenticacao(e: EnviarTemplateAutenticacaoEntrada) {
-    return this.#envio('enviarTemplateAutenticacao', e)
   }
   enviarInterativo(e: EnviarInterativoEntrada) {
     return this.#envio('enviarInterativo', e)

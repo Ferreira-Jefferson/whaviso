@@ -10,7 +10,6 @@ import {
   BaixarMidiaEntrada,
   EnviarInterativoEntrada,
   EnviarMidiaEntrada,
-  EnviarTemplateAutenticacaoEntrada,
   EnviarTemplateEntrada,
   EnviarTextoEntrada,
   MarcarLidaEntrada,
@@ -38,7 +37,6 @@ import {
   corpoMarcarLida,
   corpoMidia,
   corpoTemplate,
-  corpoTemplateAutenticacao,
   corpoTexto,
 } from './corpos'
 import { requisicaoGraph, retryAposMs, urlGraph, type ContextoGraph } from './graph_api'
@@ -187,12 +185,6 @@ export function criarClienteWhatsMeta(opcoes: OpcoesClienteMeta): ClienteWhats {
     enviarTemplate: (entrada) => {
       const v = validar(EnviarTemplateEntrada, entrada)
       return v ? enviarCorpo(v.numero, corpoTemplate(v)) : Promise.resolve(falha(entradaInvalida()))
-    },
-    enviarTemplateAutenticacao: (entrada) => {
-      const v = validar(EnviarTemplateAutenticacaoEntrada, entrada)
-      return v
-        ? enviarCorpo(v.numero, corpoTemplateAutenticacao(v))
-        : Promise.resolve(falha(entradaInvalida()))
     },
     enviarInterativo: (entrada) => {
       const v = validar(EnviarInterativoEntrada, entrada)

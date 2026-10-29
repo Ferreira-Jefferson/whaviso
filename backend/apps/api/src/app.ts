@@ -12,7 +12,6 @@ import type { Logger } from '@whaviso/shared/logger'
 import { serializerCompilerRapido } from './shared/serializacao'
 import { tratadorDeErros, tratadorNaoEncontrado } from './shared/http_errors'
 import { registrarModulos, type ModuloRota } from './routes'
-import { criarAdminSupabase, type AdminSupabase } from './shared/supabase_admin'
 import { autenticarPlugin, criarVerificadorSupabase, type Verificador } from './shared/auth'
 import { escopoLojaPlugin, criarLeitorEscopoSql, comCoalescencia } from './shared/tenant'
 import { escopoOperadorPlugin } from './shared/operador'
@@ -23,8 +22,6 @@ declare module 'fastify' {
   interface FastifyInstance {
     pool: Pool
     env: EnvApi
-    /** Admin API do Supabase; null quando a SERVICE ROLE KEY nao esta configurada. */
-    adminSupabase: AdminSupabase | null
   }
 }
 
@@ -64,12 +61,6 @@ export async function construirApp(deps: DepsApi) {
 
   app.decorate('pool', deps.pool)
   app.decorate('env', deps.env)
-  app.decorate(
-    'adminSupabase',
-    deps.env.SUPABASE_SERVICE_ROLE_KEY
-      ? criarAdminSupabase(deps.env.SUPABASE_URL, deps.env.SUPABASE_SERVICE_ROLE_KEY)
-      : null,
-  )
 
   // SEC-090: API JSON pura. CSP fechada (nada carrega nem emoldura), HSTS, nosniff,
   // frameguard DENY, no-referrer. COEP/CORP desligados p/ nao atrapalhar XHR da SPA.

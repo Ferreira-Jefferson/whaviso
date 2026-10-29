@@ -26,14 +26,6 @@ export const envSchema = z.object({
   META_VERIFY_TOKEN: z.string().optional().describe('verify token do handshake do webhook'),
   META_GRAPH_URL: z.url().default('https://graph.facebook.com'),
   META_API_VERSION: z.string().default('v23.0'),
-  // Template AUTHENTICATION do OTP de login (registrado na Meta; categoria AUTHENTICATION,
-  // formato fixo). O nome aqui deve bater com o nome aprovado na WABA.
-  META_OTP_TEMPLATE: z.string().default('whaviso_otp'),
-  META_OTP_IDIOMA: z.string().default('pt_BR'),
-  // Segredo do Send SMS Hook do Supabase (formato whsec_...; o Standard Webhooks assina
-  // id.timestamp.corpo). O login por telefone gera o OTP no Supabase, que o POSTa em
-  // /hooks/send-code; entregamos pelo WhatsApp. Opcional: sem ele a rota responde 503.
-  SEND_CODE_HOOK_SECRET: z.string().optional().describe('segredo do Send SMS Hook (whsec_...)'),
 
   // E-mail transacional (Resend) para o dreno da outbox de e-mail (ZAP-enviar-email, migration
   // 0082). OPCIONAL: sem a chave o dreno fica idle e deixa os e-mails na fila (o boot nao quebra).

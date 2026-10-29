@@ -3,12 +3,9 @@
 // É PROIBIDO usar `.from()` ou `functions.invoke()` aqui: todo dado trafega
 // pela `api` REST (ver shared/api_client). RLS é deny-all para anon/authenticated.
 //
-// Login SEM e-mail/senha (decisão 2026-06-17): dois métodos, ambos no plano free e
-// sem o SMTP limitado do Supabase:
-//   1. Google via Identity Services + signInWithIdToken (o consentimento roda na NOSSA
-//      origem, não redireciona pro supabase.co → o Google mostra o nosso app).
-//   2. WhatsApp OTP (phone auth + Send SMS Hook; o nosso `zap` entrega o código pela
-//      Meta Cloud API, via template AUTHENTICATION).
+// Login SEM e-mail/senha: método ÚNICO Google via Identity Services + signInWithIdToken
+// (o consentimento roda na NOSSA origem, não redireciona pro supabase.co, então o Google
+// mostra o nosso app). O login por WhatsApp/OTP foi removido (decisão 2026-10-29).
 import { createClient, type Session } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
@@ -25,11 +22,9 @@ export const supabase = createClient(url, publishableKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    // Nenhum fluxo de auth aqui depende de token na URL: Google usa
-    // signInWithIdToken (GIS devolve o id_token direto, sem redirect),
-    // WhatsApp usa OTP (verifyOtp), e o merge usa o token_hash vindo no CORPO
-    // da resposta de /auth/verificar-sessao. Desligar reduz a superfície: o
-    // cliente não processa tokens vindos no fragmento da URL.
+    // O login por Google usa signInWithIdToken (GIS devolve o id_token direto, sem
+    // redirect), então nenhum fluxo depende de token na URL. Desligar reduz a superfície:
+    // o cliente não processa tokens vindos no fragmento da URL.
     detectSessionInUrl: false,
   },
 })
@@ -45,41 +40,6 @@ export type { Session }
  */
 export async function signInWithGoogleIdToken(idToken: string, nonce: string) {
   return supabase.auth.signInWithIdToken({ provider: 'google', token: idToken, nonce })
-}
-
-/**
- * Envia um código de login pelo WhatsApp. O Supabase gera o OTP e o Send SMS
- * Hook o entrega pela Meta Cloud API (template AUTHENTICATION, no `zap`). `telefone` em E.164.
- */
-export async function enviarCodigoWhatsapp(telefone: string) {
-  return supabase.auth.signInWithOtp({ phone: telefone })
-}
-
-/** Verifica o código recebido no WhatsApp; em sucesso, abre a sessão. */
-export async function verificarCodigoWhatsapp(telefone: string, codigo: string) {
-  return supabase.auth.verifyOtp({ phone: telefone, token: codigo, type: 'sms' })
-}
-
-/**
- * Usuário já logado (Google ou phone) quer vincular/trocar o telefone: envia OTP
- * via Send SMS Hook para o novo número. O Supabase linka a identidade phone ao
- * usuário atual ao confirmar. Não cria conta nova.
- */
-export async function atualizarTelefone(telefone: string) {
-  return supabase.auth.updateUser({ phone: telefone })
-}
-
-/** Confirma o OTP de troca/vinculação de telefone (type phone_change). */
-export async function verificarNovoTelefone(telefone: string, codigo: string) {
-  return supabase.auth.verifyOtp({ phone: telefone, token: codigo, type: 'phone_change' })
-}
-
-/**
- * Troca a sessão phone-only pela sessão da conta Google após merge server-side.
- * Usa o hashed_token devolvido por `POST /auth/verificar-sessao` (magic link flow).
- */
-export async function completarMesclagem(magicToken: string) {
-  return supabase.auth.verifyOtp({ token_hash: magicToken, type: 'email' })
 }
 
 export async function signOut() {
