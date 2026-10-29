@@ -274,8 +274,9 @@ async function gerarUm(deps: DepsRetro, sinal: repo.SinalPendente): Promise<Desf
 
   // Dedup e antilixo: hash exato + similaridade com documentos aprovados e rascunhos pendentes.
   const hash = hashConteudo(g.corpo)
-  const docs = await repo.documentosParaDedup(deps.exec, sinal.loja_id)
-  const duplicado = docs.some((d) => d.hash_conteudo === hash || jaccard(d.conteudo, g.corpo) >= LIMIAR_DEDUP)
+  const duplicado =
+    (await repo.existeDocumentoComHash(deps.exec, sinal.loja_id, hash)) ||
+    (await repo.documentosParaDedup(deps.exec, sinal.loja_id)).some((d) => jaccard(d.conteudo, g.corpo) >= LIMIAR_DEDUP)
   if (duplicado) {
     await repo.marcarTentado(deps.exec, sinal.id, sinal.loja_id, { resultado: 'descartado', motivo: 'duplicado' })
     return 'duplicado'

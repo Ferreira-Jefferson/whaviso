@@ -40,8 +40,7 @@ export async function gastoDoDiaCentavos(exec: Executor, lojaId: string): Promis
     sql`select coalesce(sum(custo_estimado_centavos), 0)::int as total
           from public.uso_llm
          where loja_id = ${lojaId}
-           and (criado_em at time zone 'America/Sao_Paulo')::date
-             = (now() at time zone 'America/Sao_Paulo')::date`,
+           and criado_em >= (date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo')`,
   )
   return linha?.total ?? 0
 }

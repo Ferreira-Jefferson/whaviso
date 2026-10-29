@@ -13,6 +13,7 @@ import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
 import { idLoja, type Escopo } from '../escopo'
 import { podeCachear, validarConteudoConhecimento } from './validador'
 import { vetorDisponivel } from './retriever'
+import { comBuscaVetorial } from './tx'
 
 /** Similaridade minima (cosseno) para servir do cache. Alta de proposito (RAG.md 6). */
 export const LIMIAR_SIMILARIDADE = 0.97
@@ -83,14 +84,16 @@ export async function consultarCache(exec: Executor, e: ConsultarCacheEntrada): 
   let linha: { id: string; resposta: string } | null
   if (temVetor && e.perguntaEmbedding?.length) {
     const vec = literalVetor(e.perguntaEmbedding)
-    linha = await consultarUm<{ id: string; resposta: string }>(
-      exec,
-      sql`select id, resposta
-            from public.cache_semantico
-           where loja_id = ${idLoja(e.escopo)} and expira_em > now() and contem_dado_vivo = false
-             and embedding is not null and (1 - (embedding <=> ${vec}::vector)) >= ${LIMIAR_SIMILARIDADE}
-           order by embedding <=> ${vec}::vector
-           limit 1`,
+    linha = await comBuscaVetorial(exec, (tx) =>
+      consultarUm<{ id: string; resposta: string }>(
+        tx,
+        sql`select id, resposta
+              from public.cache_semantico
+             where loja_id = ${idLoja(e.escopo)} and expira_em > now() and contem_dado_vivo = false
+               and embedding is not null and (1 - (embedding <=> ${vec}::vector)) >= ${LIMIAR_SIMILARIDADE}
+             order by embedding <=> ${vec}::vector
+             limit 1`,
+      ),
     )
   } else {
     // Degradado (sem vetor): igualdade exata da pergunta, ainda escopada por loja + nao-expirado.
@@ -108,4 +111,16 @@ export async function consultarCache(exec: Executor, e: ConsultarCacheEntrada): 
   if (!linha) return null
   await consultar(exec, sql`update public.cache_semantico set acertos = acertos + 1 where id = ${linha.id}`)
   return linha.resposta
+}
+
+/**
+ * Apaga as entradas de cache vencidas (a tabela e o indice HNSW so cresceriam). Cache nao e auditoria.
+ * Devolve quantas linhas apagou. Ligar no scheduler do atendente (ver server.ts), nao a cada tick.
+ */
+export async function limparCacheExpirado(exec: Executor): Promise<number> {
+  const linhas = await consultar<{ id: string }>(
+    exec,
+    sql`delete from public.cache_semantico where expira_em < now() returning id`,
+  )
+  return linhas.length
 }

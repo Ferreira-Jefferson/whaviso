@@ -10,7 +10,6 @@ interface LinhaJob {
   loja_id: string
   tipo_arquivo: 'imagem' | 'pdf'
   mime: string
-  arquivo_bytes: Buffer | null
   tentativas: number
 }
 
@@ -22,7 +21,7 @@ interface LinhaJob {
 export async function reivindicar(tx: Executor, excluir: readonly string[]): Promise<JobImportacao | null> {
   const l = await consultarUm<LinhaJob>(
     tx,
-    sql`select id, loja_id, tipo_arquivo, mime, arquivo_bytes, tentativas
+    sql`select id, loja_id, tipo_arquivo, mime, tentativas
           from public.importacoes_cardapio
          where status = 'fila' and id <> all(${[...excluir]}::uuid[])
          order by criado_em
@@ -35,12 +34,17 @@ export async function reivindicar(tx: Executor, excluir: readonly string[]): Pro
     sql`update public.importacoes_cardapio set status = 'processando', processando_desde = now()
          where id = ${l.id}`,
   )
+  // Binario lido numa segunda query (o claim traz so colunas leves).
+  const bin = await consultarUm<{ arquivo_bytes: Buffer | null }>(
+    tx,
+    sql`select arquivo_bytes from public.importacoes_cardapio where id = ${l.id}`,
+  )
   return {
     id: l.id,
     lojaId: l.loja_id,
     tipoArquivo: l.tipo_arquivo,
     mime: l.mime,
-    arquivoBytes: l.arquivo_bytes,
+    arquivoBytes: bin?.arquivo_bytes ?? null,
     tentativas: l.tentativas,
   }
 }

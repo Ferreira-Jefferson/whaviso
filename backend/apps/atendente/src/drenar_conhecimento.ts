@@ -39,7 +39,8 @@ export async function drenarConhecimento(
            where d.status = 'aprovado'
              and not exists (select 1 from public.chunks c where c.documento_id = d.id)
              and not exists (select 1 from public.eventos e
-                              where e.tipo = ${EVENTO_INGERIDO} and e.entidade_id = d.id)
+                              where e.tipo = ${EVENTO_INGERIDO} and e.entidade = 'documento'
+                                and e.entidade_id = d.id)
            order by d.aprovado_em nulls last, d.criado_em
            limit ${max}`,
     )

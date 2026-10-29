@@ -14,6 +14,7 @@ import { idLoja, type Escopo } from '../escopo'
 import type { ClienteEmbeddings } from './embeddings'
 import type { ClienteReranker } from './reranker'
 import type { TrechoRecuperado } from './tipos'
+import { comBuscaVetorial } from './tx'
 
 /** Constante k do RRF (padrao da literatura). Amortece o peso das posicoes mais baixas. */
 export const RRF_K = 60
@@ -145,10 +146,12 @@ export async function buscarConhecimento(deps: DepsRetriever, entrada: BuscaEntr
   const temVetor = await vetorDisponivel(deps.exec)
 
   let consulta: Consulta
+  let hibrida = false
   if (temVetor) {
     const r = await deps.embeddings.embutir({ exec: deps.exec, escopo: entrada.escopo, textos: [entrada.consulta] })
     // Falha de embedding (credencial ausente, provedor fora): degrada para BM25, nao quebra o atendimento.
     const qvec = r.ok ? r.valor.vetores[0] : undefined
+    hibrida = Boolean(qvec && qvec.length > 0)
     consulta = qvec && qvec.length > 0
       ? consultaHibrida(entrada.escopo, entrada.consulta, literalVetor(qvec), k, contexto)
       : consultaLexical(entrada.escopo, entrada.consulta, contexto)
@@ -156,7 +159,9 @@ export async function buscarConhecimento(deps: DepsRetriever, entrada: BuscaEntr
     consulta = consultaLexical(entrada.escopo, entrada.consulta, contexto)
   }
 
-  const linhas = await consultar<LinhaTrecho>(deps.exec, consulta)
+  const linhas = hibrida
+    ? await comBuscaVetorial(deps.exec, (tx) => consultar<LinhaTrecho>(tx, consulta))
+    : await consultar<LinhaTrecho>(deps.exec, consulta)
   const trechos: TrechoRecuperado[] = linhas.map((l) => ({
     chunkId: l.chunk_id,
     documentoId: l.documento_id,

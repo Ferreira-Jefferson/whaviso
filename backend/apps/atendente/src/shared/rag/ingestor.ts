@@ -5,12 +5,13 @@
 // contextualizar (opcional, ClienteLLM da loja; sem credencial, ingere sem prefixo) -> embeddar
 // (credencial da PLATAFORMA; sem pgvector, ingere sem vetor) -> gravar chunks com loja_id desnormalizado.
 // Reindexacao = apagar os chunks do documento e reinserir (idempotente por documento).
-import { consultar, consultarUm, sql, type Consulta, type Executor } from '@whaviso/shared/db'
+import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import { escopoLoja } from '../escopo'
 import { chunkPorUnidadeLogica } from './chunking'
 import type { ClienteEmbeddings } from './embeddings'
 import { vetorDisponivel } from './retriever'
+import { comTx } from './tx'
 import { validarConteudoConhecimento } from './validador'
 import type { ChunkBruto, DocumentoParaIngestao } from './tipos'
 
@@ -104,33 +105,42 @@ export async function ingerirDocumento(deps: DepsIngestor, documentoId: string):
     else deps.logger.warn({ documento_id: documentoId }, 'embedding indisponivel: chunks sem vetor')
   }
 
-  // Reindexacao: apaga os chunks anteriores do documento e reinsere (idempotente por documento).
-  await consultar(deps.exec, sql`delete from public.chunks where documento_id = ${documentoId}`)
-  for (let i = 0; i < brutos.length; i++) {
-    const c = brutos[i]!
-    const ctx = contextos[i]
+  // Reindexacao atomica: apaga os chunks anteriores e reinsere em um unico insert (unnest), na mesma
+  // transacao (falha no meio nao deixa chunks parciais). Idempotente por documento.
+  const ordens = brutos.map((c) => c.ordem)
+  const textos = brutos.map((c) => c.texto)
+  const ctxs = brutos.map((_, i) => contextos[i] ?? null)
+  const tokens = brutos.map((_, i) => estimarTokens(paraEmbutir[i]!))
+  const modelos = brutos.map((_, i) => (vetores?.[i] ? deps.embeddings.modelo : null))
+  const vetLiterais = brutos.map((_, i) => {
     const vet = vetores?.[i]
-    const embeddingModel = vet ? deps.embeddings.modelo : null
-    if (temVetor && vet && vet.length > 0) {
-      const vecSql: Consulta = sql`${literalVetor(vet)}::vector`
+    return vet && vet.length > 0 ? literalVetor(vet) : null
+  })
+  await comTx(deps.exec, async (tx) => {
+    await consultar(tx, sql`delete from public.chunks where documento_id = ${documentoId}`)
+    if (temVetor) {
       await consultar(
-        deps.exec,
+        tx,
         sql`insert into public.chunks
               (documento_id, loja_id, ordem, texto, texto_contextualizado, embedding_model, token_count, embedding)
-            values (${documentoId}, ${doc.loja_id}, ${c.ordem}, ${c.texto}, ${ctx},
-                    ${embeddingModel}, ${estimarTokens(paraEmbutir[i]!)}, ${vecSql})`,
+            select ${documentoId}, ${doc.loja_id}, u.ordem, u.texto, u.ctx, u.modelo, u.tokens, u.vec::vector
+              from unnest(${ordens}::int[], ${textos}::text[], ${ctxs}::text[], ${modelos}::text[],
+                          ${tokens}::int[], ${vetLiterais}::text[])
+                   as u(ordem, texto, ctx, modelo, tokens, vec)`,
       )
     } else {
       // Sem pgvector: insere sem referenciar a coluna embedding (ela nem existe no banco local).
       await consultar(
-        deps.exec,
+        tx,
         sql`insert into public.chunks
               (documento_id, loja_id, ordem, texto, texto_contextualizado, embedding_model, token_count)
-            values (${documentoId}, ${doc.loja_id}, ${c.ordem}, ${c.texto}, ${ctx},
-                    ${embeddingModel}, ${estimarTokens(paraEmbutir[i]!)})`,
+            select ${documentoId}, ${doc.loja_id}, u.ordem, u.texto, u.ctx, u.modelo, u.tokens
+              from unnest(${ordens}::int[], ${textos}::text[], ${ctxs}::text[], ${modelos}::text[],
+                          ${tokens}::int[])
+                   as u(ordem, texto, ctx, modelo, tokens)`,
       )
     }
-  }
+  })
 
   return { documentoId, chunks: brutos.length, comVetor: Boolean(vetores) }
 }

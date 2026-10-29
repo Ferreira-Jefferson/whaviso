@@ -102,7 +102,8 @@ export async function proximoCodigo(tx: Executor, lojaId: string, aammdd: string
     tx,
     sql`select coalesce(max(substring(codigo from 8)::int), 0) + 1 as n
           from public.pedidos
-         where loja_id = ${lojaId} and codigo ~ ${`^${aammdd}-[0-9]+$`}`,
+         where loja_id = ${lojaId} and codigo like ${aammdd} || '-%'
+           and substring(codigo from 8) ~ '^[0-9]+$'`,
   )
   return `${aammdd}-${String(r?.n ?? 1).padStart(3, '0')}`
 }

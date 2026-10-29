@@ -29,7 +29,8 @@ export async function coletarConversasHandoff(
   return consultar<LinhaConversaHandoff>(
     exec,
     sql`select c.id as conversa_id, c.loja_id, c.cliente_id, cl.nome as nome_cliente,
-               (select array_agg(e.logradouro) from public.enderecos e where e.cliente_id = c.cliente_id) as logradouros,
+               (select array_agg(x.logradouro) from (select e.logradouro from public.enderecos e
+                  where e.cliente_id = c.cliente_id limit 5) x) as logradouros,
                m.id as mensagem_id, coalesce(m.transcricao, m.conteudo) as pergunta
           from public.conversas c
           join public.clientes cl on cl.id = c.cliente_id
@@ -73,7 +74,8 @@ export async function coletarRespostasHumanas(
   return consultar<LinhaCorrecao>(
     exec,
     sql`select m.id as mensagem_id, m.conversa_id, c.loja_id, c.cliente_id, cl.nome as nome_cliente,
-               (select array_agg(e.logradouro) from public.enderecos e where e.cliente_id = c.cliente_id) as logradouros,
+               (select array_agg(x.logradouro) from (select e.logradouro from public.enderecos e
+                  where e.cliente_id = c.cliente_id limit 5) x) as logradouros,
                coalesce(m.transcricao, m.conteudo) as resposta,
                (select coalesce(q.transcricao, q.conteudo) from public.mensagens q
                  where q.conversa_id = c.id and q.autor = 'cliente' and q.direcao = 'entrada'
@@ -110,7 +112,8 @@ export async function coletarPerguntasClientes(
   return consultar<LinhaPerguntaCliente>(
     exec,
     sql`select m.id as mensagem_id, m.conversa_id, c.loja_id, c.cliente_id, cl.nome as nome_cliente,
-               (select array_agg(e.logradouro) from public.enderecos e where e.cliente_id = c.cliente_id) as logradouros,
+               (select array_agg(x.logradouro) from (select e.logradouro from public.enderecos e
+                  where e.cliente_id = c.cliente_id limit 5) x) as logradouros,
                coalesce(m.transcricao, m.conteudo) as pergunta
           from public.mensagens m
           join public.conversas c on c.id = m.conversa_id
@@ -180,13 +183,30 @@ export interface DocDedup {
   conteudo: string
 }
 
-/** Documentos aprovados e rascunhos pendentes da loja, para dedup por hash e similaridade. */
+/** Dedup exato por hash no banco (indice documentos_loja_hash), sem baixar conteudo. */
+export async function existeDocumentoComHash(exec: Executor, lojaId: string, hash: string): Promise<boolean> {
+  const r = await consultarUm<{ ok: number }>(
+    exec,
+    sql`select 1 as ok from public.documentos
+         where loja_id = ${lojaId} and hash_conteudo = ${hash} and status in ('rascunho', 'aprovado')
+         limit 1`,
+  )
+  return Boolean(r)
+}
+
+/** Teto de documentos e de caracteres por documento trazidos para a similaridade em memoria. */
+export const MAX_DOCS_DEDUP = 200
+export const MAX_CHARS_DEDUP = 2000
+
+/** Documentos aprovados e rascunhos pendentes da loja (mais recentes, conteudo truncado), para similaridade. */
 export async function documentosParaDedup(exec: Executor, lojaId: string): Promise<DocDedup[]> {
   return consultar<DocDedup>(
     exec,
-    sql`select hash_conteudo, titulo, conteudo
+    sql`select hash_conteudo, titulo, left(conteudo, ${MAX_CHARS_DEDUP}) as conteudo
           from public.documentos
-         where loja_id = ${lojaId} and status in ('rascunho', 'aprovado')`,
+         where loja_id = ${lojaId} and status in ('rascunho', 'aprovado')
+         order by criado_em desc
+         limit ${MAX_DOCS_DEDUP}`,
   )
 }
 

@@ -38,6 +38,7 @@ export async function montarContexto(
   conversa: leitura.ConversaCtx,
   agora: Date,
   logger: Logger,
+  cardapioPreCarregado?: leitura.CardapioRaw,
 ): Promise<ContextoTurno | null> {
   // Sequencial: a transacao do turno usa um unico PoolClient (sem queries concorrentes).
   const loja = await leitura.lerLoja(tx, conversa.loja_id)
@@ -50,7 +51,11 @@ export async function montarContexto(
   const fonte = await resolverFonte(tx, conversa.loja_id, estadoLido.fluxo_versao_id, logger)
   const estado: EstadoFluxo = { ...estadoLido, fluxo_versao_id: fonte.versaoId }
 
-  const cardapioRaw = await leitura.lerCardapioRaw(tx, conversa.loja_id)
+  // Pre-carregado (fora do lock da conversa) so vale se a loja do claim e a da conversa; senao le agora.
+  const cardapioRaw =
+    cardapioPreCarregado && claim.loja_id === conversa.loja_id
+      ? cardapioPreCarregado
+      : await leitura.lerCardapioRaw(tx, conversa.loja_id)
   const ultimoEndereco = await leitura.lerUltimoEndereco(tx, conversa.loja_id, conversa.cliente_id)
   const zonasBairros = await leitura.lerZonasBairros(tx, conversa.loja_id)
   const pedidoStatus = estado.pedido_id

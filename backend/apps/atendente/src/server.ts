@@ -13,7 +13,7 @@ import { criarPixDecifra, criarRegistry, drenarInbound, type LlmMotor } from './
 import { criarRegistroTools, ferramentasPadrao, selarConversaCtx } from './modules/tools'
 import { criarRepoHarness } from './shared/harness'
 import { criarServicoLlmProducao } from './shared/llm_client'
-import { criarClienteEmbeddingsProducao, criarRerankerNulo, type DepsRetriever } from './shared/rag'
+import { criarClienteEmbeddingsProducao, criarRerankerNulo, limparCacheExpirado, type DepsRetriever } from './shared/rag'
 import { drenarConhecimento } from './drenar_conhecimento'
 import { iniciarScheduler } from './scheduler'
 import { iniciarSaude } from './saude'
@@ -65,6 +65,8 @@ const pixDecifra = env.MASTER_KEY ? criarPixDecifra(env.MASTER_KEY) : undefined
 
 const intervaloMs = Number(process.env.ATENDENTE_INTERVALO_MS ?? 5000)
 // Cada drenagem e independente e nunca lanca (falha fechada): uma nao trava as outras.
+const INTERVALO_LIMPEZA_CACHE_MS = 60 * 60 * 1000
+let ultimaLimpezaCache = 0
 const tick = async () => {
   const resumo = await drenarInbound({ pool, logger, registry, llm, pixDecifra })
   if (resumo.processadas || resumo.suprimidas) logger.info(resumo, 'dreno de inbound')
@@ -80,6 +82,17 @@ const tick = async () => {
     ingestor: { exec: pool, embeddings: rag.embeddings, logger },
   })
   if (conhecimento.ingeridos || conhecimento.arquivados) logger.info(conhecimento, 'dreno de conhecimento')
+
+  // Limpeza do cache semantico vencido: no maximo 1x por hora (nao a cada tick). Nunca lanca.
+  if (Date.now() - ultimaLimpezaCache >= INTERVALO_LIMPEZA_CACHE_MS) {
+    ultimaLimpezaCache = Date.now()
+    try {
+      const apagadas = await limparCacheExpirado(pool)
+      if (apagadas) logger.info({ apagadas }, 'cache semantico expirado removido')
+    } catch (erro) {
+      logger.error({ err: erro }, 'limpeza do cache semantico falhou')
+    }
+  }
 }
 const scheduler = iniciarScheduler({ logger, intervaloMs, tick })
 const saude = iniciarSaude(env.HOST, env.PORT)

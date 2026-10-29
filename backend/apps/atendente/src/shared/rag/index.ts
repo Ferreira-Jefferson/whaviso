@@ -47,6 +47,7 @@ export {
 export {
   gravarCache,
   consultarCache,
+  limparCacheExpirado,
   LIMIAR_SIMILARIDADE,
   TTL_PADRAO_SEGUNDOS,
   type GravarCacheEntrada,

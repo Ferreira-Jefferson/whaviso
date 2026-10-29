@@ -17,7 +17,7 @@ import { montarContexto, type ContextoTurno } from './contexto'
 import { aplicarEfeitos } from './efeitos'
 import { configDaEtapa } from './fluxo_fonte'
 import { BOTAO_CANCELAR, BOTAO_CONFIRMAR, BOTAO_MAIS } from './ids'
-import { claimMensagem, lockConversa } from './repo_leitura'
+import { claimMensagem, lerCardapioRaw, lockConversa } from './repo_leitura'
 import type { PixDecifra } from './pix'
 import * as escrita from './repo_escrita'
 import { resumoCarrinho } from './resumo'
@@ -47,6 +47,10 @@ export async function processarProximaMensagem(deps: DepsMotor): Promise<Desfech
     const claim = await claimMensagem(tx, deps.conversaId)
     if (!claim) return 'vazio'
 
+    // Cardapio lido ANTES de travar a conversa (so depende da loja do claim): encurta o tempo de
+    // FOR UPDATE na conversa. Sem cache (preco/disponibilidade sempre vivos).
+    const cardapioRaw = await lerCardapioRaw(tx, claim.loja_id)
+
     const conversa = await lockConversa(tx, claim.conversa_id)
     if (!conversa) {
       await escrita.marcarProcessada(tx, claim.id)
@@ -60,7 +64,7 @@ export async function processarProximaMensagem(deps: DepsMotor): Promise<Desfech
       return 'suprimida'
     }
 
-    const ctx = await montarContexto(tx, claim, conversa, agora, deps.logger)
+    const ctx = await montarContexto(tx, claim, conversa, agora, deps.logger, cardapioRaw)
     if (!ctx) {
       await escrita.marcarProcessada(tx, claim.id)
       return 'descartada'
