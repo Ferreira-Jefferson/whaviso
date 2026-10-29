@@ -65,11 +65,14 @@ vazia e dá SASL auth fail). Primeiro o dry-run para ver o que subiria:
 ```bash
 cd backend
 set -a; . ./.env; set +a
-npx --yes supabase db push \
-  --db-url "postgresql://postgres.exxczsyjvgjsxmwlrwww:${SUPABASE_PASSWORD}@aws-1-us-east-1.pooler.supabase.com:5432/postgres" \
-  --dry-run
+npx --yes supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
 ```
 
+- **`SUPABASE_DB_URL` vive em `backend/.env`** (gitignored): role `postgres`, session
+  pooler 5432, projeto do cloud atual. O skill nao embute ref/host/senha, para nao
+  desatualizar quando o projeto mudar (ja aconteceu: ref e regiao antigos ficaram no
+  texto). Se faltar essa var no `.env`, monte-a com o ref do `SUPABASE_URL` e a
+  `SUPABASE_PASSWORD`, no host do session pooler da regiao do projeto.
 - **Pooler SESSION porta 5432** (não a 6543, que é transaction, do runtime). O host
   direto `db.<ref>.supabase.co` é IPv6-only e não conecta desta máquina.
 - Se o dry-run lista migrations pendentes e o usuário confirmar, aplique (sem

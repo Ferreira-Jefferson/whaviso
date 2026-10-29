@@ -25,7 +25,7 @@
 #    OWNER `postgres` do destino (Session pooler 5432, ou conexao direta IPv6).
 #
 # 4) RESTAURE no destino novo (precisa de --yes E da RESTORE_DATABASE_URL do destino):
-#      RESTORE_DATABASE_URL="postgresql://postgres.<ref>:<SENHA>@aws-1-us-east-1.pooler.supabase.com:5432/postgres" \
+#      RESTORE_DATABASE_URL="postgresql://postgres.<ref>:<SENHA>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres" \
 #        /opt/whaviso/app/deploy/scripts/restore-db.sh --yes /var/lib/whaviso/backups/whaviso-AAAAMMDD-HHMMSS.dump
 #    Se o pg_restore nao estiver no PATH, aponte o binario versionado (o script deriva o
 #    pg_restore do mesmo diretorio do PG_DUMP_BIN):
