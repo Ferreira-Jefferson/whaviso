@@ -18,7 +18,10 @@ export const NumeroWhats = z
   .strict()
 export type NumeroWhats = z.infer<typeof NumeroWhats>
 
-const Base = { numero: NumeroWhats, para: TelefoneE164 }
+// `rastreio` vira o biz_opaque_callback_data (nivel de mensagem) na Cloud API: um rotulo
+// opaco que a Meta devolve no webhook de status. O chamador passa o id do envio para
+// reconciliar entrega/leitura com a linha da outbox (max 512 na Cloud API; nao e PII).
+const Base = { numero: NumeroWhats, para: TelefoneE164, rastreio: z.string().max(512).optional() }
 
 export const EnviarTextoEntrada = z
   .object({ ...Base, texto: z.string().min(1).max(4096), previewUrl: z.boolean().optional() })

@@ -16,13 +16,25 @@ function digitos(para: string): string {
   return para.replace(/\D/g, '')
 }
 
+/**
+ * Anexa o rastreio como `biz_opaque_callback_data` (campo de nivel de mensagem da Cloud API):
+ * a Meta devolve esse rotulo opaco no webhook de status, permitindo casar entrega/leitura com
+ * a linha da outbox. So e incluido quando o chamador informa um rastreio.
+ */
+function comRastreio(corpo: Json, rastreio: string | undefined): Json {
+  return rastreio !== undefined ? { ...corpo, biz_opaque_callback_data: rastreio } : corpo
+}
+
 export function corpoTexto(e: EnviarTextoEntrada): Json {
-  return {
-    messaging_product: 'whatsapp',
-    to: digitos(e.para),
-    type: 'text',
-    text: { body: e.texto, preview_url: e.previewUrl ?? false },
-  }
+  return comRastreio(
+    {
+      messaging_product: 'whatsapp',
+      to: digitos(e.para),
+      type: 'text',
+      text: { body: e.texto, preview_url: e.previewUrl ?? false },
+    },
+    e.rastreio,
+  )
 }
 
 export function corpoTemplate(e: EnviarTemplateEntrada): Json {
@@ -43,16 +55,19 @@ export function corpoTemplate(e: EnviarTemplateEntrada): Json {
     }
     return { type: c.tipo, parameters: c.parametros.map((text) => ({ type: 'text', text })) }
   })
-  return {
-    messaging_product: 'whatsapp',
-    to: digitos(e.para),
-    type: 'template',
-    template: {
-      name: nome,
-      language: { code: idioma },
-      ...(components.length ? { components } : {}),
+  return comRastreio(
+    {
+      messaging_product: 'whatsapp',
+      to: digitos(e.para),
+      type: 'template',
+      template: {
+        name: nome,
+        language: { code: idioma },
+        ...(components.length ? { components } : {}),
+      },
     },
-  }
+    e.rastreio,
+  )
 }
 
 export function corpoInterativo(e: EnviarInterativoEntrada): Json {
@@ -80,7 +95,10 @@ export function corpoInterativo(e: EnviarInterativoEntrada): Json {
             })),
           },
         }
-  return { messaging_product: 'whatsapp', to: digitos(e.para), type: 'interactive', interactive }
+  return comRastreio(
+    { messaging_product: 'whatsapp', to: digitos(e.para), type: 'interactive', interactive },
+    e.rastreio,
+  )
 }
 
 export function corpoMidia(e: EnviarMidiaEntrada): Json {
@@ -88,7 +106,10 @@ export function corpoMidia(e: EnviarMidiaEntrada): Json {
   // A Cloud API nao aceita caption em audio; filename so faz sentido em documento.
   if (e.legenda !== undefined && e.tipo !== 'audio') midia.caption = e.legenda
   if (e.nomeArquivo !== undefined && e.tipo === 'document') midia.filename = e.nomeArquivo
-  return { messaging_product: 'whatsapp', to: digitos(e.para), type: e.tipo, [e.tipo]: midia }
+  return comRastreio(
+    { messaging_product: 'whatsapp', to: digitos(e.para), type: e.tipo, [e.tipo]: midia },
+    e.rastreio,
+  )
 }
 
 export function corpoMarcarLida(wamid: string): Json {

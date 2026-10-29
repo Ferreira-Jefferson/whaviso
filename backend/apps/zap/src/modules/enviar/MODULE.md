@@ -29,3 +29,13 @@ enfileira; este modulo nunca cria linha em `envios`.
 ## Contratos
 - consome: `MensagemProposta` (F1) como forma do `payload` de `envios`; `ClienteWhats` (F2).
 - nao publica contrato.
+
+## Entrega at-least-once (trade-off conhecido)
+O envio a Meta e at-least-once, nao exactly-once: a Cloud API nao tem idempotency key nativa.
+Se o processo morre ENTRE o 200 da Meta e o commit de `marcarEnviado` (wamid + status), o
+wamid se perde, `recuperarOrfaos` devolve a linha a `agendado` e ela e reenviada, podendo
+duplicar a mensagem ao cliente numa janela estreita. Mitigacao atual: todo envio leva
+`biz_opaque_callback_data = envio.id` (campo de nivel de mensagem da Cloud API, via
+`despachar` -> `ClienteWhats` -> `corpos`), que a Meta devolve no webhook de status; esse
+rastro permite uma reconciliacao futura casar wamid<->envio e detectar a duplicata. A
+reconciliacao em si ainda nao existe (fora de escopo).

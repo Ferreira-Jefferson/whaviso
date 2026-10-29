@@ -30,10 +30,18 @@ export async function reivindicar(pool: Pool, tamanhoLote: number): Promise<Envi
       with devidos as (
         select e.id from public.envios e
         join public.numeros_whatsapp n on n.id = e.numero_whatsapp_id
+        left join public.clientes c on c.id = e.cliente_id
+        left join public.conversas conv on conv.id = e.conversa_id
         where e.status = 'agendado'
           and e.agendado_para <= now()
           and (e.proxima_tentativa_em is null or e.proxima_tentativa_em <= now())
           and n.status = 'conectado'
+          -- Coerencia de tenant (SEC): numero, cliente e conversa tem que ser da MESMA loja do
+          -- envio. Uma linha de outbox cruzada (ex.: cliente da loja B com numero da loja A) NAO
+          -- e reivindicada, logo nunca e decifrada nem enviada ao destino errado.
+          and n.loja_id = e.loja_id
+          and (e.cliente_id is null or c.loja_id = e.loja_id)
+          and (e.conversa_id is null or conv.loja_id = e.loja_id)
         order by e.agendado_para
         for update of e skip locked
         limit ${tamanhoLote}
@@ -50,6 +58,12 @@ export async function reivindicar(pool: Pool, tamanhoLote: number): Promise<Envi
 /**
  * Recupera envios orfaos: ficaram `processando` alem do limite (worker morreu). Volta a
  * `agendado` SEM consumir tentativa. Devolve quantos foram recuperados.
+ *
+ * AT-LEAST-ONCE: se o worker morreu DEPOIS do 200 da Meta mas ANTES de gravar o wamid, esta
+ * recuperacao reagenda uma linha que ja foi entregue, o que PODE duplicar a mensagem ao cliente
+ * (a Cloud API nao tem idempotency key nativa; ver service.ts). O biz_opaque_callback_data =
+ * envio.id enviado em cada mensagem volta no webhook de status e serve de rastro para uma
+ * reconciliacao futura identificar esses casos.
  */
 export async function recuperarOrfaos(pool: Pool, orfaoAposMs: number): Promise<number> {
   const linhas = await consultar<{ id: string }>(

@@ -161,6 +161,20 @@ describe('cliente_meta: payloads', () => {
     expect(body.image).toMatchObject({ link: 'https://x.test/i.jpg', caption: 'ola' })
   })
 
+  it('rastreio vira biz_opaque_callback_data no corpo (reconciliacao at-least-once)', async () => {
+    const { cliente, chamadas } = clienteOk()
+    await cliente.enviarTexto({ numero: numero(), para, texto: 'oi', rastreio: 'envio-123' })
+    const body = JSON.parse(chamadas[0]!.body!) as { biz_opaque_callback_data?: string }
+    expect(body.biz_opaque_callback_data).toBe('envio-123')
+  })
+
+  it('sem rastreio nao inclui biz_opaque_callback_data', async () => {
+    const { cliente, chamadas } = clienteOk()
+    await cliente.enviarTexto({ numero: numero(), para, texto: 'oi' })
+    const body = JSON.parse(chamadas[0]!.body!) as Record<string, unknown>
+    expect('biz_opaque_callback_data' in body).toBe(false)
+  })
+
   it('entrada invalida vira erro local (sem round-trip): > 3 botoes', async () => {
     const { cliente, chamadas } = clienteOk()
     const r = await cliente.enviarInterativo({

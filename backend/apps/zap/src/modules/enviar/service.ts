@@ -47,7 +47,17 @@ async function processarEnvio(
 ): Promise<Desfecho> {
   const { pool } = deps
 
-  // Idempotencia: uma tentativa anterior ja obteve wamid mas a gravacao falhou. Nao reenvia.
+  // Idempotencia parcial: uma tentativa anterior ja obteve wamid mas a gravacao do desfecho
+  // falhou. Nesse caso nao reenvia, so completa a gravacao.
+  //
+  // ENTREGA AT-LEAST-ONCE (trade-off explicito): este guard so cobre a janela em que o wamid
+  // chegou a ser gravado. Se o processo morre ENTRE o 200 da Meta (despachar, abaixo) e o
+  // commit de marcarEnviado, o wamid se perde; recuperarOrfaos devolve a linha a 'agendado' e
+  // ela e reenviada, o que PODE duplicar a mensagem ao cliente numa janela estreita. A Cloud
+  // API nao tem idempotency key nativa, entao nao da p/ deduplicar no envio. Mitigacao: todo
+  // envio leva biz_opaque_callback_data = envio.id (ver despachar/corpos), devolvido pela Meta
+  // no webhook de status; isso deixa o rastro para uma reconciliacao futura casar wamid<->envio
+  // e detectar a duplicata. A reconciliacao em si esta fora de escopo aqui.
   if (envio.wamid) {
     await repo.marcarEnviado(pool, envio.id, envio.wamid)
     return 'enviado'
@@ -113,7 +123,9 @@ async function processarEnvio(
     template = resolvido
   }
 
-  const r = await despachar(deps.whats, { numero, para, mensagem: msg.data, template })
+  // `rastreio` = id do envio: vai como biz_opaque_callback_data e volta no webhook de status,
+  // dando o rastro para reconciliar entrega/leitura (e detectar o reenvio at-least-once acima).
+  const r = await despachar(deps.whats, { numero, para, mensagem: msg.data, template, rastreio: envio.id })
   if (r.ok) {
     await repo.marcarEnviado(pool, envio.id, r.valor.wamid)
     return 'enviado'

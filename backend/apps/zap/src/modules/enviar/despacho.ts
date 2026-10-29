@@ -25,13 +25,15 @@ export interface Despacho {
   mensagem: MensagemProposta
   /** Obrigatorio quando `mensagem.tipo === 'template'`. */
   template?: TemplateResolvido
+  /** Rotulo opaco (id do envio) repassado como biz_opaque_callback_data p/ reconciliacao. */
+  rastreio?: string
 }
 
 export function despachar(whats: ClienteWhats, d: Despacho): ResultadoWhats<EnvioWhats> {
-  const { numero, para, mensagem } = d
+  const { numero, para, mensagem, rastreio } = d
   switch (mensagem.tipo) {
     case 'texto':
-      return whats.enviarTexto({ numero, para, texto: mensagem.texto })
+      return whats.enviarTexto({ numero, para, texto: mensagem.texto, rastreio })
     case 'interativo':
       return whats.enviarInterativo({
         numero,
@@ -41,6 +43,7 @@ export function despachar(whats: ClienteWhats, d: Despacho): ResultadoWhats<Envi
           tipo: 'botoes',
           botoes: mensagem.botoes.map((b) => ({ id: b.id, titulo: b.rotulo })),
         },
+        rastreio,
       })
     case 'template': {
       if (!d.template) {
@@ -56,6 +59,7 @@ export function despachar(whats: ClienteWhats, d: Despacho): ResultadoWhats<Envi
         componentes: d.template.parametros.length
           ? [{ tipo: 'body', parametros: d.template.parametros }]
           : [],
+        rastreio,
       })
     }
   }
