@@ -540,7 +540,7 @@ Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
 | Cortar refetchInterval + resync seletivo | 27 | Front | FEITO (commit c959b76) |
 | Dashboard num só (/dashboard/geral) | 28 | API+Front | FEITO (commit 8168599). /bootstrap do boot nao feito (ganho pequeno pos-item 25) |
 | DATABASE_URL_LISTEN (corrige cache/realtime) | 24 | config | no production.env e no backend/.env dev; falta VPS |
-| Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | FEITO em código (migration 0081, validada local); falta db push no cloud |
+| Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | FEITO (migration 0081) e APLICADA no cloud de prod (db push 2026-10-29) |
 | Read-model de clientes | 30 | DB | FEITO (commit b63991b). Trigger mantem pedidos_total/ultimo_pedido_em; listagem O(log n) por indice. |
 | Serialização p/ listas grandes | 31 | API | FEITO (commit 005f4ef): serializer global fast-json-stringify (zod.toJSONSchema) com fallback ao serializer zod; preserva o whitelist de PII. 1058 testes verdes, 0 fallback. |
 
@@ -613,8 +613,10 @@ fixes acima cortam o número de idas ao banco e se somam a esse ganho.
   usam fjs e a saída é idêntica). Dep `fast-json-stringify@^6.4.0` (já era transitiva do Fastify)
   declarada no package.json da api. O de-dup de `/lojas` NÃO compensa (duas queries de formas
   diferentes).
-- **FALTA (fora do código / precisa de você, da VPS ou da Meta):** db push do 0081 (e das demais
-  migrations pendentes) no cloud COMPARTILHADO de prod (combinar no deploy); item 21 (OTP hook);
+- **Migrations no cloud (2026-10-29):** `0081` (índices) e `0083` (read-model de clientes) APLICADAS
+  no cloud COMPARTILHADO de prod via db push (junto da `0082` da outra sessão, com aval dela). O cloud
+  está em 0083.
+- **FALTA (fora do código / precisa de você, da VPS ou da Meta):** item 21 (OTP hook);
   itens 6, 8, 35 (VPS); 15 Fase B e 17 (Meta). O item 20/24 (VPS *.env) e o item 5 (serviço atendente)
   foram tratados por outra sessão no cutover de prod do VPS (api/zap no projeto novo, pooler 5432,
   TLS verify-full com CA pinada); confirmar o atendente e o resto no próximo deploy.
