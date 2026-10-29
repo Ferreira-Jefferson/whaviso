@@ -72,14 +72,16 @@ export async function inserirAssinatura(
     diaVencimento: number
     trialAte: string | null
     inicioEm: string | null
+    planoId?: string | null
   },
 ) {
   return consultarUm<AssinaturaLinha>(
     exec,
     sql`insert into public.assinaturas
-          (conta_id, loja_id, status, valor_mensal_centavos, dia_vencimento, trial_ate, inicio_em)
+          (conta_id, loja_id, status, valor_mensal_centavos, dia_vencimento, trial_ate, inicio_em,
+           plano_id)
         values (${d.contaId}, ${d.lojaId}, ${d.status}, ${d.valor}, ${d.diaVencimento},
-                ${d.trialAte}, ${d.inicioEm})
+                ${d.trialAte}, ${d.inicioEm}, ${d.planoId ?? null})
         returning ${SAIDA_ASSINATURA}`,
   )
 }
@@ -127,6 +129,7 @@ export async function atualizarAssinatura(
     status: StatusAssinatura | null
     valor: number | null
     diaVencimento: number | null
+    planoId?: string | null
   },
 ) {
   return consultarUm<AssinaturaLinha>(
@@ -135,6 +138,7 @@ export async function atualizarAssinatura(
           status = coalesce(${campos.status}::status_assinatura, status),
           valor_mensal_centavos = coalesce(${campos.valor}::int, valor_mensal_centavos),
           dia_vencimento = coalesce(${campos.diaVencimento}::smallint, dia_vencimento),
+          plano_id = coalesce(${campos.planoId ?? null}::uuid, plano_id),
           inicio_em = case
             when ${campos.status}::status_assinatura = 'ativa' and inicio_em is null then now()
             else inicio_em end,
@@ -282,5 +286,61 @@ export async function registrarEvento(
     sql`insert into public.eventos (loja_id, tipo, entidade, entidade_id, ator, detalhes)
         values (${e.lojaId ?? null}, ${e.tipo}, ${e.entidade}, ${e.entidadeId}, ${e.ator},
                 ${JSON.stringify(e.detalhes)}::jsonb)`,
+  )
+}
+
+// ---- Planos (catalogo) ----------------------------------------------------------------------
+
+export interface PlanoLinha {
+  id: string
+  nome: string
+  valor_centavos: number
+  inclui: string[]
+  ativo: boolean
+  criado_em: string
+  atualizado_em: string
+}
+
+const SAIDA_PLANO = sql`
+  id, nome, valor_centavos, inclui, ativo, ${TS('criado_em')} as criado_em,
+  ${TS('atualizado_em')} as atualizado_em`
+
+export async function inserirPlano(
+  exec: Executor,
+  d: { nome: string; valor: number; inclui: string[]; ativo: boolean },
+) {
+  return consultarUm<PlanoLinha>(
+    exec,
+    sql`insert into public.planos (nome, valor_centavos, inclui, ativo)
+        values (${d.nome}, ${d.valor}, ${d.inclui}::text[], ${d.ativo})
+        returning ${SAIDA_PLANO}`,
+  )
+}
+
+export async function obterPlano(exec: Executor, id: string) {
+  return consultarUm<PlanoLinha>(exec, sql`select ${SAIDA_PLANO} from public.planos where id = ${id}`)
+}
+
+export async function listarPlanos(exec: Executor) {
+  return consultar<PlanoLinha>(
+    exec,
+    sql`select ${SAIDA_PLANO} from public.planos order by ativo desc, lower(nome), id`,
+  )
+}
+
+export async function atualizarPlano(
+  exec: Executor,
+  id: string,
+  c: { nome: string | null; valor: number | null; inclui: string[] | null; ativo: boolean | null },
+) {
+  return consultarUm<PlanoLinha>(
+    exec,
+    sql`update public.planos set
+          nome = coalesce(${c.nome}::text, nome),
+          valor_centavos = coalesce(${c.valor}::int, valor_centavos),
+          inclui = coalesce(${c.inclui}::text[], inclui),
+          ativo = coalesce(${c.ativo}::boolean, ativo)
+        where id = ${id}
+        returning ${SAIDA_PLANO}`,
   )
 }

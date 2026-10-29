@@ -1,9 +1,9 @@
 // OperadorShell: layout do console interno da equipe Whaviso (operador da plataforma).
 // Diferente do AppShell: NAO tem seletor de loja, nao exige loja ativa e nao envia x-loja-id
 // (as telas usam apiClient semLoja). A guarda RequireOperador decide quem entra; a seguranca
-// real e a autorizacao por rota na api. Nav fixa: Painel, Clientes, Cobranca, Funil.
+// real e a autorizacao por rota na api. Nav fixa: Painel, Clientes, Cobranca, Planos, Funil.
 import { NavLink, Outlet } from 'react-router'
-import { BarChart3, Filter, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { BarChart3, Filter, Package, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { useTenant } from '@/shared/tenant'
 import { BellLogo, cn } from '@/shared/ui'
@@ -21,6 +21,7 @@ const NAV_OPERADOR: readonly ItemOperador[] = [
   { caminho: 'painel', rotulo: 'Painel', icone: BarChart3 },
   { caminho: 'clientes', rotulo: 'Clientes', icone: Users },
   { caminho: 'cobranca', rotulo: 'Cobrança', icone: Wallet },
+  { caminho: 'planos', rotulo: 'Planos', icone: Package },
   { caminho: 'funil', rotulo: 'Funil', icone: Filter },
 ]
 

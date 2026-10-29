@@ -16,6 +16,7 @@ import NotFound from './NotFound'
 const PlataformaPainel = lazy(() => import('@/modules/plataforma_painel'))
 const PlataformaClientes = lazy(() => import('@/modules/plataforma_clientes'))
 const PlataformaCobranca = lazy(() => import('@/modules/plataforma_cobranca'))
+const PlataformaPlanos = lazy(() => import('@/modules/plataforma_cobranca').then((m) => ({ default: m.PlanosPage })))
 const PlataformaFunil = lazy(() => import('@/modules/plataforma_funil'))
 // Paginas publicas de compliance ja em producao (politica e termos): seguem servidas pelo
 // modulo legado ate o FR de compliance reassumir. Unica dependencia de modules/** do shell.
@@ -74,6 +75,7 @@ export const rotas: RouteObject[] = [
           { path: '/plataforma/painel', element: <PlataformaPainel /> },
           { path: '/plataforma/clientes', element: <PlataformaClientes /> },
           { path: '/plataforma/cobranca', element: <PlataformaCobranca /> },
+          { path: '/plataforma/planos', element: <PlataformaPlanos /> },
           { path: '/plataforma/funil', element: <PlataformaFunil /> },
         ],
       },

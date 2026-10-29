@@ -31,6 +31,7 @@ import {
   type StatusAssinatura,
   type StatusFatura,
 } from '@/shared/contracts/_generated/plataforma_cobranca'
+import { PlanoDTO, PlanosLista, type PlanoCriar, type PlanoPatch } from './planos'
 import { PlataformaContaPagina } from '@/shared/contracts/_generated/plataforma_clientes'
 
 export const RAIZ = 'plataforma_cobranca'
@@ -196,5 +197,34 @@ export function useMinhasFaturas() {
     queryKey: [RAIZ, 'minhas_faturas'],
     queryFn: ({ signal }) =>
       apiClient.get<MinhaFaturaDTO[]>('/plataforma-cobranca/minha-fatura', { schema: MinhasFaturasLista, signal }),
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Planos (catalogo; so admin da equipe: operador comum recebe 403)
+//   GET/POST /v1/plataforma-cobranca/planos · PATCH /v1/plataforma-cobranca/planos/:id
+// ---------------------------------------------------------------------------------------------
+export function usePlanos() {
+  return useQuery({
+    queryKey: [RAIZ, 'planos'],
+    queryFn: ({ signal }) =>
+      apiClient.get<PlanoDTO[]>('/plataforma-cobranca/planos', { schema: PlanosLista, signal, ...OP }),
+  })
+}
+
+export function useCriarPlano() {
+  const invalidar = useInvalidarRaiz()
+  return useMutation<PlanoDTO, Error, PlanoCriar>({
+    mutationFn: (body) => apiClient.post<PlanoDTO>('/plataforma-cobranca/planos', { body, schema: PlanoDTO, ...OP }),
+    onSettled: invalidar,
+  })
+}
+
+export function useAlterarPlano() {
+  const invalidar = useInvalidarRaiz()
+  return useMutation<PlanoDTO, Error, { id: string; patch: PlanoPatch }>({
+    mutationFn: ({ id, patch }) =>
+      apiClient.patch<PlanoDTO>(`/plataforma-cobranca/planos/${id}`, { body: patch, schema: PlanoDTO, ...OP }),
+    onSettled: invalidar,
   })
 }

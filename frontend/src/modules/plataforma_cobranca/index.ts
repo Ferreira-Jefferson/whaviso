@@ -5,3 +5,4 @@
 // componente quebram em runtime ("wrapped in React.lazy() more than once").
 export { default } from './pages/Cobranca'
 export { default as MinhaFaturaPage } from './pages/MinhaFatura'
+export { default as PlanosPage } from './pages/Planos'

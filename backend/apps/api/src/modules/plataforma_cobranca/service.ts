@@ -6,12 +6,13 @@
 import { comTransacao, type Pool } from '@whaviso/shared/db'
 import { hojeSp } from '@whaviso/shared/datas'
 import type {
-  ApurarAtrasosResultado, AssinaturaCriar, AssinaturaDTO, AssinaturaPatch, FaturaDTO, FaturaMarcarPaga,
+  ApurarAtrasosResultado, AssinaturaDTO, FaturaDTO, FaturaMarcarPaga,
   GerarFaturasResultado, MinhaFaturaDTO, StatusAssinatura,
 } from '@whaviso/shared/contracts'
+import type { AssinaturaCriar, AssinaturaPatch, PlanoCriar, PlanoDTO, PlanoPatch } from './schemas'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import * as repo from './repo'
-import type { AssinaturaLinha, FaturaLinha } from './repo'
+import type { AssinaturaLinha, FaturaLinha, PlanoLinha } from './repo'
 import {
   CARENCIA_DIAS_PADRAO, calcularVencimento, deveSuspender, mesCompetenciaDe, transicaoValida,
 } from './regras'
@@ -45,6 +46,13 @@ function paraAssinatura(l: AssinaturaLinha): AssinaturaDTO {
   }
 }
 
+function paraPlano(l: PlanoLinha): PlanoDTO {
+  return {
+    id: l.id, nome: l.nome, valor_centavos: l.valor_centavos, inclui: l.inclui, ativo: l.ativo,
+    criado_em: l.criado_em, atualizado_em: l.atualizado_em,
+  }
+}
+
 function paraFatura(l: FaturaLinha): FaturaDTO {
   return {
     id: l.id,
@@ -71,7 +79,25 @@ function paraMinhaFatura(l: FaturaLinha): MinhaFaturaDTO {
   }
 }
 
+const VALOR_PADRAO_CENTAVOS = 70000
+
+/** Violacao do indice unico de nome (23505) vira 409; qualquer outro erro segue. */
+function traduzirNomeDuplicado(e: unknown): unknown {
+  if ((e as { code?: string } | null)?.code === '23505') {
+    return conflito('plano_nome_duplicado', 'Ja existe um plano com esse nome')
+  }
+  return e
+}
+
 export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA_DIAS_PADRAO) {
+  /** Plano precisa existir e estar ativo para ser escolhido numa assinatura. */
+  async function planoUsavel(id: string): Promise<PlanoLinha> {
+    const p = await repo.obterPlano(pool, id)
+    if (!p) throw naoEncontrado('Plano nao encontrado')
+    if (!p.ativo) throw regraNegocio('plano_inativo', 'O plano escolhido esta inativo')
+    return p
+  }
+
   async function criar(_a: Ator, b: AssinaturaCriar): Promise<AssinaturaDTO> {
     const lojaId = b.loja_id ?? null
     if (!(await repo.contaExiste(pool, b.conta_id))) {
@@ -81,12 +107,16 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
       // 422 (regra): a loja existe noutra conta ou nao existe; nao confirmamos qual.
       throw regraNegocio('loja_fora_da_conta', 'A loja informada nao pertence a esta conta')
     }
+    // Plano escolhido: o valor do plano e COPIADO (congelado) na assinatura, salvo valor manual.
+    const plano = b.plano_id ? await planoUsavel(b.plano_id) : null
+    const valor = b.valor_mensal_centavos ?? plano?.valor_centavos ?? VALOR_PADRAO_CENTAVOS
     const nova = await comTransacao(pool, async (tx) => {
       const linha = await repo.inserirAssinatura(tx, {
         contaId: b.conta_id,
         lojaId,
         status: b.status,
-        valor: b.valor_mensal_centavos,
+        planoId: plano?.id ?? null,
+        valor,
         diaVencimento: b.dia_vencimento,
         trialAte: b.status === 'trial' ? (b.trial_ate ?? null) : null,
         inicioEm: b.status === 'ativa' ? new Date().toISOString() : null,
@@ -98,6 +128,33 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
       return linha!
     })
     return paraAssinatura(nova)
+  }
+
+  async function criarPlano(_a: Ator, b: PlanoCriar): Promise<PlanoDTO> {
+    try {
+      const p = await repo.inserirPlano(pool, {
+        nome: b.nome, valor: b.valor_centavos, inclui: b.inclui, ativo: b.ativo,
+      })
+      return paraPlano(p!)
+    } catch (e) {
+      throw traduzirNomeDuplicado(e)
+    }
+  }
+
+  async function listarPlanos(_a: Ator): Promise<PlanoDTO[]> {
+    return (await repo.listarPlanos(pool)).map(paraPlano)
+  }
+
+  async function alterarPlano(_a: Ator, id: string, b: PlanoPatch): Promise<PlanoDTO> {
+    try {
+      const p = await repo.atualizarPlano(pool, id, {
+        nome: b.nome ?? null, valor: b.valor_centavos ?? null, inclui: b.inclui ?? null, ativo: b.ativo ?? null,
+      })
+      if (!p) throw naoEncontrado('Plano nao encontrado')
+      return paraPlano(p)
+    } catch (e) {
+      throw traduzirNomeDuplicado(e)
+    }
   }
 
   async function listarAssinaturas(
@@ -117,10 +174,12 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
       throw conflito('transicao_invalida', `Transicao ${atual.status} -> ${novoStatus} nao e permitida`)
     }
 
+    const plano = b.plano_id ? await planoUsavel(b.plano_id) : null
     const atualizada = await comTransacao(pool, async (tx) => {
       const linha = await repo.atualizarAssinatura(tx, id, atual.status, {
         status: novoStatus,
-        valor: b.valor_mensal_centavos ?? null,
+        planoId: plano?.id ?? null,
+        valor: b.valor_mensal_centavos ?? plano?.valor_centavos ?? null,
         diaVencimento: b.dia_vencimento ?? null,
       })
       // null = o status mudou entre a leitura e o UPDATE (corrida): recusa em vez de aplicar cego.
@@ -271,7 +330,7 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
 
   return {
     criar, listarAssinaturas, alterar, gerarFaturas, apurarAtrasos, marcarPaga, cancelarFatura,
-    listarFaturas, minhasFaturas,
+    listarFaturas, minhasFaturas, criarPlano, listarPlanos, alterarPlano,
   }
 }
 

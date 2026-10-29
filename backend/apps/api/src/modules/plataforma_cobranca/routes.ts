@@ -1,11 +1,11 @@
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsync, FastifyRequest, preHandlerHookHandler } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { proibido } from '../../shared/http_errors'
 import { criarServicoCobranca, type Ator } from './service'
 import {
   ApurarAtrasosResultado, AssinaturaCriar, AssinaturaDTO, AssinaturaPatch, AssinaturasLista, AssinaturasQuery,
   FaturaDTO, FaturaMarcarPaga, FaturasLista, FaturasQuery, GerarFaturasEntrada, GerarFaturasResultado,
-  IdParams, MinhasFaturasLista,
+  IdParams, MinhasFaturasLista, PlanoCriar, PlanoDTO, PlanoPatch, PlanosLista,
 } from './schemas'
 
 /** Ator = operador autenticado. O user_id vem SO do escopo resolvido (nunca do corpo/query). */
@@ -13,6 +13,11 @@ function operador(req: FastifyRequest): Ator {
   const o = req.operador
   if (!o) throw proibido('Escopo de operador ausente')
   return { userId: o.user_id }
+}
+
+/** Catalogo de planos e so do admin da equipe (operador comum recebe 403). */
+const exigirAdmin: preHandlerHookHandler = async (req) => {
+  if (req.operador?.papel !== 'admin') throw proibido('Apenas admin gere o catalogo de planos')
 }
 
 /** Conta do dono: SEMPRE do escopo de loja resolvido; conta_id forjado no cliente e ignorado. */
@@ -67,6 +72,27 @@ export function criarCobrancaRoutes(): FastifyPluginAsync {
       ...plataforma(),
       schema: { params: IdParams, response: { 200: FaturaDTO } },
     }, async (req) => svc.cancelarFatura(operador(req), req.params.id))
+
+    // Catalogo de planos (admin). Sem DELETE: plano inativa (estado), nunca some.
+    const adminPlataforma = {
+      config: { acesso: 'plataforma' as const },
+      preHandler: [app.autenticar, app.escopoOperador, exigirAdmin],
+    }
+
+    app.get('/planos', {
+      ...adminPlataforma,
+      schema: { response: { 200: PlanosLista } },
+    }, async (req) => svc.listarPlanos(operador(req)))
+
+    app.post('/planos', {
+      ...adminPlataforma,
+      schema: { body: PlanoCriar, response: { 201: PlanoDTO } },
+    }, async (req, reply) => reply.status(201).send(await svc.criarPlano(operador(req), req.body)))
+
+    app.patch('/planos/:id', {
+      ...adminPlataforma,
+      schema: { params: IdParams, body: PlanoPatch, response: { 200: PlanoDTO } },
+    }, async (req) => svc.alterarPlano(operador(req), req.params.id, req.body))
 
     // Jobs manuais (idempotentes). Rate limit por SEC-101: execucao manual, nao em laco.
     app.post('/cobranca/gerar-faturas', {

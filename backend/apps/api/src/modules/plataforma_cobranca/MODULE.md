@@ -16,6 +16,7 @@ Operador (equipe Whaviso), `config.acesso: 'plataforma'` + `escopoOperador`:
 - `GET  /faturas` lista (filtros `status`, `competencia`, `conta_id`).
 - `POST /faturas/:id/pagar` baixa manual (`reativar: true` reativa se nao restam atrasos).
 - `POST /faturas/:id/cancelar` cancela (estado, nao DELETE).
+- `GET|POST /planos`, `PATCH /planos/:id` catalogo de planos, SO admin (operador comum 403); sem DELETE (inativa). `POST|PATCH /assinaturas` aceitam `plano_id` opcional: o valor do plano e COPIADO para a assinatura (congelado), valor manual continua valendo; plano inativo e recusado (422).
 - `POST /cobranca/gerar-faturas` idempotente (`ON CONFLICT (assinatura_id, competencia)`); rate-limited.
 - `POST /cobranca/apurar-atrasos` marca atrasadas e suspende apos a carencia; rate-limited.
 
