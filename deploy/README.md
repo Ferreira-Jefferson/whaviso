@@ -474,6 +474,6 @@ Para ligar:
 2. Defina `SEND_CODE_HOOK_SECRET` (formato `v1,whsec_...`) em `/etc/whaviso/zap.env` e reinicie o zap: `systemctl restart whaviso-zap`.
 3. No painel do Supabase (Authentication > Hooks > Send SMS hook): tipo **HTTPS**, URL `https://api.whaviso.com/hooks/send-code`, e cole o **mesmo** segredo. Habilite tambem o provider **Phone**. Sem o secret batendo nos dois lados, o zap responde 503/401 e nada e entregue.
 
-## Apendice C: limpeza pendente (referencias a Vercel)
+## Apendice C: referencias a Vercel (removidas)
 
-A decisao e VPS (sem Vercel), mas alguns arquivos ainda mencionam Vercel e devem ser ajustados quando der: o comentario `→ Vercel` em `backend/.env.example` e `secrets/production.env(.example)`, e o alvo `vercel` em `backend/scripts/push_secrets.sh`. Nao bloqueiam o deploy; sao so heranca da arquitetura anterior.
+A decisao e VPS (sem Vercel). As referencias herdadas da arquitetura anterior ja foram removidas: o comentario em `backend/.env.example`, o alvo `vercel` em `backend/scripts/push_secrets.sh` e o template `secrets/production.env.example`.
