@@ -4,12 +4,13 @@
 // mostra carregando, erro ou o estado "sem loja".
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
-import { ChevronRight, MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
+import { ChevronRight, LayoutDashboard, MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { SeletorLoja, useTenant } from '@/shared/tenant'
 import { useEstadoRealtime } from '@/shared/realtime'
 import { BellLogo, EmptyState, ErrorState, Skeleton, cn } from '@/shared/ui'
 import { GRUPOS_NAV, ROTAS, type GrupoNav, type RotaModulo } from '../rotas'
+import { useEhOperador } from '../sonda_operador'
 
 const FOCO = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia'
 
@@ -98,6 +99,22 @@ function GrupoSecao({ id, rotulo, aberto, ativo, onAlternar }: { id: GrupoNav; r
   )
 }
 
+/** Link para o console da plataforma. So aparece para quem tambem e operador (sonda cacheada). */
+function LinkConsole({ onNavegar }: { onNavegar?: () => void }) {
+  const { data } = useEhOperador()
+  if (!data) return null
+  return (
+    <NavLink
+      to="/plataforma"
+      onClick={onNavegar}
+      className={cn('flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-2.5 font-medium text-tinta hover:bg-black/5', FOCO)}
+    >
+      <LayoutDashboard className="size-5 flex-none" strokeWidth={1.75} aria-hidden />
+      Console da plataforma
+    </NavLink>
+  )
+}
+
 function Sidebar({ onRecolher }: { onRecolher: () => void }) {
   const { abertos, alternar } = useGruposAbertos()
   const grupoAtivo = useGrupoAtivo()
@@ -122,7 +139,10 @@ function Sidebar({ onRecolher }: { onRecolher: () => void }) {
           <GrupoSecao key={g.id} id={g.id} rotulo={g.rotulo} aberto={abertos[g.id] ?? false} ativo={grupoAtivo === g.id} onAlternar={alternar} />
         ))}
       </div>
-      <BotaoSair className="mt-auto" />
+      <div className="mt-auto flex flex-col gap-0.5">
+        <LinkConsole />
+        <BotaoSair />
+      </div>
     </aside>
   )
 }
@@ -183,6 +203,7 @@ function BarraInferior() {
                 </nav>
               )
             })}
+            <LinkConsole onNavegar={() => setAberto(false)} />
             <BotaoSair aoAbrir={() => setAberto(false)} className="mt-2 w-full border-t border-linha pt-3" />
           </div>
         </div>

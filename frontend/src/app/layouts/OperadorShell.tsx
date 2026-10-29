@@ -3,9 +3,11 @@
 // (as telas usam apiClient semLoja). A guarda RequireOperador decide quem entra; a seguranca
 // real e a autorizacao por rota na api. Nav fixa: Painel, Clientes, Cobranca, Funil.
 import { NavLink, Outlet } from 'react-router'
-import { BarChart3, Filter, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { BarChart3, Filter, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
+import { useTenant } from '@/shared/tenant'
 import { BellLogo, cn } from '@/shared/ui'
+import { ROTA_INICIAL } from '../rotas'
 
 const FOCO = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia'
 
@@ -43,7 +45,23 @@ function ItemNav({ item }: { item: ItemOperador }) {
   )
 }
 
+/** "Ver loja": so para quem e membro de alguma loja (operador puro nao ve). */
+function useTemLoja(): boolean {
+  const { status, lojas } = useTenant()
+  return status === 'ok' && lojas.length > 0
+}
+
+function LinkVerLoja({ className }: { className?: string }) {
+  return (
+    <NavLink to={ROTA_INICIAL} className={cn('flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-2.5 font-medium text-tinta hover:bg-black/5', FOCO, className)}>
+      <Store className="size-5 flex-none" strokeWidth={1.75} aria-hidden />
+      Ver loja
+    </NavLink>
+  )
+}
+
 function Sidebar() {
+  const temLoja = useTemLoja()
   return (
     <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-linha bg-papel-2 px-3 py-4 md:flex">
       <div className="flex items-center gap-2.5 px-2.5 pb-4 font-display text-xl font-bold">
@@ -58,12 +76,14 @@ function Sidebar() {
           <ItemNav key={item.caminho} item={item} />
         ))}
       </nav>
-      <BotaoSair className="mt-auto" />
+      {temLoja && <LinkVerLoja className="mt-auto" />}
+      <BotaoSair className={temLoja ? undefined : 'mt-auto'} />
     </aside>
   )
 }
 
 export function OperadorShell() {
+  const temLoja = useTemLoja()
   return (
     <div className="grid min-h-dvh md:grid-cols-[248px_1fr]">
       <Sidebar />
@@ -88,6 +108,11 @@ export function OperadorShell() {
               {item.rotulo}
             </NavLink>
           ))}
+          {temLoja && (
+            <NavLink to={ROTA_INICIAL} className={cn('whitespace-nowrap rounded-pill border border-linha px-3 py-1.5 text-sm font-medium text-tinta-2', FOCO)}>
+              Ver loja
+            </NavLink>
+          )}
           <BotaoSair aoAbrir={undefined} className="shrink-0" />
         </nav>
         <main className="w-full px-4 pb-12 pt-5 md:px-[5%] md:pt-7">

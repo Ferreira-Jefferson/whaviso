@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams, type NavigateFunction } from 'react-router'
 import { Button } from '@/shared/ui'
 import { signInWithGoogleIdToken } from '@/shared/supabase'
-import { mensagemDeErroAuth, nextSeguro } from '@/shared/auth'
+import { mensagemDeErroAuth } from '@/shared/auth'
 
 // Login com Google via Google Identity Services (GIS): o consentimento roda na NOSSA
 // origem e devolve um id_token (sem redirect pro supabase.co), que entregamos ao
@@ -38,13 +37,9 @@ const SRC_GSI = 'https://accounts.google.com/gsi/client'
 // Inicializamos UMA vez so; senao o GIS avisa "initialize() is called multiple times" a
 // cada montagem do botao (ex.: voltar do passo do codigo para o passo 1). A callback e
 // registrada uma vez e le a acao de login atual por este objeto de modulo, atualizado a
-// cada render, entao nao precisamos re-inicializar quando navigate/next/onErro mudam.
+// cada render, entao nao precisamos re-inicializar quando onErro muda.
 let gisInicializado = false
-const acaoLogin: {
-  navigate: NavigateFunction | null
-  next: string | null
-  onErro: (msg: string) => void
-} = { navigate: null, next: null, onErro: () => {} }
+const acaoLogin: { onErro: (msg: string) => void } = { onErro: () => {} }
 
 function carregarGsi(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -100,17 +95,12 @@ function IconeGoogle() {
 }
 
 export function GoogleLoginButton({ onErro }: { onErro: (msg: string) => void }) {
-  const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const next = nextSeguro(params.get('next'))
   const moldura = useRef<HTMLDivElement>(null)
   const alvoGis = useRef<HTMLDivElement>(null)
 
   // Mantem a acao de login (compartilhada no modulo) sempre com os valores atuais, sem
   // dep array: roda a cada render. A callback unica do GIS le daqui no momento do clique.
   useEffect(() => {
-    acaoLogin.navigate = navigate
-    acaoLogin.next = next ?? null
     acaoLogin.onErro = onErro
   })
 
@@ -143,9 +133,8 @@ export function GoogleLoginButton({ onErro }: { onErro: (msg: string) => void })
               acaoLogin.onErro(mensagemDeErroAuth(error))
               return
             }
-            // O AuthProvider resolve o perfil; '/' redireciona para a rota inicial
-            // (o RedirectSeLogado/registry decide a home), ou segue o next seguro.
-            acaoLogin.navigate?.(acaoLogin.next ?? '/', { replace: true })
+            // Sem navegar aqui: o AuthProvider resolve a sessao e o RedirectSeLogado
+            // (guard de /entrar) leva para a rota inicial.
           },
         })
         gisInicializado = true

@@ -40,8 +40,8 @@ export default function Entrar() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4 py-10">
       <div className="flex flex-col items-center gap-3 text-center">
-        <span className="flex size-14 items-center justify-center rounded-pill bg-salvia-claro text-salvia">
-          <BellLogo className="size-7 text-dourado" />
+        <span className="flex size-16 items-center justify-center rounded-pill bg-[#25D366] text-white shadow-sm">
+          <BellLogo className="size-9" />
         </span>
         <h1 className="font-display text-3xl text-salvia">Entrar no Whaviso</h1>
         <p className="text-sm text-tinta-2">

@@ -7,7 +7,7 @@ import { OperadorShell } from './layouts/OperadorShell'
 import { LegalLayout } from './layouts/LegalLayout'
 import { AppError } from './AppError'
 import { RedirectSeLogado, RequireAuth, RequireOperador } from './guards'
-import { ROTAS, ROTA_INICIAL } from './rotas'
+import { ROTAS } from './rotas'
 import { PaginaSlot } from './pages/PaginaSlot'
 import Entrar from './pages/Entrar'
 import NotFound from './NotFound'
@@ -19,6 +19,7 @@ const PlataformaCobranca = lazy(() => import('@/modules/plataforma_cobranca'))
 const PlataformaFunil = lazy(() => import('@/modules/plataforma_funil'))
 // Paginas publicas de compliance ja em producao (politica e termos): seguem servidas pelo
 // modulo legado ate o FR de compliance reassumir. Unica dependencia de modules/** do shell.
+import { Landing } from '@/modules/landing'
 import { PoliticaPrivacidadePage, TermosUsoPage } from '@/modules/legal'
 
 export const rotas: RouteObject[] = [
@@ -26,7 +27,14 @@ export const rotas: RouteObject[] = [
     element: <ComSuspense />,
     errorElement: <AppError />,
     children: [
-      { path: '/', element: <Navigate to={ROTA_INICIAL} replace /> },
+      {
+        path: '/',
+        element: (
+          <RedirectSeLogado>
+            <Landing />
+          </RedirectSeLogado>
+        ),
+      },
       {
         path: '/entrar',
         element: (
