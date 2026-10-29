@@ -4,6 +4,7 @@
 import type {
   EnviarInterativoEntrada,
   EnviarMidiaEntrada,
+  EnviarTemplateAutenticacaoEntrada,
   EnviarTemplateEntrada,
   EnviarTextoEntrada,
 } from '@whaviso/shared/clientes'
@@ -64,6 +65,27 @@ export function corpoTemplate(e: EnviarTemplateEntrada): Json {
         name: nome,
         language: { code: idioma },
         ...(components.length ? { components } : {}),
+      },
+    },
+    e.rastreio,
+  )
+}
+
+export function corpoTemplateAutenticacao(e: EnviarTemplateAutenticacaoEntrada): Json {
+  // Formato fixo da Meta para AUTHENTICATION: o codigo vai no corpo (body) E no botao de
+  // copiar/auto-preencher (sub_type 'url', indice 0). Os dois sao obrigatorios no envio.
+  return comRastreio(
+    {
+      messaging_product: 'whatsapp',
+      to: digitos(e.para),
+      type: 'template',
+      template: {
+        name: e.nome,
+        language: { code: e.idioma },
+        components: [
+          { type: 'body', parameters: [{ type: 'text', text: e.codigo }] },
+          { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: e.codigo }] },
+        ],
       },
     },
     e.rastreio,

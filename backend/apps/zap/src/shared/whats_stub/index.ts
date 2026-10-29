@@ -39,6 +39,7 @@ export function criarWhatsStub(op: OpcoesWhatsStub = {}): WhatsStub {
   return {
     enviarTexto: () => envio('enviarTexto'),
     enviarTemplate: () => envio('enviarTemplate'),
+    enviarTemplateAutenticacao: () => envio('enviarTemplateAutenticacao'),
     enviarInterativo: () => envio('enviarInterativo'),
     enviarMidia: () => envio('enviarMidia'),
     baixarMidia: async () => ok({ ...midia }),

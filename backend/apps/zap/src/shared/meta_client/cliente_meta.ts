@@ -10,6 +10,7 @@ import {
   BaixarMidiaEntrada,
   EnviarInterativoEntrada,
   EnviarMidiaEntrada,
+  EnviarTemplateAutenticacaoEntrada,
   EnviarTemplateEntrada,
   EnviarTextoEntrada,
   MarcarLidaEntrada,
@@ -32,7 +33,14 @@ import {
   HOSTS_MIDIA_PADRAO,
   MAX_MIDIA_BYTES_PADRAO,
 } from './config'
-import { corpoInterativo, corpoMarcarLida, corpoMidia, corpoTemplate, corpoTexto } from './corpos'
+import {
+  corpoInterativo,
+  corpoMarcarLida,
+  corpoMidia,
+  corpoTemplate,
+  corpoTemplateAutenticacao,
+  corpoTexto,
+} from './corpos'
 import { requisicaoGraph, retryAposMs, urlGraph, type ContextoGraph } from './graph_api'
 import { mapearErroMeta, normalizarExcecao } from './mapa_erros'
 
@@ -179,6 +187,12 @@ export function criarClienteWhatsMeta(opcoes: OpcoesClienteMeta): ClienteWhats {
     enviarTemplate: (entrada) => {
       const v = validar(EnviarTemplateEntrada, entrada)
       return v ? enviarCorpo(v.numero, corpoTemplate(v)) : Promise.resolve(falha(entradaInvalida()))
+    },
+    enviarTemplateAutenticacao: (entrada) => {
+      const v = validar(EnviarTemplateAutenticacaoEntrada, entrada)
+      return v
+        ? enviarCorpo(v.numero, corpoTemplateAutenticacao(v))
+        : Promise.resolve(falha(entradaInvalida()))
     },
     enviarInterativo: (entrada) => {
       const v = validar(EnviarInterativoEntrada, entrada)

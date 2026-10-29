@@ -40,6 +40,20 @@ export const EnviarTemplateEntrada = z
   .strict()
 export type EnviarTemplateEntrada = z.input<typeof EnviarTemplateEntrada>
 
+// Template de categoria AUTHENTICATION (OTP de login): formato FIXO da Meta. O codigo entra
+// no corpo E no botao de copiar/auto-preencher; os dois componentes sao obrigatorios no envio,
+// senao a Meta recusa. Metodo proprio (em vez de `enviarTemplate` generico) para o chamador
+// nao conseguir montar um envio de autenticacao malformado. O `codigo` nunca e logado.
+export const EnviarTemplateAutenticacaoEntrada = z
+  .object({
+    ...Base,
+    nome: z.string().min(1).max(512),
+    idioma: z.string().min(2).max(16),
+    codigo: z.string().min(1).max(32),
+  })
+  .strict()
+export type EnviarTemplateAutenticacaoEntrada = z.infer<typeof EnviarTemplateAutenticacaoEntrada>
+
 const Botao = z.object({ id: z.string().min(1).max(256), titulo: z.string().min(1).max(20) }).strict()
 const Linha = z
   .object({ id: z.string().min(1).max(200), titulo: z.string().min(1).max(24), descricao: z.string().max(72).optional() })
@@ -99,6 +113,8 @@ export type ResultadoWhats<T> = Promise<Resultado<T, ErroProvedor>>
 export interface ClienteWhats {
   enviarTexto(entrada: EnviarTextoEntrada): ResultadoWhats<EnvioWhats>
   enviarTemplate(entrada: EnviarTemplateEntrada): ResultadoWhats<EnvioWhats>
+  /** Template AUTHENTICATION (OTP): codigo no corpo e no botao; formato fixo da Meta. */
+  enviarTemplateAutenticacao(entrada: EnviarTemplateAutenticacaoEntrada): ResultadoWhats<EnvioWhats>
   enviarInterativo(entrada: EnviarInterativoEntrada): ResultadoWhats<EnvioWhats>
   enviarMidia(entrada: EnviarMidiaEntrada): ResultadoWhats<EnvioWhats>
   baixarMidia(entrada: BaixarMidiaEntrada): ResultadoWhats<MidiaBaixada>

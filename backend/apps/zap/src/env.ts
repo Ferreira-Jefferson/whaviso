@@ -30,6 +30,19 @@ export const envSchema = z.object({
   // formato fixo). O nome aqui deve bater com o nome aprovado na WABA.
   META_OTP_TEMPLATE: z.string().default('whaviso_otp'),
   META_OTP_IDIOMA: z.string().default('pt_BR'),
+  // Segredo do Send SMS Hook do Supabase (formato whsec_...; o Standard Webhooks assina
+  // id.timestamp.corpo). O login por telefone gera o OTP no Supabase, que o POSTa em
+  // /hooks/send-code; entregamos pelo WhatsApp. Opcional: sem ele a rota responde 503.
+  SEND_CODE_HOOK_SECRET: z.string().optional().describe('segredo do Send SMS Hook (whsec_...)'),
+
+  // E-mail transacional (Resend) para o dreno da outbox de e-mail (ZAP-enviar-email, migration
+  // 0082). OPCIONAL: sem a chave o dreno fica idle e deixa os e-mails na fila (o boot nao quebra).
+  // A chave NUNCA é logada.
+  ZAP_RESEND_API_KEY: z.string().optional().describe('chave da API Resend (re_...)'),
+  ZAP_RESEND_REMETENTE: z
+    .string()
+    .default('Whaviso <nao-responda@whaviso.com>')
+    .describe('remetente dos e-mails, "Nome <endereco@dominio>"'),
 
   // Admin API do Supabase (service role key). OPCIONAIS. NUNCA vão ao bundle do front.
   SUPABASE_URL: z.url().optional().describe('URL do Supabase para a Admin API'),

@@ -10,6 +10,7 @@ import type { Logger } from '@whaviso/shared/logger'
 import type { Cifra } from '@whaviso/shared/cifra'
 import type { ClienteWhats } from '@whaviso/shared/clientes'
 import { registrarWebhookWhatsapp } from './modules/webhook_whatsapp'
+import { registrarHookOtp } from './modules/hook_otp'
 import type { EnvZap } from './env'
 
 declare module 'fastify' {
@@ -77,6 +78,19 @@ export async function criarApp(deps: DepsZap) {
     cifra: deps.cifra,
     verificarAssinatura: (rawBody, header) => deps.whats.verificarAssinatura(rawBody, header),
     verifyToken: deps.env.META_VERIFY_TOKEN ?? '',
+  })
+
+  // Send SMS Hook do Supabase: entrega o OTP de login por telefone via template AUTHENTICATION
+  // (numero da plataforma; login nao tem loja). Valida a assinatura do hook; sem SEND_CODE_HOOK_SECRET
+  // ou credencial META a rota responde 503.
+  registrarHookOtp(app as unknown as FastifyInstance, {
+    pool: deps.pool,
+    whats: deps.whats,
+    hookSecret: deps.env.SEND_CODE_HOOK_SECRET,
+    phoneNumberId: deps.env.META_PHONE_NUMBER_ID,
+    accessToken: deps.env.META_ACCESS_TOKEN,
+    templateOtp: deps.env.META_OTP_TEMPLATE,
+    idiomaOtp: deps.env.META_OTP_IDIOMA,
   })
 
   return app
