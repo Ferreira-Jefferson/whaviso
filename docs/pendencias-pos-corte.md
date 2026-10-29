@@ -303,15 +303,15 @@ Front: o logo é o `BellLogo` em `frontend/src/shared/ui/BellLogo.tsx`.
 **Como está:** o logotipo aparece sobre um **fundo cinza**. Fica feio e não representa
 bem a marca.
 
-**Como deveria:** usar o fundo da marca, o **verde do WhatsApp** (o verde padrão do
-Whaviso, igual ao da página no Facebook: facebook.com/whaviso). O logo continua em
-**SVG**, nunca uma imagem (nada de PNG ou JPG).
+**Como deveria:** sem fundo nenhum (nem cinza, nem verde): só o próprio logo (o círculo
+vazado com o sino), em **dourado** (token `dourado`, `#b8860b`), ocupando todo o espaço.
+O logo continua em **SVG**, nunca uma imagem (nada de PNG ou JPG).
 
 **Exemplo:**
 
 ```
 Hoje:     logo sobre fundo cinza
-Deveria:  logo sobre fundo verde WhatsApp, desenhado em SVG
+Deveria:  só o logo (círculo + sino) em dourado, sem fundo, desenhado em SVG
 
 Regra: só SVG. Não usar arquivo de imagem (png/jpg) para o logo nem para o fundo.
 ```
