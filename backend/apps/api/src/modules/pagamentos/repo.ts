@@ -410,23 +410,66 @@ export async function obterSubconta(
   return linha ? mapearSubconta(linha) : null
 }
 
-/** Cria/atualiza a subconta (onboarding). Campos nulos preservam o valor atual (coalesce). */
+/**
+ * Cria/atualiza a subconta (onboarding). Campos nulos preservam o valor atual (coalesce). `apiKeyCifrada`
+ * e o SEGREDO da subconta (modelo B): gravado so por este caminho, nunca devolvido no RETURNING (que e
+ * so a projecao publica de status).
+ */
 export async function upsertSubconta(
   exec: Executor,
   lojaId: string,
   provider: string,
-  c: { subcontaRef: string | null; statusKyc: 'pendente' | 'aprovada' | 'recusada' | null },
+  c: {
+    subcontaRef: string | null
+    statusKyc: 'pendente' | 'aprovada' | 'recusada' | null
+    apiKeyCifrada?: Buffer | null
+    customerRef?: string | null
+  },
 ): Promise<SubcontaSaida> {
+  const apiKey = c.apiKeyCifrada ?? null
+  const customer = c.customerRef ?? null
   const linha = await consultarUm<SubcontaLinha>(
     exec,
-    sql`insert into public.psp_subcontas (loja_id, provider, subconta_ref, status_kyc)
-        values (${lojaId}, ${provider}, ${c.subcontaRef}, coalesce(${c.statusKyc}::status_subconta_psp, 'pendente'))
+    sql`insert into public.psp_subcontas (loja_id, provider, subconta_ref, status_kyc, api_key_cifrada, customer_ref)
+        values (${lojaId}, ${provider}, ${c.subcontaRef}, coalesce(${c.statusKyc}::status_subconta_psp, 'pendente'),
+                ${apiKey}, ${customer})
         on conflict (loja_id, provider) do update set
           subconta_ref = coalesce(excluded.subconta_ref, public.psp_subcontas.subconta_ref),
-          status_kyc = coalesce(${c.statusKyc}::status_subconta_psp, public.psp_subcontas.status_kyc)
+          status_kyc = coalesce(${c.statusKyc}::status_subconta_psp, public.psp_subcontas.status_kyc),
+          api_key_cifrada = coalesce(${apiKey}, public.psp_subcontas.api_key_cifrada),
+          customer_ref = coalesce(${customer}, public.psp_subcontas.customer_ref)
         returning id, loja_id, provider, subconta_ref, status_kyc, atualizado_em`,
   )
   return mapearSubconta(linha!)
+}
+
+export interface SubcontaParaCobranca {
+  apiKeyCifrada: Buffer
+  customerRef: string | null
+  statusKyc: 'pendente' | 'aprovada' | 'recusada'
+}
+
+/**
+ * Leitura DEDICADA da credencial da subconta (cifra + customer), usada SO para montar a cobranca
+ * intermediada. Fora deste metodo, nenhuma query do modulo seleciona `api_key_cifrada`. Null se a
+ * subconta ainda nao foi provisionada com a chave.
+ */
+export async function lerSubcontaParaCobranca(
+  exec: Executor,
+  lojaId: string,
+  provider = 'asaas',
+): Promise<SubcontaParaCobranca | null> {
+  const linha = await consultarUm<{
+    api_key_cifrada: Buffer | null
+    customer_ref: string | null
+    status_kyc: 'pendente' | 'aprovada' | 'recusada'
+  }>(
+    exec,
+    sql`select api_key_cifrada, customer_ref, status_kyc
+          from public.psp_subcontas where loja_id = ${lojaId} and provider = ${provider}`,
+  )
+  if (!linha || !linha.api_key_cifrada) return null
+  return { apiKeyCifrada: linha.api_key_cifrada, customerRef: linha.customer_ref, statusKyc: linha.status_kyc }
 }
 
 // ---- Cobranca intermediada (PSP) ------------------------------------------------------------

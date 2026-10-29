@@ -13,7 +13,7 @@ export function depsDeProducao(env: EnvApi): DepsPagamentos {
   if (!env.MASTER_KEY) {
     throw new Error('MASTER_KEY ausente: cifra da chave Pix indisponivel')
   }
-  // `criarAsaasDoAmbiente()` retorna null ate as chaves/doc do Asaas: o caminho intermediado
-  // responde 501 ate la; o resto do fluxo (config, credencial, subconta, webhook) ja funciona.
-  return { cripto: criarCripto(env.MASTER_KEY), clientePsp: criarAsaasDoAmbiente() }
+  // `criarAsaasDoAmbiente(env)` retorna null sem `ASAAS_AMBIENTE` (caminho intermediado responde 501
+  // ate as chaves do Asaas); com o ambiente configurado, devolve o cliente real (modelo B).
+  return { cripto: criarCripto(env.MASTER_KEY), clientePsp: criarAsaasDoAmbiente(env) }
 }

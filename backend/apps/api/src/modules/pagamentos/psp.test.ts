@@ -3,7 +3,7 @@
 // credencial cifrada (segredo), subconta, cobranca intermediada (absorve/repassa), conciliacao por
 // webhook (assinatura + idempotencia) e o 501 quando o PSP nao esta integrado.
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
-import { createHmac, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { invalidarCacheTaxas } from '@whaviso/shared/taxas'
 import { criarPool, criarPoolSuper, bancoDoWorker, HOST } from '../../../../../test-support/banco'
 import { construirApp } from '../../app'
@@ -30,6 +30,8 @@ async function bancoAcessivel(): Promise<boolean> {
 
 const MASTER_KEY = 'master-key-de-teste-psp-integracao-0123456789abcdef'
 const cripto = criarCripto(MASTER_KEY)
+/** Token do webhook do Asaas (validado por comparacao, nao HMAC). */
+const WEBHOOK_TOKEN = 'webhook-token-de-teste-0123456789abcdef'
 
 const env = envSchema.parse({
   DATABASE_URL: `postgresql://whaviso_api:whaviso_api_dev@${HOST}:5432/${bancoDoWorker()}`,
@@ -39,18 +41,22 @@ const env = envSchema.parse({
   RATE_LIMIT_DESLIGADO: 'true',
 })
 
-/** Cliente de PSP FAKE: cobranca deterministica + webhook assinado por HMAC do corpo com o segredo. */
+/** Cliente de PSP FAKE: cobranca deterministica + webhook validado por TOKEN fixo (como o Asaas). */
 class FakeClientePagamento implements ClientePagamento {
   ultimo: ParamsCobrancaPsp | null = null
   async criarCobranca(_cred: CredencialPsp, p: ParamsCobrancaPsp) {
     this.ultimo = p
     return { chargeRef: 'chg_' + randomUUID().slice(0, 12), payload: 'PIX-DIN-' + p.referencia }
   }
-  interpretarWebhook(segredo: string, assinatura: string | undefined, corpoBruto: string): EventoWebhookPsp | null {
-    const esperado = createHmac('sha256', segredo).update(corpoBruto).digest('hex')
-    if (!assinatura || assinatura !== esperado) return null
-    const ev = JSON.parse(corpoBruto) as { charge_ref: string; pago: boolean; taxa_psp?: number }
-    return { chargeRef: ev.charge_ref, pago: ev.pago, taxaPspCentavos: ev.taxa_psp ?? null }
+  interpretarWebhook(tokenRecebido: string | undefined, corpoBruto: string): EventoWebhookPsp | null {
+    if (tokenRecebido !== WEBHOOK_TOKEN) return null
+    let ev: { charge_ref?: string; pago?: boolean; taxa_psp?: number }
+    try {
+      ev = JSON.parse(corpoBruto)
+    } catch {
+      return { chargeRef: '', pago: false, taxaPspCentavos: null }
+    }
+    return { chargeRef: ev.charge_ref ?? '', pago: !!ev.pago, taxaPspCentavos: ev.taxa_psp ?? null }
   }
 }
 
@@ -165,11 +171,12 @@ describe('PSP: cobranca intermediada e webhook', () => {
     await app.inject({ method: 'PUT', url: '/v1/pagamentos/psp/credencial', headers: authOp(op), payload: { chave: 'asaas-key-xyz' } })
     // config: Pix intermediado + encargo escolhido (loja)
     await app.inject({ method: 'PUT', url: '/v1/pagamentos/config', headers: authLoja(userId, lojaId), payload: { pix_modo: 'intermediado', encargo_modo: encargo } })
-    // subconta aprovada (no mundo real vem do PSP; aqui aprovamos direto no banco)
-    await poolSuper.query(
-      "insert into public.psp_subcontas (loja_id, provider, subconta_ref, status_kyc) values ($1,'asaas','rcv_1','aprovada')",
-      [lojaId],
-    )
+    // subconta provisionada e aprovada pelo operador (modelo B: API key da subconta + cliente). No
+    // mundo real a subconta e criada no painel do Asaas; aqui o operador cola a chave e aprova.
+    await app.inject({
+      method: 'PUT', url: '/v1/pagamentos/psp/subcontas', headers: authOp(op),
+      payload: { loja_id: lojaId, api_key: 'subconta-api-key-abc', customer_ref: 'cus_teste', status_kyc: 'aprovada' },
+    })
     invalidarCacheTaxas()
     return { app, userId, contaId, lojaId }
   }
@@ -199,7 +206,7 @@ describe('PSP: cobranca intermediada e webhook', () => {
     expect(res.json().valor_centavos).toBe(6050)
   })
 
-  it('webhook concilia por assinatura valida e e idempotente; assinatura invalida e 401', async () => {
+  it('webhook concilia por token valido e e idempotente; token invalido e 401', async () => {
     if (!disponivel) return
     const { app, userId, lojaId } = await prepararLojaIntermediada('absorve')
     const pedido = await criarPedido(lojaId, 6000)
@@ -207,29 +214,28 @@ describe('PSP: cobranca intermediada e webhook', () => {
     const { rows } = await poolApi.query('select charge_ref from public.pagamentos where id=$1', [criada.json().id])
     const chargeRef = rows[0].charge_ref as string
 
-    // O corpo CRU (string) e o que assinamos e enviamos: a verificacao e sobre os bytes recebidos.
+    // O Asaas autentica o webhook por TOKEN FIXO no header `asaas-access-token` (nao HMAC).
     const corpo = JSON.stringify({ charge_ref: chargeRef, pago: true, taxa_psp: 99 })
-    const assinatura = createHmac('sha256', 'asaas-key-xyz').update(corpo).digest('hex')
-    const post = (sig: string | undefined, corpoRaw: string) =>
+    const post = (token: string | undefined, corpoRaw: string) =>
       app.inject({
         method: 'POST', url: '/v1/pagamentos/webhooks/psp/asaas',
-        headers: { 'content-type': 'application/json', ...(sig ? { 'x-psp-signature': sig } : {}) },
+        headers: { 'content-type': 'application/json', ...(token ? { 'asaas-access-token': token } : {}) },
         payload: corpoRaw,
       })
 
-    // sem assinatura -> 401 (rejeicao barata antes da decifra)
+    // sem token -> 401
     expect((await post(undefined, corpo)).statusCode).toBe(401)
-    // assinatura invalida -> 401, nada concilia
-    expect((await post('errada', corpo)).statusCode).toBe(401)
+    // token invalido -> 401, nada concilia
+    expect((await post('token-errado', corpo)).statusCode).toBe(401)
 
-    // assinatura valida -> concilia
-    const ok = await post(assinatura, corpo)
+    // token valido -> concilia
+    const ok = await post(WEBHOOK_TOKEN, corpo)
     expect(ok.statusCode, ok.body).toBe(200)
     const pago1 = await poolApi.query('select status, taxa_psp_centavos from public.pagamentos where charge_ref=$1', [chargeRef])
     expect(pago1.rows[0]).toMatchObject({ status: 'pago', taxa_psp_centavos: 99 })
 
     // replay do mesmo evento -> idempotente (segue pago)
-    const replay = await post(assinatura, corpo)
+    const replay = await post(WEBHOOK_TOKEN, corpo)
     await app.close()
     expect(replay.statusCode).toBe(200)
     const pago2 = await poolApi.query('select status from public.pagamentos where charge_ref=$1', [chargeRef])

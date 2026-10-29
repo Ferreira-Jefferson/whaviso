@@ -78,6 +78,19 @@ export type SubcontaStatus = z.infer<typeof SubcontaStatus>
 /** Resposta de leitura da subconta (null enquanto a loja nao iniciou o onboarding). */
 export const SubcontaResposta = z.strictObject({ subconta: SubcontaStatus.nullable() })
 
+/**
+ * Provisionamento da credencial da subconta pelo operador (onboarding manual do modelo B): a API key
+ * da subconta no Asaas e o cliente 'Consumidor final'. `api_key` e write-only (nunca volta na resposta).
+ */
+export const SubcontaCredencialEntrada = z.strictObject({
+  loja_id: z.uuid(),
+  api_key: z.string().trim().min(1).max(500),
+  customer_ref: z.string().trim().min(1).max(100),
+  subconta_ref: z.string().trim().min(1).max(100).optional(),
+  status_kyc: statusSubconta.optional(),
+})
+export type SubcontaCredencialEntrada = z.infer<typeof SubcontaCredencialEntrada>
+
 /** Criar cobranca intermediada (via PSP) de um pedido: escolhe o meio. */
 export const CobrancaIntermediadaEntrada = z.strictObject({
   meio: z.enum(['pix', 'cartao']).default('pix'),

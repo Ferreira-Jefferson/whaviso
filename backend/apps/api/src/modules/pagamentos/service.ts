@@ -281,6 +281,27 @@ export async function obterSubconta(exec: Executor, lojaId: string): Promise<Sub
 }
 
 /**
+ * Provisiona (operador) a credencial de recebimento da subconta da loja: a API key da subconta no
+ * Asaas (cifrada em repouso) e o cliente 'Consumidor final' (customer_ref). No onboarding manual dos
+ * primeiros clientes, a subconta e criada no painel do Asaas e o operador cola aqui a chave + o
+ * customer; marcar 'aprovada' libera o caminho intermediado. A API key em claro nunca volta nem e logada.
+ */
+export async function definirSubconta(
+  exec: Executor,
+  deps: DepsPagamentos,
+  lojaId: string,
+  entrada: { apiKey: string; customerRef: string; subcontaRef?: string | null; statusKyc?: 'pendente' | 'aprovada' | 'recusada' },
+): Promise<SubcontaStatus> {
+  const apiKeyCifrada = deps.cripto.cifrar(entrada.apiKey)
+  return repo.upsertSubconta(exec, lojaId, PROVIDER_PSP, {
+    subcontaRef: entrada.subcontaRef ?? null,
+    statusKyc: entrada.statusKyc ?? 'aprovada',
+    apiKeyCifrada,
+    customerRef: entrada.customerRef,
+  })
+}
+
+/**
  * Cria a cobranca INTERMEDIADA (via PSP) de um pedido. Exige: config coerente (Pix intermediado, ou
  * cartao habilitado), PSP integrado (senao 501), subconta aprovada e credencial presente. Resolve a
  * taxa do whaviso, compoe o valor por absorve/repassa, chama o PSP com split e persiste a cobranca.
@@ -308,14 +329,18 @@ export async function criarCobrancaIntermediada(
   // Sem PSP integrado (sem as chaves do Asaas), o caminho intermediado nao esta disponivel (501).
   if (!deps.clientePsp) throw erroPspNaoIntegrado()
 
-  const subconta = await repo.obterSubconta(pool, lojaId, PROVIDER_PSP)
-  if (!subconta || subconta.status_kyc !== 'aprovada' || !subconta.subconta_ref) {
+  // Modelo B: a cobranca e criada autenticando como a SUBCONTA da loja; precisamos da API key dela
+  // (cifrada) e do cliente ('Consumidor final') que o Asaas exige como pagador.
+  const subconta = await repo.lerSubcontaParaCobranca(pool, lojaId, PROVIDER_PSP)
+  if (!subconta || subconta.statusKyc !== 'aprovada') {
     throw regraNegocio('subconta_nao_aprovada', 'A subconta de recebimento da loja ainda nao esta aprovada')
   }
-
-  const cifrada = await repo.lerCredencialPspCifrada(pool, PROVIDER_PSP)
-  if (!cifrada) throw regraNegocio('psp_sem_credencial', 'Credencial do PSP nao configurada')
-  const chavePsp = deps.cripto.decifrar(cifrada) // em memoria, nao logada
+  if (!subconta.customerRef) {
+    throw regraNegocio('subconta_sem_cliente', 'A subconta da loja nao tem cliente de cobranca configurado')
+  }
+  // Captura em locais ANTES da transacao: o narrowing do guard nao atravessa o closure async abaixo.
+  const customerRef = subconta.customerRef
+  const apiKeySubconta = deps.cripto.decifrar(subconta.apiKeyCifrada) // em memoria, nao logada
 
   return comTransacao(pool, async (client) => {
     const pedido = await repo.buscarPedido(client, pedidoId, lojaId, true)
@@ -336,12 +361,12 @@ export async function criarCobrancaIntermediada(
     const comp = comporCobranca(pedido.total_centavos, taxa, encargoModo)
 
     const cobranca = await deps.clientePsp!.criarCobranca(
-      { chave: chavePsp },
+      { chave: apiKeySubconta },
       {
         meio,
         valorCobradoCentavos: comp.valorCobradoCentavos,
         encargoWhavisoCentavos: comp.encargoWhavisoCentavos,
-        subcontaRef: subconta.subconta_ref!,
+        customerRef,
         referencia: pedido.codigo,
       },
     )
@@ -369,27 +394,23 @@ export async function criarCobrancaIntermediada(
 }
 
 /**
- * Processa um webhook do PSP: verifica a assinatura (via o cliente, com a credencial como segredo) e,
- * se o evento for de pagamento, concilia a cobranca por (provider, charge_ref) de forma idempotente.
- * Assinatura invalida => 401 e nada e conciliado. Charge desconhecida => no-op (ok).
+ * Processa um webhook do PSP: valida o TOKEN (`asaas-access-token`) via o cliente (comparado em tempo
+ * constante com o `ASAAS_WEBHOOK_TOKEN` configurado) e, se o evento for de pagamento, concilia a
+ * cobranca por (provider, charge_ref) de forma idempotente. Token invalido => 401 e nada e conciliado.
+ * Charge desconhecida => no-op (ok). A validacao e em memoria, sem decifra de credencial (resiste a flood).
  */
 export async function processarWebhookPsp(
   pool: Pool,
   deps: DepsPagamentos,
-  assinatura: string | undefined,
+  tokenRecebido: string | undefined,
   corpoBruto: string,
 ): Promise<void> {
   if (!deps.clientePsp) throw erroPspNaoIntegrado()
-  // Rejeicao barata ANTES de decifrar a credencial: flood sem assinatura nao custa decifra.
-  if (!assinatura) throw naoAutorizado('Webhook sem assinatura')
-  const cifrada = await repo.lerCredencialPspCifrada(pool, PROVIDER_PSP)
-  if (!cifrada) throw naoAutorizado('Webhook sem credencial configurada')
-  const segredo = deps.cripto.decifrar(cifrada)
 
-  const evento = deps.clientePsp.interpretarWebhook(segredo, assinatura, corpoBruto)
-  if (!evento) throw naoAutorizado('Assinatura de webhook invalida')
+  const evento = deps.clientePsp.interpretarWebhook(tokenRecebido, corpoBruto)
+  if (!evento) throw naoAutorizado('Token de webhook invalido')
 
-  if (evento.pago) {
+  if (evento.pago && evento.chargeRef) {
     // Idempotente: so afeta linha pendente; repeticao do mesmo evento e no-op.
     await repo.marcarPagoPorCharge(pool, PROVIDER_PSP, evento.chargeRef, evento.taxaPspCentavos)
   }

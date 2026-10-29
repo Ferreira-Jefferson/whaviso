@@ -16,6 +16,7 @@ import {
   PagamentosFiltro,
   PagamentoSaida,
   pedidoIdParam,
+  SubcontaCredencialEntrada,
   SubcontaResposta,
   WebhookResposta,
 } from './schemas'
@@ -59,9 +60,9 @@ function guardaGerir(app: FastifyInstance) {
 function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void {
   const r = app.withTypeProvider<ZodTypeProvider>()
 
-  // Captura o corpo CRU (bytes exatos recebidos) para a verificacao de assinatura do webhook do PSP,
-  // mantendo o parse JSON das demais rotas. Escopo encapsulado deste plugin. Uma assinatura HMAC so
-  // confere sobre o corpo original; re-serializar (JSON.stringify do body ja parseado) quebraria.
+  // Captura o corpo CRU (bytes exatos recebidos) do webhook do PSP: o cliente faz o proprio parse do
+  // corpo (e a validacao do token independe disso), e manter os bytes originais evita qualquer divergencia
+  // de re-serializacao. Mantem o parse JSON das demais rotas. Escopo encapsulado deste plugin.
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
     ;(req as unknown as { rawBody?: string }).rawBody = body as string
     try {
@@ -129,6 +130,23 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void 
       return { subconta }
     })
 
+  // PUT /pagamentos/psp/subcontas: operador provisiona a credencial da subconta de uma loja (modelo B,
+  // onboarding manual): cola a API key da subconta no Asaas + o cliente 'Consumidor final' e aprova.
+  // A API key em claro nunca volta na resposta nem e logada.
+  r.put('/psp/subcontas',
+    { ...plataformaPsp, schema: { body: SubcontaCredencialEntrada, response: { 200: SubcontaResposta } } },
+    async (req) => {
+      operadorAtivo(req)
+      const subconta = await service.definirSubconta(app.pool, obterDeps(), req.body.loja_id, {
+        apiKey: req.body.api_key,
+        customerRef: req.body.customer_ref,
+        subcontaRef: req.body.subconta_ref ?? null,
+        statusKyc: req.body.status_kyc,
+      })
+      req.log.info({ loja_id: req.body.loja_id, status_kyc: subconta.status_kyc, acao: 'psp_subconta_provisionada' }, 'subconta do psp provisionada')
+      return { subconta }
+    })
+
   // POST /pagamentos/pedidos/:pedidoId/intermediado: cobranca via PSP (Pix intermediado ou cartao).
   r.post('/pedidos/:pedidoId/intermediado',
     {
@@ -147,16 +165,15 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void 
       return pag
     })
 
-  // POST /pagamentos/webhooks/psp/asaas: webhook PUBLICO do PSP (sem auth; assinatura verificada no
-  // service sobre o corpo CRU). Rate limit por IP: a decifra da credencial roda antes de poder checar
-  // a assinatura, entao limitamos o flood (requests sem assinatura ja sao rejeitados cedo, sem decifra).
+  // POST /pagamentos/webhooks/psp/asaas: webhook PUBLICO do PSP. O Asaas autentica por TOKEN FIXO no
+  // header `asaas-access-token` (nao HMAC), comparado em tempo constante no service. Rate limit por IP.
   r.post('/webhooks/psp/asaas',
     { config: { rateLimit: { max: 300, timeWindow: '1 minute' } }, schema: { response: { 200: WebhookResposta } } },
     async (req) => {
-      const bruto = req.headers['asaas-signature'] ?? req.headers['x-psp-signature']
-      const assinatura = Array.isArray(bruto) ? bruto[0] : bruto
+      const bruto = req.headers['asaas-access-token'] ?? req.headers['x-psp-signature']
+      const token = Array.isArray(bruto) ? bruto[0] : bruto
       const corpoBruto = (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {})
-      await service.processarWebhookPsp(app.pool, obterDeps(), assinatura, corpoBruto)
+      await service.processarWebhookPsp(app.pool, obterDeps(), token, corpoBruto)
       return { ok: true }
     })
 

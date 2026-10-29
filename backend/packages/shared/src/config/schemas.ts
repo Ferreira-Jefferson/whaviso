@@ -35,6 +35,20 @@ export const envApiSchema = envBaseSchema.extend({
   RATE_LIMIT_JANELA: z.string().default('1 minute'),
   /** Desliga o rate limit global (so testes de carga locais). */
   RATE_LIMIT_DESLIGADO: bool.default(false),
+  /**
+   * PSP do pagamento intermediado (Asaas). A presenca de ASAAS_AMBIENTE ATIVA o cliente real; sem
+   * ela, o caminho intermediado responde 501 (stub). Modelo B: a cobranca e criada na subconta da
+   * loja (dono do dinheiro) e o split entrega so a taxa do whaviso para ASAAS_WALLET_ID. O webhook
+   * do Asaas e validado por token fixo (header `asaas-access-token`), NUNCA por HMAC. Segredos.
+   */
+  ASAAS_AMBIENTE: z.enum(['sandbox', 'producao']).optional(),
+  ASAAS_WALLET_ID: z.string().min(1).optional().describe('walletId do whaviso: alvo do split da taxa'),
+  ASAAS_WEBHOOK_TOKEN: z
+    .string()
+    .min(32)
+    .max(255)
+    .optional()
+    .describe('authToken do webhook do Asaas (header asaas-access-token); 32-255 chars, != API key'),
 })
 
 export const envZapSchema = envBaseSchema.extend({
