@@ -538,7 +538,7 @@ Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
 | Boot: semear x-loja-id + destravar Outlet | 25 | Front | FEITO (commit c959b76) |
 | Token em memória (fetch síncrono) | 26 | Front | FEITO (commit c959b76) |
 | Cortar refetchInterval + resync seletivo | 27 | Front | FEITO (commit c959b76) |
-| Endpoint /bootstrap + dashboard num só | 28 | API+Front | maior, planejar |
+| Dashboard num só (/dashboard/geral) | 28 | API+Front | FEITO (commit 8168599). /bootstrap do boot nao feito (ganho pequeno pos-item 25) |
 | DATABASE_URL_LISTEN (corrige cache/realtime) | 24 | config | no production.env e no backend/.env dev; falta VPS |
 | Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | FEITO em código (migration 0081, validada local); falta db push no cloud |
 | Read-model de clientes (B5) | 30 | DB | só dói com volume, depois |
@@ -581,13 +581,32 @@ fixes acima cortam o número de idas ao banco e se somam a esse ganho.
   com resync seletivo. Gate verde (front e back: typecheck, lint, 1057 testes de api passando).
 - **Item 22 ADIADO** (ver a nota no índice acima): o cache de escopo por TTL quebrava correção e
   gate; precisa de invalidação na mutação antes de religar.
+- **Item 28 FEITO** (commit 8168599): endpoint agregado `GET /dashboard/geral` resolve os cinco
+  read-models do dashboard em paralelo no servidor, então a página faz uma ida ao banco em vez de
+  cinco (e resolve o escopo uma vez). O front passou a usar um hook só. A parte `/bootstrap` (juntar
+  identidade + lojas + flag de operador no boot) NÃO foi feita: depois do item 25 o boot já roda em
+  paralelo, então o ganho remanescente é pequeno; fica como follow-up se precisar.
+- **Item 13 FEITO** (commit 56f620a): seletor de plano na criação/edição de assinatura. O backend já
+  aceitava `plano_id` numa cópia LOCAL do contrato; unifiquei `plano_id` na fonte compartilhada
+  (propaga pro front via codegen) e removi a duplicata. O seletor some com graça para papel sem
+  `planos:gerir` (403) e segue com valor manual. NÃO mostra o plano atual na edição (o `AssinaturaDTO`
+  não traz `plano_id`): follow-up pequeno (repo + DTO) se quiser.
+- **Item 14 FEITO** (commit 095f646): o menu da loja se adapta à grade de permissões (`/acessos/minhas`),
+  escondendo os itens cuja chave `:ver` o papel não tem. Mapeei só as rotas com chave `:ver` dedicada
+  e inequívoca; as ambíguas (cozinha, despacho, estoque, avaliações, dashboard, fatura, lojas, agenda)
+  ficam sempre visíveis (seguro: o servidor já nega a ação com 403). O motor de permissão e a tela
+  Acessos já existiam; isto é só o gating de UI que faltava. Gating de BOTÕES de ação dentro das telas
+  fica como follow-up.
 
-- **FALTA (código):** item 22 feito direito (com invalidação), item 28 (/bootstrap), item 30
-  (read-model), item 31 (serialização), item 32 (limpezas).
-- **FALTA (fora do código / precisa de você ou da VPS):** db push do 0081 (e das demais migrations
-  pendentes) no cloud COMPARTILHADO de prod; item 20 (VPS *.env); item 21 (OTP hook); item 24 na
-  VPS; itens 5, 6, 8, 35 (VPS); e verificar os restos de 13 (seletor de plano), 14 (granularidade
-  de permissão nos módulos de atendimento), 15 Fase B e 17 (Meta).
+- **FALTA (código, baixa prioridade):** item 22 feito direito (com invalidação; ganho pequeno pós-SP),
+  item 30 (read-model, só dói com volume), item 31 (serialização, idem), e as sobras do item 32
+  (de-dup de `/lojas` NÃO compensa: são duas queries de formas diferentes; `staleTime` de catálogo;
+  alvo `vercel` do push_secrets).
+- **FALTA (fora do código / precisa de você, da VPS ou da Meta):** db push do 0081 (e das demais
+  migrations pendentes) no cloud COMPARTILHADO de prod (combinar no deploy); item 21 (OTP hook);
+  itens 6, 8, 35 (VPS); 15 Fase B e 17 (Meta). O item 20/24 (VPS *.env) e o item 5 (serviço atendente)
+  foram tratados por outra sessão no cutover de prod do VPS (api/zap no projeto novo, pooler 5432,
+  TLS verify-full com CA pinada); confirmar o atendente e o resto no próximo deploy.
 
 ---
 
