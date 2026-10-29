@@ -439,11 +439,30 @@ nc -6 -vz db.yrwkwgmikjbkiplvjtyx.supabase.co 5432
 - **Sem IPv6 (ou nao conectou):** use o **Session Pooler (IPv4, porta 5432)**. No painel do Supabase, **Connect > Session pooler**, copie o host/regiao (algo como `aws-0-<regiao>.pooler.supabase.com`) e monte:
 
   ```
-  postgresql://whaviso_api.<ref>:<SENHA_whaviso_api>@aws-0-<regiao>.pooler.supabase.com:5432/postgres
-  postgresql://whaviso_zap.<ref>:<SENHA_whaviso_zap>@aws-0-<regiao>.pooler.supabase.com:5432/postgres
+  postgresql://whaviso_api.<ref>:<SENHA_whaviso_api>@aws-1-<regiao>.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=/etc/whaviso/supabase-root-2021-ca.crt
+  postgresql://whaviso_zap.<ref>:<SENHA_whaviso_zap>@aws-1-<regiao>.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=/etc/whaviso/supabase-root-2021-ca.crt
   ```
 
-  Mantenha o sufixo `.<ref>` no usuario e use as senhas dos roles `whaviso_api`/`whaviso_zap` do `production.env`. **Use a porta 5432 (session pooler), nunca a 6543 (transaction pooler):** o app usa transacoes com `FOR UPDATE SKIP LOCKED` e pools de vida longa, que o session pooler suporta como uma conexao direta.
+  Mantenha o sufixo `.<ref>` no usuario e use as senhas dos roles `whaviso_api`/`whaviso_zap` do `production.env`. **Use a porta 5432 (session pooler), nunca a 6543 (transaction pooler):** o app usa transacoes com `FOR UPDATE SKIP LOCKED` e pools de vida longa, que o session pooler suporta como uma conexao direta. O host atual do projeto e `aws-1-sa-east-1.pooler.supabase.com` (regiao sa-east-1).
+
+### TLS: CA pinada (OBRIGATORIO para o app Node)
+
+O pooler do Supabase apresenta um certificado encadeado na CA PRIVADA **"Supabase Root 2021 CA"** (self-signed), que nao esta em nenhum trust store publico. Cuidado com um gotcha que ja derrubou a api em producao:
+
+- **`sslmode=require` QUEBRA no node-postgres** com `SELF_SIGNED_CERT_IN_CHAIN`: ao contrario do libpq, o `pg` ainda VERIFICA o cert quando o sslmode nao e `disable`/`no-verify`. (O `psql`/`pg_dump`, que sao libpq, conectam com `require` sem verificar, o que ENGANA: "no psql funciona".)
+- **`sslmode=no-verify` cifra mas NAO verifica** (enfraquece o TLS). Nao usar.
+- **Solucao correta:** `sslmode=verify-full&sslrootcert=/etc/whaviso/supabase-root-2021-ca.crt` nas `*_DATABASE_URL` consumidas pelo app (api, zap, atendente) e no `DATABASE_URL_LISTEN`. A `MIGRATIONS_DB_URL` (CLI/libpq) pode seguir com `sslmode=require`.
+
+O CA (publico, nao e segredo) esta versionado em [certs/supabase-root-2021-ca.crt](certs/supabase-root-2021-ca.crt). Instale-o no servidor FORA do checkout (o deploy faz `git reset --hard` e apagaria um CA dentro do repo):
+
+```bash
+sudo install -m 644 -o root -g root /opt/whaviso/app/deploy/certs/supabase-root-2021-ca.crt /etc/whaviso/supabase-root-2021-ca.crt
+# ou re-extrair da cadeia que o proprio pooler apresenta:
+echo | openssl s_client -starttls postgres -connect aws-1-sa-east-1.pooler.supabase.com:5432 -showcerts 2>/dev/null \
+  | awk 'BEGIN{n=0} /BEGIN CERTIFICATE/{n++} {c[n]=c[n] $0 ORS} END{printf "%s", c[n]}' | sudo tee /etc/whaviso/supabase-root-2021-ca.crt >/dev/null
+# conferir (deve dizer CN = Supabase Root 2021 CA):
+openssl x509 -in /etc/whaviso/supabase-root-2021-ca.crt -noout -subject
+```
 
 ## Apendice B: habilitar o OTP por telefone
 
