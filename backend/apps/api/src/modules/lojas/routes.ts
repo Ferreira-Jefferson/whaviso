@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync } from 'fastify'
+import type { FastifyPluginAsync, FastifyRequest, preHandlerHookHandler } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { Proibido } from '../../shared/http_errors'
+import { NaoEncontrado, Proibido } from '../../shared/http_errors'
+import { papelPermite, type Permissao } from '../../shared/tenant'
 import {
   LojaAtualizarEntrada,
   LojaBrandingEntrada,
@@ -27,7 +28,34 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
     )
     const config = { acesso: 'conteudo_de_loja' as const }
     const comEscopo = { config, preHandler: [app.autenticar, app.escopoLoja] }
-    // Criar/desativar/reativar: so autenticacao; a conta vem do vinculo de dono, nunca do corpo.
+    // Guarda de rota (defesa em profundidade; o service re-checa por id). As rotas de loja
+    // operam pela loja do :id (nao pela loja ativa), entao o guard le o papel dessa loja e
+    // exige a permissao na grade, espelhando exigirGestor/contaDoDono do service. Fora do
+    // escopo = 404 (nao confirma a existencia de loja de outra conta).
+    const exigirNaLoja =
+      (permissao: Permissao): preHandlerHookHandler =>
+      async (req: FastifyRequest) => {
+        const escopo = req.escopo
+        const id = (req.params as { id?: string }).id
+        if (!escopo || !id) throw new Proibido()
+        const papel = escopo.papel_por_loja[id]
+        if (!escopo.loja_ids.includes(id) || !papel) throw new NaoEncontrado()
+        if (!papelPermite(papel, permissao)) throw new Proibido()
+      }
+    // Editar/branding/pausar/capacidade: exige `lojas:gerir` (padrao: dono e gerente).
+    const comGestao = { config, preHandler: [app.autenticar, app.escopoLoja, exigirNaLoja('lojas:gerir')] }
+    // Desativar/reativar: operacao de dono, FIXA e nao delegavel (nao e governada pela grade editavel,
+    // assim como a administracao da propria conta). Checa o papel dessa loja direto: so `dono` passa.
+    const exigirDonoDaLoja: preHandlerHookHandler = async (req: FastifyRequest) => {
+      const escopo = req.escopo
+      const id = (req.params as { id?: string }).id
+      if (!escopo || !id) throw new Proibido()
+      const papel = escopo.papel_por_loja[id]
+      if (!escopo.loja_ids.includes(id) || !papel) throw new NaoEncontrado()
+      if (papel !== 'dono') throw new Proibido()
+    }
+    const soDono = { config, preHandler: [app.autenticar, app.escopoLoja, exigirDonoDaLoja] }
+    // Criar: so autenticacao; nao ha loja ainda, a conta vem do vinculo de dono (service), nunca do corpo.
     const soAuth = { config, preHandler: [app.autenticar] }
     const usuario = (req: { usuario: { user_id: string } | null }): string => {
       if (!req.usuario) throw new Proibido()
@@ -60,7 +88,7 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
     app.patch(
       '/:id',
       {
-        ...comEscopo,
+        ...comGestao,
         schema: { params: LojaParams, body: LojaAtualizarEntrada, response: { 200: LojaSaida } },
       },
       async (req) => service.atualizar(app.pool, req.escopo!, req.params.id, req.body),
@@ -69,7 +97,7 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
     app.patch(
       '/:id/branding',
       {
-        ...comEscopo,
+        ...comGestao,
         schema: { params: LojaParams, body: LojaBrandingEntrada, response: { 200: LojaSaida } },
       },
       async (req) => service.branding(app.pool, req.escopo!, req.params.id, req.body, hostsLogo),
@@ -77,32 +105,32 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
 
     app.post(
       '/:id/desativar',
-      { ...soAuth, schema: { params: LojaParams, response: { 200: LojaSaida } } },
+      { ...soDono, schema: { params: LojaParams, response: { 200: LojaSaida } } },
       async (req) => service.alterarAtivo(app.pool, usuario(req), req.params.id, false),
     )
 
     app.post(
       '/:id/reativar',
-      { ...soAuth, schema: { params: LojaParams, response: { 200: LojaSaida } } },
+      { ...soDono, schema: { params: LojaParams, response: { 200: LojaSaida } } },
       async (req) => service.alterarAtivo(app.pool, usuario(req), req.params.id, true),
     )
 
     // G7: pausar/despausar a loja agora e configurar capacidade por janela (gestor da loja).
     app.post(
       '/:id/pausar',
-      { ...comEscopo, schema: { params: LojaParams, body: LojaPausarEntrada, response: { 200: LojaSaida } } },
+      { ...comGestao, schema: { params: LojaParams, body: LojaPausarEntrada, response: { 200: LojaSaida } } },
       async (req) => service.pausar(app.pool, req.escopo!, req.params.id, req.body),
     )
 
     app.post(
       '/:id/despausar',
-      { ...comEscopo, schema: { params: LojaParams, response: { 200: LojaSaida } } },
+      { ...comGestao, schema: { params: LojaParams, response: { 200: LojaSaida } } },
       async (req) => service.despausar(app.pool, req.escopo!, req.params.id),
     )
 
     app.patch(
       '/:id/capacidade',
-      { ...comEscopo, schema: { params: LojaParams, body: LojaCapacidadeEntrada, response: { 200: LojaSaida } } },
+      { ...comGestao, schema: { params: LojaParams, body: LojaCapacidadeEntrada, response: { 200: LojaSaida } } },
       async (req) => service.definirCapacidade(app.pool, req.escopo!, req.params.id, req.body),
     )
   }

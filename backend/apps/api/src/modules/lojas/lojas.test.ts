@@ -196,6 +196,28 @@ d('lojas (integracao)', () => {
     expect(sem.statusCode).toBe(401)
   })
 
+  it('guard de rota: papel sem lojas:gerir e barrado no preHandler (403) em toda rota de edicao', async () => {
+    // Defesa em profundidade: o guard do preHandler nega ANTES do service (que tambem re-checa).
+    // atendente nao tem `lojas:gerir` na grade padrao -> 403 em editar/branding/pausar/despausar/capacidade.
+    const edicoes = [
+      ['PATCH', `/${lojaA}`, { nome: 'Nao' }],
+      ['PATCH', `/${lojaA}/branding`, { cores: {} }],
+      ['POST', `/${lojaA}/pausar`, {}],
+      ['POST', `/${lojaA}/despausar`, undefined],
+      ['PATCH', `/${lojaA}/capacidade`, { por_janela: 3 }],
+    ] as const
+    for (const [m, u, p] of edicoes) {
+      const r = await req(atendente, m, u, p, lojaA)
+      expect(r.statusCode, `${m} ${u} atendente`).toBe(403)
+      expect(r.json().error.code).toBe('proibido')
+    }
+    // Desativar/reativar sao operacao FIXA de dono (nao delegavel pela grade): gerente/atendente -> 403.
+    expect((await req(gerente, 'POST', `/${lojaA}/desativar`, undefined, lojaA)).statusCode).toBe(403)
+    expect((await req(atendente, 'POST', `/${lojaA}/reativar`, undefined, lojaA)).statusCode).toBe(403)
+    // Loja fora do escopo = 404 ja no guard (nao confirma existencia de loja de outra conta).
+    expect((await req(gerente, 'PATCH', `/${lojaB}`, { nome: 'x' }, lojaA)).statusCode).toBe(404)
+  })
+
   it('PATCH atualiza endereco; campo ausente permanece', async () => {
     const r = await req(dono, 'PATCH', `/${lojaA}`, {
       endereco: { logradouro: 'Rua A', numero: '10', bairro: 'Centro', cidade: 'Sao Paulo', uf: 'SP', cep: '01001000' },
