@@ -8,6 +8,7 @@ import type { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
   ComandaAbrirEntrada,
+  ComandaFecharEntrada,
   ComandaItemEntrada,
   ComandaSaida,
   MesaAtualizarEntrada,
@@ -26,6 +27,7 @@ type CriarMesaBody = z.input<typeof MesaCriarEntrada>
 type AtualizarMesaBody = z.input<typeof MesaAtualizarEntrada>
 type AbrirComandaBody = z.input<typeof ComandaAbrirEntrada>
 type LancarItemBody = z.input<typeof ComandaItemEntrada>
+type FecharComandaBody = z.input<typeof ComandaFecharEntrada>
 
 type ListaMesas = z.infer<typeof MesaListaSaida>
 
@@ -128,11 +130,15 @@ export function useLancarItem() {
   })
 }
 
-/** POST /v1/salao/comandas/:id/fechar: encerra a comanda (mesa volta a ficar livre). */
+/**
+ * POST /v1/salao/comandas/:id/fechar: encerra a comanda (mesa volta a ficar livre). O recebimento
+ * entra no caixa aberto na forma de pagamento informada (historia 07, regra 6).
+ */
 export function useFecharComanda() {
   const invalidar = useInvalidarRaiz()
-  return useMutation<Comanda, Error, { id: string }>({
-    mutationFn: ({ id }) => apiClient.post<Comanda>(`/salao/comandas/${id}/fechar`, { schema: ComandaSaida }),
+  return useMutation<Comanda, Error, { id: string; body: FecharComandaBody }>({
+    mutationFn: ({ id, body }) =>
+      apiClient.post<Comanda>(`/salao/comandas/${id}/fechar`, { body, schema: ComandaSaida }),
     onSettled: invalidar,
   })
 }

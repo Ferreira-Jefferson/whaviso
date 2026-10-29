@@ -12,9 +12,15 @@ import type {
 } from './repo_leitura'
 import type { CardapioCtx, CategoriaCtx, GrupoCtx, ItemCtx, OpcaoCtx } from './tipos'
 
-function disponivel(e: { ativo: boolean; esgotado_ate: Date | null }, agora: Date): boolean {
+function disponivel(
+  e: { ativo: boolean; esgotado_ate: Date | null; controla_estoque?: boolean; quantidade_disponivel?: number | null },
+  agora: Date,
+): boolean {
   if (!e.ativo) return false
-  return !(e.esgotado_ate && e.esgotado_ate.getTime() > agora.getTime())
+  if (e.esgotado_ate && e.esgotado_ate.getTime() > agora.getTime()) return false
+  // Item com contador de estoque (historia 03): saldo zero esgota (opcao nao tem contador).
+  if (e.controla_estoque && e.quantidade_disponivel != null && e.quantidade_disponivel <= 0) return false
+  return true
 }
 
 /** Grupos efetivos do item: (categoria) menos (item incluir=false) mais (item incluir=true); inativo some. */

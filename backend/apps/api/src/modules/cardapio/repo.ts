@@ -43,6 +43,9 @@ export interface ItemRow {
   ativo: boolean
   esgotado_ate: Date | null
   ordem: number
+  // Contador de estoque do item (historia 03): saldo zerado tira o item da oferta (via estaDisponivel).
+  controla_estoque?: boolean
+  quantidade_disponivel?: number | null
 }
 export interface VinculoCategoriaRow {
   categoria_id: string
@@ -68,7 +71,7 @@ export interface DadosCardapio {
 const COLS_GRUPO = sql`id, nome, tipo, obrigatorio, min_escolhas::int as min_escolhas, max_escolhas::int as max_escolhas, aplica_a_opcao_id, ativo, ordem`
 const COLS_OPCAO = sql`id, grupo_id, nome, preco_centavos, padrao, ativo, esgotado_ate, ordem`
 const COLS_CATEGORIA = sql`id, nome, descricao, programacao, ativo, ordem`
-const COLS_ITEM = sql`id, categoria_id, nome, descricao, preco_centavos, imagem_url, sugerivel, ativo, esgotado_ate, ordem`
+const COLS_ITEM = sql`id, categoria_id, nome, descricao, preco_centavos, imagem_url, sugerivel, ativo, esgotado_ate, ordem, controla_estoque, quantidade_disponivel`
 
 export async function listarGrupos(exec: Executor, lojaId: string): Promise<GrupoRow[]> {
   return consultar<GrupoRow>(

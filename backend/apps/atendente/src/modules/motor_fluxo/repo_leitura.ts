@@ -217,6 +217,9 @@ export interface RawItem {
   ativo: boolean
   esgotado_ate: Date | null
   ordem: number
+  // Contador de estoque do item (historia 03): saldo zerado tira o item da oferta.
+  controla_estoque: boolean
+  quantidade_disponivel: number | null
 }
 export interface RawGrupo {
   id: string
@@ -265,7 +268,8 @@ export async function lerCardapioRaw(tx: Executor, lojaId: string): Promise<Card
   )
   const itens = await consultar<RawItem>(
     tx,
-    sql`select id, categoria_id, nome, preco_centavos, ativo, esgotado_ate, ordem
+    sql`select id, categoria_id, nome, preco_centavos, ativo, esgotado_ate, ordem,
+               controla_estoque, quantidade_disponivel
           from public.itens where loja_id = ${lojaId} order by ordem`,
   )
   const grupos = await consultar<RawGrupo>(

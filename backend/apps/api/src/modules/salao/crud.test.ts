@@ -85,7 +85,7 @@ d('modulo salao (crud)', () => {
   })
 
   it('fecha a comanda; mesa volta a ficar livre; lancar/fechar de novo: 409 comanda_fechada', async () => {
-    const r = await comoDono('POST', `/comandas/${comandaId}/fechar`)
+    const r = await comoDono('POST', `/comandas/${comandaId}/fechar`, { forma_pagamento: 'dinheiro' })
     expect(r.status, JSON.stringify(r.corpo)).toBe(200)
     expect(r.corpo.status).toBe('fechada')
     expect(r.corpo.fechada_em).toMatch(/Z$/)
@@ -95,7 +95,7 @@ d('modulo salao (crud)', () => {
     const relanca = await comoDono('POST', `/comandas/${comandaId}/itens`, { item_id: m.A.cardapio.burger, quantidade: 1 })
     expect(relanca.status).toBe(409)
     expect(relanca.corpo.error.code).toBe('comanda_fechada')
-    expect((await comoDono('POST', `/comandas/${comandaId}/fechar`)).status).toBe(409)
+    expect((await comoDono('POST', `/comandas/${comandaId}/fechar`, { forma_pagamento: 'dinheiro' })).status).toBe(409)
   })
 
   it('apos fechar, a mesa pode receber nova comanda', async () => {

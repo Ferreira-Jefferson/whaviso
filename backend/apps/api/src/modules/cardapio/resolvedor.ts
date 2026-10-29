@@ -76,11 +76,24 @@ export function excecoesReais(
 export interface Disponivel {
   ativo: boolean
   esgotado_ate: Date | null
+  /**
+   * Contador de estoque do item (historia 03): quando o item controla contagem finita e o saldo
+   * chega a zero, ele sai da oferta como esgotado. Opcional porque opcoes nao tem contador (campos
+   * ausentes = item sem contagem, sempre ofertavel por este criterio).
+   */
+  controla_estoque?: boolean
+  quantidade_disponivel?: number | null
 }
-/** Disponivel = ativo e sem `esgotado_ate` no futuro (no passado ou null = disponivel). */
+/**
+ * Disponivel = ativo, sem `esgotado_ate` no futuro (no passado ou null = disponivel) e, para item
+ * com contador de estoque, com saldo > 0 (saldo zero esgota e tira da oferta; contagem ilimitada
+ * (quantidade null) ou item sem controle nunca esgotam por este criterio).
+ */
 export function estaDisponivel(e: Disponivel, agora: Date): boolean {
   if (!e.ativo) return false
-  return !(e.esgotado_ate && e.esgotado_ate.getTime() > agora.getTime())
+  if (e.esgotado_ate && e.esgotado_ate.getTime() > agora.getTime()) return false
+  if (e.controla_estoque && e.quantidade_disponivel != null && e.quantidade_disponivel <= 0) return false
+  return true
 }
 
 const DIAS: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }

@@ -3,6 +3,7 @@
 // cardapio (snapshot). Dinheiro em centavos.
 import { z } from 'zod'
 import { Centavos, DataHoraIso, UuidSchema } from './primitivos'
+import { formaPagamento } from './caixa'
 
 const texto = (max: number) => z.string().trim().min(1).max(max)
 
@@ -49,6 +50,15 @@ export const ComandaItemEntrada = z.strictObject({
   quantidade: z.number().int().min(1).max(99),
 })
 export type ComandaItemEntrada = z.infer<typeof ComandaItemEntrada>
+
+/**
+ * Fechar a comanda (historia 07, regra 6): o recebimento entra no caixa aberto na forma de
+ * pagamento usada. A forma e obrigatoria porque o valor da comanda tem que cair no caixa.
+ */
+export const ComandaFecharEntrada = z.strictObject({
+  forma_pagamento: formaPagamento,
+})
+export type ComandaFecharEntrada = z.infer<typeof ComandaFecharEntrada>
 
 export const ComandaItemSaida = z.strictObject({
   id: UuidSchema,

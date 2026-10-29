@@ -37,6 +37,8 @@ export interface Mundo {
   atendente: string
   donoB: string
   operador: string
+  /** Caixa aberto da loja A (o fechamento de comanda exige caixa aberto e lanca o recebimento). */
+  caixaA: string
 }
 
 async function q<T = { id: string }>(sql: string, params: unknown[]): Promise<T> {
@@ -88,13 +90,23 @@ export async function montarMundo(): Promise<Mundo> {
     modulos: [{ prefixo: 'salao', plugin: criarSalaoRoutes() }],
   })
   await app.ready()
-  return { app, cenario, A, B, dono, gerente, atendente, donoB, operador }
+  const caixaA = (await q(
+    `insert into public.caixas (loja_id, aberto_por_user_id, saldo_inicial_centavos, status)
+     values ($1, $2, 0, 'aberto') returning id`,
+    [lojaA, dono],
+  )).id
+  return { app, cenario, A, B, dono, gerente, atendente, donoB, operador, caixaA }
 }
 
 export async function encerrar(m: Mundo): Promise<void> {
   await m.app.close()
   const lojas = [m.A.loja, m.B.loja]
   await poolSuper.query('delete from public.eventos where loja_id = any($1)', [lojas])
+  // Trilhas de baixa/caixa referenciam comanda/caixa: apaga antes do teardown compartilhado.
+  await poolSuper.query('delete from public.movimentos_item_estoque where loja_id = any($1)', [lojas])
+  await poolSuper.query('delete from public.movimentos_insumo where loja_id = any($1)', [lojas])
+  await poolSuper.query('delete from public.movimentos_caixa where loja_id = any($1)', [lojas])
+  await poolSuper.query('delete from public.caixas where loja_id = any($1)', [lojas])
   await poolSuper.query('delete from public.comanda_itens where loja_id = any($1)', [lojas])
   await poolSuper.query('delete from public.comandas where loja_id = any($1)', [lojas])
   await poolSuper.query('delete from public.mesas where loja_id = any($1)', [lojas])

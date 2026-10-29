@@ -29,6 +29,10 @@ export interface ItemRow {
   preco_centavos: number
   ativo: boolean
   esgotado_ate: Date | null
+  // Contador de estoque do item (historia 03): saldo zerado tira o item da oferta. Opcionais
+  // porque opcoes reusam `estaDisponivel` e nao tem contador.
+  controla_estoque?: boolean
+  quantidade_disponivel?: number | null
 }
 export interface CategoriaRow {
   id: string
@@ -44,9 +48,15 @@ export interface VinculoItemRow extends VinculoRow {
   incluir: boolean
 }
 
-export function estaDisponivel(e: { ativo: boolean; esgotado_ate: Date | null }, agora: Date): boolean {
+export function estaDisponivel(
+  e: { ativo: boolean; esgotado_ate: Date | null; controla_estoque?: boolean; quantidade_disponivel?: number | null },
+  agora: Date,
+): boolean {
   if (!e.ativo) return false
-  return !(e.esgotado_ate && e.esgotado_ate.getTime() > agora.getTime())
+  if (e.esgotado_ate && e.esgotado_ate.getTime() > agora.getTime()) return false
+  // Item com contador: saldo zero esgota (ilimitado/sem controle nao esgota por aqui).
+  if (e.controla_estoque && e.quantidade_disponivel != null && e.quantidade_disponivel <= 0) return false
+  return true
 }
 
 const DIAS: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }

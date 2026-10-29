@@ -9,6 +9,7 @@ export {
   MesaListaSaida,
   ComandaAbrirEntrada,
   ComandaItemEntrada,
+  ComandaFecharEntrada,
   ComandaItemSaida,
   ComandaSaida,
   ComandaListaSaida,

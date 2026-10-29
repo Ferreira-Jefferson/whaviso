@@ -16,15 +16,25 @@ interface Props {
   aoVoltar: () => void
 }
 
+const FORMAS_PAGAMENTO = [
+  { valor: 'dinheiro', rotulo: 'Dinheiro' },
+  { valor: 'credito', rotulo: 'Credito' },
+  { valor: 'debito', rotulo: 'Debito' },
+  { valor: 'pix', rotulo: 'Pix' },
+  { valor: 'outro', rotulo: 'Outro' },
+] as const
+type Forma = (typeof FORMAS_PAGAMENTO)[number]['valor']
+
 export function ComandaPanel({ comandaId, aoLancarItem, aoFechada, aoVoltar }: Props) {
   const comanda = useComanda(comandaId)
   const fechar = useFecharComanda()
   const { mostrarToast } = useToast()
   const [confirmando, setConfirmando] = useState(false)
+  const [formaPagamento, setFormaPagamento] = useState<Forma>('dinheiro')
 
   function confirmarFechar() {
     fechar.mutate(
-      { id: comandaId },
+      { id: comandaId, body: { forma_pagamento: formaPagamento } },
       {
         onSuccess: () => {
           setConfirmando(false)
@@ -128,7 +138,21 @@ export function ComandaPanel({ comandaId, aoLancarItem, aoFechada, aoVoltar }: P
         onConfirmar={confirmarFechar}
         onCancelar={() => setConfirmando(false)}
       >
-        A comanda sera encerrada e a mesa volta a ficar livre. Essa acao nao pode ser desfeita.
+        <div className="flex flex-col gap-3">
+          <p>A comanda sera encerrada e a mesa volta a ficar livre. O recebimento entra no caixa aberto.</p>
+          <label className="flex flex-col gap-1 text-sm text-tinta">
+            <span className="text-tinta-2">Forma de pagamento</span>
+            <select
+              value={formaPagamento}
+              onChange={(e) => setFormaPagamento(e.target.value as Forma)}
+              className="rounded-input border border-linha bg-papel px-3 py-2 text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia"
+            >
+              {FORMAS_PAGAMENTO.map((f) => (
+                <option key={f.valor} value={f.valor}>{f.rotulo}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </ConfirmDialog>
     </section>
   )
