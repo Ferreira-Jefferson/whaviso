@@ -66,6 +66,11 @@ export async function criarCobranca(
   return comTransacao(pool, async (client) => {
     const pedido = await repo.buscarPedido(client, pedidoId, lojaId, true)
     if (!pedido) throw new NaoEncontrado('Pedido nao encontrado')
+    // Nao faz sentido cobrar pedido que ainda nao entrou no fluxo (rascunho) ou que saiu dele
+    // por problema/cancelamento (problema). Barra a geracao de um Pix para esses estados.
+    if (pedido.status === 'rascunho' || pedido.status === 'problema') {
+      throw regraNegocio('pedido_status_invalido', 'Pedido neste status nao pode ser cobrado')
+    }
     if (pedido.total_centavos <= 0) {
       throw regraNegocio('pedido_sem_total', 'Pedido sem valor a cobrar')
     }
@@ -151,6 +156,11 @@ export async function conciliar(
     throw new Conflito(`Cobranca ${atual.status} nao pode ser conciliada`, 'transicao_invalida')
   }
   const pagoEm = entrada.pago_em ?? new Date().toISOString()
+  // `pago_em` e um instante absoluto (ISO com offset): comparar com agora independe do fuso.
+  // Um carimbo no futuro nao faz sentido para "quando foi pago".
+  if (new Date(pagoEm).getTime() > Date.now()) {
+    throw regraNegocio('pago_em_futuro', 'A data do pagamento nao pode estar no futuro')
+  }
   const pago = await repo.marcarPago(pool, id, lojaId, pagoEm)
   if (!pago) {
     // Corrida rara: outra requisição mudou o estado entre a leitura e o update.

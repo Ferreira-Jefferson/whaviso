@@ -75,13 +75,13 @@ async function criarMembro(
     [contaId, lojaId, userId, papel],
   )
 }
-async function criarPedido(lojaId: string, totalCentavos: number): Promise<string> {
+async function criarPedido(lojaId: string, totalCentavos: number, status = 'novo'): Promise<string> {
   const id = randomUUID()
   const codigo = 'P' + id.slice(0, 6).toUpperCase()
   await poolSuper.query(
     `insert into public.pedidos (id, loja_id, codigo, status, subtotal_centavos, taxa_entrega_centavos, total_centavos)
-     values ($1,$2,$3,'novo',$4,0,$4)`,
-    [id, lojaId, codigo, totalCentavos],
+     values ($1,$2,$3,$5,$4,0,$4)`,
+    [id, lojaId, codigo, totalCentavos, status],
   )
   return id
 }
@@ -314,6 +314,37 @@ describe('POST /pagamentos/pedidos/:pedidoId (criar cobrança)', () => {
     expect(res.statusCode).toBe(422)
     expect(res.json().error.code).toBe('pedido_sem_total')
   })
+
+  it('pedido cancelado (problema): 422 pedido_status_invalido', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('dono'))
+    const app = await montarApp()
+    const h = auth(f.userId, f.lojaId)
+    await definirPix(app, h)
+    const pedidoId = await criarPedido(f.lojaId, 1000)
+    // Cancela o pedido (status 'problema' exige motivo pelo check do banco).
+    await poolSuper.query(
+      "update public.pedidos set status='problema', problema_motivo='cancelado no teste' where id=$1",
+      [pedidoId],
+    )
+    const res = await app.inject({ method: 'POST', url: `/v1/pagamentos/pedidos/${pedidoId}`, headers: h, payload: {} })
+    await app.close()
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error.code).toBe('pedido_status_invalido')
+  })
+
+  it('pedido em rascunho: 422 pedido_status_invalido', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('dono'))
+    const app = await montarApp()
+    const h = auth(f.userId, f.lojaId)
+    await definirPix(app, h)
+    const pedidoId = await criarPedido(f.lojaId, 1000, 'rascunho')
+    const res = await app.inject({ method: 'POST', url: `/v1/pagamentos/pedidos/${pedidoId}`, headers: h, payload: {} })
+    await app.close()
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error.code).toBe('pedido_status_invalido')
+  })
 })
 
 describe('conciliação / cancelamento / expiração', () => {
@@ -339,6 +370,24 @@ describe('conciliação / cancelamento / expiração', () => {
     await app.close()
     expect(c2.statusCode).toBe(200)
     expect(c2.json()).toMatchObject({ status: 'pago', id: pag.id })
+  })
+
+  it('conciliar com pago_em no futuro: 422 pago_em_futuro', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('dono'))
+    const app = await montarApp()
+    const h = auth(f.userId, f.lojaId)
+    const pag = await criarCobranca(app, h, f.lojaId)
+    const futuro = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const res = await app.inject({
+      method: 'POST',
+      url: `/v1/pagamentos/${pag.id}/conciliar`,
+      headers: h,
+      payload: { pago_em: futuro },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error.code).toBe('pago_em_futuro')
   })
 
   it('pago não pode ser cancelado (409 transicao_invalida)', async () => {

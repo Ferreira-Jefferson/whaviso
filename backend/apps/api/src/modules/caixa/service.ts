@@ -105,6 +105,10 @@ export function criarServicoCaixa(pool: Pool) {
       throw regraNegocio('motivo_obrigatorio', 'Ajuste exige um motivo')
     }
     // pedido_id so se vincula a venda e tem que ser da loja.
+    // INTENCIONAL (design de PDV): quando ha pedido_id, o valor_centavos NAO e conferido contra o
+    // total do pedido. A gaveta e fisica e o lancamento e legitimo em pagamento parcial, split,
+    // troco e gorjeta, entao o operador digita o valor efetivamente recebido. Conferir contra o
+    // total do pedido quebraria esses fluxos. Nao mudar sem rever a regra de negocio do PDV.
     const pedidoId = b.tipo === 'venda' ? (b.pedido_id ?? null) : null
     if (pedidoId && !(await repo.pedidoDaLoja(pool, a.lojaId, pedidoId))) {
       throw naoEncontrado('Pedido nao encontrado')
