@@ -26,6 +26,8 @@ export function useLojas(incluirInativas: boolean) {
         signal,
       }),
     select: (d) => d.itens,
+    // Catalogo estavel: mutacoes invalidam RAIZ na hora, entao 5 min corta refetch redundante.
+    staleTime: 5 * 60_000,
   })
 }
 

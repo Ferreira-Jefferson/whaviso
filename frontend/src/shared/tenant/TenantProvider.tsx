@@ -22,6 +22,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     enabled: status === 'logado',
     // Rota fora do escopo de loja: ainda nao ha loja ativa para enviar.
     queryFn: ({ signal }) => apiClient.get<LojaResumo[]>('/lojas', { schema: ListaLojas, semLoja: true, signal }),
+    // Catalogo que quase nunca muda na sessao: mutacoes ja invalidam CHAVE_LOJAS na hora, entao
+    // um staleTime de 5 min so corta o refetch de boas a cada navegacao, sem servir dado velho.
+    staleTime: 5 * 60_000,
   })
 
   const lojas = useMemo(() => consulta.data ?? [], [consulta.data])
