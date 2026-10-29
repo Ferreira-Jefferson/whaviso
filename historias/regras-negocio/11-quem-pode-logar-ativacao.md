@@ -91,19 +91,41 @@ A autoridade do acesso é o servidor; a tela de login apenas reflete o resultado
   do PSP (PIX ou link de cartão); o pagamento confirmado ativa o acesso.
 - Um e-mail revogado deixa de acessar e permanece na tela de login; o registro não é apagado.
 
+## Plano (não é carteira de créditos)
+
+- A adesão contrata um **plano**, não um pacote de créditos. A carteira de créditos era do produto
+  antigo (cobrança/notificação), onde o cliente pagava por mensagem enviada; **não se aplica** a este
+  produto, que é de uso aberto dentro do plano.
+- Haverá **vários planos** (a tela de planos e o catálogo serão construídos depois). Exemplo ilustrativo
+  de como os planos se diferenciam (valores e regras são ilustrativos, não finais): um plano mais barato
+  em que o cliente usa a **própria** chave de IA (cadastra a dele), e um plano mais caro que inclui o uso
+  da **API da própria Whaviso**. O que cada plano libera é definição de produto a detalhar na tela de
+  planos.
+
+## Criação de loja é do próprio cliente
+
+- A plataforma **concede o acesso** e envia o aviso de boas-vindas; **não cria a loja** do cliente.
+- Com acesso, o cliente **cria a própria loja** (uma ou mais), manualmente, dentro do sistema. Logo, um
+  cliente recém-ativado entra **sem nenhuma loja** e a primeira tela útil é a de criar a primeira loja.
+- Consequência para o gate de entrada: estar ativo **não** é o mesmo que ter loja. O gate de entrada do
+  painel deve liberar quem está **ativo** (ainda que sem loja), e barrar apenas quem **não** está ativo.
+  Barrar por "não tem loja" é errado: expulsaria o cliente legítimo antes de ele criar a primeira loja.
+
 ## Decisões em aberto (a confirmar, não assumir)
 
-- **Plano x carteira de créditos.** Esta regra fala em "plano/pacote contratado", mas a direção de
-  cobrança registrada é a carteira de créditos de envio (ver nota de billing em
-  `../plataforma/cobranca.md` e as taxas em `../plataforma/taxas-intermediacao.md`). Confirmar se a adesão
-  contrata um PLANO (com definições fixas) ou um PACOTE DE CRÉDITOS, para alinhar o "já com as definições
-  do plano" do caso 1.
+- **Registro órfão de autenticação.** Esta tela é só de **login**, não de cadastro. Mas autenticar no
+  Google cria, por si, um registro de identidade no provedor (Supabase Auth) para qualquer e-mail válido,
+  mesmo sem cadastro nem plano. Decidir como evitar acumular e-mails não cadastrados: (a) **bloquear na
+  porta** com um hook de autenticação do Supabase (rejeitar a criação do usuário quando o e-mail não está
+  na allowlist ativa), que é o mais limpo e casa com "só login, não cadastro"; ou (b) **limpar depois**:
+  ao detectar sessão de e-mail não ativo, o servidor remove o registro de identidade e devolve a pessoa
+  ao `/entrar`. Preferência indicada: bloquear na porta.
 - **PSP e cartão.** `plataforma/cobranca.md` ainda descreve conferência manual v1 sem gateway. O modelo
   aqui (PSP Asaas notifica o pagamento; link de cartão além do PIX) **supersede** aquela nota: atualizar
   `plataforma/cobranca.md` para refletir o gancho de pagamento automático e a geração de cobrança
   (PIX/cartão) pelo operador.
 - **Campos exatos da ficha de adesão.** Mínimo acordado: nome, e-mail, telefone/WhatsApp, CNPJ e/ou CPF
-  (ao menos um) e o plano/pacote. Confirmar se há outros obrigatórios.
+  (ao menos um) e o plano. Confirmar se há outros obrigatórios.
 
 ## Notas de implementação (espelho do que já existe; não é regra, é rastreio)
 
@@ -111,7 +133,8 @@ A autoridade do acesso é o servidor; a tela de login apenas reflete o resultado
   adiciona, aprova (enfileira o boas-vindas) e revoga. O gate de bootstrap da primeira conta vive no
   módulo `conta` (`criarConta`), que exige o e-mail aprovado. O `plataforma_cobranca` também marca o
   e-mail como aprovado no gancho de pagamento (origem pagamento), por coordenação via banco.
-- O gate de **entrada no painel** (front-shell) barra quem autenticou mas não tem acesso, deslogando e
-  voltando para `/entrar` com aviso. Hoje ele decide pela presença de vínculo (loja ou operador), que é o
-  efeito observável de um e-mail ativo já provisionado; se no futuro existir "aprovado sem conta ainda
-  provisionada", o gate deve passar a consultar o estado de ativação diretamente.
+- O gate de **entrada no painel** (front-shell) barra quem autenticou mas não está ativo, deslogando e
+  voltando para `/entrar` com aviso. O critério correto é o **estado de ativação** do e-mail (está ativo
+  na allowlist? ou é operador?), não a presença de loja: um cliente ativo cria a própria loja depois,
+  então "sem loja" não pode barrar. Isso exige uma sonda de "estou ativo?" (consultar o estado de
+  ativação do e-mail autenticado), em vez de inferir acesso por ter loja.
