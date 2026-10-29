@@ -38,6 +38,17 @@ async function fichaLinha(lojaId: string, itemId: string, insumoId: string, qtd:
   )
 }
 
+// Desde a 0076, movimentos_insumo.pedido_id tem FK para pedidos.id: a baixa so registra para um
+// pedido REAL (espelha o ledger gemeo de itens, FK em 0023). Cria um pedido minimo e devolve o id.
+async function criarPedido(lojaId: string): Promise<string> {
+  const { rows } = await poolSuper.query<{ id: string }>(
+    `insert into public.pedidos (loja_id, codigo, status, subtotal_centavos, total_centavos)
+     values ($1, $2, 'novo', 0, 0) returning id`,
+    [lojaId, `BX-${randomUUID().slice(0, 8)}`],
+  )
+  return rows[0]!.id
+}
+
 d('darBaixaPorVenda (integracao)', () => {
   let lojaId = '', itemId = '', insA = '', insB = ''
   const contasParaLimpar: string[] = []
@@ -62,7 +73,7 @@ d('darBaixaPorVenda (integracao)', () => {
   })
 
   it('decrementa cada insumo pelo consumo e registra movimento com a quantidade resultante', async () => {
-    const pedido = randomUUID()
+    const pedido = await criarPedido(lojaId)
     const r = await darBaixaPorVenda(poolSuper, { item_id: itemId, loja_id: lojaId, quantidade_vendida: 2, pedido_id: pedido })
     expect(r).toEqual({ baixados: 2, jaRegistrados: 0 })
 
@@ -79,7 +90,7 @@ d('darBaixaPorVenda (integracao)', () => {
   })
 
   it('idempotente por pedido_id: reexecutar nao da baixa em dobro nem duplica movimento', async () => {
-    const pedido = randomUUID()
+    const pedido = await criarPedido(lojaId)
     await darBaixaPorVenda(poolSuper, { item_id: itemId, loja_id: lojaId, quantidade_vendida: 1, pedido_id: pedido })
     const aposPrimeira = await quantidadeAtual(insA)
     const r2 = await darBaixaPorVenda(poolSuper, { item_id: itemId, loja_id: lojaId, quantidade_vendida: 1, pedido_id: pedido })
@@ -95,7 +106,7 @@ d('darBaixaPorVenda (integracao)', () => {
   })
 
   it('corrida: duas baixas simultaneas do MESMO pedido: um movimento por insumo, decremento uma vez', async () => {
-    const pedido = randomUUID()
+    const pedido = await criarPedido(lojaId)
     const antesA = await quantidadeAtual(insA)
     // Duas baixas concorrentes do mesmo (pedido, item): o indice unico parcial (pedido_id, insumo_id)
     // where tipo='consumo' barra a duplicata; o decremento perdido reverte com o statement que falha.
