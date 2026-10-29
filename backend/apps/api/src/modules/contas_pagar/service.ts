@@ -19,6 +19,9 @@ export interface Ator {
   userId: string
 }
 
+/** Teto do periodo de consulta do acerto (a leitura materializa lancamentos). */
+const MAX_DIAS_ACERTO = 93
+
 export function criarServicoContasPagar(pool: Pool, cifra: Cifra) {
   /** Ultimos 4 digitos do telefone decifrado; nunca o numero completo. */
   const mascara = (cifrado: Buffer | null): string | null => {
@@ -284,6 +287,10 @@ export function criarServicoContasPagar(pool: Pool, cifra: Cifra) {
     async acertoPeriodo(a: Ator, de: string, ate: string): Promise<AcertoPeriodoDto> {
       if (ate < de) {
         throw regraNegocio('periodo_invalido', 'A data final nao pode ser anterior a inicial')
+      }
+      const dias = Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86_400_000) + 1
+      if (dias > MAX_DIAS_ACERTO) {
+        throw regraNegocio('periodo_muito_longo', `O periodo maximo e de ${MAX_DIAS_ACERTO} dias`)
       }
       await comTransacao(pool, (tx) => escrita.materializarEntregasPeriodo(tx, a.lojaId, de, ate))
       const [agregados, lancs] = await Promise.all([

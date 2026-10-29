@@ -28,7 +28,7 @@ function decodificarCursor(c: string): { ts: string; id: string } {
 export function criarServicoCustos(pool: Pool) {
   /** Parte comum das duas visoes (loja e operador). */
   async function resumoBase(escopo: Consulta, q: CustosPeriodoQuery) {
-    const p = await repo.resolverPeriodo(pool, q.de, q.ate)
+    const p = repo.resolverPeriodo(q.de, q.ate)
     const [totalC, categorias, origens, dias] = await Promise.all([
       repo.total(pool, escopo, p),
       repo.porCategoria(pool, escopo, p),
@@ -67,7 +67,7 @@ export function criarServicoCustos(pool: Pool) {
     },
 
     async eventosLoja(lojaId: string, q: CustosEventosBusca) {
-      const p = await repo.resolverPeriodo(pool, q.de, q.ate)
+      const p = repo.resolverPeriodo(q.de, q.ate)
       const linhas = await repo.listarEventos(pool, lojaId, p, {
         categoria: q.categoria,
         cursor: q.cursor ? decodificarCursor(q.cursor) : undefined,

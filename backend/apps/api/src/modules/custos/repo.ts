@@ -3,6 +3,7 @@
 // `select *`. A visao da loja filtra por loja_id; a do operador agrega a base inteira e nunca
 // devolve linha individual nem loja_id. Dias e periodos em America/Sao_Paulo.
 import { consultar, consultarUm, sql, sqlBruto, type Consulta, type Executor } from '@whaviso/shared/db'
+import { hojeSp } from '@whaviso/shared/datas'
 import type { CategoriaCusto, EventoCustoDto, TarifaMetaDto } from './schemas'
 
 const FUSO = 'America/Sao_Paulo'
@@ -20,20 +21,24 @@ export interface Periodo {
   dias: number
 }
 
-/** Resolve o periodo efetivo (default: ultimos 30 dias ate hoje em Sao Paulo). */
-export async function resolverPeriodo(exec: Executor, de?: string, ate?: string): Promise<Periodo> {
-  const r = await consultarUm<Periodo>(
-    exec,
-    sql`with p as (
-          select coalesce(${ate ?? null}::date, (now() at time zone ${FUSO})::date) as ate
-        ), q as (
-          select p.ate, coalesce(${de ?? null}::date, p.ate - 29) as de from p
-        )
-        select to_char(q.de, 'YYYY-MM-DD') as de, to_char(q.ate, 'YYYY-MM-DD') as ate,
-               (q.ate - q.de + 1)::int as dias
-          from q`,
-  )
-  return r!
+const DIA_MS = 86_400_000
+/** Mesmo teto do contrato (CustosPeriodoQuery): vale tambem quando so `de` e informado. */
+const MAX_DIAS = 92
+
+const somarDias = (dia: string, n: number): string =>
+  new Date(Date.parse(`${dia}T00:00:00Z`) + n * DIA_MS).toISOString().slice(0, 10)
+
+/**
+ * Resolve o periodo efetivo (default: ultimos 30 dias ate hoje em Sao Paulo), em JS puro.
+ * O teto de MAX_DIAS e aplicado depois dos defaults (so `de` informado: `de` sobe para o teto).
+ */
+export function resolverPeriodo(de?: string, ate?: string): Periodo {
+  const fim = ate ?? hojeSp()
+  let ini = de ?? somarDias(fim, -29)
+  const limite = somarDias(fim, -(MAX_DIAS - 1))
+  if (ini < limite) ini = limite
+  const dias = Math.round((Date.parse(`${fim}T00:00:00Z`) - Date.parse(`${ini}T00:00:00Z`)) / DIA_MS) + 1
+  return { de: ini, ate: fim, dias }
 }
 
 // Limites do periodo como timestamptz: [inicio do dia `de`, inicio do dia seguinte a `ate`).

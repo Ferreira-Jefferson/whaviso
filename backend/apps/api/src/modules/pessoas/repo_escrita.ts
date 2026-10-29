@@ -35,6 +35,13 @@ export async function atualizarCargo(
   const partes: Consulta[] = []
   if (p.nome !== undefined) partes.push(sql`nome = ${p.nome}`)
   if (p.ativo !== undefined) partes.push(sql`ativo = ${p.ativo}`)
+  // Patch vazio: nada a gravar; devolve a linha atual (mesmas regras de escopo) em vez de 500.
+  if (partes.length === 0) {
+    return consultarUm<CargoLinha>(
+      exec,
+      sql`select ${COLS_CARGO} from public.cargos where id = ${id} and loja_id = ${lojaId} and not sistema`,
+    )
+  }
   return consultarUm<CargoLinha>(
     exec,
     sql`update public.cargos set ${montarSets(partes)}
@@ -181,6 +188,13 @@ export async function atualizarEscala(
   if (p.entrada !== undefined) partes.push(sql`entrada = ${p.entrada}::time`)
   if (p.saida !== undefined) partes.push(sql`saida = ${p.saida}::time`)
   if (p.ativo !== undefined) partes.push(sql`ativo = ${p.ativo}`)
+  // Patch vazio: nada a gravar; devolve a linha atual em vez de 500.
+  if (partes.length === 0) {
+    return consultarUm<EscalaLinha>(
+      exec,
+      sql`select ${COLS_ESCALA} from public.escalas where id = ${id} and loja_id = ${lojaId}`,
+    )
+  }
   return consultarUm<EscalaLinha>(
     exec,
     sql`update public.escalas set ${montarSets(partes)}

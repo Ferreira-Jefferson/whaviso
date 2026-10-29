@@ -83,7 +83,8 @@ export async function listarPessoas(exec: Executor, lojaId: string, incluirInati
           from public.pessoas p
           join public.cargos c on c.id = p.cargo_id
          where p.loja_id = ${lojaId}${filtroAtivo}
-         order by p.ativo desc, p.nome`,
+         order by p.ativo desc, p.nome
+         limit 500`,
   )
 }
 

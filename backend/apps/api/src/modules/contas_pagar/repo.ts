@@ -98,7 +98,8 @@ export async function listarContas(exec: Executor, lojaId: string, f: ContasFilt
     exec,
     sql`select ${COLS_CONTA} ${JOIN_CREDOR}
          where ${where}
-         order by c.vencimento desc nulls last, c.criado_em desc`,
+         order by c.vencimento desc nulls last, c.criado_em desc
+         limit 200`,
   )
 }
 

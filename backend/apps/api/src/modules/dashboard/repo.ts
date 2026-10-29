@@ -155,7 +155,8 @@ export async function conversas(exec: Executor, j: Janela): Promise<ConversasLin
                (count(*) filter (where status = 'encerrada' and criado_em >= ${j.inicio} and criado_em < ${j.fim}))::int
                  as p_encerrada
           from public.conversas
-         where loja_id = ${j.lojaId}`,
+         where loja_id = ${j.lojaId}
+           and (status <> 'encerrada' or (criado_em >= ${j.inicio} and criado_em < ${j.fim}))`,
   )
   return r!
 }

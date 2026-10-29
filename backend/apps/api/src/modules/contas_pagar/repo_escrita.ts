@@ -171,7 +171,8 @@ export async function materializarEntregasPeriodo(
           join public.motoboys m on m.id = p.motoboy_id and m.loja_id = p.loja_id
           left join public.zonas_entrega z on z.id = p.zona_id and z.loja_id = p.loja_id
          where p.loja_id = ${lojaId} and p.status = 'entregue' and p.motoboy_id is not null
-           and (p.entregue_em at time zone ${TZ})::date between ${de}::date and ${ate}::date
+           and p.entregue_em >= (${de}::date::timestamp at time zone ${TZ})
+           and p.entregue_em < ((${ate}::date + 1)::timestamp at time zone ${TZ})
            and not exists (
              select 1 from public.acertos_motoboy ac
               where ac.loja_id = p.loja_id and ac.motoboy_id = p.motoboy_id and ac.status = 'pago'
