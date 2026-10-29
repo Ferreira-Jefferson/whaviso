@@ -210,6 +210,25 @@ describe.skipIf(!online)('ZAP-enviar: dreno da outbox', () => {
     expect(e.erro).not.toContain('EAAG')
   })
 
+  it('coerencia de tenant: envio com cliente de OUTRA loja NAO e reivindicado nem enviado', async () => {
+    // Loja A (a dona do envio e do numero) e loja B (dona do cliente). Uma linha de outbox com
+    // loja_id/numero de A mas cliente_id de B e inconsistente: nunca pode decifrar o telefone de B
+    // e manda-lo pelo numero de A. Defesa em profundidade contra um bug de autorizacao na api.
+    const a = await cenario()
+    const b = await cenario()
+    const cruzado = await enfileirarTexto(a, 'cruzado', { clienteId: b.clienteId })
+    const legitimo = await enfileirarTexto(a, 'ok')
+    const whats = new FakeClienteWhats()
+
+    const resumo = await drenarEnvios(deps(whats))
+
+    // So o envio coerente e reivindicado/enviado; o cruzado nao sai e fica retido em `agendado`.
+    expect(resumo).toMatchObject({ reivindicados: 1, enviados: 1 })
+    expect(whats.chamadas).toHaveLength(1)
+    expect((await lerEnvio(cruzado)).status).toBe('agendado')
+    expect((await lerEnvio(legitimo)).status).toBe('enviado')
+  })
+
   it('SEC-031: whaviso_zap NAO escreve coluna fora do outbox (loja_id)', async () => {
     const c = await cenario()
     const id = await enfileirarTexto(c, 'rbac')

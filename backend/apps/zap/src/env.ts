@@ -31,11 +31,6 @@ export const envSchema = z.object({
   META_OTP_TEMPLATE: z.string().default('whaviso_otp'),
   META_OTP_IDIOMA: z.string().default('pt_BR'),
 
-  // Send SMS Hook do Supabase: gera o OTP do login por telefone e POSTa em
-  // /hooks/send-code (assinatura Standard Webhooks); entregamos o código por template
-  // AUTHENTICATION da Meta. Sem o secret a rota responde 503 (recurso desligado).
-  SEND_CODE_HOOK_SECRET: z.string().optional().describe('segredo whsec_ do Send SMS Hook'),
-
   // Admin API do Supabase (service role key). OPCIONAIS. NUNCA vão ao bundle do front.
   SUPABASE_URL: z.url().optional().describe('URL do Supabase para a Admin API'),
   SUPABASE_SERVICE_ROLE_KEY: z

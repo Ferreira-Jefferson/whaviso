@@ -43,8 +43,8 @@ export async function criarApp(deps: DepsZap) {
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
 
-  // Preserva o corpo cru p/ validar assinaturas de webhook: Standard Webhooks do
-  // /hooks/send-code (Supabase) e X-Hub-Signature-256 do /webhook/whatsapp (Meta).
+  // Preserva o corpo cru p/ validar a assinatura do webhook: X-Hub-Signature-256 do
+  // /webhook/whatsapp (Meta), que e HMAC-SHA256 sobre o corpo exato recebido.
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, corpo, done) => {
     ;(req as { rawBody?: Buffer }).rawBody = corpo as Buffer
     if ((corpo as Buffer).length === 0) return done(null, undefined)

@@ -104,7 +104,16 @@ export async function semear(op: OpcoesCenario = {}): Promise<Cenario> {
 export async function enfileirarTexto(
   c: Cenario,
   texto = 'oi',
-  extra: { status?: string; tentativas?: number; atualizadoEm?: Date } = {},
+  extra: {
+    status?: string
+    tentativas?: number
+    atualizadoEm?: Date
+    // Overrides para forjar uma linha de outbox com tenant cruzado (numero/cliente/conversa de
+    // outra loja): default usa os ids coerentes do proprio cenario.
+    numeroId?: string
+    clienteId?: string
+    conversaId?: string
+  } = {},
 ): Promise<string> {
   const id = randomUUID()
   // atualizado_em so e aceito no INSERT (o trigger before-update o reescreve em updates): usamos
@@ -117,11 +126,11 @@ export async function enfileirarTexto(
     [
       id,
       c.lojaId,
-      c.numeroId,
-      c.clienteId,
+      extra.numeroId ?? c.numeroId,
+      extra.clienteId ?? c.clienteId,
       hex64(),
       JSON.stringify({ tipo: 'texto', texto }),
-      c.conversaId,
+      extra.conversaId ?? c.conversaId,
       extra.status ?? 'agendado',
       extra.tentativas ?? 0,
       extra.atualizadoEm ?? new Date(),
