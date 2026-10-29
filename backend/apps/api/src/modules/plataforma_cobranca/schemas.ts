@@ -50,6 +50,8 @@ export const PlanoDTO = z.strictObject({
   valor_centavos: Centavos,
   inclui: z.array(z.string()),
   ativo: z.boolean(),
+  /** Override da taxa de intermediacao (centavos); NULL = herda o padrao da plataforma. */
+  taxa_intermediacao_centavos: Centavos.nullable(),
   criado_em: z.string(),
   atualizado_em: z.string(),
 })
@@ -61,6 +63,8 @@ export const PlanoCriar = z.strictObject({
   valor_centavos: Centavos,
   inclui: Inclui.default([]),
   ativo: z.boolean().default(true),
+  /** NULL (ou ausente) = herda o padrao da plataforma; numero = override (0 = taxa zero). */
+  taxa_intermediacao_centavos: Centavos.nullable().default(null),
 })
 export type PlanoCriar = z.infer<typeof PlanoCriar>
 
@@ -70,6 +74,21 @@ export const PlanoPatch = z
     valor_centavos: Centavos.optional(),
     inclui: Inclui.optional(),
     ativo: z.boolean().optional(),
+    /** Presente = altera (null limpa o override, voltando a herdar); ausente = nao mexe. */
+    taxa_intermediacao_centavos: Centavos.nullable().optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: 'informe ao menos um campo para alterar' })
 export type PlanoPatch = z.infer<typeof PlanoPatch>
+
+// ---- Config da plataforma: taxa de intermediacao PADRAO (fallback de todos os planos) ----------
+
+export const ConfigTaxaDTO = z.strictObject({
+  taxa_intermediacao_padrao_centavos: Centavos,
+  atualizado_em: z.string(),
+})
+export type ConfigTaxaDTO = z.infer<typeof ConfigTaxaDTO>
+
+export const ConfigTaxaPatch = z.strictObject({
+  taxa_intermediacao_padrao_centavos: Centavos,
+})
+export type ConfigTaxaPatch = z.infer<typeof ConfigTaxaPatch>

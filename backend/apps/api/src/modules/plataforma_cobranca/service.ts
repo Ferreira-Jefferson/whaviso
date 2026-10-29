@@ -5,14 +5,17 @@
 // Nenhum dado pessoal vai para log, evento ou auditoria.
 import { comTransacao, type Pool } from '@whaviso/shared/db'
 import { hojeSp } from '@whaviso/shared/datas'
+import { invalidarCacheTaxas } from '@whaviso/shared/taxas'
 import type {
   ApurarAtrasosResultado, AssinaturaDTO, FaturaDTO, FaturaMarcarPaga,
   GerarFaturasResultado, MinhaFaturaDTO, StatusAssinatura,
 } from '@whaviso/shared/contracts'
-import type { AssinaturaCriar, AssinaturaPatch, PlanoCriar, PlanoDTO, PlanoPatch } from './schemas'
+import type {
+  AssinaturaCriar, AssinaturaPatch, ConfigTaxaDTO, ConfigTaxaPatch, PlanoCriar, PlanoDTO, PlanoPatch,
+} from './schemas'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import * as repo from './repo'
-import type { AssinaturaLinha, FaturaLinha, PlanoLinha } from './repo'
+import type { AssinaturaLinha, ConfigTaxaLinha, FaturaLinha, PlanoLinha } from './repo'
 import {
   CARENCIA_DIAS_PADRAO, calcularVencimento, deveSuspender, mesCompetenciaDe, transicaoValida,
 } from './regras'
@@ -49,7 +52,15 @@ function paraAssinatura(l: AssinaturaLinha): AssinaturaDTO {
 function paraPlano(l: PlanoLinha): PlanoDTO {
   return {
     id: l.id, nome: l.nome, valor_centavos: l.valor_centavos, inclui: l.inclui, ativo: l.ativo,
+    taxa_intermediacao_centavos: l.taxa_intermediacao_centavos,
     criado_em: l.criado_em, atualizado_em: l.atualizado_em,
+  }
+}
+
+function paraConfigTaxa(l: ConfigTaxaLinha): ConfigTaxaDTO {
+  return {
+    taxa_intermediacao_padrao_centavos: l.taxa_intermediacao_padrao_centavos,
+    atualizado_em: l.atualizado_em,
   }
 }
 
@@ -134,7 +145,9 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
     try {
       const p = await repo.inserirPlano(pool, {
         nome: b.nome, valor: b.valor_centavos, inclui: b.inclui, ativo: b.ativo,
+        taxa: b.taxa_intermediacao_centavos,
       })
+      invalidarCacheTaxas()
       return paraPlano(p!)
     } catch (e) {
       throw traduzirNomeDuplicado(e)
@@ -146,15 +159,41 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
   }
 
   async function alterarPlano(_a: Ator, id: string, b: PlanoPatch): Promise<PlanoDTO> {
+    // Tri-estado da taxa: chave presente (mesmo com null) = altera; ausente = nao mexe.
+    const taxaInformada = 'taxa_intermediacao_centavos' in b
     try {
       const p = await repo.atualizarPlano(pool, id, {
         nome: b.nome ?? null, valor: b.valor_centavos ?? null, inclui: b.inclui ?? null, ativo: b.ativo ?? null,
+        taxaInformada, taxa: b.taxa_intermediacao_centavos ?? null,
       })
       if (!p) throw naoEncontrado('Plano nao encontrado')
+      if (taxaInformada) invalidarCacheTaxas()
       return paraPlano(p)
     } catch (e) {
       throw traduzirNomeDuplicado(e)
     }
+  }
+
+  /** Taxa de intermediacao PADRAO da plataforma (singleton). Semeada na migration 0084. */
+  async function obterConfigTaxa(_a: Ator): Promise<ConfigTaxaDTO> {
+    const c = await repo.obterConfigTaxa(pool)
+    // A linha unica nasce na migration; ausencia so ocorreria se a migration nao rodou.
+    if (!c) throw naoEncontrado('Config da plataforma nao encontrada')
+    return paraConfigTaxa(c)
+  }
+
+  async function alterarConfigTaxa(_a: Ator, b: ConfigTaxaPatch): Promise<ConfigTaxaDTO> {
+    const atualizada = await comTransacao(pool, async (tx) => {
+      const c = await repo.atualizarConfigTaxa(tx, b.taxa_intermediacao_padrao_centavos)
+      if (!c) throw naoEncontrado('Config da plataforma nao encontrada')
+      await repo.registrarEvento(tx, {
+        tipo: 'taxa.padrao_alterada', entidade: 'config_plataforma', entidadeId: null, ator: 'operador',
+        detalhes: { taxa_intermediacao_padrao_centavos: c.taxa_intermediacao_padrao_centavos },
+      })
+      return c
+    })
+    invalidarCacheTaxas()
+    return paraConfigTaxa(atualizada)
   }
 
   async function listarAssinaturas(
@@ -331,6 +370,7 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
   return {
     criar, listarAssinaturas, alterar, gerarFaturas, apurarAtrasos, marcarPaga, cancelarFatura,
     listarFaturas, minhasFaturas, criarPlano, listarPlanos, alterarPlano,
+    obterConfigTaxa, alterarConfigTaxa,
   }
 }
 

@@ -13,6 +13,7 @@
     "./pix": "./src/pix/index.ts",
     "./cifra": "./src/cifra/index.ts",
     "./pix_credencial": "./src/pix_credencial/index.ts",
+    "./taxas": "./src/taxas/index.ts",
     "./clientes": "./src/clientes/index.ts",
     "./clientes/testing": "./src/clientes/contratos/index.ts"
   },

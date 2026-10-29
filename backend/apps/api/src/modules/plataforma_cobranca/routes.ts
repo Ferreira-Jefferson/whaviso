@@ -5,8 +5,8 @@ import type { Permissao } from '../../shared/tenant'
 import { criarServicoCobranca, type Ator } from './service'
 import {
   ApurarAtrasosResultado, AssinaturaCriar, AssinaturaDTO, AssinaturaPatch, AssinaturasLista, AssinaturasQuery,
-  FaturaDTO, FaturaMarcarPaga, FaturasLista, FaturasQuery, GerarFaturasEntrada, GerarFaturasResultado,
-  IdParams, MinhasFaturasLista, PlanoCriar, PlanoDTO, PlanoPatch, PlanosLista,
+  ConfigTaxaDTO, ConfigTaxaPatch, FaturaDTO, FaturaMarcarPaga, FaturasLista, FaturasQuery, GerarFaturasEntrada,
+  GerarFaturasResultado, IdParams, MinhasFaturasLista, PlanoCriar, PlanoDTO, PlanoPatch, PlanosLista,
 } from './schemas'
 
 /** Ator = operador autenticado. O user_id vem SO do escopo resolvido (nunca do corpo/query). */
@@ -88,6 +88,18 @@ export function criarCobrancaRoutes(): FastifyPluginAsync {
       ...adminPlataforma,
       schema: { params: IdParams, body: PlanoPatch, response: { 200: PlanoDTO } },
     }, async (req) => svc.alterarPlano(operador(req), req.params.id, req.body))
+
+    // Taxa de intermediacao PADRAO da plataforma (fallback de todos os planos). Config de preco:
+    // mesmo gate do catalogo de planos (admin/financeiro). Nunca hardcoded; vive no banco.
+    app.get('/config/taxa', {
+      ...adminPlataforma,
+      schema: { response: { 200: ConfigTaxaDTO } },
+    }, async (req) => svc.obterConfigTaxa(operador(req)))
+
+    app.put('/config/taxa', {
+      ...adminPlataforma,
+      schema: { body: ConfigTaxaPatch, response: { 200: ConfigTaxaDTO } },
+    }, async (req) => svc.alterarConfigTaxa(operador(req), req.body))
 
     // Jobs manuais (idempotentes). Rate limit por SEC-101: execucao manual, nao em laco.
     app.post('/cobranca/gerar-faturas', {

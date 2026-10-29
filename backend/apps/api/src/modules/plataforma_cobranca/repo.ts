@@ -275,7 +275,8 @@ export async function registrarEvento(
   e: {
     tipo: string
     entidade: string
-    entidadeId: string
+    // uuid da entidade afetada, ou null para entidades singleton sem uuid (ex.: config_plataforma).
+    entidadeId: string | null
     ator: 'operador' | 'sistema'
     lojaId?: string | null
     detalhes: object
@@ -297,22 +298,23 @@ export interface PlanoLinha {
   valor_centavos: number
   inclui: string[]
   ativo: boolean
+  taxa_intermediacao_centavos: number | null
   criado_em: string
   atualizado_em: string
 }
 
 const SAIDA_PLANO = sql`
-  id, nome, valor_centavos, inclui, ativo, ${TS('criado_em')} as criado_em,
-  ${TS('atualizado_em')} as atualizado_em`
+  id, nome, valor_centavos, inclui, ativo, taxa_intermediacao_centavos,
+  ${TS('criado_em')} as criado_em, ${TS('atualizado_em')} as atualizado_em`
 
 export async function inserirPlano(
   exec: Executor,
-  d: { nome: string; valor: number; inclui: string[]; ativo: boolean },
+  d: { nome: string; valor: number; inclui: string[]; ativo: boolean; taxa: number | null },
 ) {
   return consultarUm<PlanoLinha>(
     exec,
-    sql`insert into public.planos (nome, valor_centavos, inclui, ativo)
-        values (${d.nome}, ${d.valor}, ${d.inclui}::text[], ${d.ativo})
+    sql`insert into public.planos (nome, valor_centavos, inclui, ativo, taxa_intermediacao_centavos)
+        values (${d.nome}, ${d.valor}, ${d.inclui}::text[], ${d.ativo}, ${d.taxa}::int)
         returning ${SAIDA_PLANO}`,
   )
 }
@@ -331,7 +333,15 @@ export async function listarPlanos(exec: Executor) {
 export async function atualizarPlano(
   exec: Executor,
   id: string,
-  c: { nome: string | null; valor: number | null; inclui: string[] | null; ativo: boolean | null },
+  c: {
+    nome: string | null
+    valor: number | null
+    inclui: string[] | null
+    ativo: boolean | null
+    // taxa e tri-estado: `taxaInformada=false` nao mexe; true aplica `taxa` (null limpa o override).
+    taxaInformada: boolean
+    taxa: number | null
+  },
 ) {
   return consultarUm<PlanoLinha>(
     exec,
@@ -339,8 +349,34 @@ export async function atualizarPlano(
           nome = coalesce(${c.nome}::text, nome),
           valor_centavos = coalesce(${c.valor}::int, valor_centavos),
           inclui = coalesce(${c.inclui}::text[], inclui),
-          ativo = coalesce(${c.ativo}::boolean, ativo)
+          ativo = coalesce(${c.ativo}::boolean, ativo),
+          taxa_intermediacao_centavos = case when ${c.taxaInformada}::boolean
+            then ${c.taxa}::int else taxa_intermediacao_centavos end
         where id = ${id}
         returning ${SAIDA_PLANO}`,
+  )
+}
+
+// ---- Config da plataforma (singleton id = 1): taxa de intermediacao PADRAO --------------------
+
+export interface ConfigTaxaLinha {
+  taxa_intermediacao_padrao_centavos: number
+  atualizado_em: string
+}
+
+export async function obterConfigTaxa(exec: Executor) {
+  return consultarUm<ConfigTaxaLinha>(
+    exec,
+    sql`select taxa_intermediacao_padrao_centavos, ${TS('atualizado_em')} as atualizado_em
+          from public.config_plataforma where id = 1`,
+  )
+}
+
+export async function atualizarConfigTaxa(exec: Executor, padraoCentavos: number) {
+  return consultarUm<ConfigTaxaLinha>(
+    exec,
+    sql`update public.config_plataforma set taxa_intermediacao_padrao_centavos = ${padraoCentavos}
+          where id = 1
+          returning taxa_intermediacao_padrao_centavos, ${TS('atualizado_em')} as atualizado_em`,
   )
 }
