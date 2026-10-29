@@ -34,3 +34,33 @@ export interface NovoCliente {
 
 export const NovoClienteSaida = z.object({ conta_id: z.uuid(), loja_id: z.uuid() })
 export type NovoClienteSaida = z.infer<typeof NovoClienteSaida>
+
+// Chaves de API da conta (emitidas pela Whaviso). A listagem so traz a mascara; o valor completo
+// vem uma unica vez, na resposta da criacao.
+export const situacaoChave = z.enum(['ativa', 'expirada', 'revogada'])
+export type SituacaoChave = z.infer<typeof situacaoChave>
+
+export const ChaveApiDTO = z.object({
+  id: z.uuid(),
+  nome: z.string(),
+  prefixo: z.string(),
+  ultimos4: z.string(),
+  mascara: z.string(),
+  criado_em: z.iso.datetime({ offset: true }),
+  expira_em: z.iso.datetime({ offset: true }).nullable(),
+  revogada_em: z.iso.datetime({ offset: true }).nullable(),
+  situacao: situacaoChave,
+})
+export type ChaveApiDTO = z.infer<typeof ChaveApiDTO>
+
+export const ChaveApiLista = z.object({ itens: z.array(ChaveApiDTO) })
+export type ChaveApiLista = z.infer<typeof ChaveApiLista>
+
+export const ChaveApiCriada = z.object({ chave: ChaveApiDTO, valor: z.string() })
+export type ChaveApiCriada = z.infer<typeof ChaveApiCriada>
+
+export interface NovaChaveApi {
+  nome: string
+  /** ISO com offset; ausente = sem validade. */
+  expira_em?: string
+}

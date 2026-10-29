@@ -42,6 +42,7 @@ import { roteirizacaoRoutes } from './modules/roteirizacao'
 import { fluxoRoutes } from './modules/fluxo'
 import { canaisRoutes } from './modules/canais'
 import { fiscalRoutes } from './modules/fiscal'
+import { chavesApiRoutes } from './modules/chaves_api'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -93,6 +94,7 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'fluxo', plugin: fluxoRoutes },
   { prefixo: 'canais', plugin: canaisRoutes },
   { prefixo: 'fiscal', plugin: fiscalRoutes },
+  { prefixo: 'chaves-api', plugin: chavesApiRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/

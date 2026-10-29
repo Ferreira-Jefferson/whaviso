@@ -1,15 +1,17 @@
 // Ficha da conta (operador): lojas, saude do WhatsApp, membros e ultima assinatura. So metadado:
 // sem contato (telefone/e-mail) e sem nenhum conteudo da loja (conversa, pedido, cliente final).
 // Suspender/reativar assinatura NAO mora aqui (modulo de cobranca).
-import type { ReactNode } from 'react'
-import { Avatar, Badge, Dialog, Button, Skeleton } from '@/shared/ui'
+import { useState, type ReactNode } from 'react'
+import { ApiError } from '@/shared/api_client'
+import { Avatar, Badge, Banner, ConfirmDialog, Dialog, Button, Field, Input, Skeleton, useToast } from '@/shared/ui'
 import { brl, formatarData, formatarDataHora } from '@/shared/format'
 import type {
   PlataformaContaFicha,
   PlataformaLojaResumo,
 } from '@/shared/contracts/_generated/plataforma_clientes'
 import type { StatusNumero } from '@/shared/contracts/_generated/enums'
-import { useFichaConta } from '../api'
+import { useChavesApi, useCriarChaveApi, useFichaConta, useRevogarChaveApi } from '../api'
+import type { ChaveApiDTO, SituacaoChave } from '../schemas'
 import {
   ROTULO_PAPEL_MEMBRO,
   ROTULO_SAUDE,
@@ -137,6 +139,8 @@ function Conteudo({ ficha }: { ficha: PlataformaContaFicha }) {
         )}
         <p className="mt-2 text-xs text-tinta-2">Por privacidade, o console não mostra contato nem dados de uso da loja.</p>
       </Secao>
+
+      <SecaoChavesApi contaId={ficha.id} />
     </div>
   )
 }
@@ -170,5 +174,190 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
       <dt className="text-tinta-2">{rotulo}</dt>
       <dd className="tabular font-medium">{valor}</dd>
     </div>
+  )
+}
+
+const ROTULO_SITUACAO_CHAVE: Record<SituacaoChave, string> = { ativa: 'Ativa', expirada: 'Expirada', revogada: 'Revogada' }
+const TOM_SITUACAO_CHAVE: Record<SituacaoChave, TomBadge> = { ativa: 'sucesso', expirada: 'atencao', revogada: 'neutro' }
+
+/** Chaves de API da conta: emitidas pela Whaviso, so admin. O valor completo aparece uma unica vez. */
+function SecaoChavesApi({ contaId }: { contaId: string }) {
+  const chaves = useChavesApi(contaId)
+  const revogar = useRevogarChaveApi(contaId)
+  const { mostrarToast } = useToast()
+  const [criando, setCriando] = useState(false)
+  const [alvo, setAlvo] = useState<ChaveApiDTO | null>(null)
+
+  const semPermissao = chaves.error instanceof ApiError && chaves.error.status === 403
+
+  return (
+    <Secao titulo="Chaves de API">
+      {chaves.isPending && <Skeleton className="h-12 w-full" />}
+      {semPermissao && <p className="text-sm text-tinta-2">Apenas administradores gerenciam as chaves de API.</p>}
+      {chaves.isError && !semPermissao && (
+        <AreaErro erro={chaves.error} aoTentarDeNovo={() => void chaves.refetch()} />
+      )}
+      {chaves.data && (
+        <>
+          {chaves.data.itens.length === 0 ? (
+            <p className="text-sm text-tinta-2">Esta conta ainda não tem chave de API.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <caption className="sr-only">Chaves de API da conta</caption>
+                <thead className="text-xs text-tinta-2">
+                  <tr>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">Nome</th>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">Chave</th>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">Criação</th>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">Validade</th>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">Situação</th>
+                    <th scope="col" className="py-1.5 font-medium"><span className="sr-only">Ações</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-linha">
+                  {chaves.data.itens.map((c) => (
+                    <tr key={c.id}>
+                      <td className="py-2 pr-3 font-medium">{c.nome}</td>
+                      <td className="py-2 pr-3"><code className="text-xs">{c.mascara}</code></td>
+                      <td className="tabular py-2 pr-3">{formatarData(c.criado_em)}</td>
+                      <td className="tabular py-2 pr-3">{c.expira_em ? formatarData(c.expira_em) : 'Sem validade'}</td>
+                      <td className="py-2 pr-3">
+                        <Badge tom={TOM_SITUACAO_CHAVE[c.situacao]}>{ROTULO_SITUACAO_CHAVE[c.situacao]}</Badge>
+                      </td>
+                      <td className="py-2 text-right">
+                        {c.situacao !== 'revogada' && (
+                          <Button type="button" variante="secondary" onClick={() => setAlvo(c)}>
+                            Revogar
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="mt-3">
+            <Button type="button" variante="secondary" onClick={() => setCriando(true)}>
+              Nova chave
+            </Button>
+          </div>
+        </>
+      )}
+
+      <NovaChaveDialog contaId={contaId} aberto={criando} aoFechar={() => setCriando(false)} />
+      <ConfirmDialog
+        aberto={alvo != null}
+        titulo="Revogar chave de API"
+        textoConfirmar="Revogar"
+        variante="destructive"
+        carregando={revogar.isPending}
+        onCancelar={() => setAlvo(null)}
+        onConfirmar={() => {
+          if (!alvo) return
+          revogar.mutate(alvo.id, {
+            onSuccess: () => {
+              mostrarToast('Chave revogada.', { tom: 'sucesso' })
+              setAlvo(null)
+            },
+            onError: () => mostrarToast('Não foi possível revogar a chave.', { tom: 'erro' }),
+          })
+        }}
+      >
+        <p className="text-sm text-tinta-2">
+          A chave {alvo?.mascara} deixa de funcionar agora e não volta a valer. O cliente precisará de uma chave nova.
+        </p>
+      </ConfirmDialog>
+    </Secao>
+  )
+}
+
+function NovaChaveDialog({ contaId, aberto, aoFechar }: { contaId: string; aberto: boolean; aoFechar: () => void }) {
+  return (
+    <Dialog aberto={aberto} onFechar={aoFechar} titulo="Nova chave de API" className="max-w-md">
+      {aberto && <FormNovaChave contaId={contaId} aoFechar={aoFechar} />}
+    </Dialog>
+  )
+}
+
+function FormNovaChave({ contaId, aoFechar }: { contaId: string; aoFechar: () => void }) {
+  const [nome, setNome] = useState('')
+  const [validade, setValidade] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
+  const [valor, setValor] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState(false)
+  const criar = useCriarChaveApi(contaId)
+
+  if (valor != null) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Banner tom="atencao">Copie a chave agora. Por segurança, ela não será mostrada de novo.</Banner>
+        <input
+          readOnly
+          value={valor}
+          aria-label="Chave de API"
+          onFocus={(e) => e.currentTarget.select()}
+          className="min-w-0 rounded-input border border-linha bg-papel-2 px-3 py-2.5 font-mono text-sm text-tinta"
+        />
+        <Button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(valor)
+              .then(() => setCopiado(true))
+              .catch(() => setErro('Não foi possível copiar. Selecione o texto e copie manualmente.'))
+          }}
+        >
+          {copiado ? 'Copiado!' : 'Copiar chave'}
+        </Button>
+        {erro && <Banner tom="erro">{erro}</Banner>}
+        <Button type="button" variante="secondary" onClick={aoFechar}>
+          Já guardei a chave
+        </Button>
+      </div>
+    )
+  }
+
+  const salvar = () => {
+    const nomeLimpo = nome.trim()
+    if (nomeLimpo.length < 1) return setErro('Informe um nome para a chave.')
+    // Validade opcional: vale ate o fim do dia (horario de Sao Paulo, sem horario de verao).
+    const expira_em = validade ? new Date(`${validade}T23:59:59-03:00`).toISOString() : undefined
+    if (expira_em && Date.parse(expira_em) <= Date.now()) return setErro('A validade precisa estar no futuro.')
+    setErro(null)
+    criar.mutate(
+      { nome: nomeLimpo, ...(expira_em ? { expira_em } : {}) },
+      {
+        onSuccess: (r) => setValor(r.valor),
+        onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível criar a chave.'),
+      },
+    )
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault()
+        salvar()
+      }}
+    >
+      <Field label="Nome" dica="Identifica onde a chave é usada (ex.: integração com o ERP).">
+        <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} />
+      </Field>
+      <Field label="Validade (opcional)" dica="Deixe em branco para uma chave sem validade.">
+        <Input type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
+      </Field>
+      {erro && <Banner tom="erro">{erro}</Banner>}
+      <div className="flex flex-col gap-2">
+        <Button type="submit" loading={criar.isPending}>
+          Criar chave
+        </Button>
+        <Button type="button" variante="secondary" disabled={criar.isPending} onClick={aoFechar}>
+          Cancelar
+        </Button>
+      </div>
+    </form>
   )
 }

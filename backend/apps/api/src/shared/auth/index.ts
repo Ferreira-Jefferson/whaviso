@@ -10,3 +10,4 @@ export {
   type OpcoesVerificadorSupabase,
 } from './verificador'
 export { autenticarPlugin, type OpcoesAutenticar } from './plugin'
+export { resolverChaveApi, PREFIXO_CHAVE_API, type ChaveApiResolvida } from './chave_api'

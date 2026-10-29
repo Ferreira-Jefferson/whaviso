@@ -17,9 +17,13 @@ import {
   type PlataformaSituacaoConta,
 } from '@/shared/contracts/_generated/plataforma_clientes'
 import {
+  ChaveApiCriada,
+  ChaveApiDTO,
+  ChaveApiLista,
   NovoClienteSaida,
   OperadorDTO,
   OperadorListaSaida,
+  type NovaChaveApi,
   type NovoCliente,
   type OperadorConvite,
 } from './schemas'
@@ -105,5 +109,48 @@ export function useProvisionarCliente() {
     mutationFn: (body) =>
       apiClient.post<NovoClienteSaida>('/plataforma-clientes/contas', { body, schema: NovoClienteSaida, semLoja: true }),
     onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'contas'] }),
+  })
+}
+
+// Chaves de API da conta (so admin; o corpo nunca leva loja_id/conta_id: a conta vai na rota).
+//   GET  /v1/chaves-api/contas/:contaId/chaves                lista (mascarada)
+//   POST /v1/chaves-api/contas/:contaId/chaves                cria (valor completo UMA vez)
+//   POST /v1/chaves-api/contas/:contaId/chaves/:id/revogar    revoga (soft)
+export function useChavesApi(contaId: string | null) {
+  return useQuery({
+    queryKey: [RAIZ, 'chaves', contaId],
+    enabled: contaId != null,
+    queryFn: ({ signal }) =>
+      apiClient.get<ChaveApiLista>(`/chaves-api/contas/${contaId}/chaves`, {
+        schema: ChaveApiLista,
+        signal,
+        semLoja: true,
+      }),
+  })
+}
+
+export function useCriarChaveApi(contaId: string) {
+  const qc = useQueryClient()
+  return useMutation<ChaveApiCriada, Error, NovaChaveApi>({
+    mutationFn: (body) =>
+      apiClient.post<ChaveApiCriada>(`/chaves-api/contas/${contaId}/chaves`, {
+        body,
+        schema: ChaveApiCriada,
+        semLoja: true,
+      }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'chaves', contaId] }),
+  })
+}
+
+/** "Excluir" na UI; por baixo e revogar (a linha continua, com a situacao revogada). */
+export function useRevogarChaveApi(contaId: string) {
+  const qc = useQueryClient()
+  return useMutation<ChaveApiDTO, Error, string>({
+    mutationFn: (id) =>
+      apiClient.post<ChaveApiDTO>(`/chaves-api/contas/${contaId}/chaves/${id}/revogar`, {
+        schema: ChaveApiDTO,
+        semLoja: true,
+      }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'chaves', contaId] }),
   })
 }
