@@ -5,6 +5,7 @@
 // nem persistida em claro. Em repouso só ficam `chave_hash` (sha256) e `chave_cifrada` (cifra).
 import { comTransacao, ErroBanco, type Executor, type Pool } from '@whaviso/shared/db'
 import { gerarPayloadPixCopiaCola } from '@whaviso/shared/pix'
+import { resolverTaxaIntermediacao } from '@whaviso/shared/taxas'
 import type {
   ConciliarEntrada,
   CriarCobrancaEntrada,
@@ -13,11 +14,15 @@ import type {
   PagamentosFiltro,
   PagamentoSaida,
 } from '@whaviso/shared/contracts'
-import { Conflito, NaoEncontrado, regraNegocio } from '../../shared/http_errors'
+import { Conflito, NaoEncontrado, naoAutorizado, regraNegocio } from '../../shared/http_errors'
 import { sha256Hex } from '../../shared/tokens'
+import { comporCobranca } from './composicao'
 import type { Cripto } from './cripto'
+import { erroPspNaoIntegrado, type ClientePagamento } from './psp_cliente'
 import * as repo from './repo'
-import type { PagamentoConfigDTO, PagamentoConfigPatch } from './schemas'
+import type {
+  CredencialPspStatus, PagamentoConfigDTO, PagamentoConfigPatch, SubcontaStatus,
+} from './schemas'
 import { candidatoTxid, MAX_TENTATIVAS_TXID } from './txid'
 
 const CONFIG_PAGAMENTO_PADRAO: PagamentoConfigDTO = {
@@ -33,6 +38,8 @@ function isoData(v: Date | string): string {
 
 export interface DepsPagamentos {
   cripto: Cripto
+  /** PSP do pagamento intermediado; null = nao integrado (caminho intermediado responde 501). */
+  clientePsp?: ClientePagamento | null
 }
 
 /** Set/rotate da chave Pix da loja. Cifra a chave, guarda hash + últimos 4; devolve só metadado. */
@@ -234,5 +241,150 @@ export async function definirConfigPagamento(
     encargo_modo: l.encargo_modo,
     cartao_habilitado: l.cartao_habilitado,
     atualizado_em: isoData(l.atualizado_em),
+  }
+}
+
+// ---- PSP: credencial (operador), subconta (loja), cobranca intermediada e webhook -----------
+
+const PROVIDER_PSP = 'asaas'
+
+/** Set/rotate da credencial do PSP (cifra em repouso; a chave em claro nunca volta nem e logada). */
+export async function definirCredencialPsp(
+  exec: Executor,
+  deps: DepsPagamentos,
+  chave: string,
+): Promise<CredencialPspStatus> {
+  const cifrada = deps.cripto.cifrar(chave)
+  const { atualizado_em } = await repo.upsertCredencialPsp(exec, PROVIDER_PSP, cifrada)
+  return { configurada: true, atualizado_em }
+}
+
+/** Metadado da credencial do PSP (nunca a chave). */
+export async function statusCredencialPsp(exec: Executor): Promise<CredencialPspStatus> {
+  return repo.statusCredencialPsp(exec, PROVIDER_PSP)
+}
+
+/**
+ * Inicia o onboarding da subconta (recebedor) da loja no PSP. Sem PSP integrado, cria/retorna uma
+ * subconta 'pendente'. Com o cliente real, aqui se chamaria o PSP para criar o recebedor e guardar
+ * a referencia; a aprovacao (KYC) vem do PSP (onboarding/webhook), nunca e assumida pelo whaviso.
+ */
+export async function iniciarSubconta(exec: Executor, lojaId: string): Promise<SubcontaStatus> {
+  const existente = await repo.obterSubconta(exec, lojaId, PROVIDER_PSP)
+  if (existente) return existente
+  return repo.upsertSubconta(exec, lojaId, PROVIDER_PSP, { subcontaRef: null, statusKyc: 'pendente' })
+}
+
+/** Status da subconta da loja, ou null se o onboarding ainda nao comecou. */
+export async function obterSubconta(exec: Executor, lojaId: string): Promise<SubcontaStatus | null> {
+  return repo.obterSubconta(exec, lojaId, PROVIDER_PSP)
+}
+
+/**
+ * Cria a cobranca INTERMEDIADA (via PSP) de um pedido. Exige: config coerente (Pix intermediado, ou
+ * cartao habilitado), PSP integrado (senao 501), subconta aprovada e credencial presente. Resolve a
+ * taxa do whaviso, compoe o valor por absorve/repassa, chama o PSP com split e persiste a cobranca.
+ */
+export async function criarCobrancaIntermediada(
+  pool: Pool,
+  deps: DepsPagamentos,
+  lojaId: string,
+  contaId: string,
+  pedidoId: string,
+  meio: 'pix' | 'cartao',
+): Promise<PagamentoSaida> {
+  const cfg = await repo.obterPagamentoConfig(pool, lojaId)
+  const pixModo = cfg?.pix_modo ?? 'chave_propria'
+  const encargoModo = cfg?.encargo_modo ?? 'absorve'
+  const cartaoHabilitado = cfg?.cartao_habilitado ?? false
+
+  if (meio === 'pix' && pixModo !== 'intermediado') {
+    throw regraNegocio('pix_nao_intermediado', 'A loja nao esta em Pix intermediado')
+  }
+  if (meio === 'cartao' && !cartaoHabilitado) {
+    throw regraNegocio('cartao_desabilitado', 'Cartao nao esta habilitado para esta loja')
+  }
+
+  // Sem PSP integrado (sem as chaves do Asaas), o caminho intermediado nao esta disponivel (501).
+  if (!deps.clientePsp) throw erroPspNaoIntegrado()
+
+  const subconta = await repo.obterSubconta(pool, lojaId, PROVIDER_PSP)
+  if (!subconta || subconta.status_kyc !== 'aprovada' || !subconta.subconta_ref) {
+    throw regraNegocio('subconta_nao_aprovada', 'A subconta de recebimento da loja ainda nao esta aprovada')
+  }
+
+  const cifrada = await repo.lerCredencialPspCifrada(pool, PROVIDER_PSP)
+  if (!cifrada) throw regraNegocio('psp_sem_credencial', 'Credencial do PSP nao configurada')
+  const chavePsp = deps.cripto.decifrar(cifrada) // em memoria, nao logada
+
+  return comTransacao(pool, async (client) => {
+    const pedido = await repo.buscarPedido(client, pedidoId, lojaId, true)
+    if (!pedido) throw new NaoEncontrado('Pedido nao encontrado')
+    if (pedido.status === 'rascunho' || pedido.status === 'problema') {
+      throw regraNegocio('pedido_status_invalido', 'Pedido neste status nao pode ser cobrado')
+    }
+    if (pedido.total_centavos <= 0) throw regraNegocio('pedido_sem_total', 'Pedido sem valor a cobrar')
+
+    const pendente = await repo.buscarPendenteAtiva(client, pedidoId, lojaId)
+    if (pendente) return pendente // idempotencia: reusa a pendente
+
+    const taxa = await resolverTaxaIntermediacao(client, contaId)
+    const comp = comporCobranca(pedido.total_centavos, taxa, encargoModo)
+
+    const cobranca = await deps.clientePsp!.criarCobranca(
+      { chave: chavePsp },
+      {
+        meio,
+        valorCobradoCentavos: comp.valorCobradoCentavos,
+        encargoWhavisoCentavos: comp.encargoWhavisoCentavos,
+        subcontaRef: subconta.subconta_ref!,
+        referencia: pedido.codigo,
+      },
+    )
+
+    try {
+      return await repo.inserirCobrancaIntermediada(client, {
+        lojaId,
+        pedidoId,
+        valorCobradoCentavos: comp.valorCobradoCentavos,
+        encargoCentavos: comp.encargoWhavisoCentavos,
+        meio,
+        chargeRef: cobranca.chargeRef,
+        payload: cobranca.payload,
+        expiraEm: null,
+      })
+    } catch (err) {
+      // Mesmo charge_ref ja persistido (retry): reusa em vez de duplicar.
+      if (err instanceof ErroBanco && err.tipo === 'unique') {
+        const existente = await repo.buscarPorCharge(client, PROVIDER_PSP, cobranca.chargeRef)
+        if (existente) return existente
+      }
+      throw err
+    }
+  })
+}
+
+/**
+ * Processa um webhook do PSP: verifica a assinatura (via o cliente, com a credencial como segredo) e,
+ * se o evento for de pagamento, concilia a cobranca por (provider, charge_ref) de forma idempotente.
+ * Assinatura invalida => 401 e nada e conciliado. Charge desconhecida => no-op (ok).
+ */
+export async function processarWebhookPsp(
+  pool: Pool,
+  deps: DepsPagamentos,
+  assinatura: string | undefined,
+  corpoBruto: string,
+): Promise<void> {
+  if (!deps.clientePsp) throw erroPspNaoIntegrado()
+  const cifrada = await repo.lerCredencialPspCifrada(pool, PROVIDER_PSP)
+  if (!cifrada) throw naoAutorizado('Webhook sem credencial configurada')
+  const segredo = deps.cripto.decifrar(cifrada)
+
+  const evento = deps.clientePsp.interpretarWebhook(segredo, assinatura, corpoBruto)
+  if (!evento) throw naoAutorizado('Assinatura de webhook invalida')
+
+  if (evento.pago) {
+    // Idempotente: so afeta linha pendente; repeticao do mesmo evento e no-op.
+    await repo.marcarPagoPorCharge(pool, PROVIDER_PSP, evento.chargeRef, evento.taxaPspCentavos)
   }
 }

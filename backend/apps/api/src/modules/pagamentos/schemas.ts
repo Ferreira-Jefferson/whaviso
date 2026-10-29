@@ -50,3 +50,39 @@ export const PagamentoConfigPatch = z
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: 'informe ao menos um campo para alterar' })
 export type PagamentoConfigPatch = z.infer<typeof PagamentoConfigPatch>
+
+// ---- PSP: credencial (operador) e subconta/recebedor (loja) ---------------------------------
+
+/** Credencial do PSP (write-only): a chave em claro nunca volta numa resposta. */
+export const CredencialPspEntrada = z.strictObject({ chave: z.string().trim().min(1).max(500) })
+export type CredencialPspEntrada = z.infer<typeof CredencialPspEntrada>
+
+/** Metadado da credencial do PSP: se esta configurada e quando mudou (NUNCA a chave). */
+export const CredencialPspStatus = z.strictObject({
+  configurada: z.boolean(),
+  atualizado_em: z.string().nullable(),
+})
+export type CredencialPspStatus = z.infer<typeof CredencialPspStatus>
+
+export const statusSubconta = z.enum(['pendente', 'aprovada', 'recusada'])
+export type StatusSubconta = z.infer<typeof statusSubconta>
+
+export const SubcontaStatus = z.strictObject({
+  provider: z.string(),
+  subconta_ref: z.string().nullable(),
+  status_kyc: statusSubconta,
+  atualizado_em: z.string(),
+})
+export type SubcontaStatus = z.infer<typeof SubcontaStatus>
+
+/** Resposta de leitura da subconta (null enquanto a loja nao iniciou o onboarding). */
+export const SubcontaResposta = z.strictObject({ subconta: SubcontaStatus.nullable() })
+
+/** Criar cobranca intermediada (via PSP) de um pedido: escolhe o meio. */
+export const CobrancaIntermediadaEntrada = z.strictObject({
+  meio: z.enum(['pix', 'cartao']).default('pix'),
+})
+export type CobrancaIntermediadaEntrada = z.infer<typeof CobrancaIntermediadaEntrada>
+
+/** Resposta do webhook do PSP (sem vazar dado de cobranca). */
+export const WebhookResposta = z.strictObject({ ok: z.boolean() })

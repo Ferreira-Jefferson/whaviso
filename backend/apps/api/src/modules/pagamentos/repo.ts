@@ -327,3 +327,163 @@ export async function cancelar(
   )
   return linha ? mapearPag(linha) : null
 }
+
+// ---- Credencial do PSP (plataforma; segredo cifrado) ----------------------------------------
+
+/** Leitura DEDICADA da cifra da credencial do PSP (decifrada só em memória pelo service). */
+export async function lerCredencialPspCifrada(
+  exec: Executor,
+  provider = 'asaas',
+): Promise<Buffer | null> {
+  const linha = await consultarUm<{ chave_cifrada: Buffer }>(
+    exec,
+    sql`select chave_cifrada from public.credenciais_psp where provider = ${provider}`,
+  )
+  return linha ? linha.chave_cifrada : null
+}
+
+/** Metadado da credencial (NUNCA a cifra): existe e quando foi atualizada. */
+export async function statusCredencialPsp(
+  exec: Executor,
+  provider = 'asaas',
+): Promise<{ configurada: boolean; atualizado_em: string | null }> {
+  const linha = await consultarUm<{ atualizado_em: Date | string }>(
+    exec,
+    sql`select atualizado_em from public.credenciais_psp where provider = ${provider}`,
+  )
+  return linha ? { configurada: true, atualizado_em: iso(linha.atualizado_em) } : { configurada: false, atualizado_em: null }
+}
+
+/** Set/rotate da credencial do PSP (cifra em repouso). RETURNING só o metadado. */
+export async function upsertCredencialPsp(
+  exec: Executor,
+  provider: string,
+  chaveCifrada: Buffer,
+): Promise<{ atualizado_em: string }> {
+  const linha = await consultarUm<{ atualizado_em: Date | string }>(
+    exec,
+    sql`insert into public.credenciais_psp (provider, chave_cifrada)
+        values (${provider}, ${chaveCifrada})
+        on conflict (provider) do update set chave_cifrada = excluded.chave_cifrada
+        returning atualizado_em`,
+  )
+  return { atualizado_em: iso(linha!.atualizado_em) }
+}
+
+// ---- Subconta (recebedor) do PSP por loja ---------------------------------------------------
+
+export interface SubcontaLinha {
+  id: string
+  loja_id: string
+  provider: string
+  subconta_ref: string | null
+  status_kyc: 'pendente' | 'aprovada' | 'recusada'
+  atualizado_em: Date | string
+}
+
+export interface SubcontaSaida {
+  provider: string
+  subconta_ref: string | null
+  status_kyc: 'pendente' | 'aprovada' | 'recusada'
+  atualizado_em: string
+}
+
+function mapearSubconta(l: SubcontaLinha): SubcontaSaida {
+  return {
+    provider: l.provider,
+    subconta_ref: l.subconta_ref,
+    status_kyc: l.status_kyc,
+    atualizado_em: iso(l.atualizado_em),
+  }
+}
+
+export async function obterSubconta(
+  exec: Executor,
+  lojaId: string,
+  provider = 'asaas',
+): Promise<SubcontaSaida | null> {
+  const linha = await consultarUm<SubcontaLinha>(
+    exec,
+    sql`select id, loja_id, provider, subconta_ref, status_kyc, atualizado_em
+          from public.psp_subcontas where loja_id = ${lojaId} and provider = ${provider}`,
+  )
+  return linha ? mapearSubconta(linha) : null
+}
+
+/** Cria/atualiza a subconta (onboarding). Campos nulos preservam o valor atual (coalesce). */
+export async function upsertSubconta(
+  exec: Executor,
+  lojaId: string,
+  provider: string,
+  c: { subcontaRef: string | null; statusKyc: 'pendente' | 'aprovada' | 'recusada' | null },
+): Promise<SubcontaSaida> {
+  const linha = await consultarUm<SubcontaLinha>(
+    exec,
+    sql`insert into public.psp_subcontas (loja_id, provider, subconta_ref, status_kyc)
+        values (${lojaId}, ${provider}, ${c.subcontaRef}, coalesce(${c.statusKyc}::status_subconta_psp, 'pendente'))
+        on conflict (loja_id, provider) do update set
+          subconta_ref = coalesce(excluded.subconta_ref, public.psp_subcontas.subconta_ref),
+          status_kyc = coalesce(${c.statusKyc}::status_subconta_psp, public.psp_subcontas.status_kyc)
+        returning id, loja_id, provider, subconta_ref, status_kyc, atualizado_em`,
+  )
+  return mapearSubconta(linha!)
+}
+
+// ---- Cobranca intermediada (PSP) ------------------------------------------------------------
+
+export interface DadosCobrancaIntermediada {
+  lojaId: string
+  pedidoId: string
+  valorCobradoCentavos: number
+  encargoCentavos: number
+  meio: 'pix' | 'cartao'
+  chargeRef: string
+  payload: string
+  expiraEm: string | null
+}
+
+/** Insere a cobranca do caminho intermediado (provider='asaas'); `payload` vai em br_code. */
+export async function inserirCobrancaIntermediada(
+  exec: Executor,
+  d: DadosCobrancaIntermediada,
+): Promise<PagamentoSaida> {
+  const linha = await consultarUm<LinhaPag>(
+    exec,
+    sql`insert into public.pagamentos
+          (loja_id, pedido_id, status, valor_centavos, br_code, expira_em,
+           provider, meio, charge_ref, encargo_centavos)
+        values (${d.lojaId}, ${d.pedidoId}, 'pendente', ${d.valorCobradoCentavos}, ${d.payload}, ${d.expiraEm},
+                'asaas', ${d.meio}, ${d.chargeRef}, ${d.encargoCentavos})
+        returning ${COLS_PAG}`,
+  )
+  return mapearPag(linha!)
+}
+
+/** Conciliacao por webhook: pendente -> pago via (provider, charge_ref). Idempotente (null se nao pendente). */
+export async function marcarPagoPorCharge(
+  exec: Executor,
+  provider: string,
+  chargeRef: string,
+  taxaPspCentavos: number | null,
+): Promise<PagamentoSaida | null> {
+  const linha = await consultarUm<LinhaPag>(
+    exec,
+    sql`update public.pagamentos set status = 'pago', pago_em = now(), taxa_psp_centavos = ${taxaPspCentavos}
+          where provider = ${provider} and charge_ref = ${chargeRef} and status = 'pendente'
+        returning ${COLS_PAG}`,
+  )
+  return linha ? mapearPag(linha) : null
+}
+
+/** Cobranca por (provider, charge_ref), para o webhook decidir idempotencia. */
+export async function buscarPorCharge(
+  exec: Executor,
+  provider: string,
+  chargeRef: string,
+): Promise<PagamentoSaida | null> {
+  const linha = await consultarUm<LinhaPag>(
+    exec,
+    sql`select ${COLS_PAG} from public.pagamentos where provider = ${provider} and charge_ref = ${chargeRef}`,
+  )
+  return linha ? mapearPag(linha) : null
+}

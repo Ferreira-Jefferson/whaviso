@@ -2,7 +2,10 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastif
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { proibido } from '../../shared/http_errors'
 import {
+  CobrancaIntermediadaEntrada,
   ConciliarEntrada,
+  CredencialPspEntrada,
+  CredencialPspStatus,
   CriarCobrancaEntrada,
   ListaPagamentosSaida,
   LojaPixEntrada,
@@ -13,6 +16,8 @@ import {
   PagamentosFiltro,
   PagamentoSaida,
   pedidoIdParam,
+  SubcontaResposta,
+  WebhookResposta,
 } from './schemas'
 import type { DepsPagamentos } from './service'
 import * as service from './service'
@@ -26,6 +31,18 @@ function lojaAtiva(req: FastifyRequest): string {
   const loja = req.escopo?.loja_ativa
   if (!loja) throw proibido('Loja ativa nao definida')
   return loja
+}
+
+/** Conta da loja ativa (do escopo resolvido; nunca do cliente). */
+function contaAtiva(req: FastifyRequest): string {
+  const conta = req.escopo?.conta_id
+  if (!conta) throw proibido('Conta nao definida')
+  return conta
+}
+
+/** Operador autenticado (equipe Whaviso) para rotas de plataforma. */
+function operadorAtivo(req: FastifyRequest): void {
+  if (!req.operador) throw proibido('Escopo de operador ausente')
 }
 
 /** Membro autenticado, escopo de loja resolvido e permissão de gestão da loja (dono/gerente). */
@@ -62,6 +79,68 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void 
       )
       return cfg
     })
+
+  // --- PSP (pagamento intermediado): credencial (operador), subconta (loja), cobranca, webhook ---
+
+  const plataformaPsp = {
+    config: { acesso: 'plataforma' as const, rateLimit: LIMITE_SENSIVEL },
+    preHandler: [app.autenticar, app.escopoOperador, app.exigirPermissao('chaves_api:gerir')],
+  }
+
+  // GET /pagamentos/psp/credencial: metadado da credencial do PSP (operador). NUNCA a chave.
+  r.get('/psp/credencial', { ...plataformaPsp, schema: { response: { 200: CredencialPspStatus } } },
+    async (req) => {
+      operadorAtivo(req)
+      return service.statusCredencialPsp(app.pool)
+    })
+
+  // PUT /pagamentos/psp/credencial: set/rotate (operador). A chave em claro nunca volta nem e logada.
+  r.put('/psp/credencial',
+    { ...plataformaPsp, schema: { body: CredencialPspEntrada, response: { 200: CredencialPspStatus } } },
+    async (req) => {
+      operadorAtivo(req)
+      const st = await service.definirCredencialPsp(app.pool, obterDeps(), req.body.chave)
+      req.log.info({ acao: 'psp_credencial_definida' }, 'credencial do psp definida')
+      return st
+    })
+
+  // GET /pagamentos/psp/subconta: status do recebedor da loja no PSP.
+  r.get('/psp/subconta', { ...loja, schema: { response: { 200: SubcontaResposta } } },
+    async (req) => ({ subconta: await service.obterSubconta(app.pool, lojaAtiva(req)) }))
+
+  // POST /pagamentos/psp/subconta: inicia o onboarding do recebedor (dono/gerente).
+  r.post('/psp/subconta', { ...lojaGerir, schema: { response: { 201: SubcontaResposta } } },
+    async (req, reply) => {
+      const subconta = await service.iniciarSubconta(app.pool, lojaAtiva(req))
+      void reply.code(201)
+      return { subconta }
+    })
+
+  // POST /pagamentos/pedidos/:pedidoId/intermediado: cobranca via PSP (Pix intermediado ou cartao).
+  r.post('/pedidos/:pedidoId/intermediado',
+    {
+      ...lojaSensivel,
+      schema: { params: pedidoIdParam, body: CobrancaIntermediadaEntrada, response: { 201: PagamentoSaida } },
+    },
+    async (req, reply) => {
+      const pag = await service.criarCobrancaIntermediada(
+        app.pool, obterDeps(), lojaAtiva(req), contaAtiva(req), req.params.pedidoId, req.body.meio,
+      )
+      req.log.info(
+        { pagamento_id: pag.id, pedido_id: pag.pedido_id, loja_id: pag.loja_id, status: pag.status, acao: 'cobranca_intermediada' },
+        'cobranca intermediada criada',
+      )
+      void reply.code(201)
+      return pag
+    })
+
+  // POST /pagamentos/webhooks/psp/asaas: webhook PUBLICO do PSP (sem auth; assinatura verificada no service).
+  r.post('/webhooks/psp/asaas', { schema: { response: { 200: WebhookResposta } } }, async (req) => {
+    const bruto = req.headers['asaas-signature'] ?? req.headers['x-psp-signature']
+    const assinatura = Array.isArray(bruto) ? bruto[0] : bruto
+    await service.processarWebhookPsp(app.pool, obterDeps(), assinatura, JSON.stringify(req.body ?? {}))
+    return { ok: true }
+  })
 
   // GET /pagamentos/pix: metadado da chave Pix da loja (nunca a chave em claro nem a cifra).
   r.get('/pix', { ...loja, schema: { response: { 200: LojaPixEstadoResposta } } }, async (req) => ({
