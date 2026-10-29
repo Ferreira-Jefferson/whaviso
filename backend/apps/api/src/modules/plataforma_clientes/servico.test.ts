@@ -21,7 +21,9 @@ function poolFalso(c: Cenario) {
     },
     release() {},
   }
-  return { pool: { connect: async () => client } as unknown as Pool, eventos }
+  // leituras fora da transacao (auth info) usam pool.query: devolvem vazio
+  const pool = { connect: async () => client, query: async () => ({ rows: [] }) } as unknown as Pool
+  return { pool, eventos }
 }
 
 const adminAlvo = { id: ID_ADMIN, user_id: U_ADMIN, nome: 'A', papel: 'admin', ativo: true, criado_em: '2026-01-01T00:00:00.000000Z' }

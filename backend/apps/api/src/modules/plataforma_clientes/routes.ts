@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { naoAutorizado, proibido } from '../../shared/http_errors'
 import { criarServicoPlataformaClientes, type AtorOperador } from './service'
 import {
-  IdParams, OperadorConvite, OperadorDTO, OperadorListaSaida, OperadorPatch,
+  IdParams, NovoCliente, NovoClienteSaida, OperadorConvite, OperadorDTO, OperadorListaSaida, OperadorPatch,
   PlataformaContaFicha, PlataformaContaPagina, PlataformaContasQuery,
 } from './schemas'
 
@@ -37,6 +37,11 @@ export function criarPlataformaClientesRoutes(): FastifyPluginAsync {
       ...plataforma(), preHandler: leitura,
       schema: { params: IdParams, response: { 200: PlataformaContaFicha } },
     }, async (req) => svc.fichaConta(req.params.id))
+
+    app.post('/contas', {
+      ...plataforma({ rateLimit: { max: 20, timeWindow: '1 minute' } }), preHandler: escritaAdmin,
+      schema: { body: NovoCliente, response: { 201: NovoClienteSaida } },
+    }, async (req, reply) => reply.status(201).send(await svc.provisionarCliente(ator(req), req.body)))
 
     app.get('/operadores', {
       ...plataforma(), preHandler: escritaAdmin,

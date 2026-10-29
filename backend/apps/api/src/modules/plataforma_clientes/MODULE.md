@@ -8,7 +8,8 @@ Console do operador (equipe Whaviso): restaurantes como clientes. Lista/busca co
 ## Entry points
 - `index.ts`: `plataformaClientesRoutes` (registry) e `criarPlataformaClientesRoutes()` (teste).
 - Rotas (`/v1/plataforma-clientes`): `GET /contas`, `GET /contas/:id`, `GET /operadores` (admin),
-  `POST /operadores` (admin), `PATCH /operadores/:id` (admin).
+  `POST /operadores` (admin, por e-mail), `PATCH /operadores/:id` (admin), `POST /contas` (admin,
+  provisiona cliente: conta + loja + dono, dono resolvido por e-mail).
 
 ## Escopo / permissoes
 - Toda rota: `config.acesso = 'plataforma'` + `preHandler [autenticar, escopoOperador]`. Membro de
@@ -16,7 +17,7 @@ Console do operador (equipe Whaviso): restaurantes como clientes. Lista/busca co
   `req.operador`). O alvo vem sempre de `params`; nada de `loja_id`/`conta_id` no corpo/query (strict).
 
 ## Tabelas
-- escreve: `operadores` (sem DELETE: `ativo=false`), `eventos` (`plataforma.operador_criado|alterado`,
+- escreve: `operadores` (sem DELETE: `ativo=false`), `contas`/`lojas`/`membros` (so INSERT, no provisionamento de cliente), `eventos` (`plataforma.operador_criado|alterado`,
   ator `operador`, `detalhes` so com ids/papeis).
 - le (colunas explicitas): `contas`, `lojas`, `membros` (papel/ids, sem contato), `numeros_whatsapp`
   (somente status/verificado/criado_em), `assinaturas`.
@@ -26,7 +27,9 @@ Console do operador (equipe Whaviso): restaurantes como clientes. Lista/busca co
 
 ## Invariantes
 - Sempre resta >= 1 admin ativo (admins travados `for update` na transacao); ninguem se autopromove.
-- Convite de operador = vincular `user_id` ja existente no Auth (FK; inexistente -> 409).
+- Convite de operador e provisionamento de cliente resolvem o `user_id` por e-mail no Auth via funcoes
+  SECURITY DEFINER (migration 0069: `plataforma_user_id_por_email`, `plataforma_auth_info`); e-mail
+  desconhecido -> 422 `usuario_sem_acesso`. Dono que ja pertence a uma conta -> 409 `ja_possui_conta`.
 - Busca ILIKE parametrizada, min. 2 caracteres, `%`/`_`/`\` escapados. Paginacao por cursor
   (`criado_em`, `id`).
 - Acoes de suspender/reativar assinatura NAO moram aqui (P-cobranca).

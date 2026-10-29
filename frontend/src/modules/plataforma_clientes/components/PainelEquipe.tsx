@@ -1,5 +1,5 @@
-// Equipe Whaviso (operadores): so administradores. Vincula um usuario do Auth ja existente
-// (por id), troca o papel e desativa (nunca remove). O servidor garante >= 1 admin ativo e que
+// Equipe Whaviso (operadores): so administradores. Vincula por e-mail quem ja entrou no
+// Whaviso (o servidor resolve o usuario), troca o papel e desativa (nunca remove). O servidor garante >= 1 admin ativo e que
 // ninguem se autopromove; aqui mostramos a mensagem de erro dele.
 import { useState } from 'react'
 import { Plus, UserCog } from 'lucide-react'
@@ -21,14 +21,14 @@ import {
   type ColunaTabela,
 } from '@/shared/ui'
 import { formatarData } from '@/shared/format'
-import type { OperadorDTO } from '@/shared/contracts/_generated/plataforma_clientes'
 import { papelOperador, type PapelOperador } from '@/shared/contracts/_generated/enums'
 import { useAtualizarOperador, useConvidarOperador, useOperadores } from '../api'
-import { ROTULO_PAPEL_OPERADOR } from '../rotulos'
+import { ROTULO_METODO_LOGIN, ROTULO_PAPEL_OPERADOR } from '../rotulos'
+import type { OperadorDTO } from '../schemas'
 import { AreaErro } from './AreaErro'
 
 const OPCOES_PAPEL = papelOperador.options.map((p) => ({ value: p, label: ROTULO_PAPEL_OPERADOR[p] }))
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function mensagem(e: unknown, padrao: string): string {
   return e instanceof ApiError ? e.message : padrao
@@ -55,6 +55,16 @@ export function PainelEquipe() {
           </span>
         </span>
       ),
+    },
+    {
+      chave: 'email',
+      titulo: 'E-mail de acesso',
+      render: (o) => <span className="min-w-0 truncate text-tinta-2">{o.email ?? 'Não informado'}</span>,
+    },
+    {
+      chave: 'metodo',
+      titulo: 'Método',
+      render: (o) => <span className="text-tinta-2">{o.metodo ? ROTULO_METODO_LOGIN[o.metodo] : 'Não informado'}</span>,
     },
     {
       chave: 'papel',
@@ -110,7 +120,7 @@ function ConviteDialog({ aberto, aoFechar }: { aberto: boolean; aoFechar: () => 
 }
 
 function FormConvite({ aoFechar }: { aoFechar: () => void }) {
-  const [userId, setUserId] = useState('')
+  const [email, setEmail] = useState('')
   const [nome, setNome] = useState('')
   const [papel, setPapel] = useState<PapelOperador>('operador')
   const [erro, setErro] = useState<string | null>(null)
@@ -118,13 +128,13 @@ function FormConvite({ aoFechar }: { aoFechar: () => void }) {
   const { mostrarToast } = useToast()
 
   const salvar = () => {
-    const id = userId.trim()
+    const emailLimpo = email.trim()
     const nomeLimpo = nome.trim()
-    if (!UUID.test(id)) return setErro('Informe o id do usuário (UUID) como aparece no Auth.')
+    if (!EMAIL.test(emailLimpo)) return setErro('Informe um e-mail válido.')
     if (nomeLimpo.length === 0) return setErro('Informe o nome.')
     setErro(null)
     convidar.mutate(
-      { user_id: id, nome: nomeLimpo, papel },
+      { email: emailLimpo, nome: nomeLimpo, papel },
       {
         onSuccess: () => {
           mostrarToast('Pessoa adicionada à equipe.', { tom: 'sucesso' })
@@ -143,9 +153,9 @@ function FormConvite({ aoFechar }: { aoFechar: () => void }) {
         salvar()
       }}
     >
-      <p className="text-sm text-tinta-2">Vincula um usuário que já existe no login à equipe da plataforma.</p>
-      <Field label="Id do usuário" dica="O identificador do usuário no Auth. O servidor recusa se o usuário não existir.">
-        <Input value={userId} onChange={(e) => setUserId(e.target.value)} autoComplete="off" spellCheck={false} placeholder="00000000-0000-0000-0000-000000000000" />
+      <p className="text-sm text-tinta-2">Adiciona à equipe da plataforma quem já entrou no Whaviso, pelo e-mail de acesso.</p>
+      <Field label="E-mail" dica="O e-mail com que a pessoa entra no Whaviso. Ela precisa ter acessado ao menos uma vez.">
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" spellCheck={false} maxLength={254} placeholder="nome@empresa.com" />
       </Field>
       <Field label="Nome">
         <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={120} />

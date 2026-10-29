@@ -52,6 +52,12 @@ export const ROTULO_PAPEL_OPERADOR: Record<PapelOperador, string> = {
   admin: 'Administrador',
 }
 
+export const ROTULO_METODO_LOGIN: Record<'google' | 'whatsapp' | 'email', string> = {
+  google: 'Google',
+  whatsapp: 'WhatsApp',
+  email: 'E-mail',
+}
+
 /** Id opaco encurtado para exibicao (o operador nao ve contato; so referencia). */
 export function idCurto(id: string): string {
   return id.slice(0, 8)

@@ -1,4 +1,5 @@
-// Escrita do modulo: SO a tabela `operadores` (equipe Whaviso) e o registro em `eventos`.
+// Escrita do modulo: `operadores` (equipe Whaviso), o provisionamento de cliente (contas, lojas,
+// membros: so INSERT, sem DELETE) e o registro em `eventos`.
 // Sem DELETE (nao ha grant): operador sai da equipe com ativo = false.
 import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
 import type { OperadorLinha } from './repo'
@@ -48,14 +49,40 @@ export async function atualizarOperador(
   )
 }
 
+/** Provisiona o cliente: conta + primeira loja + dono (membro de todas as lojas). Cruza por banco. */
+export async function inserirContaCliente(
+  exec: Executor,
+  d: { donoUserId: string; nomeRestaurante: string },
+): Promise<{ contaId: string; lojaId: string; membroId: string }> {
+  const conta = await consultarUm<{ id: string }>(
+    exec,
+    sql`insert into public.contas (dono_user_id, nome) values (${d.donoUserId}, ${d.nomeRestaurante}) returning id`,
+  )
+  const loja = await consultarUm<{ id: string }>(
+    exec,
+    sql`insert into public.lojas (conta_id, nome) values (${conta!.id}, ${d.nomeRestaurante}) returning id`,
+  )
+  const membro = await consultarUm<{ id: string }>(
+    exec,
+    sql`insert into public.membros (conta_id, loja_id, user_id, papel)
+        values (${conta!.id}, null, ${d.donoUserId}, 'dono'::papel_membro) returning id`,
+  )
+  return { contaId: conta!.id, lojaId: loja!.id, membroId: membro!.id }
+}
+
+/** Serializa provisionamentos concorrentes do mesmo usuario (so vale dentro de transacao). */
+export async function travarUsuario(exec: Executor, userId: string): Promise<void> {
+  await consultar(exec, sql`select pg_advisory_xact_lock(hashtext(${userId}))`)
+}
+
 /** Auditoria (append-only). `detalhes` so com ids e papeis, nunca PII. Evento global (sem loja). */
 export async function registrarEvento(
   exec: Executor,
-  e: { tipo: string; entidadeId: string; detalhes: Record<string, unknown> },
+  e: { tipo: string; entidade?: string; entidadeId: string; detalhes: Record<string, unknown> },
 ): Promise<void> {
   await consultar(
     exec,
     sql`insert into public.eventos (loja_id, tipo, entidade, entidade_id, ator, detalhes)
-        values (null, ${e.tipo}, 'operador', ${e.entidadeId}, 'operador', ${JSON.stringify(e.detalhes)}::jsonb)`,
+        values (null, ${e.tipo}, ${e.entidade ?? 'operador'}, ${e.entidadeId}, 'operador', ${JSON.stringify(e.detalhes)}::jsonb)`,
   )
 }

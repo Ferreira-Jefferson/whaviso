@@ -2,13 +2,27 @@
 // O operador enxerga metadado/saude agregada, NUNCA conteudo de loja nem contato. Nenhum dado
 // pessoal vai para log/evento (eventos so com ids e papeis).
 import { comTransacao, type Pool } from '@whaviso/shared/db'
-import { naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
+import { conflito, naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
 import { codificarCursor, decodificarCursor } from './cursor'
 import * as repo from './repo'
 import * as escrita from './repo_escrita'
 import type {
-  ContaFicha, ContaResumo, ContasQuery, OperadorAlteracao, OperadorNovo,
+  ContaFicha, ContaResumo, ContasQuery, MetodoLogin, NovoCliente, OperadorAlteracao, OperadorDTO, OperadorNovo,
 } from './schemas'
+
+const MSG_SEM_ACESSO = 'Esta pessoa ainda não acessou o Whaviso. Peça para ela entrar uma vez e tente de novo.'
+
+/** Metodo de login a partir dos provedores do Auth (google > whatsapp/phone > email). */
+function metodoDe(provedores: string[]): MetodoLogin | null {
+  if (provedores.includes('google')) return 'google'
+  if (provedores.includes('phone')) return 'whatsapp'
+  if (provedores.includes('email')) return 'email'
+  return null
+}
+
+function comAuth(o: repo.OperadorLinha, info: repo.AuthInfo | undefined): OperadorDTO {
+  return { ...o, email: info?.email ?? null, metodo: info ? metodoDe(info.provedores) : null }
+}
 
 export interface AtorOperador {
   userId: string
@@ -79,13 +93,17 @@ export function criarServicoPlataformaClientes(pool: Pool) {
 
     // --------------------------------------------------------------- operadores (equipe)
     async listarOperadores() {
-      return { itens: await repo.listarOperadores(pool) }
+      const ops = await repo.listarOperadores(pool)
+      const info = await repo.authInfoDeUsuarios(pool, ops.map((o) => o.user_id))
+      return { itens: ops.map((o) => comAuth(o, info.get(o.user_id))) }
     },
 
-    /** Vincula usuario do Auth existente a equipe. Rota ja restrita a admin. */
-    async criarOperador(ator: AtorOperador, d: OperadorNovo) {
-      return comTransacao(pool, async (tx) => {
-        const op = await escrita.inserirOperador(tx, { userId: d.user_id, nome: d.nome, papel: d.papel })
+    /** Vincula a equipe o usuario do Auth com este e-mail. Rota ja restrita a admin. */
+    async criarOperador(ator: AtorOperador, d: OperadorNovo): Promise<OperadorDTO> {
+      const userId = await repo.userIdPorEmail(pool, d.email)
+      if (!userId) throw regraNegocio('usuario_sem_acesso', MSG_SEM_ACESSO)
+      const op = await comTransacao(pool, async (tx) => {
+        const op = await escrita.inserirOperador(tx, { userId, nome: d.nome, papel: d.papel })
         await escrita.registrarEvento(tx, {
           tipo: 'plataforma.operador_criado',
           entidadeId: op.id,
@@ -93,11 +111,13 @@ export function criarServicoPlataformaClientes(pool: Pool) {
         })
         return op
       })
+      const info = await repo.authInfoDeUsuarios(pool, [userId])
+      return comAuth(op, info.get(userId))
     },
 
     /** Troca papel e/ou ativa/desativa. Invariante: sempre resta >= 1 admin ativo. */
-    async alterarOperador(ator: AtorOperador, id: string, p: OperadorAlteracao) {
-      return comTransacao(pool, async (tx) => {
+    async alterarOperador(ator: AtorOperador, id: string, p: OperadorAlteracao): Promise<OperadorDTO> {
+      const novo = await comTransacao(pool, async (tx) => {
         // Trava os admins ativos: duas desativacoes concorrentes nao zeram a equipe admin.
         const admins = await escrita.travarAdminsAtivos(tx)
         const alvo = await escrita.obterOperadorPorId(tx, id)
@@ -125,6 +145,33 @@ export function criarServicoPlataformaClientes(pool: Pool) {
           },
         })
         return novo
+      })
+      const info = await repo.authInfoDeUsuarios(pool, [novo.user_id])
+      return comAuth(novo, info.get(novo.user_id))
+    },
+
+    // ------------------------------------------------------------ provisionamento de cliente
+    /**
+     * Cria conta + primeira loja + dono para um restaurante cliente. O dono e resolvido por e-mail
+     * no Auth (precisa ja ter entrado uma vez). Cruza por banco, sem importar outro modulo; o
+     * bootstrap (conta + membro dono) espelha o de `conta`, com a loja inicial junto.
+     */
+    async provisionarCliente(ator: AtorOperador, d: NovoCliente) {
+      const donoId = await repo.userIdPorEmail(pool, d.email_dono)
+      if (!donoId) throw regraNegocio('usuario_sem_acesso', MSG_SEM_ACESSO)
+      return comTransacao(pool, async (tx) => {
+        await escrita.travarUsuario(tx, donoId)
+        if (await repo.usuarioTemVinculo(tx, donoId)) {
+          throw conflito('ja_possui_conta', 'Esta pessoa já pertence a uma conta no Whaviso.')
+        }
+        const r = await escrita.inserirContaCliente(tx, { donoUserId: donoId, nomeRestaurante: d.nome_restaurante })
+        await escrita.registrarEvento(tx, {
+          tipo: 'plataforma.cliente_provisionado',
+          entidade: 'conta',
+          entidadeId: r.contaId,
+          detalhes: { por_user_id: ator.userId, loja_id: r.lojaId },
+        })
+        return { conta_id: r.contaId, loja_id: r.lojaId }
       })
     },
   }

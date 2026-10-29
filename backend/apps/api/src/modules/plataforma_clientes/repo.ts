@@ -167,6 +167,31 @@ export interface OperadorLinha {
   criado_em: string
 }
 
+export interface AuthInfo {
+  user_id: string
+  email: string | null
+  provedores: string[]
+}
+
+/** E-mail e provedores de login (auth.identities) de uma lista de usuarios, via funcao SECURITY DEFINER. */
+export async function authInfoDeUsuarios(exec: Executor, userIds: string[]): Promise<Map<string, AuthInfo>> {
+  if (userIds.length === 0) return new Map()
+  const linhas = await consultar<AuthInfo>(
+    exec,
+    sql`select user_id, email, provedores from public.plataforma_auth_info(${userIds}::uuid[])`,
+  )
+  return new Map(linhas.map((l) => [l.user_id, l]))
+}
+
+/** Resolve o user_id do Auth pelo e-mail (sem diferenciar caixa); null se a pessoa nunca entrou. */
+export async function userIdPorEmail(exec: Executor, email: string): Promise<string | null> {
+  const r = await consultarUm<{ id: string | null }>(
+    exec,
+    sql`select public.plataforma_user_id_por_email(${email}) as id`,
+  )
+  return r?.id ?? null
+}
+
 export async function listarOperadores(exec: Executor): Promise<OperadorLinha[]> {
   return consultar<OperadorLinha>(
     exec,
@@ -174,4 +199,14 @@ export async function listarOperadores(exec: Executor): Promise<OperadorLinha[]>
           from public.operadores o
          order by o.criado_em asc, o.id asc`,
   )
+}
+
+/** Usuario ja e dono de conta ou membro ativo de alguma? (guarda do provisionamento de cliente) */
+export async function usuarioTemVinculo(exec: Executor, userId: string): Promise<boolean> {
+  const r = await consultarUm<{ existe: boolean }>(
+    exec,
+    sql`select (exists (select 1 from public.contas where dono_user_id = ${userId})
+             or exists (select 1 from public.membros where user_id = ${userId} and ativo)) as existe`,
+  )
+  return r?.existe ?? false
 }

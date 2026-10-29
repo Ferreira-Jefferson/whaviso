@@ -21,7 +21,8 @@ d('modulo plataforma_clientes', () => {
     const id = m.contaA
     const rotas: [Parameters<typeof chamar>[2], string, unknown?][] = [
       ['GET', '/contas'], ['GET', `/contas/${id}`], ['GET', '/operadores'],
-      ['POST', '/operadores', { user_id: m.dono, nome: 'X' }],
+      ['POST', '/operadores', { email: 'x@exemplo.com', nome: 'X' }],
+      ['POST', '/contas', { nome_restaurante: 'Novo', email_dono: 'x@exemplo.com' }],
       ['PATCH', `/operadores/${m.operadorOpId}`, { ativo: false }],
     ]
     for (const [metodo, url, corpo] of rotas) {
@@ -116,23 +117,67 @@ d('modulo plataforma_clientes', () => {
   it('equipe: operador comum nao lista nem escreve (403); admin lista e convida (SEC-041)', async () => {
     expect((await chamar(m, m.operador, 'GET', '/operadores')).status).toBe(403)
     expect((await chamar(m, m.operador, 'PATCH', `/operadores/${m.operadorOpId}`, { papel: 'admin' })).status).toBe(403)
-    expect((await chamar(m, m.operador, 'POST', '/operadores', { user_id: m.dono, nome: 'X', papel: 'admin' })).status).toBe(403)
+    expect((await chamar(m, m.operador, 'POST', '/operadores', { email: 'x@exemplo.com', nome: 'X', papel: 'admin' })).status).toBe(403)
     const lista = await chamar(m, m.admin, 'GET', '/operadores')
     expect(lista.status).toBe(200)
     expect(lista.corpo.itens.map((x: { id: string }) => x.id)).toEqual(expect.arrayContaining([m.adminOpId, m.operadorOpId]))
 
     const novo = await criarUsuario(m.cenario)
-    const ok = await chamar(m, m.admin, 'POST', '/operadores', { user_id: novo, nome: 'Novo Membro da Equipe' })
+    const email = `${m.marca.toLowerCase()}.novo@exemplo.com`
+    await poolSuper.query('update auth.users set email = $2 where id = $1', [novo, email])
+    await poolSuper.query(
+      "insert into auth.identities (id, user_id, provider) values ($1, $2, 'google')", [novo, novo],
+    )
+    // e-mail e resolvido sem diferenciar caixa; resposta traz e-mail e metodo de login
+    const ok = await chamar(m, m.admin, 'POST', '/operadores', { email: email.toUpperCase(), nome: 'Novo Membro da Equipe' })
     expect(ok.status, JSON.stringify(ok.corpo)).toBe(201)
-    expect(ok.corpo).toMatchObject({ user_id: novo, papel: 'operador', ativo: true })
-    expect((await chamar(m, m.admin, 'POST', '/operadores', { user_id: novo, nome: 'Dup' })).status).toBe(409)
-    expect((await chamar(m, m.admin, 'POST', '/operadores', { user_id: crypto.randomUUID(), nome: 'Fantasma' })).status).toBe(409)
-    expect((await chamar(m, m.admin, 'POST', '/operadores', { user_id: m.dono, nome: 'X', extra: 1 })).status).toBe(400)
+    expect(ok.corpo).toMatchObject({ user_id: novo, papel: 'operador', ativo: true, email, metodo: 'google' })
+    const lista2 = await chamar(m, m.admin, 'GET', '/operadores')
+    expect(lista2.corpo.itens.find((x: { id: string }) => x.id === ok.corpo.id)).toMatchObject({ email, metodo: 'google' })
+    expect((await chamar(m, m.admin, 'POST', '/operadores', { email, nome: 'Dup' })).status).toBe(409)
+    const fantasma = await chamar(m, m.admin, 'POST', '/operadores', { email: `${m.marca.toLowerCase()}.nunca@exemplo.com`, nome: 'Fantasma' })
+    expect(fantasma.status).toBe(422)
+    expect(fantasma.corpo.error.code).toBe('usuario_sem_acesso')
+    expect(fantasma.corpo.error.message).toContain('ainda não acessou o Whaviso')
+    expect((await chamar(m, m.admin, 'POST', '/operadores', { email, nome: 'X', extra: 1 })).status).toBe(400)
+    expect((await chamar(m, m.admin, 'POST', '/operadores', { email: 'nao-e-email', nome: 'X' })).status).toBe(400)
     const ev = await poolSuper.query(
       "select detalhes from public.eventos where tipo = 'plataforma.operador_criado' and entidade_id = $1", [ok.corpo.id],
     )
     expect(ev.rows).toHaveLength(1)
     expect(JSON.stringify(ev.rows[0].detalhes)).not.toMatch(/nome|telefone|email/i)
+  })
+
+  it('admin provisiona cliente por e-mail do dono: conta + loja + dono (SEC-041)', async () => {
+    const dono = await criarUsuario(m.cenario)
+    const email = `${m.marca.toLowerCase()}.dono@exemplo.com`
+    await poolSuper.query('update auth.users set email = $2 where id = $1', [dono, email])
+    const nome = `${m.marca} Novo Cliente`
+    const ok = await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: nome, email_dono: email })
+    expect(ok.status, JSON.stringify(ok.corpo)).toBe(201)
+    m.cenario.contas.push(ok.corpo.conta_id) // limpeza no encerramento
+    const c = await poolSuper.query('select dono_user_id, nome from public.contas where id = $1', [ok.corpo.conta_id])
+    expect(c.rows[0]).toMatchObject({ dono_user_id: dono, nome })
+    const l = await poolSuper.query('select conta_id, nome from public.lojas where id = $1', [ok.corpo.loja_id])
+    expect(l.rows[0]).toMatchObject({ conta_id: ok.corpo.conta_id, nome })
+    const mb = await poolSuper.query(
+      'select papel, loja_id from public.membros where conta_id = $1 and user_id = $2', [ok.corpo.conta_id, dono],
+    )
+    expect(mb.rows).toEqual([{ papel: 'dono', loja_id: null }])
+    const ev = await poolSuper.query(
+      "select detalhes from public.eventos where tipo = 'plataforma.cliente_provisionado' and entidade_id = $1", [ok.corpo.conta_id],
+    )
+    expect(ev.rows).toHaveLength(1)
+    expect(JSON.stringify(ev.rows[0].detalhes)).not.toMatch(/@|email|nome/i)
+    // mesmo dono de novo: ja possui conta
+    const dup = await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: 'Outro', email_dono: email })
+    expect(dup.status).toBe(409)
+    expect(dup.corpo.error.code).toBe('ja_possui_conta')
+    // e-mail inexistente no Auth: mensagem clara; corpo estrito (sem loja_id)
+    const sem = await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: 'Outro', email_dono: `${m.marca.toLowerCase()}.zz@exemplo.com` })
+    expect(sem.status).toBe(422)
+    expect(sem.corpo.error.code).toBe('usuario_sem_acesso')
+    expect((await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: 'Outro', email_dono: email, loja_id: m.lojaA })).status).toBe(400)
   })
 
   it('admin troca papel e desativa; ultimo admin ativo nao cai (invariante)', async () => {

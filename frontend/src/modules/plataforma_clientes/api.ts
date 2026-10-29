@@ -5,24 +5,26 @@
 //   GET   /v1/plataforma-clientes/contas?busca&situacao&cursor&limite   lista paginada por cursor
 //   GET   /v1/plataforma-clientes/contas/:id                            ficha
 //   GET   /v1/plataforma-clientes/operadores                            equipe (so admin)
-//   POST  /v1/plataforma-clientes/operadores                            vincula user existente (admin)
+//   POST  /v1/plataforma-clientes/operadores                            vincula por e-mail (admin)
+//   POST  /v1/plataforma-clientes/contas                                provisiona cliente (admin)
 //   PATCH /v1/plataforma-clientes/operadores/:id                        papel/ativo (admin)
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
-  OperadorDTO,
-  OperadorListaSaida,
   PlataformaContaFicha,
   PlataformaContaPagina,
-  type OperadorConvite,
   type OperadorPatch,
   type PlataformaSituacaoConta,
 } from '@/shared/contracts/_generated/plataforma_clientes'
+import {
+  NovoClienteSaida,
+  OperadorDTO,
+  OperadorListaSaida,
+  type NovoCliente,
+  type OperadorConvite,
+} from './schemas'
 
 export const RAIZ = 'plataforma_clientes'
-
-type OperadorLista = z.infer<typeof OperadorListaSaida>
 
 export interface FiltroContas {
   /** Minimo 2 caracteres (o backend recusa menos); o chamador so passa quando valido. */
@@ -66,7 +68,7 @@ export function useOperadores() {
   return useQuery({
     queryKey: [RAIZ, 'operadores'],
     queryFn: ({ signal }) =>
-      apiClient.get<OperadorLista>('/plataforma-clientes/operadores', {
+      apiClient.get<OperadorListaSaida>('/plataforma-clientes/operadores', {
         schema: OperadorListaSaida,
         signal,
         semLoja: true,
@@ -93,5 +95,15 @@ export function useAtualizarOperador() {
         semLoja: true,
       }),
     onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'operadores'] }),
+  })
+}
+
+/** Provisiona restaurante cliente: conta + primeira loja + dono (por e-mail). So admin. */
+export function useProvisionarCliente() {
+  const qc = useQueryClient()
+  return useMutation<NovoClienteSaida, Error, NovoCliente>({
+    mutationFn: (body) =>
+      apiClient.post<NovoClienteSaida>('/plataforma-clientes/contas', { body, schema: NovoClienteSaida, semLoja: true }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'contas'] }),
   })
 }

@@ -1,7 +1,7 @@
 // Lista de contas (restaurantes clientes): busca por nome (min. 2 caracteres, com debounce),
 // filtro por situacao da assinatura, paginacao por cursor ("Carregar mais") e ficha ao clicar.
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Store } from 'lucide-react'
+import { Plus, Search, Store } from 'lucide-react'
 import {
   Avatar,
   Badge,
@@ -24,6 +24,7 @@ import { useContas } from '../api'
 import { ROTULO_SAUDE, ROTULO_SITUACAO, TOM_SAUDE, TOM_SITUACAO } from '../rotulos'
 import { AreaErro } from './AreaErro'
 import { FichaContaDialog } from './FichaContaDialog'
+import { NovoClienteDialog } from './NovoClienteDialog'
 
 type FiltroSituacao = PlataformaSituacaoConta | 'todas'
 
@@ -80,6 +81,7 @@ export function PainelContas() {
   const [texto, setTexto] = useState('')
   const [situacao, setSituacao] = useState<FiltroSituacao>('todas')
   const [aberta, setAberta] = useState<string | null>(null)
+  const [criando, setCriando] = useState(false)
 
   const termo = useDebounce(texto.trim(), 300)
   // O backend exige >= 2 caracteres; abaixo disso a lista fica sem filtro de busca.
@@ -105,6 +107,10 @@ export function PainelContas() {
           />
         </div>
         <Select ariaLabel="Filtrar por situação" value={situacao} onChange={setSituacao} options={OPCOES_SITUACAO} className="w-full sm:w-56" />
+        <Button onClick={() => setCriando(true)}>
+          <Plus className="size-4" aria-hidden />
+          Novo cliente
+        </Button>
       </div>
       {texto.trim().length === 1 && <p className="-mt-2 text-xs text-tinta-2">Digite ao menos 2 letras para buscar.</p>}
 
@@ -143,6 +149,7 @@ export function PainelContas() {
         </>
       )}
 
+      <NovoClienteDialog aberto={criando} aoFechar={() => setCriando(false)} />
       <FichaContaDialog contaId={aberta} aoFechar={() => setAberta(null)} />
     </div>
   )
