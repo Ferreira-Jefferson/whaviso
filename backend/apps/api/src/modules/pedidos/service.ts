@@ -30,6 +30,7 @@ interface PedidoParaInserir {
   observacao: string | null
   linhas: LinhaMontada[]
   evento: Record<string, unknown>
+  chaveIdempotencia: string | null
 }
 
 export interface Ator {
@@ -108,26 +109,42 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
       formaPagamento: b.forma_pagamento ?? null, trocoPara: b.troco_para_centavos ?? null,
       observacao: b.observacao ?? null, linhas: m.linhas,
       evento: { user_id: a.userId, origem: 'manual', modalidade: b.modalidade, total_centavos: m.total_centavos },
+      chaveIdempotencia: b.chave_idempotencia ?? null,
     })
     return detalhe(a, id)
   }
 
-  /** Insere pedido + itens + opcoes numa transacao, com retry no conflito do codigo diario. */
+  /**
+   * Insere pedido + itens + opcoes numa transacao. Retry quando:
+   *  - a sequencia diaria do codigo colide (outro pedido pegou o mesmo numero), ou
+   *  - duas efetivacoes concorrentes dao deadlock (40P01) ao travar itens/insumos compartilhados.
+   * Idempotente: com chave, o reenvio devolve o pedido original sem reprocessar itens, evento nem a
+   * baixa de estoque (o trigger 0055 so dispara na unica linha que existe).
+   */
   async function inserirPedidoComRetry(a: Ator, p: PedidoParaInserir): Promise<string> {
     const dia = hojeSp().slice(2).replace(/-/g, '')
     for (let tentativa = 0; tentativa < 5; tentativa++) {
       try {
         return await comTransacao(pool, async (tx: PoolClient) => {
+          // Idempotencia: se esta chave ja criou um pedido, devolve o mesmo (sem guards, codigo,
+          // itens, evento ou baixa). Fecha o reenvio/duplo-clique APOS um sucesso ja commitado.
+          if (p.chaveIdempotencia) {
+            const existente = await escrita.pedidoPorChave(tx, a.lojaId, p.chaveIdempotencia)
+            if (existente) return existente.id
+          }
           // G7 autoritativo: serializa o aceite por loja e reconfere pausa/capacidade DENTRO da tx,
           // senao duas criacoes concorrentes passam a pre-checagem e estouram a capacidade da janela.
           await repo.travarAceiteLoja(tx, a.lojaId)
           await exigirAceiteDaLoja(tx, a.lojaId)
           const codigo = await escrita.proximoCodigo(tx, a.lojaId, dia)
-          const pedidoId = await escrita.inserirPedido(tx, {
+          const { id: pedidoId, criado } = await escrita.inserirPedido(tx, {
             lojaId: a.lojaId, clienteId: p.clienteId, enderecoId: p.enderecoId, modalidade: p.modalidade,
             codigo, subtotal: p.subtotal, taxa: p.taxa, total: p.total, formaPagamento: p.formaPagamento,
-            trocoPara: p.trocoPara, observacao: p.observacao,
+            trocoPara: p.trocoPara, observacao: p.observacao, chaveIdempotencia: p.chaveIdempotencia,
           })
+          // Corrida: outra tx com a mesma chave ganhou entre a checagem acima e o insert. Devolve o
+          // pedido dela sem reprocessar (nao insere itens/evento, nao dispara a baixa duas vezes).
+          if (!criado) return pedidoId
           for (const l of p.linhas) await escrita.inserirLinha(tx, a.lojaId, pedidoId, l)
           if (p.enderecoId) await escrita.marcarUsoEndereco(tx, a.lojaId, p.enderecoId)
           await escrita.registrarEvento(tx, { lojaId: a.lojaId, tipo: 'pedido.criado', pedidoId, detalhes: p.evento })
@@ -135,8 +152,12 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
           return pedidoId
         })
       } catch (e) {
-        // Corrida na sequencia diaria: outro pedido pegou o mesmo codigo; tenta o proximo.
-        if (e instanceof ErroBanco && e.tipo === 'unique' && e.constraint === 'pedidos_codigo_loja') continue
+        if (e instanceof ErroBanco) {
+          // Corrida na sequencia diaria: outro pedido pegou o mesmo codigo; tenta o proximo.
+          if (e.tipo === 'unique' && e.constraint === 'pedidos_codigo_loja') continue
+          // Deadlock (40P01) entre efetivacoes concorrentes na baixa de estoque: transiente, retenta.
+          if (e.sqlstate === '40P01') continue
+        }
         throw e
       }
     }
@@ -217,6 +238,7 @@ export function criarServicoPedidos(pool: Pool, cifra: () => Cifra) {
       clienteId, enderecoId, modalidade, subtotal, taxa, total, formaPagamento, trocoPara, observacao,
       linhas: montadas,
       evento: { user_id: a.userId, origem: 'manual', modalidade, total_centavos: total, repetido_de: anteriorId },
+      chaveIdempotencia: b.chave_idempotencia ?? null,
     })
     return detalhe(a, id)
   }

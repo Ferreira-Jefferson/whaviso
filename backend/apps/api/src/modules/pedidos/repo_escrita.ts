@@ -48,22 +48,46 @@ export interface PedidoNovo {
   formaPagamento: FormaPagamento | null
   trocoPara: number | null
   observacao: string | null
+  chaveIdempotencia: string | null
 }
 
-export async function inserirPedido(exec: Executor, p: PedidoNovo): Promise<string> {
-  const r = await consultarUm<{ id: string }>(
+/** Pedido ja criado com esta chave de idempotencia (ou null). So a loja ativa. */
+export async function pedidoPorChave(exec: Executor, lojaId: string, chave: string) {
+  return consultarUm<{ id: string }>(
+    exec,
+    sql`select id from public.pedidos
+         where loja_id = ${lojaId} and chave_idempotencia = ${chave}`,
+  )
+}
+
+/**
+ * Insere o pedido. Com `chaveIdempotencia`, o reenvio da mesma chave (duplo-clique/retry) e no-op: o
+ * `on conflict do nothing` nao grava a 2a linha e o fallback devolve o pedido original (`criado:false`),
+ * evitando duplicar estoque/faturamento. Sem chave, insere sempre (o indice parcial nao se aplica a
+ * null). A colisao do codigo diario (indice pedidos_codigo_loja) NAO e coberta por este on conflict:
+ * continua estourando como unique para o retry do chamador tratar.
+ */
+export async function inserirPedido(
+  exec: Executor,
+  p: PedidoNovo,
+): Promise<{ id: string; criado: boolean }> {
+  const inserido = await consultarUm<{ id: string }>(
     exec,
     sql`insert into public.pedidos
           (loja_id, cliente_id, endereco_id, codigo, status, origem, modalidade,
            subtotal_centavos, taxa_entrega_centavos, total_centavos,
-           forma_pagamento, troco_para_centavos, observacao)
+           forma_pagamento, troco_para_centavos, observacao, chave_idempotencia)
         values (${p.lojaId}, ${p.clienteId}, ${p.enderecoId}, ${p.codigo}, 'novo', 'manual',
                 ${p.modalidade}::modalidade_pedido, ${p.subtotal}, ${p.taxa}, ${p.total},
-                ${p.formaPagamento}, ${p.trocoPara}, ${p.observacao})
+                ${p.formaPagamento}, ${p.trocoPara}, ${p.observacao}, ${p.chaveIdempotencia})
+        on conflict (loja_id, chave_idempotencia) where chave_idempotencia is not null do nothing
         returning id`,
   )
-  if (!r) throw new Error('insert de pedido sem retorno')
-  return r.id
+  if (inserido) return { id: inserido.id, criado: true }
+  // Conflito de idempotencia: ja havia um pedido com esta chave. Devolve o original (sem reprocessar).
+  const existente = await pedidoPorChave(exec, p.lojaId, p.chaveIdempotencia!)
+  if (!existente) throw new Error('insert de pedido sem retorno')
+  return { id: existente.id, criado: false }
 }
 
 export async function inserirLinha(exec: Executor, lojaId: string, pedidoId: string, l: LinhaMontada) {
