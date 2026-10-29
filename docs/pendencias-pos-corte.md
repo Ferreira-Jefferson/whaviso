@@ -542,7 +542,7 @@ Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
 | DATABASE_URL_LISTEN (corrige cache/realtime) | 24 | config | no production.env e no backend/.env dev; falta VPS |
 | Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | FEITO em código (migration 0081, validada local); falta db push no cloud |
 | Read-model de clientes | 30 | DB | FEITO (commit b63991b). Trigger mantem pedidos_total/ultimo_pedido_em; listagem O(log n) por indice. |
-| Serialização p/ listas grandes | 31 | API | NAO escala com volume (payloads paginados = fator constante). Jeito seguro = fast-json-stringify (dep nova + 188 schemas). A decidir. |
+| Serialização p/ listas grandes | 31 | API | FEITO (commit 005f4ef): serializer global fast-json-stringify (zod.toJSONSchema) com fallback ao serializer zod; preserva o whitelist de PII. 1058 testes verdes, 0 fallback. |
 
 **Nota do item 22 (FEITO como single-flight, 2026-10-29):** a 1a tentativa foi um cache por TTL de
 3s, que quebrou 3 testes de integração por uma regressão de correção real (loja recém-criada
@@ -604,13 +604,15 @@ fixes acima cortam o número de idas ao banco e se somam a esse ganho.
   catálogo de lojas (commit d3ec479); alvo `vercel` morto removido do push_secrets e notas (commit
   93691c5); **item 30 read-model de clientes** (commit b63991b, migration 0083): decisão de nascer
   pronto para volume, o lateral join virou colunas mantidas por trigger + índice (O(log n)).
-- **Item 31 (serialização) a decidir:** NÃO escala com volume (payloads são paginados = fator
-  constante por requisição, não cresce com os dados). O jeito seguro é fast-json-stringify (preserva o
-  whitelist de PII que o serializer atual faz via zod.parse, do qual os testes SEC dependem), mas
-  custa uma DEPENDÊNCIA nova e a conversão zod->json-schema->fjs em 188 schemas de resposta
-  (uniões/nullables/records num sistema de PII+dinheiro). Pular a validação em prod vazaria PII (contra
-  real). Aguardando decisão do dono sobre fazer o fjs. O de-dup de `/lojas` NÃO compensa (duas queries
-  de formas diferentes).
+- **Item 31 FEITO (2026-10-29, commit 005f4ef) por decisão do dono (nascer pronto):** serializer de
+  resposta global passou a usar fast-json-stringify, convertendo cada schema de resposta com
+  `z.toJSONSchema` (zod v4) e compilando o fjs (cache por schema), com FALLBACK ao serializer zod do
+  pacote quando um schema não converte. O fjs emite só os campos declarados, então o whitelist de PII
+  (do qual os testes SEC dependem) é preservado. Verificação própria: a suíte INTEIRA (1058) passou sem
+  alterar teste, e um diagnóstico temporário mostrou 0 fallback no sistema todo (todas as 188 respostas
+  usam fjs e a saída é idêntica). Dep `fast-json-stringify@^6.4.0` (já era transitiva do Fastify)
+  declarada no package.json da api. O de-dup de `/lojas` NÃO compensa (duas queries de formas
+  diferentes).
 - **FALTA (fora do código / precisa de você, da VPS ou da Meta):** db push do 0081 (e das demais
   migrations pendentes) no cloud COMPARTILHADO de prod (combinar no deploy); item 21 (OTP hook);
   itens 6, 8, 35 (VPS); 15 Fase B e 17 (Meta). O item 20/24 (VPS *.env) e o item 5 (serviço atendente)
