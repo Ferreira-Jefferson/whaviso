@@ -20,6 +20,11 @@ npm ci
 echo ">> frontend: instalando deps e buildando a SPA"
 cd "$APP/frontend"
 npm ci
+# Remove dotenvs antigos e gitignorados do front: o build usa o env exportado abaixo
+# (precedencia maxima no Vite); um .env solto so causa confusao e ja envenenou o build
+# uma vez (apontando para um Supabase deletado). O .env.example rastreado nao e tocado.
+rm -f "$APP/frontend/.env" "$APP/frontend/.env.local" \
+      "$APP/frontend/.env.production" "$APP/frontend/.env.production.local"
 # As VITE_* sao assadas no bundle em build-time. Exportamos aqui (env de processo tem
 # precedencia maxima no Vite) para o build NAO depender de nenhum .env solto no servidor:
 # um .env gitignorado antigo ja envenenou o build uma vez, apontando para um projeto
@@ -48,6 +53,25 @@ mv "${WEBROOT}.new" "$WEBROOT"
 # outro dono) e deixa o app imutavel em runtime. O unico caminho que o zap escreve
 # e /var/lib/whaviso (ReadWritePaths na unit), fora do checkout. O acesso de leitura
 # do whaviso ao codigo vem de ele ser dono de /opt/whaviso (que e 750).
+
+echo ">> nginx: sincronizando a config do site (config-as-code) e recarregando"
+# O deploy.sh roda como root (sudo), entao mantem /etc/nginx/sites-available/whaviso.conf
+# igual ao versionado deploy/nginx/whaviso.conf. Defensivo: backup, nginx -t, e so recarrega
+# se a config validar; se nao validar, restaura o backup. Isso elimina o drift (o servidor
+# estava com um CSP mais antigo que o repo, sem accounts.google.com no style-src).
+NGINX_SITE=/etc/nginx/sites-available/whaviso.conf
+NGINX_SRC="$APP/deploy/nginx/whaviso.conf"
+if [ -f "$NGINX_SRC" ]; then
+  [ -f "$NGINX_SITE" ] && cp -f "$NGINX_SITE" "${NGINX_SITE}.bak.$(date +%s)"
+  install -m 644 "$NGINX_SRC" "$NGINX_SITE"
+  if nginx -t; then
+    systemctl reload nginx
+  else
+    echo "AVISO: nginx -t falhou apos sincronizar; restaurando a config anterior" >&2
+    last=$(ls -t "${NGINX_SITE}.bak."* 2>/dev/null | head -1)
+    if [ -n "$last" ]; then cp -f "$last" "$NGINX_SITE" && nginx -t && systemctl reload nginx; fi
+  fi
+fi
 
 echo ">> reiniciando os servicos"
 systemctl restart whaviso-api
