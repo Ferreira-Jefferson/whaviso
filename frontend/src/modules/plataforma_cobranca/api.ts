@@ -31,7 +31,7 @@ import {
   type StatusAssinatura,
   type StatusFatura,
 } from '@/shared/contracts/_generated/plataforma_cobranca'
-import { PlanoDTO, PlanosLista, type PlanoCriar, type PlanoPatch } from './planos'
+import { ConfigTaxa, PlanoDTO, PlanosLista, type PlanoCriar, type PlanoPatch } from './planos'
 import { PlataformaContaPagina } from '@/shared/contracts/_generated/plataforma_clientes'
 
 export const RAIZ = 'plataforma_cobranca'
@@ -226,5 +226,31 @@ export function useAlterarPlano() {
     mutationFn: ({ id, patch }) =>
       apiClient.patch<PlanoDTO>(`/plataforma-cobranca/planos/${id}`, { body: patch, schema: PlanoDTO, ...OP }),
     onSettled: invalidar,
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Taxa de intermediacao PADRAO da plataforma (admin)
+//   GET/PUT /v1/plataforma-cobranca/config/taxa
+// ---------------------------------------------------------------------------------------------
+export function useConfigTaxa() {
+  return useQuery({
+    queryKey: [RAIZ, 'config_taxa'],
+    queryFn: ({ signal }) =>
+      apiClient.get<ConfigTaxa>('/plataforma-cobranca/config/taxa', { schema: ConfigTaxa, signal, ...OP }),
+  })
+}
+
+export function useSalvarConfigTaxa() {
+  const qc = useQueryClient()
+  return useMutation<ConfigTaxa, Error, number>({
+    mutationFn: (padraoCentavos) =>
+      apiClient.put<ConfigTaxa>('/plataforma-cobranca/config/taxa', {
+        body: { taxa_intermediacao_padrao_centavos: padraoCentavos },
+        schema: ConfigTaxa,
+        ...OP,
+      }),
+    onSuccess: (resp) => qc.setQueryData([RAIZ, 'config_taxa'], resp),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'config_taxa'] }),
   })
 }

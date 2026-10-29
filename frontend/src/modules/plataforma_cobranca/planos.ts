@@ -8,6 +8,8 @@ export const PlanoDTO = z.object({
   valor_centavos: z.number().int().nonnegative(),
   inclui: z.array(z.string()),
   ativo: z.boolean(),
+  /** Override da taxa de intermediacao (centavos); null = herda o padrao da plataforma. */
+  taxa_intermediacao_centavos: z.number().int().nonnegative().nullable(),
   criado_em: z.string(),
   atualizado_em: z.string(),
 })
@@ -19,5 +21,14 @@ export interface PlanoCriar {
   valor_centavos: number
   inclui: string[]
   ativo: boolean
+  /** null (ou ausente) = herda o padrao da plataforma; numero = override (0 = sem taxa). */
+  taxa_intermediacao_centavos?: number | null
 }
 export type PlanoPatch = Partial<PlanoCriar>
+
+/** Taxa de intermediacao PADRAO da plataforma (fallback de todos os planos). */
+export const ConfigTaxa = z.object({
+  taxa_intermediacao_padrao_centavos: z.number().int().nonnegative(),
+  atualizado_em: z.string(),
+})
+export type ConfigTaxa = z.infer<typeof ConfigTaxa>

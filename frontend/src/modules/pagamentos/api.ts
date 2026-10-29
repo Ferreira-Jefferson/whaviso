@@ -5,7 +5,7 @@
 //    nunca vai para log, URL ou storage.
 // Loja ativa no header x-loja-id. Contratos: @/shared/contracts/_generated/pagamentos.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { z } from 'zod'
+import { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
   ListaPagamentosSaida,
@@ -83,5 +83,37 @@ export function useCancelarPagamento() {
   return useMutation<Pagamento, Error, string>({
     mutationFn: (id) => apiClient.post<Pagamento>(`/pagamentos/${id}/cancelar`, { schema: PagamentoSaida }),
     onSettled: invalidar,
+  })
+}
+
+// ---- Config de recebimento (modo do Pix + quem paga a taxa) ---------------------------------
+// Contrato proprio do front (espelha a api; nao e gerado, pois o backend o mantem local ao modulo).
+
+export const PagamentoConfig = z.object({
+  pix_modo: z.enum(['chave_propria', 'intermediado']),
+  encargo_modo: z.enum(['absorve', 'repassa']),
+  cartao_habilitado: z.boolean(),
+  atualizado_em: z.string().nullable(),
+})
+export type PagamentoConfig = z.infer<typeof PagamentoConfig>
+export type PagamentoConfigPatch = Partial<Pick<PagamentoConfig, 'pix_modo' | 'encargo_modo' | 'cartao_habilitado'>>
+
+/** GET /v1/pagamentos/config: modo do Pix e quem paga a taxa (default se nunca salvo). */
+export function useConfigPagamento() {
+  return useQuery({
+    queryKey: [RAIZ, 'config'],
+    queryFn: ({ signal }) =>
+      apiClient.get<PagamentoConfig>('/pagamentos/config', { schema: PagamentoConfig, signal }),
+  })
+}
+
+/** PUT /v1/pagamentos/config: salva a config de recebimento (dono/gerente). */
+export function useSalvarConfigPagamento() {
+  const qc = useQueryClient()
+  return useMutation<PagamentoConfig, Error, PagamentoConfigPatch>({
+    mutationFn: (body) =>
+      apiClient.put<PagamentoConfig>('/pagamentos/config', { body, schema: PagamentoConfig }),
+    onSuccess: (resp) => qc.setQueryData([RAIZ, 'config'], resp),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'config'] }),
   })
 }

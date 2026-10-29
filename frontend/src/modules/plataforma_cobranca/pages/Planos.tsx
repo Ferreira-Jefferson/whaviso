@@ -1,14 +1,14 @@
 // Console do operador: catalogo de planos. Admin cria/edita e ativa/inativa. Plano nunca some
 // (so inativa). O valor do plano e copiado para a assinatura ao escolher o plano; reajustar o
 // plano nao muda a cobranca de quem ja assina.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Package, Plus } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import {
-  Badge, Banner, Button, Dialog, EmptyState, Field, Input, MoneyInput, MoneyText, PageHeader, Skeleton,
+  Badge, Banner, Button, Card, Dialog, EmptyState, Field, Input, MoneyInput, MoneyText, PageHeader, Skeleton,
   Switch, TableResponsive, Textarea, useToast, type ColunaTabela,
 } from '@/shared/ui'
-import { useAlterarPlano, useCriarPlano, usePlanos } from '../api'
+import { useAlterarPlano, useConfigTaxa, useCriarPlano, usePlanos, useSalvarConfigTaxa } from '../api'
 import { AreaErro } from '../components/AreaErro'
 import type { PlanoDTO } from '../planos'
 
@@ -42,6 +42,15 @@ export default function Planos() {
     { chave: 'nome', titulo: 'Plano', principal: true, render: (p) => <span className="font-medium">{p.nome}</span> },
     { chave: 'valor', titulo: 'Valor mensal', alinhar: 'direita', render: (p) => <MoneyText centavos={p.valor_centavos} /> },
     {
+      chave: 'taxa',
+      titulo: 'Taxa',
+      alinhar: 'direita',
+      render: (p) =>
+        p.taxa_intermediacao_centavos == null
+          ? <span className="text-sm text-tinta-2">Padrão</span>
+          : <MoneyText centavos={p.taxa_intermediacao_centavos} />,
+    },
+    {
       chave: 'inclui',
       titulo: 'Inclui',
       render: (p) => (
@@ -70,6 +79,7 @@ export default function Planos() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader titulo="Planos" descricao="Catálogo de planos oferecidos aos restaurantes clientes." />
+      <TaxaPadraoCard />
       <div className="flex justify-end">
         <Button className="max-sm:w-full" onClick={() => setCriando(true)}>
           <Plus className="size-4" aria-hidden />
@@ -109,6 +119,7 @@ export default function Planos() {
 function FormPlano({ plano, aoFechar }: { plano?: PlanoDTO; aoFechar: () => void }) {
   const [nome, setNome] = useState(plano?.nome ?? '')
   const [valor, setValor] = useState<number | null>(plano?.valor_centavos ?? null)
+  const [taxa, setTaxa] = useState<number | null>(plano?.taxa_intermediacao_centavos ?? null)
   const [inclui, setInclui] = useState((plano?.inclui ?? []).join('\n'))
   const [erro, setErro] = useState<string | null>(null)
   const criar = useCriarPlano()
@@ -120,7 +131,12 @@ function FormPlano({ plano, aoFechar }: { plano?: PlanoDTO; aoFechar: () => void
     if (!nome.trim()) return setErro('Informe o nome do plano.')
     if (valor === null || valor <= 0) return setErro('Informe o valor mensal.')
     setErro(null)
-    const corpo = { nome: nome.trim(), valor_centavos: valor, inclui: linhasParaLista(inclui) }
+    const corpo = {
+      nome: nome.trim(),
+      valor_centavos: valor,
+      inclui: linhasParaLista(inclui),
+      taxa_intermediacao_centavos: taxa,
+    }
     const opcoes = {
       onSuccess: () => {
         mostrarToast(plano ? 'Plano atualizado.' : 'Plano criado.', { tom: 'sucesso' })
@@ -146,6 +162,9 @@ function FormPlano({ plano, aoFechar }: { plano?: PlanoDTO; aoFechar: () => void
       <Field label="Valor mensal" dica={plano ? 'Reajuste vale para novas assinaturas. Quem já assina mantém o valor combinado.' : undefined}>
         <MoneyInput value={valor} onChange={setValor} />
       </Field>
+      <Field label="Taxa de intermediação" dica="Por transação, no Pix/cartão intermediado. Em branco = usa o padrão da plataforma. R$ 0,00 = sem taxa.">
+        <MoneyInput value={taxa} onChange={setTaxa} />
+      </Field>
       <Field label="O que inclui" dica="Um item por linha. Ex.: Atendente com IA, 2 lojas, 1 número de WhatsApp.">
         <Textarea value={inclui} onChange={(e) => setInclui(e.target.value)} rows={5} />
       </Field>
@@ -159,5 +178,52 @@ function FormPlano({ plano, aoFechar }: { plano?: PlanoDTO; aoFechar: () => void
         </Button>
       </div>
     </form>
+  )
+}
+
+/** Taxa de intermediacao PADRAO da plataforma (fallback de todos os planos). */
+function TaxaPadraoCard() {
+  const config = useConfigTaxa()
+  const salvar = useSalvarConfigTaxa()
+  const { mostrarToast } = useToast()
+  const [valor, setValor] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (config.data) setValor(config.data.taxa_intermediacao_padrao_centavos)
+  }, [config.data])
+
+  const mudou = config.data != null && valor != null && valor !== config.data.taxa_intermediacao_padrao_centavos
+
+  const enviar = () => {
+    if (valor == null) return
+    salvar.mutate(valor, {
+      onSuccess: () => mostrarToast('Taxa padrão salva.', { tom: 'sucesso' }),
+      onError: (e) => mostrarToast(mensagem(e, 'Não foi possível salvar a taxa.'), { tom: 'erro' }),
+    })
+  }
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg text-salvia">Taxa de intermediação padrão</h2>
+        <p className="text-sm text-tinta-2">
+          Cobrada por transação quando o pagamento passa pelo Whaviso. Cada plano pode ter a sua; em branco, o plano usa esta.
+        </p>
+      </div>
+      {config.isPending && <Skeleton className="h-10 w-48" />}
+      {config.isError && <AreaErro erro={config.error} aoTentarDeNovo={() => void config.refetch()} />}
+      {config.isSuccess && (
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-44">
+            <Field label="Valor por transação">
+              <MoneyInput value={valor} onChange={setValor} />
+            </Field>
+          </div>
+          <Button onClick={enviar} loading={salvar.isPending} disabled={!mudou}>
+            Salvar taxa
+          </Button>
+        </div>
+      )}
+    </Card>
   )
 }
