@@ -14,3 +14,5 @@ backend/supabase/.branches/
 frontend/dist/
 .DS_Store
 .claude/refs
+# Claude Code local settings (pessoal, nao versionar)
+.claude/settings.local.json
