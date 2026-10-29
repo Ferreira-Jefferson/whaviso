@@ -73,10 +73,41 @@ if [ -f "$NGINX_SRC" ]; then
   fi
 fi
 
+echo ">> atendente: sincronizando a unit (config-as-code) e provisionando o env"
+# O servico do atendente (motor IA/RAG :3003) entra como config-as-code, igual ao nginx: a unit
+# vem do repo. O env de segredo (/etc/whaviso/atendente.env) e provisionado UMA vez a partir de um
+# seed que o operador deixa em /home/deploy/atendente.env.seed (DATABASE_URL do role
+# whaviso_atendente + PORT/LOG_LEVEL, SEM a MASTER_KEY) mais a MASTER_KEY lida do api.env/zap.env
+# (fonte unica da chave mestra, sem drift). Instalado o env, o seed e destruido.
+ATND_SRC="$APP/deploy/systemd/whaviso-atendente.service"
+ATND_UNIT=/etc/systemd/system/whaviso-atendente.service
+ATND_ENV=/etc/whaviso/atendente.env
+ATND_SEED=/home/deploy/atendente.env.seed
+if [ -f "$ATND_SRC" ]; then
+  install -m 644 "$ATND_SRC" "$ATND_UNIT"
+  if [ ! -f "$ATND_ENV" ] && [ -f "$ATND_SEED" ]; then
+    echo ">> atendente: provisionando $ATND_ENV (seed + MASTER_KEY do api.env)"
+    MK=$(grep -hE '^MASTER_KEY=' /etc/whaviso/api.env /etc/whaviso/zap.env 2>/dev/null | head -1 || true)
+    umask 077
+    { cat "$ATND_SEED"; [ -n "$MK" ] && printf '%s\n' "$MK"; } > "$ATND_ENV"
+    chown root:root "$ATND_ENV"
+    chmod 600 "$ATND_ENV"
+    shred -u "$ATND_SEED" 2>/dev/null || rm -f "$ATND_SEED"
+    [ -n "$MK" ] || echo "AVISO: MASTER_KEY nao achada em api.env/zap.env; atendente sobe mas nao decifra chave de LLM" >&2
+  fi
+  systemctl daemon-reload
+  if [ -f "$ATND_ENV" ]; then
+    systemctl enable whaviso-atendente >/dev/null 2>&1 || true
+    systemctl restart whaviso-atendente
+  else
+    echo "AVISO: $ATND_ENV ausente (sem seed em $ATND_SEED); whaviso-atendente NAO iniciado" >&2
+  fi
+fi
+
 echo ">> reiniciando os servicos"
 systemctl restart whaviso-api
 systemctl restart whaviso-zap   # reconecta a Meta Cloud API pelas credenciais (META_*)
 
 echo ">> status"
-systemctl --no-pager --lines=5 status whaviso-api whaviso-zap || true
+systemctl --no-pager --lines=5 status whaviso-api whaviso-zap whaviso-atendente || true
 echo ">> deploy concluido"
