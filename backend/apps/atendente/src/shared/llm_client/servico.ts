@@ -36,6 +36,7 @@ import { lerCredencialAtiva } from './credencial'
 import { LimiteExcedido, LlmIndisponivel, SaidaInvalida } from './erros'
 import type { AdaptadorProvedor, ResolverAdaptador } from './provedores/porta'
 import { gastoDoDiaCentavos, registrarUso } from './uso'
+import { idLoja, type Escopo } from '../escopo'
 
 export interface DepsServicoLlm {
   /** Obtem a decifra da chave (lazy): producao usa `decifraPadrao`; teste injeta a sua. */
@@ -50,7 +51,8 @@ export interface DepsServicoLlm {
 /** Campos comuns a toda chamada: executor de banco, loja e o modulo chamador (vai em `uso_llm.origem`). */
 export interface BaseChamada {
   exec: Executor
-  lojaId: string
+  /** Escopo resolvido no servidor (hoje so 'loja'; a credencial/uso seguem por loja_id). */
+  escopo: Escopo
   origem: string
 }
 
@@ -154,7 +156,7 @@ export function criarServicoLlm(deps: DepsServicoLlm): ServicoLlm {
 
   const servico: ServicoLlm = {
     async completar(e) {
-      const prep = await preparar(e.exec, e.lojaId)
+      const prep = await preparar(e.exec, idLoja(e.escopo))
       if (!prep.ok) return prep
       const { adaptador, credencial, provedor, modeloPreferido } = prep.valor
       const r = await adaptador.completar({
@@ -163,12 +165,12 @@ export function criarServicoLlm(deps: DepsServicoLlm): ServicoLlm {
         ...(e.ferramentas ? { ferramentas: e.ferramentas } : {}),
         ...(e.modelo ?? modeloPreferido ? { modelo: e.modelo ?? modeloPreferido! } : {}),
       })
-      if (r.ok) await contabilizar(e.exec, e.lojaId, provedor, e.origem, r.valor.modelo, r.valor.uso)
+      if (r.ok) await contabilizar(e.exec, idLoja(e.escopo), provedor, e.origem, r.valor.modelo, r.valor.uso)
       return r
     },
 
     async completarEstruturado(e, schema) {
-      const prep = await preparar(e.exec, e.lojaId)
+      const prep = await preparar(e.exec, idLoja(e.escopo))
       if (!prep.ok) return prep
       const { adaptador, credencial, provedor, modeloPreferido } = prep.valor
       const mensagens: MensagemLlm[] = [...e.mensagens]
@@ -184,7 +186,7 @@ export function criarServicoLlm(deps: DepsServicoLlm): ServicoLlm {
           formatoSaida: { tipo: 'json' },
         })
         if (!r.ok) return r
-        await contabilizar(e.exec, e.lojaId, provedor, e.origem, r.valor.modelo, r.valor.uso)
+        await contabilizar(e.exec, idLoja(e.escopo), provedor, e.origem, r.valor.modelo, r.valor.uso)
 
         const validado = validarJson(schema, r.valor.texto)
         if (validado.ok) return ok({ dados: validado.valor, resposta: r.valor })
@@ -197,7 +199,7 @@ export function criarServicoLlm(deps: DepsServicoLlm): ServicoLlm {
     },
 
     async transcrever(e) {
-      const prep = await preparar(e.exec, e.lojaId)
+      const prep = await preparar(e.exec, idLoja(e.escopo))
       if (!prep.ok) return prep
       const { adaptador, credencial, provedor } = prep.valor
       const r = await adaptador.transcrever({
@@ -205,12 +207,12 @@ export function criarServicoLlm(deps: DepsServicoLlm): ServicoLlm {
         audio: e.audio,
         ...(e.idioma ? { idioma: e.idioma } : {}),
       })
-      if (r.ok) await contabilizar(e.exec, e.lojaId, provedor, e.origem, prep.valor.modeloPreferido, r.valor.uso)
+      if (r.ok) await contabilizar(e.exec, idLoja(e.escopo), provedor, e.origem, prep.valor.modeloPreferido, r.valor.uso)
       return r
     },
 
     async descreverImagem(e) {
-      const prep = await preparar(e.exec, e.lojaId)
+      const prep = await preparar(e.exec, idLoja(e.escopo))
       if (!prep.ok) return prep
       const { adaptador, credencial, provedor } = prep.valor
       const r = await adaptador.descreverImagem({
@@ -218,7 +220,7 @@ export function criarServicoLlm(deps: DepsServicoLlm): ServicoLlm {
         imagem: e.imagem,
         ...(e.instrucao ? { instrucao: e.instrucao } : {}),
       })
-      if (r.ok) await contabilizar(e.exec, e.lojaId, provedor, e.origem, prep.valor.modeloPreferido, r.valor.uso)
+      if (r.ok) await contabilizar(e.exec, idLoja(e.escopo), provedor, e.origem, prep.valor.modeloPreferido, r.valor.uso)
       return r
     },
   }

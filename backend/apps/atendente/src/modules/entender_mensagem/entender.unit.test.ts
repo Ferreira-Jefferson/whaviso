@@ -7,6 +7,7 @@ import { criarLogger } from '@whaviso/shared/logger'
 import { ok, falha, type ErroProvedor } from '@whaviso/shared/clientes'
 import { LimiteExcedido, LlmIndisponivel, SaidaInvalida, type ServicoLlm } from '../../shared/llm_client'
 import { ancorarItem, criarEntendedor, MAX_BYTES_AUDIO, pareceInjecao, type CardapioEntendimento } from './index'
+import { escopoLoja } from '../../shared/escopo'
 
 const exec = {} as Executor
 const logger = criarLogger('entender-teste', 'silent')
@@ -42,7 +43,7 @@ function fakeServico(op: {
     },
     async completarEstruturado(e, schema) {
       esp.completar++
-      esp.lojas.push(e.lojaId)
+      esp.lojas.push(e.escopo.id)
       esp.prompts.push(e.mensagens.map((m) => m.conteudo).join('\n---\n'))
       if (op.erro) return falha(op.erro)
       const p = schema.safeParse(op.saida)
@@ -51,7 +52,7 @@ function fakeServico(op: {
     },
     async transcrever(e) {
       esp.transcricoes++
-      esp.lojas.push(e.lojaId)
+      esp.lojas.push(e.escopo.id)
       if (typeof op.stt !== 'string' && op.stt) return falha(op.stt)
       return ok({ texto: op.stt ?? '', uso: { tokensIn: 1, tokensOut: 1, custoEstimadoCentavos: 0 } })
     },
@@ -67,7 +68,7 @@ const montar = (op: Parameters<typeof fakeServico>[0], limiar?: number) => {
   return { esp, e: criarEntendedor({ servico, logger, ...(limiar !== undefined ? { limiarConfianca: limiar } : {}) }) }
 }
 const texto = (t: string) => ({ tipo: 'texto' as const, texto: t })
-const base = { exec, lojaId: 'loja-A', cardapio: CARDAPIO }
+const base = { exec, escopo: escopoLoja('loja-A'), cardapio: CARDAPIO }
 
 describe('classificacao: frases reais com respostas gravadas', () => {
   const casos: Array<{ frase: string; saida: unknown; esperado: string; itemId?: string }> = [
@@ -258,7 +259,7 @@ describe('seguranca', () => {
   it('SEC-062: o prompt traz so o cardapio da loja da chamada e usa o lojaId dela', async () => {
     const outra: CardapioEntendimento = { itens: [{ id: 'z1', nome: 'Sushi Combo Secreto' }] }
     const { e, esp } = montar({ saida: { tipo: 'desconhecida', confianca: 0.9, motivo: 'ambigua' } })
-    await e.entender({ exec, lojaId: 'loja-B', cardapio: outra, mensagem: texto('oi') })
+    await e.entender({ exec, escopo: escopoLoja('loja-B'), cardapio: outra, mensagem: texto('oi') })
     expect(esp.lojas).toEqual(['loja-B'])
     expect(esp.prompts[0]).toContain('Sushi Combo Secreto')
     expect(esp.prompts[0]).not.toContain('Pizza Calabresa')

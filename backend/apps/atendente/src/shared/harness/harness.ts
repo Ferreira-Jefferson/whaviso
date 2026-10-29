@@ -35,6 +35,7 @@ import type {
   MotivoSemLlm,
   ResultadoHarness,
 } from './tipos'
+import { escopoLoja } from '../escopo'
 
 /** Mesmo algoritmo de `chaveIdempotencia` de modules/tools para `escalar_humano` (conteudo `{}`): o handoff
  * proposto pelo harness e o proposto pela tool compartilham a chave e o motor efetiva uma vez (SEC-066). */
@@ -189,7 +190,7 @@ export async function rodarTurno(deps: DepsHarness, entrada: EntradaHarness): Pr
   for (let passo = 0; passo < lim.maxPassos; passo++) {
     const restante = prazo - Date.now()
     const r = await comPrazo(
-      deps.servico.completar({ exec: deps.exec, lojaId: ctx.loja_id, origem: ORIGEM_LLM, mensagens: msgs, ferramentas }),
+      deps.servico.completar({ exec: deps.exec, escopo: escopoLoja(ctx.loja_id), origem: ORIGEM_LLM, mensagens: msgs, ferramentas }),
       restante,
     )
     if (r === 'timeout') return degradar('timeout', 'timeout')

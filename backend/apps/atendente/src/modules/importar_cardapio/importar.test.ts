@@ -37,7 +37,7 @@ function fake(op: Op): { servico: ServicoLlm; chamadas: { visao: number; estrutu
     },
     async descreverImagem(e) {
       c.visao++
-      c.lojas.push(e.lojaId)
+      c.lojas.push(e.escopo.id)
       if (op.lancar) throw new Error('rede caiu')
       if (op.visao instanceof Error) return falha(op.visao as ErroProvedor)
       return ok({ descricao: op.visao ?? 'Lanches: X-Burger R$ 18,50', uso })

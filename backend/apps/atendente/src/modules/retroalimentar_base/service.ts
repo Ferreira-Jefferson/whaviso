@@ -33,6 +33,7 @@ import {
   type ResumoGeracao,
   type ResumoRetroalimentacao,
 } from './tipos'
+import { escopoLoja } from '../../shared/escopo'
 
 export interface DepsRetro {
   /** Executor sob o role whaviso_atendente (le conversas/documentos, grava rag_feedback/rascunho/eventos). */
@@ -238,7 +239,7 @@ export async function gerarRascunhos(deps: DepsRetro): Promise<ResumoGeracao> {
 
 async function gerarUm(deps: DepsRetro, sinal: repo.SinalPendente): Promise<DesfechoRascunho> {
   const r = await deps.servico.completarEstruturado(
-    { exec: deps.exec, lojaId: sinal.loja_id, origem: ORIGEM_LLM, mensagens: montarMensagens(sinal.tipo, sinal.texto) },
+    { exec: deps.exec, escopo: escopoLoja(sinal.loja_id), origem: ORIGEM_LLM, mensagens: montarMensagens(sinal.tipo, sinal.texto) },
     RascunhoGerado,
   )
 

@@ -7,6 +7,7 @@
 import type { ConversaCtx, NodeContract } from '@whaviso/shared/contracts'
 import type { Executor } from '@whaviso/shared/db'
 import { rodarTurno, type DepsHarness, type EntendimentoResumo, type ResultadoHarness } from '../../shared/harness'
+import { escopoLoja, type Escopo } from '../../shared/escopo'
 import { montarLinha } from './cardapio'
 import { escolherDaLista } from './entrada'
 import { LinhaCarrinho, type CardapioCtx, type EntradaTurno } from './tipos'
@@ -15,7 +16,7 @@ import { LinhaCarrinho, type CardapioCtx, type EntradaTurno } from './tipos'
 export interface EntendedorMotor {
   entender(e: {
     exec: Executor
-    lojaId: string
+    escopo: Escopo
     mensagem: { tipo: 'texto'; texto: string }
     cardapio: { itens: readonly { id: string; nome: string }[] }
   }): Promise<EntendimentoResumo>
@@ -59,7 +60,7 @@ export async function consultarHarness(
     ...(entendedor
       ? {
           entender: (t: string) =>
-            entendedor.entender({ exec: llm.harness.exec, lojaId: v.lojaId, mensagem: { tipo: 'texto', texto: t }, cardapio: { itens } }),
+            entendedor.entender({ exec: llm.harness.exec, escopo: escopoLoja(v.lojaId), mensagem: { tipo: 'texto', texto: t }, cardapio: { itens } }),
         }
       : {}),
   }

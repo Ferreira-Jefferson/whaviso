@@ -61,7 +61,7 @@ function servicoFake(script: Script[] | Script, opcoes: { atrasoMs?: number; err
   const chamadas: Array<{ mensagens: MensagemLlm[]; ferramentas: unknown; lojaId: string; origem: string }> = []
   const servico = {
     async completar(e: { mensagens: MensagemLlm[]; ferramentas?: unknown; lojaId: string; origem: string }) {
-      chamadas.push({ mensagens: [...e.mensagens], ferramentas: e.ferramentas, lojaId: e.lojaId, origem: e.origem })
+      chamadas.push({ mensagens: [...e.mensagens], ferramentas: e.ferramentas, lojaId: e.escopo.id, origem: e.origem })
       if (opcoes.atrasoMs) await new Promise((r) => setTimeout(r, opcoes.atrasoMs))
       if (opcoes.erro) return falha(opcoes.erro as never)
       const i = Array.isArray(script) ? Math.min(chamadas.length - 1, script.length - 1) : 0

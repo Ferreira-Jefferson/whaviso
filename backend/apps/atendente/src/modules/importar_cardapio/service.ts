@@ -22,6 +22,7 @@ import {
   type JobImportacao,
   type ResumoDrenagem,
 } from './tipos'
+import { escopoLoja } from '../../shared/escopo'
 
 export interface DepsImportador {
   pool: Pool
@@ -56,7 +57,7 @@ async function extrair(deps: DepsImportador, job: JobImportacao, bytes: Uint8Arr
   // Passo 1: visao (imagem ou PDF) -> transcricao em texto.
   const v = await deps.servico.descreverImagem({
     exec: deps.pool,
-    lojaId: job.lojaId,
+    escopo: escopoLoja(job.lojaId),
     origem: ORIGEM_LLM,
     imagem: { bytes: new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength), mimeType: job.mime },
     instrucao: INSTRUCAO_VISAO,
@@ -68,7 +69,7 @@ async function extrair(deps: DepsImportador, job: JobImportacao, bytes: Uint8Arr
   const e = await deps.servico.completarEstruturado(
     {
       exec: deps.pool,
-      lojaId: job.lojaId,
+      escopo: escopoLoja(job.lojaId),
       origem: ORIGEM_LLM,
       mensagens: montarMensagensEstrutura(v.valor.descricao),
     },

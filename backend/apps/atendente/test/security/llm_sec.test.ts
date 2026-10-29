@@ -23,6 +23,7 @@ import {
   type AdaptadorProvedor,
 } from '../../src/shared/llm_client'
 import { bancoAcessivel, fecharPools, limpar, poolAtendente, poolSuper, semear } from '../db'
+import { escopoLoja } from '../../src/shared/escopo'
 
 const online = await bancoAcessivel()
 const logger = criarLogger('llm-sec', 'silent')
@@ -125,11 +126,11 @@ describe.skipIf(!online)('AT-llm (integracao, role whaviso_atendente)', () => {
     const ad = fakeAdaptador()
     const servico = servicoCom(ad)
 
-    const rA = await servico.completar({ exec: poolAtendente, lojaId: a.lojaId, origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
+    const rA = await servico.completar({ exec: poolAtendente, escopo: escopoLoja(a.lojaId), origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
     expect(rA.ok).toBe(true)
     expect(ad.credVistas).toEqual([SENTINELA_A]) // usou a chave da loja A
 
-    const rB = await servico.completar({ exec: poolAtendente, lojaId: b.lojaId, origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
+    const rB = await servico.completar({ exec: poolAtendente, escopo: escopoLoja(b.lojaId), origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
     expect(rB.ok).toBe(false)
     if (!rB.ok) expect(rB.erro.codigo).toBe('llm_indisponivel') // falha fechada, nao caiu na chave de A
     expect(ad.credVistas).toEqual([SENTINELA_A]) // B nao chamou o adaptador
@@ -146,7 +147,7 @@ describe.skipIf(!online)('AT-llm (integracao, role whaviso_atendente)', () => {
     await poolSuper.query('update public.credenciais_llm set ativo = false where loja_id = $1', [a.lojaId])
 
     const ad = fakeAdaptador()
-    const r = await servicoCom(ad).completar({ exec: poolAtendente, lojaId: a.lojaId, origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
+    const r = await servicoCom(ad).completar({ exec: poolAtendente, escopo: escopoLoja(a.lojaId), origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.erro.codigo).toBe('llm_indisponivel')
     expect(ad.credVistas).toEqual([])
@@ -158,7 +159,7 @@ describe.skipIf(!online)('AT-llm (integracao, role whaviso_atendente)', () => {
     await semearCredencial(a.lojaId, SENTINELA_A, LLM_MASTER_KEY) // cifrada com a chave certa
     const ad = fakeAdaptador()
     const servico = servicoCom(ad, LLM_MASTER_KEY_ERRADA) // decifra com a ERRADA
-    const r = await servico.completar({ exec: poolAtendente, lojaId: a.lojaId, origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
+    const r = await servico.completar({ exec: poolAtendente, escopo: escopoLoja(a.lojaId), origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.erro.codigo).toBe('llm_indisponivel')
     expect(JSON.stringify(r)).not.toContain(SENTINELA_A)

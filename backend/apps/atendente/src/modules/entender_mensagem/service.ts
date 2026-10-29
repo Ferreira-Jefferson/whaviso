@@ -17,6 +17,7 @@ import {
   type MotivoSemLlm,
   type ResultadoEntendimento,
 } from './tipos'
+import { type Escopo } from '../../shared/escopo'
 
 export const ORIGEM_LLM = 'entender_mensagem'
 export const LIMIAR_CONFIANCA_PADRAO = 0.6
@@ -32,7 +33,8 @@ export interface DepsEntendedor {
 
 export interface EntenderEntrada {
   exec: Executor
-  lojaId: string
+  /** Escopo resolvido no servidor (hoje so 'loja'). */
+  escopo: Escopo
   mensagem: EntradaMensagem
   /** Cardapio vivo SOMENTE desta loja (SEC-062). */
   cardapio: CardapioEntendimento
@@ -74,13 +76,13 @@ export function criarEntendedor(deps: DepsEntendedor): Entendedor {
         }
         const t = await deps.servico.transcrever({
           exec: e.exec,
-          lojaId: e.lojaId,
+          escopo: e.escopo,
           origem: ORIGEM_LLM,
           audio: { bytes, mimeType: mime },
           idioma: 'pt',
         })
         if (!t.ok) {
-          deps.logger.warn({ loja_id: e.lojaId, codigo: t.erro.codigo }, 'stt indisponivel ou falhou')
+          deps.logger.warn({ escopo_tipo: e.escopo.tipo, escopo_id: e.escopo.id, codigo: t.erro.codigo }, 'stt indisponivel ou falhou')
           // Provedor sem audio ou erro tecnico: degrada (o motor pede para escrever, segue por botoes).
           return { estado: 'sem_llm', motivo: motivoSemLlm(t.erro) }
         }
@@ -113,11 +115,11 @@ export function criarEntendedor(deps: DepsEntendedor): Entendedor {
       }
 
       const r = await deps.servico.completarEstruturado(
-        { exec: e.exec, lojaId: e.lojaId, origem: ORIGEM_LLM, mensagens: montarMensagens(texto, e.cardapio.itens) },
+        { exec: e.exec, escopo: e.escopo, origem: ORIGEM_LLM, mensagens: montarMensagens(texto, e.cardapio.itens) },
         IntencaoModelo,
       )
       if (!r.ok) {
-        deps.logger.warn({ loja_id: e.lojaId, codigo: r.erro.codigo }, 'entendimento de intencao falhou')
+        deps.logger.warn({ escopo_tipo: e.escopo.tipo, escopo_id: e.escopo.id, codigo: r.erro.codigo }, 'entendimento de intencao falhou')
         // Saida invalida ou recusada: "nao entendi" (botoes), nunca uma acao.
         if (r.erro.codigo === CODIGO.saidaInvalida || r.erro.codigo === CODIGO.conteudo) return naoEntendi
         return { estado: 'sem_llm', motivo: motivoSemLlm(r.erro) }

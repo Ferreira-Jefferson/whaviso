@@ -20,6 +20,7 @@ import {
 import type { Executor } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
 import type { AdaptadorProvedor } from '../llm_client'
+import type { Escopo } from '../escopo'
 import { registrarUsoRag } from './uso'
 
 /** Dimensao fixa do indice (espelha a coluna `vector(1536)` da migration 0018/0011). */
@@ -29,7 +30,7 @@ export const MODELO_EMBEDDING_PADRAO = 'openai/text-embedding-3-small'
 
 export interface EmbutirRagEntrada {
   exec: Executor
-  lojaId: string
+  escopo: Escopo
   textos: string[]
 }
 
@@ -77,7 +78,7 @@ export function criarClienteEmbeddingsPlataforma(op: OpcoesClienteEmbeddings): C
         chave = obterChave()
       } catch {
         // Mensagem sem valor: so a categoria (a chave nunca entra em log).
-        op.logger.error({ loja_id: e.lojaId }, 'credencial de embedding da plataforma ausente')
+        op.logger.error({ escopo_tipo: e.escopo.tipo, escopo_id: e.escopo.id }, 'credencial de embedding da plataforma ausente')
         return falha(new Permanente('credencial de embedding indisponivel', { codigo: 'rota' }))
       }
       const credencial = new CredencialResolvida(chave)
@@ -85,14 +86,14 @@ export function criarClienteEmbeddingsPlataforma(op: OpcoesClienteEmbeddings): C
       if (r.ok) {
         try {
           await registrarUsoRag(e.exec, {
-            lojaId: e.lojaId,
+            escopo: e.escopo,
             provedor: op.adaptador.provedor,
             modelo,
             tipoUso: 'embedding',
             uso: r.valor.uso,
           })
         } catch (erro) {
-          op.logger.error({ loja_id: e.lojaId, err: erro }, 'falha ao registrar uso_llm de embedding')
+          op.logger.error({ escopo_tipo: e.escopo.tipo, escopo_id: e.escopo.id, err: erro }, 'falha ao registrar uso_llm de embedding')
         }
       }
       return r

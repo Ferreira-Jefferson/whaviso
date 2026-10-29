@@ -10,6 +10,7 @@
 // Sem pgvector (Postgres local), o lookup degrada para igualdade exata da pergunta (similaridade 1.0),
 // preservando as travas 1 e 2; a trava 3 e vacuamente satisfeita.
 import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
+import { idLoja, type Escopo } from '../escopo'
 import { podeCachear, validarConteudoConhecimento } from './validador'
 import { vetorDisponivel } from './retriever'
 
@@ -19,7 +20,7 @@ export const LIMIAR_SIMILARIDADE = 0.97
 export const TTL_PADRAO_SEGUNDOS = 900
 
 export interface GravarCacheEntrada {
-  lojaId: string
+  escopo: Escopo
   pergunta: string
   resposta: string
   perguntaEmbedding?: number[]
@@ -46,7 +47,7 @@ export async function gravarCache(exec: Executor, e: GravarCacheEntrada): Promis
       exec,
       sql`insert into public.cache_semantico
             (loja_id, pergunta, resposta, expira_em, contem_dado_vivo, embedding_model, embedding, acertos)
-          values (${e.lojaId}, ${e.pergunta}, ${e.resposta},
+          values (${idLoja(e.escopo)}, ${e.pergunta}, ${e.resposta},
                   now() + make_interval(secs => ${ttl}), false, ${e.embeddingModel ?? null},
                   ${vec}::vector, 0)`,
     )
@@ -56,7 +57,7 @@ export async function gravarCache(exec: Executor, e: GravarCacheEntrada): Promis
       exec,
       sql`insert into public.cache_semantico
             (loja_id, pergunta, resposta, expira_em, contem_dado_vivo, embedding_model, acertos)
-          values (${e.lojaId}, ${e.pergunta}, ${e.resposta},
+          values (${idLoja(e.escopo)}, ${e.pergunta}, ${e.resposta},
                   now() + make_interval(secs => ${ttl}), false, ${e.embeddingModel ?? null}, 0)`,
     )
   }
@@ -64,7 +65,7 @@ export async function gravarCache(exec: Executor, e: GravarCacheEntrada): Promis
 }
 
 export interface ConsultarCacheEntrada {
-  lojaId: string
+  escopo: Escopo
   pergunta: string
   perguntaEmbedding?: number[]
 }
@@ -86,7 +87,7 @@ export async function consultarCache(exec: Executor, e: ConsultarCacheEntrada): 
       exec,
       sql`select id, resposta
             from public.cache_semantico
-           where loja_id = ${e.lojaId} and expira_em > now() and contem_dado_vivo = false
+           where loja_id = ${idLoja(e.escopo)} and expira_em > now() and contem_dado_vivo = false
              and embedding is not null and (1 - (embedding <=> ${vec}::vector)) >= ${LIMIAR_SIMILARIDADE}
            order by embedding <=> ${vec}::vector
            limit 1`,
@@ -97,7 +98,7 @@ export async function consultarCache(exec: Executor, e: ConsultarCacheEntrada): 
       exec,
       sql`select id, resposta
             from public.cache_semantico
-           where loja_id = ${e.lojaId} and expira_em > now() and contem_dado_vivo = false
+           where loja_id = ${idLoja(e.escopo)} and expira_em > now() and contem_dado_vivo = false
              and pergunta = ${e.pergunta}
            order by criado_em desc
            limit 1`,

@@ -35,7 +35,7 @@ function fake(saida: Saida = RASCUNHO_OK): { servico: ServicoLlm; prompts: strin
     async completarEstruturado(e, schema) {
       const texto = e.mensagens.map((m) => m.conteudo).join('\n')
       prompts.push(texto)
-      lojas.push(e.lojaId)
+      lojas.push(e.escopo.id)
       const s = typeof saida === 'function' ? saida(texto) : saida
       if (s instanceof Error) return falha(s as ErroProvedor)
       const p = schema.safeParse(s)

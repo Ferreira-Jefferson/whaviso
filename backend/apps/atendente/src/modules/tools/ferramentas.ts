@@ -9,6 +9,7 @@ import type { Executor } from '@whaviso/shared/db'
 import { buscarConhecimento, montarContextoRag, type DepsRetriever } from '../../shared/rag'
 import { ErroTool, referenciaInvalida } from './erros'
 import * as repo from './repo'
+import { escopoLoja } from '../../shared/escopo'
 
 export interface DepsTools {
   exec: Executor
@@ -275,7 +276,7 @@ export function buscarConhecimentoTool(
     args: ConhecimentoArgs,
     result: ConhecimentoResultado,
     async executar(ctx, a) {
-      const trechos = await buscarConhecimento(d.rag, { lojaId: ctx.loja_id, consulta: a.consulta })
+      const trechos = await buscarConhecimento(d.rag, { escopo: escopoLoja(ctx.loja_id), consulta: a.consulta })
       // Trecho e DADO delimitado, nunca comando (SEC-060/061).
       return { contexto: montarContextoRag(trechos), trechos: trechos.length }
     },

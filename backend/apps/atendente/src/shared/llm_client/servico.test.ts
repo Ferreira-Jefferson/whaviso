@@ -7,6 +7,7 @@ import { criarServicoLlm } from './servico'
 import type { AdaptadorProvedor } from './provedores/porta'
 import type { DecifraLlm } from './cifra'
 import { ChaveInvalida } from './erros'
+import { escopoLoja } from '../escopo'
 
 const SENTINELA = 'sk-or-chave-decifrada-sentinela'
 const logger = criarLogger('llm-teste', 'silent')
@@ -103,7 +104,7 @@ function montar(opExec: OpExec, ad: AdaptadorProvedor, decifra: DecifraLlm, teto
   return { servico, exec }
 }
 
-const base = { lojaId: 'loja-A', origem: 'atendente' }
+const base = { escopo: escopoLoja('loja-A'), origem: 'atendente' }
 const msgs = [{ papel: 'user' as const, conteudo: 'oi' }]
 
 // --- Testes ------------------------------------------------------------------------------------

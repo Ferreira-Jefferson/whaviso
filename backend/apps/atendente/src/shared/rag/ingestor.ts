@@ -7,6 +7,7 @@
 // Reindexacao = apagar os chunks do documento e reinserir (idempotente por documento).
 import { consultar, consultarUm, sql, type Consulta, type Executor } from '@whaviso/shared/db'
 import type { Logger } from '@whaviso/shared/logger'
+import { escopoLoja } from '../escopo'
 import { chunkPorUnidadeLogica } from './chunking'
 import type { ClienteEmbeddings } from './embeddings'
 import { vetorDisponivel } from './retriever'
@@ -98,7 +99,7 @@ export async function ingerirDocumento(deps: DepsIngestor, documentoId: string):
   const temVetor = await vetorDisponivel(deps.exec)
   let vetores: number[][] | undefined
   if (temVetor) {
-    const r = await deps.embeddings.embutir({ exec: deps.exec, lojaId: doc.loja_id, textos: paraEmbutir })
+    const r = await deps.embeddings.embutir({ exec: deps.exec, escopo: escopoLoja(doc.loja_id), textos: paraEmbutir })
     if (r.ok) vetores = r.valor.vetores
     else deps.logger.warn({ documento_id: documentoId }, 'embedding indisponivel: chunks sem vetor')
   }

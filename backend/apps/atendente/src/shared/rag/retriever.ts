@@ -1,4 +1,4 @@
-// Retriever hibrido escopado por loja: a UNICA porta de leitura da base de conhecimento (RAG.md 2).
+// Retriever hibrido escopado (Escopo; hoje so 'loja'): a UNICA porta de leitura da base de conhecimento (RAG.md 2).
 //
 // Isolamento (RAG-ISO-001 / SEC-062): TODA sub-consulta pre-filtra `where loja_id = $1` ANTES do
 // ranqueamento, e o join final repete o filtro (defesa em profundidade). Um trecho de outra loja
@@ -10,6 +10,7 @@
 // ao esparso, RAG.md 2). Sem a extensao `vector` (ex.: Postgres local de teste), degrada para BM25
 // sozinho: o isolamento e a montagem de contexto nao mudam, so o sinal de recuperacao.
 import { consultar, consultarUm, sql, type Consulta, type Executor } from '@whaviso/shared/db'
+import { idLoja, type Escopo } from '../escopo'
 import type { ClienteEmbeddings } from './embeddings'
 import type { ClienteReranker } from './reranker'
 import type { TrechoRecuperado } from './tipos'
@@ -32,7 +33,7 @@ export interface DepsRetriever {
 
 export interface BuscaEntrada {
   /** Resolvido no servidor a partir da conversa; NUNCA de entrada do cliente (SEC-002/062). */
-  lojaId: string
+  escopo: Escopo
   /** Consulta ja reescrita por `entender_mensagem` (turno + ultimas mensagens). */
   consulta: string
   k?: number
@@ -81,7 +82,8 @@ const TSQUERY = (consulta: string): Consulta =>
   sql`replace(plainto_tsquery('portuguese', ${consulta})::text, '&', '|')::tsquery`
 
 /** Consulta BM25 sozinha (modo degradado, sem pgvector). Pre-filtra loja em todo lugar. */
-function consultaLexical(lojaId: string, consulta: string, contexto: number): Consulta {
+function consultaLexical(escopo: Escopo, consulta: string, contexto: number): Consulta {
+  const lojaId = idLoja(escopo)
   return sql`
     with q as (select ${TSQUERY(consulta)} as query)
     select ${SELECT_FINAL}, ts_rank(c.tsv, q.query) as pontuacao
@@ -95,7 +97,8 @@ function consultaLexical(lojaId: string, consulta: string, contexto: number): Co
 }
 
 /** Consulta hibrida vetor + BM25 fundidos por RRF. Pre-filtra loja em CADA sub-select e no join final. */
-function consultaHibrida(lojaId: string, consulta: string, qvec: string, k: number, contexto: number): Consulta {
+function consultaHibrida(escopo: Escopo, consulta: string, qvec: string, k: number, contexto: number): Consulta {
+  const lojaId = idLoja(escopo)
   return sql`
     with q as (select ${TSQUERY(consulta)} as query),
     lexical as (
@@ -134,7 +137,7 @@ function consultaHibrida(lojaId: string, consulta: string, qvec: string, k: numb
 /**
  * Recupera os trechos de conhecimento mais relevantes da loja para a consulta. Uma passada hibrida
  * (sem multi-hop, RAG.md 6): embute a consulta (credencial da plataforma), funde vetor + BM25 por RRF,
- * reordena (reranker nulo por padrao) e devolve o contexto final. Escopo sempre por `lojaId`.
+ * reordena (reranker nulo por padrao) e devolve o contexto final. Escopo sempre por `escopo`.
  */
 export async function buscarConhecimento(deps: DepsRetriever, entrada: BuscaEntrada): Promise<TrechoRecuperado[]> {
   const contexto = entrada.contexto ?? CONTEXTO_PADRAO
@@ -143,14 +146,14 @@ export async function buscarConhecimento(deps: DepsRetriever, entrada: BuscaEntr
 
   let consulta: Consulta
   if (temVetor) {
-    const r = await deps.embeddings.embutir({ exec: deps.exec, lojaId: entrada.lojaId, textos: [entrada.consulta] })
+    const r = await deps.embeddings.embutir({ exec: deps.exec, escopo: entrada.escopo, textos: [entrada.consulta] })
     // Falha de embedding (credencial ausente, provedor fora): degrada para BM25, nao quebra o atendimento.
     const qvec = r.ok ? r.valor.vetores[0] : undefined
     consulta = qvec && qvec.length > 0
-      ? consultaHibrida(entrada.lojaId, entrada.consulta, literalVetor(qvec), k, contexto)
-      : consultaLexical(entrada.lojaId, entrada.consulta, contexto)
+      ? consultaHibrida(entrada.escopo, entrada.consulta, literalVetor(qvec), k, contexto)
+      : consultaLexical(entrada.escopo, entrada.consulta, contexto)
   } else {
-    consulta = consultaLexical(entrada.lojaId, entrada.consulta, contexto)
+    consulta = consultaLexical(entrada.escopo, entrada.consulta, contexto)
   }
 
   const linhas = await consultar<LinhaTrecho>(deps.exec, consulta)

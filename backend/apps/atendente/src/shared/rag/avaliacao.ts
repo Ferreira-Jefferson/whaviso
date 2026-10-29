@@ -6,6 +6,7 @@
 //                        comparacao de ids de documento (sem LLM). Regressao barra o merge.
 //   RAG-EVAL-002 (fora): faithfulness/relevance amostrado; aqui so o esqueleto do job.
 import { consultar, sql, type Executor } from '@whaviso/shared/db'
+import { idLoja, type Escopo } from '../escopo'
 import { buscarConhecimento, type DepsRetriever } from './retriever'
 
 export interface CasoAvaliacao {
@@ -22,11 +23,11 @@ export interface ResultadoHitAtK {
 }
 
 /** Le o golden set ativo da loja. */
-export async function lerGoldenSet(exec: Executor, lojaId: string): Promise<CasoAvaliacao[]> {
+export async function lerGoldenSet(exec: Executor, escopo: Escopo): Promise<CasoAvaliacao[]> {
   const linhas = await consultar<{ pergunta: string; docs_esperados: string[] }>(
     exec,
     sql`select pergunta, docs_esperados from public.base_avaliacao
-         where loja_id = ${lojaId} and ativo order by criado_em`,
+         where loja_id = ${idLoja(escopo)} and ativo order by criado_em`,
   )
   return linhas.map((l) => ({ pergunta: l.pergunta, docsEsperados: l.docs_esperados ?? [] }))
 }
@@ -37,16 +38,16 @@ export async function lerGoldenSet(exec: Executor, lojaId: string): Promise<Caso
  */
 export async function avaliarHitAtK(
   deps: DepsRetriever,
-  lojaId: string,
+  escopo: Escopo,
   k = 4,
 ): Promise<ResultadoHitAtK> {
-  const casos = (await lerGoldenSet(deps.exec, lojaId)).filter((c) => c.docsEsperados.length > 0)
+  const casos = (await lerGoldenSet(deps.exec, escopo)).filter((c) => c.docsEsperados.length > 0)
   if (casos.length === 0) return { casos: 0, hitAtK: 0, contextRecall: 0 }
 
   let hits = 0
   let somaRecall = 0
   for (const caso of casos) {
-    const trechos = await buscarConhecimento(deps, { lojaId, consulta: caso.pergunta, contexto: k })
+    const trechos = await buscarConhecimento(deps, { escopo, consulta: caso.pergunta, contexto: k })
     const recuperados = new Set(trechos.map((t) => t.documentoId))
     const encontrados = caso.docsEsperados.filter((d) => recuperados.has(d))
     if (encontrados.length > 0) hits++

@@ -19,6 +19,7 @@ import {
   type DepsRetriever,
 } from '../src/shared/rag'
 import type { AdaptadorProvedor } from '../src/shared/llm_client'
+import { escopoLoja } from '../src/shared/escopo'
 import { bancoAcessivel, fecharPools, limpar, poolAtendente, poolSuper, semear } from './db'
 
 const online = await bancoAcessivel()
@@ -80,7 +81,7 @@ describe.skipIf(!online)('AT-rag ingestao + retrieval (role whaviso_atendente)',
     expect(r.chunks).toBeGreaterThan(0)
     expect(r.pulado).toBeUndefined()
 
-    const trechos = await buscarConhecimento(deps(), { lojaId: a.lojaId, consulta: 'o x-tudo tem bacon?' })
+    const trechos = await buscarConhecimento(deps(), { escopo: escopoLoja(a.lojaId), consulta: 'o x-tudo tem bacon?' })
     expect(trechos.length).toBeGreaterThan(0)
     expect(trechos[0]!.documentoId).toBe(doc)
     expect(trechos[0]!.texto.toLowerCase()).toContain('bacon')
@@ -132,7 +133,7 @@ describe.skipIf(!online)('AT-rag ingestao + retrieval (role whaviso_atendente)',
       [a.lojaId, 'voces fazem entrega?', [entrega], 'quais formas de pagamento?', [pagamento]],
     )
 
-    const res = await avaliarHitAtK(deps(), a.lojaId, 4)
+    const res = await avaliarHitAtK(deps(), escopoLoja(a.lojaId), 4)
     expect(res.casos).toBe(2)
     expect(res.hitAtK).toBe(1)
     expect(res.contextRecall).toBeGreaterThan(0)
@@ -142,11 +143,11 @@ describe.skipIf(!online)('AT-rag ingestao + retrieval (role whaviso_atendente)',
     _resetVetorCache()
     const a = await semear()
     contas.push(a.contaId)
-    expect(await gravarCache(poolAtendente, { lojaId: a.lojaId, pergunta: 'voces fazem entrega?', resposta: 'Sim, em toda a regiao central.' })).toBe(true)
-    expect(await consultarCache(poolAtendente, { lojaId: a.lojaId, pergunta: 'voces fazem entrega?' })).toContain('regiao central')
+    expect(await gravarCache(poolAtendente, { escopo: escopoLoja(a.lojaId), pergunta: 'voces fazem entrega?', resposta: 'Sim, em toda a regiao central.' })).toBe(true)
+    expect(await consultarCache(poolAtendente, { escopo: escopoLoja(a.lojaId), pergunta: 'voces fazem entrega?' })).toContain('regiao central')
 
     // resposta com preco nunca e cacheada
-    expect(await gravarCache(poolAtendente, { lojaId: a.lojaId, pergunta: 'quanto custa?', resposta: 'Custa R$ 40' })).toBe(false)
+    expect(await gravarCache(poolAtendente, { escopo: escopoLoja(a.lojaId), pergunta: 'quanto custa?', resposta: 'Custa R$ 40' })).toBe(false)
   })
 
   it('cache expirado nao e servido', async () => {
@@ -158,14 +159,14 @@ describe.skipIf(!online)('AT-rag ingestao + retrieval (role whaviso_atendente)',
        values ($1,'tem wifi?','Sim, senha na parede.', now() - interval '1 minute', false)`,
       [a.lojaId],
     )
-    expect(await consultarCache(poolAtendente, { lojaId: a.lojaId, pergunta: 'tem wifi?' })).toBeNull()
+    expect(await consultarCache(poolAtendente, { escopo: escopoLoja(a.lojaId), pergunta: 'tem wifi?' })).toBeNull()
   })
 
   it('embedding da plataforma grava uso_llm com tipo_uso=embedding e origem=plataforma', async () => {
     _resetVetorCache()
     const a = await semear()
     contas.push(a.contaId)
-    const r = await embeddings().embutir({ exec: poolAtendente, lojaId: a.lojaId, textos: ['oi', 'tchau'] })
+    const r = await embeddings().embutir({ exec: poolAtendente, escopo: escopoLoja(a.lojaId), textos: ['oi', 'tchau'] })
     expect(r.ok).toBe(true)
     const { rows } = await poolSuper.query(
       `select tipo_uso, origem, tokens_entrada from public.uso_llm where loja_id = $1`,

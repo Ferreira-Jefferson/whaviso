@@ -3,6 +3,7 @@
 //
 // `buscarConhecimento` e a unica porta de leitura da base (AT-tools a envolvera numa ToolContract). O
 // escopo e SEMPRE por loja_id resolvido no servidor; embedding/rerank usam a credencial da PLATAFORMA.
+// O tipo Escopo vive em ../escopo (costura loja|plataforma).
 export type { TrechoRecuperado, DocumentoTipo, DocumentoParaIngestao, ChunkBruto } from './tipos'
 
 export { chunkPorUnidadeLogica } from './chunking'

@@ -45,7 +45,7 @@ function fake(corpo = 'Fazemos entrega em toda a regiao central.'): { servico: S
     },
     async completarEstruturado(e, schema) {
       prompts.push(e.mensagens.map((m) => m.conteudo).join('\n'))
-      lojas.push(e.lojaId)
+      lojas.push(e.escopo.id)
       const p = schema.safeParse(saida)
       if (!p.success) return falha(new SaidaInvalida() as ErroProvedor)
       return ok({ dados: p.data, resposta: { texto: '', chamadasFerramenta: [], modelo: 'm', uso } })
