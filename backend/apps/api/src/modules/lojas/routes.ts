@@ -44,17 +44,10 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
       }
     // Editar/branding/pausar/capacidade: exige `lojas:gerir` (padrao: dono e gerente).
     const comGestao = { config, preHandler: [app.autenticar, app.escopoLoja, exigirNaLoja('lojas:gerir')] }
-    // Desativar/reativar: operacao de dono, FIXA e nao delegavel (nao e governada pela grade editavel,
-    // assim como a administracao da propria conta). Checa o papel dessa loja direto: so `dono` passa.
-    const exigirDonoDaLoja: preHandlerHookHandler = async (req: FastifyRequest) => {
-      const escopo = req.escopo
-      const id = (req.params as { id?: string }).id
-      if (!escopo || !id) throw new Proibido()
-      const papel = escopo.papel_por_loja[id]
-      if (!escopo.loja_ids.includes(id) || !papel) throw new NaoEncontrado()
-      if (papel !== 'dono') throw new Proibido()
-    }
-    const soDono = { config, preHandler: [app.autenticar, app.escopoLoja, exigirDonoDaLoja] }
+    // Desativar/reativar: operacao FIXA de dono (nao delegavel pela grade). NAO ha guard de preHandler
+    // aqui porque a loja pode estar INATIVA (fora do escopo ativo, logo sem papel em `req.escopo`, o que
+    // tornaria reativar impossivel). A checagem de dono roda no service (contaDoDono, que carrega tambem
+    // loja inativa e devolve `loja_ja_inativa`/`nao_encontrado` conforme o caso).
     // Criar: so autenticacao; nao ha loja ainda, a conta vem do vinculo de dono (service), nunca do corpo.
     const soAuth = { config, preHandler: [app.autenticar] }
     const usuario = (req: { usuario: { user_id: string } | null }): string => {
@@ -105,13 +98,13 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
 
     app.post(
       '/:id/desativar',
-      { ...soDono, schema: { params: LojaParams, response: { 200: LojaSaida } } },
+      { ...soAuth, schema: { params: LojaParams, response: { 200: LojaSaida } } },
       async (req) => service.alterarAtivo(app.pool, usuario(req), req.params.id, false),
     )
 
     app.post(
       '/:id/reativar',
-      { ...soDono, schema: { params: LojaParams, response: { 200: LojaSaida } } },
+      { ...soAuth, schema: { params: LojaParams, response: { 200: LojaSaida } } },
       async (req) => service.alterarAtivo(app.pool, usuario(req), req.params.id, true),
     )
 

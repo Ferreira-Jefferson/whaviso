@@ -215,7 +215,9 @@ d('lojas (integracao)', () => {
     expect((await req(gerente, 'POST', `/${lojaA}/desativar`, undefined, lojaA)).statusCode).toBe(403)
     expect((await req(atendente, 'POST', `/${lojaA}/reativar`, undefined, lojaA)).statusCode).toBe(403)
     // Loja fora do escopo = 404 ja no guard (nao confirma existencia de loja de outra conta).
-    expect((await req(gerente, 'PATCH', `/${lojaB}`, { nome: 'x' }, lojaA)).statusCode).toBe(404)
+    // Corpo valido de proposito: a validacao do body (Zod) roda ANTES do preHandler no Fastify; com
+    // corpo invalido viria 400 e nao exercitaria o guard de escopo que queremos testar aqui.
+    expect((await req(gerente, 'PATCH', `/${lojaB}`, { nome: 'Nome' }, lojaA)).statusCode).toBe(404)
   })
 
   it('PATCH atualiza endereco; campo ausente permanece', async () => {
