@@ -20,6 +20,10 @@ const TTL_MS = 30_000
 export const CANAL_GRADE = 'grade_permissoes'
 
 let fonte: Executor | null = null
+// A grade e GLOBAL (plataforma-wide), nao por tenant: a chave do cache e `${escopo}|${papel}|${chave}`,
+// SEM conta_id (ver `papel_permissoes`, sem coluna de conta). Por desenho, o admin que edita a grade
+// muda o comportamento de TODAS as contas de uma vez. Nao e burlavel por usuario de loja (so quem tem
+// `acessos:gerir` edita, e `acessos:gerir` so o admin fixo tem). NAO re-arquitetar para per-tenant.
 /** `${escopo}|${papel}|${chave}` -> permitido, so das linhas lidas do banco. */
 let explicitas = new Map<string, boolean>()
 let carregadaEm = 0

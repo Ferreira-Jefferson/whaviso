@@ -13,6 +13,9 @@ plataforma liga/desliga celulas. Grade GLOBAL (todas as contas). Papeis sao fixo
 - `GET /v1/acessos/minhas`: permissoes de loja do proprio usuario em cada loja do escopo (qualquer membro; so a UI usa para nao oferecer o que o servidor negaria).
 
 ## Invariantes
+- A grade e GLOBAL (plataforma-wide) por desenho: `papel_permissoes` nao tem `conta_id`, entao o admin
+  que edita uma celula muda o comportamento de TODAS as contas de uma vez (nao e per-tenant, e nao e
+  burlavel por usuario de loja: so o admin fixo tem `acessos:gerir`).
 - `admin` (console) e `dono` (loja) sao sempre tudo e nao editaveis (CHECK no banco + service +
   `permite()` ignora a grade para eles). `acessos:gerir` nunca e delegavel.
 - Os guards leem a grade pelo kernel (`shared/tenant`: `permite`, `exigirPermissao`) com cache por

@@ -29,7 +29,9 @@ interface Def<P extends string> {
 const CONSOLE = [
   { chave: 'clientes_plataforma:ver', rotulo: 'Ver clientes (contas e fichas)', padrao: ['convidado', 'suporte', 'financeiro', 'operador'] },
   { chave: 'clientes_plataforma:criar', rotulo: 'Cadastrar cliente (provisionar conta)', padrao: [] },
-  { chave: 'cobranca:ver', rotulo: 'Ver assinaturas e faturas', padrao: ['convidado', 'suporte', 'financeiro', 'operador'] },
+  // `convidado` NAO ve faturas/assinaturas por desenho (so clientes e o painel de metricas):
+  // fonte da verdade docs/pendencias-pos-corte.md item 14, grade do console (`ver fatura` = `-`).
+  { chave: 'cobranca:ver', rotulo: 'Ver assinaturas e faturas', padrao: ['suporte', 'financeiro', 'operador'] },
   { chave: 'cobranca:gerir', rotulo: 'Gerir assinaturas, dar baixa e gerar faturas', padrao: ['financeiro', 'operador'] },
   { chave: 'planos:gerir', rotulo: 'Gerir catalogo de planos', padrao: ['financeiro'] },
   { chave: 'funil:ver', rotulo: 'Ver funil e prospectos', padrao: ['operador'] },
@@ -42,7 +44,9 @@ const CONSOLE = [
 ] as const satisfies readonly Def<PapelOperador>[]
 
 const LOJA = [
-  { chave: 'conta:gerir', rotulo: 'Conta, membros e assinatura', padrao: [] },
+  // Administracao da propria CONTA (renomear, membros, convites, assinatura) e a desativacao/reativacao
+  // de loja NAO estao na grade: sao operacoes FIXAS de dono (nao delegaveis), checadas direto no codigo
+  // (contexto.ts e lojas/routes.ts). Por isso aqui nao ha chave `conta:gerir`.
   { chave: 'loja:gerir', rotulo: 'Configuracao geral da loja (onboarding)', padrao: ['gerente'] },
   { chave: 'lojas:gerir', rotulo: 'Editar dados, branding, pausa e capacidade da loja', padrao: ['gerente'] },
   { chave: 'pedidos:ver', rotulo: 'Ver pedidos', padrao: ['convidado', 'atendente', 'gerente'] },

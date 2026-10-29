@@ -11,7 +11,7 @@ afterEach(() => resetarGrade())
 
 // --- Loja: o que cada papel existente podia (chave antiga) ---
 const LEGADO_LOJA = {
-  dono: ['conta:gerir', 'loja:gerir', 'pedidos:gerir', 'conversas:atender', 'relatorios:ver'],
+  dono: ['loja:gerir', 'pedidos:gerir', 'conversas:atender', 'relatorios:ver'],
   gerente: ['loja:gerir', 'pedidos:gerir', 'conversas:atender', 'relatorios:ver'],
   atendente: ['pedidos:gerir', 'conversas:atender'],
 } as const
@@ -42,8 +42,8 @@ const NOVA_DE_ANTIGA: Record<string, string> = {
 describe('loja: padroes reproduzem o comportamento anterior', () => {
   const chavesLoja = CATALOGO.filter((d) => d.escopo === 'loja').map((d) => d.chave)
   for (const papel of ['dono', 'gerente', 'atendente'] as const) {
-    it(`${papel}: as 5 chaves antigas continuam exatamente iguais`, () => {
-      for (const chave of ['conta:gerir', 'loja:gerir', 'pedidos:gerir', 'conversas:atender', 'relatorios:ver'] as const) {
+    it(`${papel}: as 4 chaves antigas continuam exatamente iguais`, () => {
+      for (const chave of ['loja:gerir', 'pedidos:gerir', 'conversas:atender', 'relatorios:ver'] as const) {
         expect(papelPermite(papel, chave), `${papel} ${chave}`).toBe((LEGADO_LOJA[papel] as readonly string[]).includes(chave))
       }
     })
@@ -88,6 +88,15 @@ describe('console: padroes reproduzem o comportamento anterior', () => {
   it('todas as chaves de console estao cobertas (operador ou so admin)', () => {
     const consolePerms = CATALOGO.filter((d) => d.escopo === 'console').map((d) => d.chave as string).sort()
     expect([...OPERADOR_ANTES, ...SO_ADMIN_ANTES].sort()).toEqual(consolePerms)
+  })
+  it('convidado (console) nao ve faturas/assinaturas, mas ve clientes e o painel (fonte da verdade item 14)', () => {
+    // `ver fatura` = `-` para convidado na grade do console (docs/pendencias-pos-corte.md item 14):
+    // o papel de menor privilegio NAO le cobranca de nenhum tenant.
+    expect(operadorPermite('convidado', 'cobranca:ver')).toBe(false)
+    expect(operadorPermite('convidado', 'cobranca:gerir')).toBe(false)
+    // Mantidos por desenho: `vê clientes e relatórios` (nao regredir ao remover cobranca).
+    expect(operadorPermite('convidado', 'clientes_plataforma:ver')).toBe(true)
+    expect(operadorPermite('convidado', 'painel:ver')).toBe(true)
   })
   it('papeis novos nunca gerem equipe nem acessos', () => {
     for (const papel of ['convidado', 'suporte', 'financeiro'] as const) {

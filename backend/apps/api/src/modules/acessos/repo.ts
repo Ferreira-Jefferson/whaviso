@@ -1,4 +1,7 @@
 // Persistencia do modulo acessos. So INSERT/UPDATE na grade (sem DELETE). Colunas explicitas.
+// A grade `papel_permissoes` e GLOBAL por desenho: a chave e (escopo, papel, permissao_chave), SEM
+// conta_id. Editar uma celula vale para TODAS as contas de uma vez (plataforma-wide); e intencional e
+// nao burlavel por usuario de loja (so o admin fixo tem `acessos:gerir`). Nao adicionar coluna de conta.
 import { consultar, sql, type Executor } from '@whaviso/shared/db'
 
 export interface PermissaoLinha {
