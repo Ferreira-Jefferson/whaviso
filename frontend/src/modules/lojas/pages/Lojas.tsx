@@ -30,7 +30,9 @@ export default function Lojas() {
   const alterar = useAlterarAtivo()
 
   const lojas = useMemo(() => consulta.data ?? [], [consulta.data])
-  const algumDono = lojas.some((l) => l.papel === 'dono')
+  // Sem conta: a api responde 403 (so o dono da conta lista/gere). A loja e liberada pela equipe.
+  const semConta = consulta.error instanceof ApiError && consulta.error.status === 403
+  const algumDono =lojas.some((l) => l.papel === 'dono')
   const total = lojas.length
   const abertas = lojas.filter((l) => l.aberta_agora === true).length
   const conectados = lojas.reduce((s, l) => s + l.numeros_whatsapp.conectados, 0)
@@ -99,26 +101,16 @@ export default function Lojas() {
       </div>
 
       {consulta.isPending && <EsqueletoLista />}
-      {consulta.isError && <ErrorState aoTentarDeNovo={() => void consulta.refetch()} className="mt-2" />}
+      {consulta.isError && !semConta && (
+        <ErrorState aoTentarDeNovo={() => void consulta.refetch()} className="mt-2" />
+      )}
 
-      {consulta.isSuccess && total === 0 && (
+      {(semConta || (consulta.isSuccess && total === 0)) && (
         <EmptyState
           className="mt-2"
           icone={<Store className="size-7" aria-hidden />}
           titulo="Nenhuma loja por aqui"
-          descricao={
-            algumDono
-              ? 'Crie a primeira loja para começar a receber pedidos pelo WhatsApp.'
-              : 'Você ainda não participa de nenhuma loja.'
-          }
-          acao={
-            algumDono ? (
-              <Button type="button" onClick={() => setForm({ loja: null })}>
-                <Plus aria-hidden strokeWidth={1.75} className="size-4" />
-                Nova loja
-              </Button>
-            ) : undefined
-          }
+          descricao="Sua loja é liberada pela equipe Whaviso."
         />
       )}
 
