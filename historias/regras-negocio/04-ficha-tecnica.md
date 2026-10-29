@@ -44,9 +44,9 @@ dono o trabalho de descontar o estoque de insumos à mão.
 4. **Unidade compatível:** a quantidade de insumo na ficha usa a unidade do insumo (ou uma conversão
    definida para a mesma grandeza, por exemplo g para kg). A ficha não mistura grandezas incompatíveis.
 5. **Falta de insumo não trava a venda já efetivada:** se o insumo não tiver saldo suficiente, a venda
-   não é desfeita; o saldo do insumo pode ficar negativo e isso é sinalizado para o dono acertar por
-   ajuste de inventário. O bloqueio preventivo de venda por falta é regra do item do cardápio (contador),
-   não da ficha técnica.
+   não é desfeita; o saldo do insumo é reduzido no máximo até zero (não fica negativo) e o insumo entra na
+   lista de baixo estoque para o dono acertar por ajuste de inventário. O bloqueio preventivo de venda por
+   falta é regra do item do cardápio (contador), não da ficha técnica.
 6. **Dois controles complementares:** o contador do item (quantas unidades do prato) e a ficha técnica
    (quanto de insumo por unidade) são independentes. Um item pode ter os dois, um, ou nenhum. A venda
    aplica os que existirem.

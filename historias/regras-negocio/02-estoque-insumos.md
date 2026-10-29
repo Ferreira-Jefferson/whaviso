@@ -49,9 +49,10 @@ custo de mercadoria e para a ficha técnica dar baixa automática ao vender.
 4. **Estoque mínimo e alerta:** quando o saldo cai para o mínimo ou abaixo, o insumo entra na lista de
    baixo estoque. O alerta é informativo e não bloqueia a venda por si só (o bloqueio de venda por falta
    é regra do item do cardápio e da ficha técnica).
-5. **Saldo pode ficar negativo por consumo automático:** se a ficha técnica consumir mais do que há em
-   estoque (por configuração incompleta ou contagem atrasada), o saldo pode ficar negativo e isso é
-   sinalizado, em vez de travar a venda já efetivada. O dono acerta por ajuste de inventário.
+5. **Saldo não fica negativo por consumo automático:** se a ficha técnica consumir mais do que há em
+   estoque (por configuração incompleta ou contagem atrasada), o saldo é reduzido no máximo até zero, em
+   vez de travar a venda já efetivada. O insumo entra na lista de baixo estoque e o dono acerta a contagem
+   real por ajuste de inventário.
 6. **Quantidade em unidade inteira ou fracionária conforme a unidade:** kg e L aceitam fração; unidade
    é inteiro. Valores monetários de custo, quando houver, ficam em centavos.
 7. **Multi-tenant:** insumos e movimentos pertencem a uma loja de uma conta; ninguém vê o estoque de
@@ -75,6 +76,7 @@ custo de mercadoria e para a ficha técnica dar baixa automática ao vender.
 
 - **Insumo:** `ativo` -> `inativo` (desativado) -> `ativo` (reativado). Nunca apagado.
 - **Saldo:** não é um estado persistido editável; é sempre recalculado a partir dos movimentos.
-- **Situação de estoque (derivada):** `normal` (acima do mínimo) <-> `baixo` (no mínimo ou abaixo) <->
-  `negativo` (abaixo de zero por consumo automático), tudo derivado do saldo corrente.
+- **Situação de estoque (derivada):** `normal` (acima do mínimo) <-> `baixo` (no mínimo ou abaixo,
+  inclusive em zero), derivado do saldo corrente. O saldo não vai abaixo de zero: o consumo automático
+  reduz no máximo até zero.
 - **Movimento:** criado e imutável (append-only); nunca editado nem apagado.
