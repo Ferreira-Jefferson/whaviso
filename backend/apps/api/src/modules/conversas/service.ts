@@ -18,6 +18,7 @@ import {
   enfileirarTextoLivre,
   inserirMensagemHumana,
   registrarEvento,
+  respostaJaEnfileirada,
   tocarConversa,
   travarConversa,
 } from './repo_escrita'
