@@ -1,6 +1,6 @@
 // Rotas do modulo custos (/v1/custos/*). Duas visoes sobre o mesmo razao:
 //   - LOJA (`acesso: conteudo_de_loja`): /resumo e /eventos, so a loja do escopo (x-loja-id,
-//     nunca do corpo/query; SEC-002). Permissao `loja:gerir` (dono e gerente veem custo).
+//     nunca do corpo/query; SEC-002). Permissao `custos:ver` (dono e gerente veem custo por padrao).
 //   - OPERADOR (`acesso: plataforma`): /plataforma/resumo e /plataforma/tarifas. Agregado da base
 //     inteira, sem conteudo e sem lista por loja (SEC-003). Membro de loja recebe 403.
 // Somente leitura: o razao e gravado pelos produtores (registrarEventoCusto), nunca por HTTP.
@@ -25,11 +25,11 @@ export const custosRoutes: FastifyPluginAsync = async (instancia) => {
   const limite = { rateLimit: { max: 60, timeWindow: '1 minute' } }
   const loja = {
     config: { acesso: 'conteudo_de_loja' as const, ...limite },
-    preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')],
+    preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('custos:ver')],
   }
   const plataforma = {
     config: { acesso: 'plataforma' as const, ...limite },
-    preHandler: [app.autenticar, app.escopoOperador],
+    preHandler: [app.autenticar, app.escopoOperador, app.exigirPermissao('custos_plataforma:ver')],
   }
 
   app.get('/resumo', {

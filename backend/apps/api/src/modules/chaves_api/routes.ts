@@ -1,15 +1,8 @@
-import type { FastifyPluginAsync, FastifyRequest, preHandlerHookHandler } from 'fastify'
+import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { naoAutorizado, proibido } from '../../shared/http_errors'
+import { naoAutorizado } from '../../shared/http_errors'
 import { criarServicoChavesApi } from './service'
 import { ChaveApiCriada, ChaveApiDTO, ChaveApiLista, ChaveParams, ContaParams, NovaChave } from './schemas'
-
-/** Gestao de chaves: so `admin` da plataforma (roda depois de `escopoOperador`). */
-const exigirAdmin: preHandlerHookHandler = async (req: FastifyRequest) => {
-  const o = req.operador
-  if (!o) throw naoAutorizado()
-  if (o.papel !== 'admin') throw proibido('Apenas admin gere chaves de API')
-}
 
 export function criarChavesApiRoutes(): FastifyPluginAsync {
   return async (instancia) => {
@@ -17,7 +10,8 @@ export function criarChavesApiRoutes(): FastifyPluginAsync {
     const svc = criarServicoChavesApi(app.pool)
     // Rota de plataforma: a chave de API nunca autentica aqui (ver shared/auth).
     const plataforma = (extra: object = {}) => ({ config: { acesso: 'plataforma' as const, ...extra } })
-    const admin = [app.autenticar, app.escopoOperador, exigirAdmin]
+    // Gestao de chaves: permissao da grade (padrao: so admin). Roda depois de `escopoOperador`.
+    const admin = [app.autenticar, app.escopoOperador, app.exigirPermissao('chaves_api:gerir')]
 
     app.get('/contas/:contaId/chaves', {
       ...plataforma(), preHandler: admin,

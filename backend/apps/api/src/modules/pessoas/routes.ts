@@ -27,12 +27,13 @@ export function criarPessoasRoutes(cifra?: Cifra): FastifyPluginAsync {
     const app = instancia.withTypeProvider<ZodTypeProvider>()
     const svc = criarServicoPessoas(app.pool, cifra ?? cifraPadrao())
     const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
-    // Cadastro de equipe e configuracao da loja: dono e gerente (permissao loja:gerir).
-    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+    // Grade editavel: ver x gerir equipe (padrao dono/gerente); revelar PII e permissao propria.
+    const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('pessoas:ver')]
+    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('pessoas:gerir')]
 
     // --- Cargos (funcoes) ---
     app.get('/cargos', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { response: { 200: CargoListaSaida } },
     }, async (req) => listarCargos(app.pool, ator(req).lojaId))
 
@@ -48,7 +49,7 @@ export function criarPessoasRoutes(cifra?: Cifra): FastifyPluginAsync {
 
     // --- Pessoas ---
     app.get('/', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { querystring: ListaQuery, response: { 200: PessoaListaSaida } },
     }, async (req) => svc.listar(ator(req), req.query.incluir_inativos === 'true'))
 
@@ -58,7 +59,7 @@ export function criarPessoasRoutes(cifra?: Cifra): FastifyPluginAsync {
     }, async (req, reply) => reply.status(201).send(await svc.criar(ator(req), req.body)))
 
     app.get('/:id', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { params: IdParams, response: { 200: PessoaDetalheSaida } },
     }, async (req) => svc.detalhe(ator(req), req.params.id))
 
@@ -70,7 +71,7 @@ export function criarPessoasRoutes(cifra?: Cifra): FastifyPluginAsync {
     // Telefone da pessoa (PII): revelar so dono/gerente, rate limit, sem cache.
     app.post('/:id/telefone/revelar', {
       ...loja({ rateLimit: { max: 10, timeWindow: '1 minute' } }),
-      preHandler: [app.autenticar, app.escopoLoja, app.exigirPapel('dono', 'gerente')],
+      preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('dados_sensiveis:revelar')],
       schema: { params: IdParams, response: { 200: PessoaTelefoneSaida } },
     }, async (req, reply) => {
       void reply.header('cache-control', 'no-store')
@@ -86,7 +87,7 @@ export function criarPessoasRoutes(cifra?: Cifra): FastifyPluginAsync {
     // Pix da entrega (PII): revelar so dono/gerente, rate limit, sem cache, auditado sem o valor.
     app.post('/:id/entrega/pix/revelar', {
       ...loja({ rateLimit: { max: 10, timeWindow: '1 minute' } }),
-      preHandler: [app.autenticar, app.escopoLoja, app.exigirPapel('dono', 'gerente')],
+      preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('dados_sensiveis:revelar')],
       schema: { params: IdParams, response: { 200: PessoaEntregaPixSaida } },
     }, async (req, reply) => {
       void reply.header('cache-control', 'no-store')
@@ -95,7 +96,7 @@ export function criarPessoasRoutes(cifra?: Cifra): FastifyPluginAsync {
 
     // --- Escalas (aninhadas na pessoa) ---
     app.get('/:id/escalas', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { params: IdParams, response: { 200: EscalaListaSaida } },
     }, async (req) => svc.listarEscalas(ator(req), req.params.id))
 

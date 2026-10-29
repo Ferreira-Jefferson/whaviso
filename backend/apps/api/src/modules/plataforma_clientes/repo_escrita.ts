@@ -2,6 +2,7 @@
 // membros: so INSERT, sem DELETE) e o registro em `eventos`.
 // Sem DELETE (nao ha grant): operador sai da equipe com ativo = false.
 import { consultar, consultarUm, sql, type Executor } from '@whaviso/shared/db'
+import type { PapelOperador } from '@whaviso/shared/contracts'
 import type { OperadorLinha } from './repo'
 
 const COLS = sql`id, user_id, nome, papel, ativo,
@@ -9,7 +10,7 @@ const COLS = sql`id, user_id, nome, papel, ativo,
 
 export async function inserirOperador(
   exec: Executor,
-  d: { userId: string; nome: string; papel: 'operador' | 'admin' },
+  d: { userId: string; nome: string; papel: PapelOperador },
 ): Promise<OperadorLinha> {
   const r = await consultarUm<OperadorLinha>(
     exec,
@@ -37,7 +38,7 @@ export async function obterOperadorPorId(exec: Executor, id: string): Promise<Op
 export async function atualizarOperador(
   exec: Executor,
   id: string,
-  patch: { papel?: 'operador' | 'admin'; ativo?: boolean },
+  patch: { papel?: PapelOperador; ativo?: boolean },
 ): Promise<OperadorLinha | null> {
   return consultarUm<OperadorLinha>(
     exec,

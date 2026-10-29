@@ -11,7 +11,7 @@ export function criarPlataformaPainelRoutes(opcoes: OpcoesPainel = {}): FastifyP
     // Nenhum parametro de loja/conta: o painel e agregado da base inteira.
     const plataforma = () => ({
       config: { acesso: 'plataforma' as const },
-      preHandler: [app.autenticar, app.escopoOperador],
+      preHandler: [app.autenticar, app.escopoOperador, app.exigirPermissao('painel:ver')],
     })
 
     app.get('/resumo', {

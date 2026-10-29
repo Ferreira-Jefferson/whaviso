@@ -1,6 +1,6 @@
 // Rotas do modulo fiscal (/v1/fiscal/*). A loja efetiva vem SO do escopo (x-loja-id).
-//   - Leitura e emissao: permissao `loja:gerir` (dono e gerente).
-//   - Config (credencial do emissor): SO o papel `dono`.
+//   - Leitura (`fiscal:ver`) e emissao (`fiscal:gerir`): dono e gerente por padrao (grade editavel).
+//   - Config (credencial do emissor, `fiscal:configurar`): so o dono por padrao.
 // Log: so ids/estado; a credencial NUNCA entra em log (o corpo do PUT /config a carrega, entao
 // nenhum handler loga o corpo).
 import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify'
@@ -38,10 +38,12 @@ function escopo(req: FastifyRequest): { lojaId: string; userId: string } {
 
 function registrar(app: FastifyInstance, obterDeps: () => DepsFiscal): void {
   const r = app.withTypeProvider<ZodTypeProvider>()
-  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
-  const dono = [app.autenticar, app.escopoLoja, app.exigirPapel('dono')]
+  // Grade editavel: ver, emitir/gerir e configurar a credencial (so dono por padrao).
+  const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('fiscal:ver')]
+  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('fiscal:gerir')]
+  const dono = [app.autenticar, app.escopoLoja, app.exigirPermissao('fiscal:configurar')]
 
-  r.get('/config', { config: { acesso: ACESSO_LOJA }, preHandler: gerir, schema: { response: { 200: FiscalConfigEstado } } },
+  r.get('/config', { config: { acesso: ACESSO_LOJA }, preHandler: ver, schema: { response: { 200: FiscalConfigEstado } } },
     async (req) => service.obterConfig(app.pool, escopo(req).lojaId))
 
   r.put('/config', {
@@ -80,12 +82,12 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsFiscal): void {
   })
 
   r.get('/pedidos-emissiveis', {
-    config: { acesso: ACESSO_LOJA }, preHandler: gerir,
+    config: { acesso: ACESSO_LOJA }, preHandler: ver,
     schema: { response: { 200: PedidosEmissiveisSaida } },
   }, async (req) => service.pedidosEmissiveis(app.pool, escopo(req).lojaId, 50))
 
   r.get('/itens', {
-    config: { acesso: ACESSO_LOJA }, preHandler: gerir,
+    config: { acesso: ACESSO_LOJA }, preHandler: ver,
     schema: { response: { 200: ItensFiscaisSaida } },
   }, async (req) => service.listarItensFiscais(app.pool, escopo(req).lojaId))
 
@@ -95,12 +97,12 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsFiscal): void {
   }, async (req) => service.definirItemFiscal(app.pool, escopo(req).lojaId, req.params.itemId, req.body))
 
   r.get('/documentos', {
-    config: { acesso: ACESSO_LOJA }, preHandler: gerir,
+    config: { acesso: ACESSO_LOJA }, preHandler: ver,
     schema: { querystring: DocumentosFiscaisEntrada, response: { 200: DocumentosFiscaisSaida } },
   }, async (req) => service.listar(app.pool, escopo(req).lojaId, req.query))
 
   r.get('/documentos/:id', {
-    config: { acesso: ACESSO_LOJA }, preHandler: gerir,
+    config: { acesso: ACESSO_LOJA }, preHandler: ver,
     schema: { params: DocumentoFiscalIdParams, response: { 200: DocumentoFiscalSaida } },
   }, async (req) => service.detalhe(app.pool, escopo(req).lojaId, req.params.id))
 }

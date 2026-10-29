@@ -5,6 +5,7 @@
 // clientes, enderecos...) NAO podem aparecer aqui (guarda estatica em escopo.test.ts).
 // Escrita de operadores em repo_escrita.ts.
 import { consultar, consultarUm, sql, sqlBruto, type Consulta, type Executor } from '@whaviso/shared/db'
+import type { PapelOperador } from '@whaviso/shared/contracts'
 
 const TS = (col: string): Consulta =>
   sqlBruto(`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`)
@@ -162,7 +163,7 @@ export interface OperadorLinha {
   id: string
   user_id: string
   nome: string
-  papel: 'operador' | 'admin'
+  papel: PapelOperador
   ativo: boolean
   criado_em: string
 }

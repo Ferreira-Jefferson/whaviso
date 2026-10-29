@@ -10,7 +10,7 @@ import { z } from 'zod'
 // reúne os que têm contrapartida no banco, para a paridade.
 
 // --- Conta, loja, número ---
-export const papelMembro = z.enum(['dono', 'gerente', 'atendente'])
+export const papelMembro = z.enum(['dono', 'gerente', 'atendente', 'convidado'])
 export type PapelMembro = z.infer<typeof papelMembro>
 
 export const statusNumero = z.enum(['conectado', 'pausado', 'removido'])
@@ -88,7 +88,7 @@ export const statusPagamento = z.enum(['pendente', 'pago', 'expirado', 'cancelad
 export type StatusPagamento = z.infer<typeof statusPagamento>
 
 // --- Plataforma (operador) ---
-export const papelOperador = z.enum(['operador', 'admin'])
+export const papelOperador = z.enum(['operador', 'admin', 'convidado', 'suporte', 'financeiro'])
 export type PapelOperador = z.infer<typeof papelOperador>
 
 export const estagioProspecto = z.enum(['novo', 'contato', 'proposta', 'ativo', 'perdido'])

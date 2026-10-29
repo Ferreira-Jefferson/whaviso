@@ -24,7 +24,9 @@ import type { LeitorEscopo } from './leitor_escopo'
 import { ErroEscopoAmbiguo, montarEscopoLoja } from './escopo'
 import { escopoTemPapel } from './consulta'
 import type { Permissao } from './papeis'
-import { papelPermite } from './papeis'
+import { operadorPermite, papelPermite } from './papeis'
+import { definicaoDe } from './catalogo'
+import { garantirGradeFresca } from './grade'
 
 export interface OpcoesEscopoLoja {
   leitor: LeitorEscopo
@@ -112,8 +114,20 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
     }
   })
 
+  // Guarda central do motor de autorizacao. A chave decide o escopo: chave de CONSOLE resolve
+  // o papel por `req.operador` (rodar depois de `escopoOperador`); chave de LOJA, pelo papel do
+  // membro na loja ativa. Sempre le a grade (cache por processo, TTL + invalidacao ao salvar).
   app.decorate('exigirPermissao', (permissao: Permissao) => {
+    const def = definicaoDe(permissao)
+    if (!def) throw new Error(`permissao desconhecida: ${permissao}`) // erro de programacao, falha no boot
     return async (req: FastifyRequest) => {
+      await garantirGradeFresca()
+      if (def.escopo === 'console') {
+        const operador = req.operador
+        if (!operador) throw proibido('Escopo de operador ausente')
+        if (!operadorPermite(operador.papel, permissao)) throw proibido()
+        return
+      }
       const escopo = req.escopo
       if (!escopo || !escopo.loja_ativa) throw proibido('Loja ativa nao definida')
       const papel = escopo.papel_por_loja[escopo.loja_ativa]

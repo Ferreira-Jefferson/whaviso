@@ -6,6 +6,10 @@
 // mesmo para um operador valido; so rotas `plataforma` passam. Assim, esquecer de proteger
 // uma rota de conteudo nao abre o conteudo ao operador: ele cai no default (negar).
 //
+// O QUE o papel do operador pode fazer nao e decidido aqui: as rotas encadeiam, depois deste
+// escopo, `app.exigirPermissao('<chave de console>')` (grade editavel em shared/tenant, item 14).
+// Papeis do console: convidado, suporte, financeiro, operador, admin (admin = sempre tudo).
+//
 // Plugin PURO (`fastify-plugin`); F4 registra injetando o `LeitorEscopo`.
 import fp from 'fastify-plugin'
 import type {

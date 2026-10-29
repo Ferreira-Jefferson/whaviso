@@ -18,12 +18,13 @@ export const promocoesRoutes: FastifyPluginAsync = async (instancia) => {
   const app = instancia.withTypeProvider<ZodTypeProvider>()
   const svc = criarServicoPromocoes(app.pool)
   const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
-  // Gestao do catalogo de promocoes: dono/gerente. Consulta/aplicacao no fluxo de pedido: quem gere pedidos.
-  const gestao = [app.autenticar, app.escopoLoja, app.exigirPapel('dono', 'gerente')]
+  // Gestao do catalogo (grade editavel; padrao dono/gerente). Consulta/aplicacao no fluxo de pedido: quem gere pedidos.
+  const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('promocoes:ver')]
+  const gestao = [app.autenticar, app.escopoLoja, app.exigirPermissao('promocoes:gerir')]
   const balcao = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
 
   app.get('/', {
-    ...loja(), preHandler: gestao,
+    ...loja(), preHandler: ver,
     schema: { querystring: PromocaoListaEntrada, response: { 200: PromocaoListaSaida } },
   }, async (req) => svc.listar(ator(req), req.query))
 
@@ -52,7 +53,7 @@ export const promocoesRoutes: FastifyPluginAsync = async (instancia) => {
   })
 
   app.get('/:id', {
-    ...loja(), preHandler: gestao,
+    ...loja(), preHandler: ver,
     schema: { params: IdParams, response: { 200: PromocaoSaida } },
   }, async (req) => svc.detalhe(ator(req), req.params.id))
 

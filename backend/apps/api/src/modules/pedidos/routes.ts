@@ -23,10 +23,12 @@ export function criarPedidosRoutes(cifra?: Cifra): FastifyPluginAsync {
     const app = instancia.withTypeProvider<ZodTypeProvider>()
     const svc = criarServicoPedidos(app.pool, () => cifra ?? cifraPadrao())
     const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
+    // Ver (kanban, detalhe, impressao) e gerir (criar, transicionar, cancelar) sao permissoes separadas da grade.
+    const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:ver')]
     const guarda = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
 
     app.get('/', {
-      ...loja(), preHandler: guarda,
+      ...loja(), preHandler: ver,
       schema: { querystring: KanbanQuery, response: { 200: PedidoKanbanSaida } },
     }, async (req) => svc.kanban(ator(req), req.query))
 
@@ -48,7 +50,7 @@ export function criarPedidosRoutes(cifra?: Cifra): FastifyPluginAsync {
     }, async (req, reply) => reply.status(201).send(await svc.repetir(ator(req), req.params.id, req.body)))
 
     app.get('/:id', {
-      ...loja(), preHandler: guarda,
+      ...loja(), preHandler: ver,
       schema: { params: IdParams, response: { 200: PedidoDetalheSaida } },
     }, async (req) => svc.detalhe(ator(req), req.params.id))
 
@@ -63,7 +65,7 @@ export function criarPedidosRoutes(cifra?: Cifra): FastifyPluginAsync {
     }, async (req) => svc.cancelarLinha(ator(req), req.params.id, req.params.itemId))
 
     app.get('/:id/impressao', {
-      ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: guarda,
+      ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: ver,
       schema: { params: IdParams, querystring: ImpressaoQuery, response: { 200: PedidoImpressaoSaida } },
     }, async (req, reply) => {
       void reply.header('cache-control', 'no-store')

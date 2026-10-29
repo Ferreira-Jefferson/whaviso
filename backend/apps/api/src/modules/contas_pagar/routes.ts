@@ -24,12 +24,13 @@ export function criarContasPagarRoutes(cifra?: Cifra): FastifyPluginAsync {
     const app = instancia.withTypeProvider<ZodTypeProvider>()
     const svc = criarServicoContasPagar(app.pool, cifra ?? cifraPadrao())
     const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
-    // Cadastro de fornecedor e lancamento (dinheiro e PII): dono e gerente (permissao loja:gerir).
-    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+    // Grade editavel: ver x gerir contas a pagar (padrao dono/gerente); revelar PII e permissao propria.
+    const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('contas_pagar:ver')]
+    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('contas_pagar:gerir')]
 
     // --- Fornecedores ---
     app.get('/', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { querystring: FornecedorListaQuery, response: { 200: FornecedorListaSaida } },
     }, async (req) => svc.listarFornecedores(ator(req), req.query.incluir_inativos === 'true'))
 
@@ -40,7 +41,7 @@ export function criarContasPagarRoutes(cifra?: Cifra): FastifyPluginAsync {
 
     // --- Contas a pagar (rotas estaticas antes das rotas /:id de fornecedor) ---
     app.get('/contas', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { querystring: ContaPagarListaQuery, response: { 200: ContaPagarListaSaida } },
     }, async (req) => svc.listarContas(ator(req), {
       credorTipo: req.query.credor_tipo,
@@ -66,7 +67,7 @@ export function criarContasPagarRoutes(cifra?: Cifra): FastifyPluginAsync {
 
     // --- Acerto do motoboy por periodo (rotas estaticas; antes das rotas /:id de fornecedor) ---
     app.get('/acertos', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { querystring: AcertoPeriodoQuery, response: { 200: AcertoPeriodoSaida } },
     }, async (req) => svc.acertoPeriodo(ator(req), req.query.de, req.query.ate))
 
@@ -82,7 +83,7 @@ export function criarContasPagarRoutes(cifra?: Cifra): FastifyPluginAsync {
 
     // --- Fornecedor por id ---
     app.get('/:id', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { params: IdParams, response: { 200: FornecedorSaida } },
     }, async (req) => svc.obterFornecedor(ator(req), req.params.id))
 
@@ -104,7 +105,7 @@ export function criarContasPagarRoutes(cifra?: Cifra): FastifyPluginAsync {
     // Telefone do fornecedor em claro (PII): so dono/gerente, rate limit, sem cache, auditado sem o valor.
     app.post('/:id/telefone/revelar', {
       ...loja({ rateLimit: { max: 10, timeWindow: '1 minute' } }),
-      preHandler: [app.autenticar, app.escopoLoja, app.exigirPapel('dono', 'gerente')],
+      preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('dados_sensiveis:revelar')],
       schema: { params: IdParams, response: { 200: FornecedorTelefoneSaida } },
     }, async (req, reply) => {
       void reply.header('cache-control', 'no-store')

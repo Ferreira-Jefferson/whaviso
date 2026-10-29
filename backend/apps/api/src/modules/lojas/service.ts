@@ -3,6 +3,7 @@ import { comTransacao, type Pool } from '@whaviso/shared/db'
 import type { EscopoLoja, PapelMembro } from '@whaviso/shared/contracts'
 import { lojaAceitandoAgora, momentoSp } from '@whaviso/shared/disponibilidade'
 import { Conflito, NaoEncontrado, Proibido, regraNegocio } from '../../shared/http_errors'
+import { papelPermite } from '../../shared/tenant'
 import * as repo from './repo'
 import {
   Cores,
@@ -145,7 +146,8 @@ export async function criar(pool: Pool, userId: string, entrada: LojaCriarEntrad
 function exigirGestor(escopo: EscopoLoja, id: string): PapelMembro {
   const papel = escopo.papel_por_loja[id]
   if (!escopo.loja_ids.includes(id) || !papel) throw new NaoEncontrado()
-  if (papel === 'atendente') throw new Proibido()
+  // Grade editavel (padrao: dono e gerente). Papel por loja (a rota passa o id, nao a loja ativa).
+  if (!papelPermite(papel, 'lojas:gerir')) throw new Proibido()
   return papel
 }
 

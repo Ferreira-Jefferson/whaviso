@@ -2,6 +2,7 @@
 // O operador enxerga metadado/saude agregada, NUNCA conteudo de loja nem contato. Nenhum dado
 // pessoal vai para log/evento (eventos so com ids e papeis).
 import { comTransacao, type Pool } from '@whaviso/shared/db'
+import type { PapelOperador } from '@whaviso/shared/contracts'
 import { conflito, naoEncontrado, proibido, regraNegocio } from '../../shared/http_errors'
 import { codificarCursor, decodificarCursor } from './cursor'
 import * as repo from './repo'
@@ -26,7 +27,7 @@ function comAuth(o: repo.OperadorLinha, info: repo.AuthInfo | undefined): Operad
 
 export interface AtorOperador {
   userId: string
-  papel: 'operador' | 'admin'
+  papel: PapelOperador
 }
 
 function resumo(l: repo.ContaLinha): ContaResumo {

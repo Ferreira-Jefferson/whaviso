@@ -24,7 +24,9 @@ export function criarClientesRoutes(cifra?: Cifra): FastifyPluginAsync {
     const loja = (extra: object = {}) => ({
       config: { acesso: 'conteudo_de_loja' as const, ...extra },
     })
-    const leitura = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
+    // Grade: ver clientes (convidado le) x gerir (cria/edita). A busca (POST) e leitura.
+    const leitura = [app.autenticar, app.escopoLoja, app.exigirPermissao('clientes:ver')]
+    const escrita = [app.autenticar, app.escopoLoja, app.exigirPermissao('clientes:gerir')]
 
     app.get('/', {
       ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }),
@@ -40,7 +42,7 @@ export function criarClientesRoutes(cifra?: Cifra): FastifyPluginAsync {
     }, async (req) => svc.buscarPorTelefone(ator(req), req.body))
 
     app.post('/', {
-      ...loja(), preHandler: leitura,
+      ...loja(), preHandler: escrita,
       schema: { body: ClienteCriarEntrada, response: { 201: ClienteSaida, 409: ClienteConflitoSaida } },
     }, async (req, reply) => {
       const r = await svc.criar(ator(req), req.body)
@@ -59,13 +61,13 @@ export function criarClientesRoutes(cifra?: Cifra): FastifyPluginAsync {
     }, async (req) => svc.detalhe(ator(req), req.params.id))
 
     app.patch('/:id', {
-      ...loja(), preHandler: leitura,
+      ...loja(), preHandler: escrita,
       schema: { params: IdParams, body: ClienteAtualizarEntrada, response: { 200: ClienteSaida } },
     }, async (req) => svc.atualizar(ator(req), req.params.id, req.body.nome))
 
     app.post('/:id/telefone/revelar', {
       ...loja({ rateLimit: { max: 10, timeWindow: '1 minute' } }),
-      preHandler: [app.autenticar, app.escopoLoja, app.exigirPapel('dono', 'gerente')],
+      preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('dados_sensiveis:revelar')],
       schema: { params: IdParams, response: { 200: TelefoneRevelarSaida } },
     }, async (req, reply) => {
       void reply.header('cache-control', 'no-store')
@@ -78,7 +80,7 @@ export function criarClientesRoutes(cifra?: Cifra): FastifyPluginAsync {
     }, async (req) => svc.listarEnderecos(ator(req), req.params.id))
 
     app.post('/:id/enderecos', {
-      ...loja(), preHandler: leitura,
+      ...loja(), preHandler: escrita,
       schema: { params: IdParams, body: EnderecoEntrada, response: { 201: EnderecoSaida } },
     }, async (req, reply) =>
       reply.status(201).send(await svc.criarEndereco(ator(req), req.params.id, req.body)))
@@ -90,12 +92,12 @@ export function criarClientesRoutes(cifra?: Cifra): FastifyPluginAsync {
 
     // Rotas finais: /v1/clientes/enderecos/:id (o prefixo do modulo e unico).
     app.patch('/enderecos/:id', {
-      ...loja(), preHandler: leitura,
+      ...loja(), preHandler: escrita,
       schema: { params: IdParams, body: EnderecoAtualizarEntrada, response: { 200: EnderecoSaida } },
     }, async (req) => svc.atualizarEndereco(ator(req), req.params.id, req.body))
 
     app.post('/enderecos/:id/desativar', {
-      ...loja(), preHandler: leitura,
+      ...loja(), preHandler: escrita,
       schema: { params: IdParams, response: { 200: EnderecoSaida } },
     }, async (req) => svc.desativarEndereco(ator(req), req.params.id))
   }

@@ -101,6 +101,8 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   pagamentos: { apiDelete: 'negado' },
   pedidos: { apiDelete: 'negado' },
   pessoas: { apiDelete: 'negado' },
+  papel_permissoes: { apiDelete: 'negado' },
+  permissoes: { apiDelete: 'negado' },
   planos: { apiDelete: 'negado' },
   promocao_itens: { apiDelete: 'negado' },
   promocao_usos: { apiDelete: 'negado' },

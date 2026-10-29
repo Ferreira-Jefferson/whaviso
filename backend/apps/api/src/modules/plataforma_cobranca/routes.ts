@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync, FastifyRequest, preHandlerHookHandler } from 'fastify'
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { proibido } from '../../shared/http_errors'
+import type { Permissao } from '../../shared/tenant'
 import { criarServicoCobranca, type Ator } from './service'
 import {
   ApurarAtrasosResultado, AssinaturaCriar, AssinaturaDTO, AssinaturaPatch, AssinaturasLista, AssinaturasQuery,
@@ -13,11 +14,6 @@ function operador(req: FastifyRequest): Ator {
   const o = req.operador
   if (!o) throw proibido('Escopo de operador ausente')
   return { userId: o.user_id }
-}
-
-/** Catalogo de planos e so do admin da equipe (operador comum recebe 403). */
-const exigirAdmin: preHandlerHookHandler = async (req) => {
-  if (req.operador?.papel !== 'admin') throw proibido('Apenas admin gere o catalogo de planos')
 }
 
 /** Conta do dono: SEMPRE do escopo de loja resolvido; conta_id forjado no cliente e ignorado. */
@@ -34,50 +30,49 @@ export function criarCobrancaRoutes(): FastifyPluginAsync {
 
     // Rotas de PLATAFORMA (operador Whaviso). O plugin de escopo bloqueia por padrao: so passa
     // quem e operador ativo; membro de loja cai no 'conteudo_de_loja' (negado).
-    const plataforma = (extra: object = {}) => ({
+    // A permissao (grade editavel) roda depois do escopo de operador. Padrao: operador ve e
+    // gere cobranca; o catalogo de planos e so do admin (e do papel financeiro).
+    const plataforma = (permissao: Permissao, extra: object = {}) => ({
       config: { acesso: 'plataforma' as const, ...extra },
-      preHandler: [app.autenticar, app.escopoOperador],
+      preHandler: [app.autenticar, app.escopoOperador, app.exigirPermissao(permissao)],
     })
 
     app.post('/assinaturas', {
-      ...plataforma(),
+      ...plataforma('cobranca:gerir'),
       schema: { body: AssinaturaCriar, response: { 201: AssinaturaDTO } },
     }, async (req, reply) => reply.status(201).send(await svc.criar(operador(req), req.body)))
 
     app.get('/assinaturas', {
-      ...plataforma(),
+      ...plataforma('cobranca:ver'),
       schema: { querystring: AssinaturasQuery, response: { 200: AssinaturasLista } },
     }, async (req) => svc.listarAssinaturas(operador(req), {
       contaId: req.query.conta_id, status: req.query.status,
     }))
 
     app.patch('/assinaturas/:id', {
-      ...plataforma(),
+      ...plataforma('cobranca:gerir'),
       schema: { params: IdParams, body: AssinaturaPatch, response: { 200: AssinaturaDTO } },
     }, async (req) => svc.alterar(operador(req), req.params.id, req.body))
 
     app.get('/faturas', {
-      ...plataforma(),
+      ...plataforma('cobranca:ver'),
       schema: { querystring: FaturasQuery, response: { 200: FaturasLista } },
     }, async (req) => svc.listarFaturas(operador(req), {
       status: req.query.status, competencia: req.query.competencia, contaId: req.query.conta_id,
     }))
 
     app.post('/faturas/:id/pagar', {
-      ...plataforma(),
+      ...plataforma('cobranca:gerir'),
       schema: { params: IdParams, body: FaturaMarcarPaga, response: { 200: FaturaDTO } },
     }, async (req) => svc.marcarPaga(operador(req), req.params.id, req.body))
 
     app.post('/faturas/:id/cancelar', {
-      ...plataforma(),
+      ...plataforma('cobranca:gerir'),
       schema: { params: IdParams, response: { 200: FaturaDTO } },
     }, async (req) => svc.cancelarFatura(operador(req), req.params.id))
 
     // Catalogo de planos (admin). Sem DELETE: plano inativa (estado), nunca some.
-    const adminPlataforma = {
-      config: { acesso: 'plataforma' as const },
-      preHandler: [app.autenticar, app.escopoOperador, exigirAdmin],
-    }
+    const adminPlataforma = plataforma('planos:gerir')
 
     app.get('/planos', {
       ...adminPlataforma,
@@ -96,12 +91,12 @@ export function criarCobrancaRoutes(): FastifyPluginAsync {
 
     // Jobs manuais (idempotentes). Rate limit por SEC-101: execucao manual, nao em laco.
     app.post('/cobranca/gerar-faturas', {
-      ...plataforma({ rateLimit: { max: 12, timeWindow: '1 minute' } }),
+      ...plataforma('cobranca:gerir', { rateLimit: { max: 12, timeWindow: '1 minute' } }),
       schema: { body: GerarFaturasEntrada, response: { 200: GerarFaturasResultado } },
     }, async (req) => svc.gerarFaturas(operador(req), req.body.competencia))
 
     app.post('/cobranca/apurar-atrasos', {
-      ...plataforma({ rateLimit: { max: 12, timeWindow: '1 minute' } }),
+      ...plataforma('cobranca:gerir', { rateLimit: { max: 12, timeWindow: '1 minute' } }),
       schema: { response: { 200: ApurarAtrasosResultado } },
     }, async (req) => svc.apurarAtrasos(operador(req)))
 

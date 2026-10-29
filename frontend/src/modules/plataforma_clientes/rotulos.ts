@@ -45,11 +45,15 @@ export const ROTULO_PAPEL_MEMBRO: Record<PapelMembro, string> = {
   dono: 'Dono',
   gerente: 'Gerente',
   atendente: 'Atendente',
+  convidado: 'Convidado',
 }
 
 export const ROTULO_PAPEL_OPERADOR: Record<PapelOperador, string> = {
   operador: 'Operador',
   admin: 'Administrador',
+  convidado: 'Convidado',
+  suporte: 'Suporte',
+  financeiro: 'Financeiro',
 }
 
 export const ROTULO_METODO_LOGIN: Record<'google' | 'whatsapp' | 'email', string> = {
