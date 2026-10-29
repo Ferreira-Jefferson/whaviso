@@ -91,10 +91,12 @@ export async function atualizarNome(exec: Executor, lojaId: string, id: string, 
 export async function resumoPedidos(exec: Executor, lojaId: string, id: string) {
   const r = await consultarUm<{ total: number; ultimo: string | null; gasto: number }>(
     exec,
-    sql`select count(*)::int as total, ${TS('max(criado_em)')} as ultimo,
-               coalesce(sum(total_centavos), 0)::int as gasto
-          from public.pedidos
-         where cliente_id = ${id} and loja_id = ${lojaId} and status <> 'rascunho'`,
+    // total e ultimo vem do read-model em `clientes` (0083, mantido por trigger); so o gasto soma.
+    sql`select c.pedidos_total as total, ${TS('c.ultimo_pedido_em')} as ultimo,
+               (select coalesce(sum(p.total_centavos), 0)::int from public.pedidos p
+                 where p.cliente_id = c.id and p.loja_id = c.loja_id and p.status <> 'rascunho') as gasto
+          from public.clientes c
+         where c.id = ${id} and c.loja_id = ${lojaId}`,
   )
   return {
     total: r?.total ?? 0,

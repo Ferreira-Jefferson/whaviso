@@ -109,9 +109,12 @@ export async function estadoAceiteLoja(exec: Executor, lojaId: string): Promise<
            (l.pausada and (l.pausada_ate is null or l.pausada_ate > now())) as pausada_agora,
            l.pausada_motivo,
            l.capacidade_por_janela,
-           (select count(*)::int from public.pedidos p
-             where p.loja_id = l.id and p.status <> 'rascunho'
-               and p.criado_em > now() - make_interval(mins => l.capacidade_janela_minutos)) as pedidos_na_janela
+           -- So conta a janela quando ha teto configurado (sem teto o numero nao e usado).
+           case when l.capacidade_por_janela is null then 0
+                else (select count(*)::int from public.pedidos p
+                       where p.loja_id = l.id and p.status <> 'rascunho'
+                         and p.criado_em > now() - make_interval(mins => l.capacidade_janela_minutos))
+           end as pedidos_na_janela
          from public.lojas l
         where l.id = ${lojaId}`,
   )
@@ -150,7 +153,9 @@ export async function listarColuna(exec: Executor, lojaId: string, f: FiltroColu
   const filtroMod = f.modalidade ? sql` and p.modalidade = ${f.modalidade}::modalidade_pedido` : sqlBruto('')
   const filtroOri = f.origem ? sql` and p.origem = ${f.origem}::origem_pedido` : sqlBruto('')
   const filtroData = f.data
-    ? sql` and (p.criado_em at time zone ${TZ})::date = ${f.data}::date`
+    ? // Faixa crua do dia (em TZ) em vez de funcao sobre a coluna: assim o indice e usado.
+      sql` and p.criado_em >= (${f.data}::date)::timestamp at time zone ${TZ}
+           and p.criado_em < ((${f.data}::date) + 1)::timestamp at time zone ${TZ}`
     : sqlBruto('')
   const cmp = sqlBruto(desc ? '<' : '>')
   const filtroCur = f.cursor
@@ -159,16 +164,30 @@ export async function listarColuna(exec: Executor, lojaId: string, f: FiltroColu
   const ordem = sqlBruto(desc ? 'order by p.criado_em desc, p.id desc' : 'order by p.criado_em asc, p.id asc')
   return consultar<CardLinha>(
     exec,
-    sql`select p.id, p.codigo, p.status, p.origem, p.modalidade, p.total_centavos,
-               (select count(*)::int from public.itens_pedido ip
-                 where ip.pedido_id = p.id and not ip.cancelado) as qtd_itens,
-               c.nome as cliente_nome, p.problema_motivo, p.motoboy_nome, p.corrida_id,
-               p.ordem_parada::int as ordem_parada, p.zona_id, ${TS('p.criado_em')} as criado_em,
-               ${TS('p.criado_em')} as cursor_ts
-          from public.pedidos p left join public.clientes c on c.id = p.cliente_id
-         where p.loja_id = ${lojaId} and p.status = ${f.status}::status_pedido${filtroMod}${filtroOri}${filtroData}${filtroCur}
-         ${ordem}
-         limit ${f.limite + 1}`,
+    // Pagina primeiro (CTE), depois conta os itens so dos pedidos da pagina numa agregacao unica.
+    sql`with pagina as (
+          select p.id, p.codigo, p.status, p.origem, p.modalidade, p.total_centavos,
+                 c.nome as cliente_nome, p.problema_motivo, p.motoboy_nome, p.corrida_id,
+                 p.ordem_parada::int as ordem_parada, p.zona_id, p.criado_em as criado_ts
+            from public.pedidos p left join public.clientes c on c.id = p.cliente_id
+           where p.loja_id = ${lojaId} and p.status = ${f.status}::status_pedido${filtroMod}${filtroOri}${filtroData}${filtroCur}
+           ${ordem}
+           limit ${f.limite + 1}
+        ), qtd as (
+          select ip.pedido_id, count(*)::int as n
+            from public.itens_pedido ip
+           where ip.loja_id = ${lojaId} and not ip.cancelado
+             and ip.pedido_id in (select id from pagina)
+           group by ip.pedido_id
+        )
+        select pg.id, pg.codigo, pg.status, pg.origem, pg.modalidade, pg.total_centavos,
+               coalesce(q.n, 0) as qtd_itens,
+               pg.cliente_nome, pg.problema_motivo, pg.motoboy_nome, pg.corrida_id,
+               pg.ordem_parada, pg.zona_id, t.ts as criado_em, t.ts as cursor_ts
+          from pagina pg
+          left join qtd q on q.pedido_id = pg.id
+          cross join lateral (select ${TS('pg.criado_ts')} as ts) t
+         order by ${sqlBruto(desc ? 'pg.criado_ts desc, pg.id desc' : 'pg.criado_ts asc, pg.id asc')}`,
   )
 }
 

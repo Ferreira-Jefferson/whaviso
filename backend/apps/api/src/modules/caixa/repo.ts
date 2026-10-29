@@ -143,6 +143,9 @@ export async function inserirMovimento(
   return { movimento: existente!, criado: false }
 }
 
+/** Teto de movimentos devolvidos no relatorio (os totais saem de `totais`, nao desta lista). */
+const LIMITE_MOVIMENTOS = 1000
+
 export async function listarMovimentos(exec: Executor, lojaId: string, caixaId: string) {
   return consultar<MovimentoLinha>(
     exec,
@@ -150,7 +153,8 @@ export async function listarMovimentos(exec: Executor, lojaId: string, caixaId: 
                criado_por_user_id, ${TS('criado_em')} as criado_em
           from public.movimentos_caixa
          where caixa_id = ${caixaId} and loja_id = ${lojaId}
-         order by criado_em, id`,
+         order by criado_em, id
+         limit ${LIMITE_MOVIMENTOS}`,
   )
 }
 

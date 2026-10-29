@@ -27,13 +27,18 @@ export async function travarPedidos(exec: Executor, lojaId: string, ids: readonl
 
 /** Proximo codigo `AAMMDD-NNN` do dia (sequencia diaria por loja). Conflito = retry no chamador. */
 export async function proximoCodigo(exec: Executor, lojaId: string, aammdd: string): Promise<string> {
-  const r = await consultarUm<{ n: number }>(
+  // LIKE de prefixo usa o indice pedidos_codigo_loja_prefixo (so varre os pedidos do dia). Ordena por
+  // tamanho antes do texto para o "1000" vir depois do "999" (o padding e de 3 digitos, nao um teto).
+  const r = await consultarUm<{ codigo: string }>(
     exec,
-    sql`select coalesce(max(substring(codigo from 8)::int), 0) + 1 as n
-          from public.pedidos
-         where loja_id = ${lojaId} and codigo ~ ${`^${aammdd}-[0-9]+$`}`,
+    sql`select codigo from public.pedidos
+         where loja_id = ${lojaId} and codigo like ${aammdd} || '-%'
+         order by length(codigo) desc, codigo desc
+         limit 1`,
   )
-  return `${aammdd}-${String(r?.n ?? 1).padStart(3, '0')}`
+  const ultimo = r ? Number.parseInt(r.codigo.slice(aammdd.length + 1), 10) : 0
+  const n = (Number.isFinite(ultimo) ? ultimo : 0) + 1
+  return `${aammdd}-${String(n).padStart(3, '0')}`
 }
 
 export interface PedidoNovo {
@@ -101,15 +106,18 @@ export async function inserirLinha(exec: Executor, lojaId: string, pedidoId: str
         returning id`,
   )
   if (!r) throw new Error('insert de item sem retorno')
-  for (const o of l.opcoes) {
-    await consultar(
-      exec,
-      sql`insert into public.itens_pedido_opcoes
-            (item_pedido_id, loja_id, opcao_id, grupo_nome_snapshot, nome_snapshot, preco_centavos, criado_em)
-          values (${r.id}, ${lojaId}, ${o.opcao_id}, ${o.grupo_nome_snapshot}, ${o.nome_snapshot},
-                  ${o.preco_centavos}, clock_timestamp())`,
-    )
-  }
+  if (l.opcoes.length === 0) return
+  // Uma ida ao banco para todas as opcoes da linha (unnest preserva a ordem das posicoes).
+  await consultar(
+    exec,
+    sql`insert into public.itens_pedido_opcoes
+          (item_pedido_id, loja_id, opcao_id, grupo_nome_snapshot, nome_snapshot, preco_centavos, criado_em)
+        select ${r.id}, ${lojaId}, o.opcao_id, o.grupo_nome, o.nome, o.preco, clock_timestamp()
+          from unnest(${l.opcoes.map((o) => o.opcao_id)}::uuid[], ${l.opcoes.map((o) => o.grupo_nome_snapshot)}::text[],
+                      ${l.opcoes.map((o) => o.nome_snapshot)}::text[], ${l.opcoes.map((o) => o.preco_centavos)}::int[])
+               with ordinality as o(opcao_id, grupo_nome, nome, preco, ord)
+         order by o.ord`,
+  )
 }
 
 export async function marcarUsoEndereco(exec: Executor, lojaId: string, enderecoId: string) {
