@@ -61,6 +61,27 @@ export async function vinculosAtivos(exec: Executor, userId: string): Promise<Vi
   )
 }
 
+// ---------- gate de allowlist de login (migration 0082) ----------
+
+/** E-mail do usuario no Auth, via funcao SECURITY DEFINER (0069). null se nunca teve e-mail. */
+export async function emailDoUsuario(exec: Executor, userId: string): Promise<string | null> {
+  const r = await consultarUm<{ email: string | null }>(
+    exec,
+    sql`select email from public.plataforma_auth_info(array[${userId}]::uuid[]) limit 1`,
+  )
+  return r?.email ?? null
+}
+
+/** true se o e-mail esta APROVADO na allowlist (case-insensitive). */
+export async function emailAprovado(exec: Executor, email: string): Promise<boolean> {
+  const r = await consultarUm(
+    exec,
+    sql`select 1 as ok from public.acessos_permitidos
+         where lower(email) = lower(${email}) and status = 'aprovado'`,
+  )
+  return r !== null
+}
+
 export async function contaDoDono(exec: Executor, userId: string): Promise<ContaLinha | null> {
   const r = await consultarUm<Bruto<ContaLinha>>(
     exec,

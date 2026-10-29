@@ -4,6 +4,7 @@
 // banco por TRIGGER a partir do status da assinatura (o servico so muda `assinaturas.status`).
 // Nenhum dado pessoal vai para log, evento ou auditoria.
 import { comTransacao, type Pool } from '@whaviso/shared/db'
+import { aprovarDonoPorPagamento } from '../../shared/emails_outbox'
 import { hojeSp } from '@whaviso/shared/datas'
 import { invalidarCacheTaxas } from '@whaviso/shared/taxas'
 import type {
@@ -313,6 +314,9 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
         tipo: 'fatura.paga', entidade: 'fatura', entidadeId: linha.id, ator: 'operador',
         detalhes: { assinatura_id: linha.assinatura_id, competencia: linha.competencia },
       })
+      // Allowlist de login (0082): a baixa de fatura libera o dono da conta (aprova o e-mail e
+      // enfileira o boas-vindas, idempotente). Toda a logica vive no helper compartilhado.
+      await aprovarDonoPorPagamento(tx, linha.conta_id)
       // Reativacao SO quando explicitamente pedida E nao resta nenhuma fatura atrasada E a
       // assinatura esta suspensa. Nunca automatica (decisao do operador).
       if (b.reativar) {

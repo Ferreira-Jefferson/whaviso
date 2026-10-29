@@ -9,6 +9,8 @@ import {
   buscarMembro,
   contaDoDono,
   contarDonosAtivos,
+  emailAprovado,
+  emailDoUsuario,
   inserirConta,
   inserirMembro,
   listarMembros,
@@ -39,6 +41,12 @@ export async function criarConta(
     // Membro de outra conta (convidado) nao cria uma segunda conta por esta rota.
     if ((await vinculosAtivos(tx, userId)).length > 0) {
       throw new Conflito('Usuario ja pertence a uma conta', 'ja_possui_conta')
+    }
+    // Gate da allowlist de login (migration 0082): so cria a 1a conta quem o operador ja liberou.
+    // O convidado ja saiu acima (ja_possui_conta), logo nao e afetado. E-mail resolvido pelo Auth.
+    const email = await emailDoUsuario(tx, userId)
+    if (!email || !(await emailAprovado(tx, email))) {
+      throw new Proibido('Seu acesso ainda nao foi liberado', 'acesso_nao_aprovado')
     }
     const conta = await inserirConta(tx, userId, nome)
     const dono = await inserirMembro(tx, {
