@@ -89,3 +89,15 @@ export const AtendimentoSaude = z.strictObject({
   taxa_autonomia_ia: z.number().min(0).max(1).nullable(),
 })
 export type AtendimentoSaude = z.infer<typeof AtendimentoSaude>
+
+/** Resposta agregada de todo o dashboard numa chamada so (GET /dashboard/geral). O servidor
+ * resolve os cinco read-models em paralelo, de modo que a pagina paga uma ida ao banco em vez de
+ * cinco. Cada campo e identico ao retorno da rota individual correspondente. */
+export const DashboardGeral = z.strictObject({
+  resumo: DashboardResumo,
+  serie_diaria: SeriePorDia,
+  por_hora: SeriePorHora,
+  top_itens: TopItensSaida,
+  atendimento: AtendimentoSaude,
+})
+export type DashboardGeral = z.infer<typeof DashboardGeral>

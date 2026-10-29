@@ -6,8 +6,8 @@ import { minutos, razao, ticketMedio } from './metricas'
 import { normalizarPeriodo, PeriodoInvalido, type Periodo } from './periodo'
 import * as repo from './repo'
 import type {
-  AtendimentoSaude, DashboardFiltro, DashboardResumo, SeriePorDia, SeriePorHora, TopItensFiltro,
-  TopItensSaida,
+  AtendimentoSaude, DashboardFiltro, DashboardGeral, DashboardResumo, SeriePorDia, SeriePorHora,
+  TopItensFiltro, TopItensSaida,
 } from './schemas'
 
 export interface Ator {
@@ -93,6 +93,16 @@ export function criarServicoDashboard(pool: Pool) {
         pedidos_sem_intervencao_humana: au.sem_humano,
         taxa_autonomia_ia: razao(au.sem_humano, au.com_conversa),
       }
+    },
+
+    // Agrega os cinco read-models numa resposta so, resolvidos em paralelo: a pagina paga uma ida
+    // em vez de cinco (e o escopo e resolvido uma vez). O filtro de top itens (com `limite`) cobre
+    // os demais, que leem so `de`/`ate`. Qualquer erro de periodo propaga igual as rotas individuais.
+    async geral(a: Ator, f: TopItensFiltro): Promise<DashboardGeral> {
+      const [resumo, serie_diaria, por_hora, top_itens, atendimento] = await Promise.all([
+        this.resumo(a, f), this.serieDiaria(a, f), this.porHora(a, f), this.topItens(a, f), this.atendimento(a, f),
+      ])
+      return { resumo, serie_diaria, por_hora, top_itens, atendimento }
     },
   }
 }

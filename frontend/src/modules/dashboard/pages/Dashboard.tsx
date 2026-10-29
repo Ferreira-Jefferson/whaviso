@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { Bot, Clock, Receipt, ShoppingBag, TrendingUp, Wallet } from 'lucide-react'
 import { Card, EmptyState, GraficoBarras, PageHeader } from '@/shared/ui'
 import { formatarCentavos } from '@/shared/format'
-import { useAtendimento, useResumo, useSerieDiaria, useSerieHoraria, useTopItens } from '../api'
+import { useDashboardGeral } from '../api'
 import { BarrasVerticais, type Coluna } from '../components/BarrasVerticais'
 import { Secao } from '../components/Secao'
 import { SeletorPeriodo } from '../components/SeletorPeriodo'
@@ -37,11 +37,17 @@ export default function Dashboard() {
   const [dias, setDias] = useState(7)
   const periodo = useMemo(() => periodoDosUltimosDias(dias), [dias])
 
-  const resumo = useResumo(periodo)
-  const diaria = useSerieDiaria(periodo)
-  const horaria = useSerieHoraria(periodo)
-  const top = useTopItens(periodo)
-  const atend = useAtendimento(periodo)
+  // Uma unica chamada agregada alimenta todas as secoes (a pagina paga uma ida em vez de cinco).
+  // Os aliases preservam a forma { data, isPending, isError, refetch } que cada secao ja consumia,
+  // derivada do mesmo estado de query.
+  const dash = useDashboardGeral(periodo)
+  const g = dash.data
+  const base = { isPending: dash.isPending, isError: dash.isError, refetch: dash.refetch }
+  const resumo = { ...base, data: g?.resumo, isSuccess: dash.isSuccess }
+  const diaria = { ...base, data: g?.serie_diaria }
+  const horaria = { ...base, data: g?.por_hora }
+  const top = { ...base, data: g?.top_itens }
+  const atend = { ...base, data: g?.atendimento }
 
   const r = resumo.data
   const semPedidos = resumo.isSuccess && r?.total_pedidos === 0

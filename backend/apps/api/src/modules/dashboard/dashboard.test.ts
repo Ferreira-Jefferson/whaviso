@@ -195,6 +195,22 @@ d('modulo dashboard', () => {
     expect(j.taxa_autonomia_ia).toBe(0.5)
   })
 
+  it('geral: agrega os cinco read-models numa chamada, igual as rotas individuais', async () => {
+    const g = await chamar(donoA, lojaA, `/geral${Q}`)
+    expect(g.statusCode).toBe(200)
+    const j = g.json()
+    expect(j.resumo).toEqual((await chamar(donoA, lojaA, `/resumo${Q}`)).json())
+    expect(j.serie_diaria).toEqual((await chamar(donoA, lojaA, `/serie-diaria${Q}`)).json())
+    expect(j.por_hora).toEqual((await chamar(donoA, lojaA, `/por-hora${Q}`)).json())
+    expect(j.top_itens).toEqual((await chamar(donoA, lojaA, `/top-itens${Q}`)).json())
+    expect(j.atendimento).toEqual((await chamar(donoA, lojaA, `/atendimento${Q}`)).json())
+    // atendente nao ve financeiro tambem no agregado
+    const atend = (await chamar(atendenteA, lojaA, `/geral${Q}`)).json()
+    expect(atend.resumo.faturamento_realizado_centavos).toBeNull()
+    // operador da plataforma: 403 (conteudo de loja)
+    expect((await chamar(operador, lojaA, `/geral${Q}`)).statusCode).toBe(403)
+  })
+
   it('SEC-001/002: loja B nunca ve numeros da A, e vice-versa; loja forjada no header = 403/404', async () => {
     const b = (await chamar(donoB, lojaB, `/resumo${Q}`)).json()
     expect(b.total_pedidos).toBe(1)

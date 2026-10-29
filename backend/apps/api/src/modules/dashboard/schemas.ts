@@ -9,4 +9,5 @@ export {
   SeriePorHora,
   TopItensSaida,
   AtendimentoSaude,
+  DashboardGeral,
 } from '@whaviso/shared/contracts'

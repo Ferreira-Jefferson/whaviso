@@ -4,7 +4,8 @@ import { HttpError } from '../../shared/http_errors'
 import { escopoPermite } from '../../shared/tenant'
 import { criarServicoDashboard, type Ator } from './service'
 import {
-  AtendimentoSaude, DashboardFiltro, DashboardResumo, SeriePorDia, SeriePorHora, TopItensFiltro, TopItensSaida,
+  AtendimentoSaude, DashboardFiltro, DashboardGeral, DashboardResumo, SeriePorDia, SeriePorHora,
+  TopItensFiltro, TopItensSaida,
 } from './schemas'
 
 /** Loja efetiva = SO a do escopo resolvido (nunca corpo/query). */
@@ -45,6 +46,14 @@ export function criarDashboardRoutes(): FastifyPluginAsync {
       ...cfg, preHandler: guarda,
       schema: { querystring: DashboardFiltro, response: { 200: AtendimentoSaude } },
     }, async (req) => svc.atendimento(ator(req), req.query))
+
+    // Tudo do dashboard numa chamada so (resumo + series + top itens + atendimento), para a pagina
+    // nao disparar cinco requisicoes em paralelo. O querystring usa o filtro de top itens (inclui
+    // `limite`), que e superconjunto do filtro das demais metricas.
+    app.get('/geral', {
+      ...cfg, preHandler: guarda,
+      schema: { querystring: TopItensFiltro, response: { 200: DashboardGeral } },
+    }, async (req) => svc.geral(ator(req), req.query))
   }
 }
 
