@@ -98,7 +98,18 @@ export async function renovarSessao(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
+// Access token em memoria, mantido pelo onAuthStateChange (INITIAL_SESSION, SIGNED_IN,
+// TOKEN_REFRESHED, SIGNED_OUT). Evita o getSession() (navigator.locks) antes de cada fetch:
+// N queries paralelas disputavam o lock e serializavam.
+let tokenMemoria: { token: string; expiraEm: number } | null = null
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  tokenMemoria = session ? { token: session.access_token, expiraEm: (session.expires_at ?? 0) * 1000 } : null
+})
+
 export async function getAccessToken(): Promise<string | null> {
+  // Folga de 10s: perto de expirar cai no plano B, que renova pela sessao.
+  if (tokenMemoria && tokenMemoria.expiraEm - 10_000 > Date.now()) return tokenMemoria.token
   const { data } = await supabase.auth.getSession()
   return data.session?.access_token ?? null
 }

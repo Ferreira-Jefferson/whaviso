@@ -6,6 +6,8 @@ export interface TenantState {
   /** Loja ativa (null enquanto carrega ou quando o usuario nao tem loja). */
   lojaAtiva: LojaResumo | null
   status: 'carregando' | 'erro' | 'ok'
+  /** Enquanto /lojas carrega: ha loja salva semeando o x-loja-id, entao a pagina pode montar ja. */
+  lojaSemeada?: boolean
   erro: Error | null
   /** Troca a loja ativa e limpa o cache de queries (exceto a lista de lojas). */
   selecionarLoja: (id: string) => void

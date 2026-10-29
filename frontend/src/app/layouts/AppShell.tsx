@@ -242,8 +242,10 @@ function BarraInferior() {
 }
 
 function ConteudoComLoja() {
-  const { status, lojaAtiva, lojas, erro, recarregar } = useTenant()
+  const { status, lojaAtiva, lojas, erro, recarregar, lojaSemeada } = useTenant()
 
+  // Loja salva semeia o x-loja-id: monta a pagina ja, em paralelo com /lojas.
+  if (status === 'carregando' && lojaSemeada) return <Outlet />
   if (status === 'carregando') {
     return (
       <div aria-busy="true" aria-label="Carregando" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

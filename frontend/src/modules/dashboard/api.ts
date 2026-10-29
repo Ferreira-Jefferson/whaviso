@@ -14,8 +14,9 @@ import type { Periodo } from './periodo'
 
 export const RAIZ = 'dashboard'
 
-// Troca de periodo mantem o dado anterior em tela (sem piscar); refetch leve a cada 60s.
-const OPCOES = { placeholderData: keepPreviousData, refetchInterval: 60_000 } as const
+// Troca de periodo mantem o dado anterior em tela (sem piscar). Sem polling: o SSE
+// (pedido.atualizado) ja invalida a raiz 'dashboard'.
+const OPCOES = { placeholderData: keepPreviousData } as const
 
 export function useResumo(p: Periodo) {
   return useQuery({

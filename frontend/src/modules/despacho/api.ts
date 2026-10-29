@@ -33,11 +33,11 @@ export type Parada = ParadaSaida
 export type PedidoPronto = PedidoProntoSaida
 export type MotoboyCarga = MotoboyCargaSaida
 
-/** GET /v1/despacho: o painel se atualiza sozinho a cada 20s (pedidos mudam o tempo todo). */
+/** GET /v1/despacho: o SSE (pedido.atualizado) invalida a raiz; o intervalo e so rede de seguranca. */
 export function useDespachoPainel() {
   return useQuery({
     queryKey: [RAIZ, 'painel'],
-    refetchInterval: 20_000,
+    refetchInterval: 120_000,
     queryFn: ({ signal }) => apiClient.get<Painel>('/despacho', { schema: DespachoPainelSaida, signal }),
   })
 }

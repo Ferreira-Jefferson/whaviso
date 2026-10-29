@@ -1,7 +1,7 @@
 // TenantProvider: carrega as lojas do usuario (GET /v1/lojas), guarda a loja ativa, aplica o
 // branding e a envia no header `x-loja-id` (via api_client/loja_ativa). Trocar de loja limpa
 // o cache de queries (nada de dado de uma loja pode aparecer na outra, SEC-001).
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, definirLojaAtiva } from '../api_client'
 import { useSessao } from '../auth'
@@ -35,9 +35,27 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     )
   }, [lojas, escolhida, userId])
 
-  const lojaAtivaId = lojaAtiva?.id ?? null
+  // Enquanto /lojas carrega, semeia o header com a loja salva: a pagina monta ja e seus dados
+  // correm em paralelo com /lojas (sem waterfall). Reconciliado abaixo quando /lojas responde.
+  const semeada = consulta.isPending && status === 'logado' && userId ? lerLojaSalva(userId) : null
+  const lojaAtivaId = lojaAtiva?.id ?? semeada
   // Sincroniza ANTES dos filhos consultarem: o header precisa estar certo na 1a requisicao.
   definirLojaAtiva(lojaAtivaId)
+
+  // Loja salva que nao bate com a resposta de /lojas (removida/sem acesso): refaz o que foi
+  // consultado com a loja semeada, agora com o header da loja real.
+  const semeadaRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (semeada) semeadaRef.current = semeada
+  }, [semeada])
+  useEffect(() => {
+    if (!consulta.isSuccess) return
+    const usada = semeadaRef.current
+    semeadaRef.current = null
+    if (usada && usada !== lojaAtivaId) {
+      void qc.resetQueries({ predicate: (q) => q.queryKey[0] !== CHAVE_LOJAS[0] })
+    }
+  }, [consulta.isSuccess, lojaAtivaId, qc])
 
   useEffect(() => {
     aplicarBranding(calcularBranding(lojaAtiva?.cores))
@@ -70,11 +88,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       lojas,
       lojaAtiva,
       status: consulta.isPending ? 'carregando' : consulta.isError ? 'erro' : 'ok',
+      lojaSemeada: semeada !== null,
       erro: consulta.error,
       selecionarLoja,
       recarregar: () => void consulta.refetch(),
     }),
-    [lojas, lojaAtiva, consulta, selecionarLoja],
+    [lojas, lojaAtiva, consulta, selecionarLoja, semeada],
   )
 
   return <TenantContext value={value}>{children}</TenantContext>
