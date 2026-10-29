@@ -1,0 +1,45 @@
+# whaviso atendente (worker do motor de atendimento IA/RAG, :3003).
+# Instalar em /etc/systemd/system/whaviso-atendente.service
+#
+# IMPORTANTE: instancia UNICA. O atendente drena o inbound (motor por botao/regra; so o
+# texto livre passa pelo harness de LLM), a fila de importacao de cardapio e a ingestao de
+# conhecimento. Nao fala com a Meta (o envio e do zap); integra pelo banco compartilhado.
+# Rode UMA so copia para nao competir consigo mesmo no tick.
+[Unit]
+Description=whaviso atendente (motor IA/RAG :3003)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=whaviso
+Group=whaviso
+WorkingDirectory=/opt/whaviso/app/backend/apps/atendente
+EnvironmentFile=/etc/whaviso/atendente.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/env npm run start
+Restart=on-failure
+# Backoff geometrico: comeca em 1s e cresce a cada falha ate o teto de 5min,
+# onde fica tentando pra sempre (sem desistir, StartLimitIntervalSec=0).
+RestartSec=1
+RestartSteps=9
+RestartMaxDelaySec=300
+StartLimitIntervalSec=0
+
+# Area de escrita de runtime, fora do checkout (que fica imutavel). Persiste entre deploys.
+ReadWritePaths=/var/lib/whaviso
+
+# ── Hardening (systemd sandbox) ──
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryHigh=512M
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target

@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/server.ts",
+    "start": "node --env-file-if-exists=../../.env --import tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:changed": "vitest run --changed --passWithNoTests"
