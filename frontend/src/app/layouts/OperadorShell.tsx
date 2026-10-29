@@ -3,7 +3,7 @@
 // (as telas usam apiClient semLoja). A guarda RequireOperador decide quem entra; a seguranca
 // real e a autorizacao por rota na api. Nav fixa: Painel, Clientes, Cobranca, Planos, Funil, Acessos.
 import { NavLink, Outlet } from 'react-router'
-import { BarChart3, Filter, Package, ShieldCheck, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { BarChart3, Filter, KeyRound, Package, ShieldCheck, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { useTenant } from '@/shared/tenant'
 import { BellLogo, cn } from '@/shared/ui'
@@ -25,6 +25,8 @@ const NAV_OPERADOR: readonly ItemOperador[] = [
   { caminho: 'funil', rotulo: 'Funil', icone: Filter },
   // So admin acessa (a api responde 403 aos demais; a tela mostra acesso restrito).
   { caminho: 'acessos', rotulo: 'Acessos', icone: ShieldCheck },
+  // Allowlist de login (quem pode entrar/criar conta); guardada por cobranca:gerir na api.
+  { caminho: 'acessos-login', rotulo: 'Logins', icone: KeyRound },
 ]
 
 function ItemNav({ item }: { item: ItemOperador }) {
