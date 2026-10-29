@@ -541,8 +541,8 @@ Aviso de segurança: nenhum segredo aqui. As senhas reais ficam só no
 | Dashboard num só (/dashboard/geral) | 28 | API+Front | FEITO (commit 8168599). /bootstrap do boot nao feito (ganho pequeno pos-item 25) |
 | DATABASE_URL_LISTEN (corrige cache/realtime) | 24 | config | no production.env e no backend/.env dev; falta VPS |
 | Índices B1/B2/B3/B6 + pg_trgm | 29 | DB | FEITO em código (migration 0081, validada local); falta db push no cloud |
-| Read-model de clientes (B5) | 30 | DB | só dói com volume, depois |
-| Serialização p/ listas grandes | 31 | API | depois |
+| Read-model de clientes | 30 | DB | FEITO (commit b63991b). Trigger mantem pedidos_total/ultimo_pedido_em; listagem O(log n) por indice. |
+| Serialização p/ listas grandes | 31 | API | NAO escala com volume (payloads paginados = fator constante). Jeito seguro = fast-json-stringify (dep nova + 188 schemas). A decidir. |
 
 **Nota do item 22 (FEITO como single-flight, 2026-10-29):** a 1a tentativa foi um cache por TTL de
 3s, que quebrou 3 testes de integração por uma regressão de correção real (loja recém-criada
@@ -600,14 +600,17 @@ fixes acima cortam o número de idas ao banco e se somam a esse ganho.
   Acessos já existiam; isto é só o gating de UI que faltava. Gating de BOTÕES de ação dentro das telas
   fica como follow-up.
 
-- **FEITO depois (2026-10-29, baixa prioridade sem contra):** item 22 como single-flight (commit
-  20e60da); `staleTime` de 5 min no catálogo de lojas (commit d3ec479); alvo `vercel` morto removido
-  do push_secrets e notas (commit 93691c5).
-- **FALTA (código, baixa prioridade, tem contra real):** item 30 (read-model de clientes: exige
-  migration + trigger de sincronização, superfície de correção nova; só dói com volume) e item 31
-  (serialização: ou remove a validação de resposta em prod, tirando a rede de segurança do contrato,
-  ou fia fast-json-stringify por rota; só dói com volume). O de-dup de `/lojas` NÃO compensa (são
-  duas queries de formas diferentes).
+- **FEITO depois (2026-10-29):** item 22 como single-flight (commit 20e60da); `staleTime` de 5 min no
+  catálogo de lojas (commit d3ec479); alvo `vercel` morto removido do push_secrets e notas (commit
+  93691c5); **item 30 read-model de clientes** (commit b63991b, migration 0083): decisão de nascer
+  pronto para volume, o lateral join virou colunas mantidas por trigger + índice (O(log n)).
+- **Item 31 (serialização) a decidir:** NÃO escala com volume (payloads são paginados = fator
+  constante por requisição, não cresce com os dados). O jeito seguro é fast-json-stringify (preserva o
+  whitelist de PII que o serializer atual faz via zod.parse, do qual os testes SEC dependem), mas
+  custa uma DEPENDÊNCIA nova e a conversão zod->json-schema->fjs em 188 schemas de resposta
+  (uniões/nullables/records num sistema de PII+dinheiro). Pular a validação em prod vazaria PII (contra
+  real). Aguardando decisão do dono sobre fazer o fjs. O de-dup de `/lojas` NÃO compensa (duas queries
+  de formas diferentes).
 - **FALTA (fora do código / precisa de você, da VPS ou da Meta):** db push do 0081 (e das demais
   migrations pendentes) no cloud COMPARTILHADO de prod (combinar no deploy); item 21 (OTP hook);
   itens 6, 8, 35 (VPS); 15 Fase B e 17 (Meta). O item 20/24 (VPS *.env) e o item 5 (serviço atendente)
