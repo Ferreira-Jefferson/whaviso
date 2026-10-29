@@ -34,6 +34,9 @@ export const MensagensEntrada = z.strictObject({
 
 export const MensagemEnviarEntrada = z.strictObject({
   texto: z.string().trim().min(1).max(TEXTO_MAX),
+  // Idempotencia de request: um UUID por submissao (reusado em retry). Opcional por compat;
+  // quando presente, dois POSTs iguais (duplo clique/retry) nao criam duas mensagens nem dois envios.
+  chave_idempotencia: Uuid.optional(),
 })
 export type MensagemEnviarEntrada = z.infer<typeof MensagemEnviarEntrada>
 

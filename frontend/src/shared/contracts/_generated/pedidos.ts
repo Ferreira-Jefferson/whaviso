@@ -29,6 +29,10 @@ export const PedidoCriarManualEntrada = z.strictObject({
   forma_pagamento: formaPagamento.optional(),
   troco_para_centavos: Centavos.optional(),
   itens: z.array(PedidoItemEntrada).min(1).max(60),
+  // Idempotencia: UUID gerado pelo cliente por submit (reusado no retry). Opcional (compat): quando
+  // presente, reenviar a mesma chave devolve o pedido original em vez de criar outro (sem duplicar
+  // estoque/faturamento). Ver migration 0079.
+  chave_idempotencia: UuidSchema.optional(),
 })
 export type PedidoCriarManualEntrada = z.infer<typeof PedidoCriarManualEntrada>
 
@@ -48,6 +52,8 @@ export const PedidoRepetirEntrada = z.strictObject({
   observacao: texto(500).nullable().optional(),
   forma_pagamento: formaPagamento.nullable().optional(),
   troco_para_centavos: Centavos.nullable().optional(),
+  // Idempotencia do repetir (mesma regra do criar manual; ver migration 0079).
+  chave_idempotencia: UuidSchema.optional(),
 })
 export type PedidoRepetirEntrada = z.infer<typeof PedidoRepetirEntrada>
 
