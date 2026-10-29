@@ -167,6 +167,27 @@ d('conta e membros (integracao)', () => {
       expect(r.json().error.code).toBe('apenas_dono')
     })
 
+    // Trava do comportamento INTENCIONAL da fonte da verdade (historias/backend-api/conta.md,
+    // etapas 7-8): gestao de membros e de dono E gerente; gerente promove ate gerente, nunca a dono.
+    // Em conjunto, confirma que a authz do service e aplicada chamando a rota direto (B3).
+    it('gerente (alcance todas) gere e promove ate gerente, nunca a dono; atendente nao gere', async () => {
+      const t = await montar(c)
+      const ger = await criarUsuario(c)
+      await criarMembro(t.contaId, ger, 'gerente', null)
+      const alvo = await criarMembro(t.contaId, await criarUsuario(c), 'atendente', null)
+      const at = await criarUsuario(c)
+      await criarMembro(t.contaId, at, 'atendente', t.lojaA)
+
+      // historia etapa 7: gerente PODE promover a gerente...
+      expect((await chamar(ger, 'PATCH', `/membros/${alvo}`, { papel: 'gerente' })).statusCode).toBe(200)
+      // ...mas nunca a dono.
+      const aDono = await chamar(ger, 'PATCH', `/membros/${alvo}`, { papel: 'dono' })
+      expect(aDono.statusCode).toBe(403)
+      expect(aDono.json().error.code).toBe('apenas_dono')
+      // B3: a authz vive no service; atendente chamando a rota de mutacao direto e barrado (gestor).
+      expect((await chamar(at, 'PATCH', `/membros/${alvo}`, { ativo: false })).statusCode).toBe(403)
+    })
+
     it('SEC-041/081: papel fora do enum e corpo invalido sao negados; sem promocao a operador', async () => {
       const t = await montar(c)
       const m = await criarMembro(t.contaId, await criarUsuario(c), 'atendente', null)

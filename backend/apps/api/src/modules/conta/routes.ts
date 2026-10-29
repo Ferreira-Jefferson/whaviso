@@ -1,5 +1,8 @@
 // Rotas /v1/conta/*. Auth: so `autenticar` (o membro e resolvido por user_id em `membros`;
-// conta/loja nunca vem do corpo, SEC-002). Conta nova nao tem loja, logo nao usa `escopoLoja`.
+// conta/loja nunca vem do corpo, SEC-002). Conta nova nao tem loja, logo nao usa `escopoLoja` nem
+// `exigirPermissao` (que dependem da loja do escopo). A autorizacao vive no service, em `contexto.ts`
+// (`resolverAtor`/`exigirDono`/`exigirGestor`): e por desenho, nao esquecimento, e esta coberta por
+// teste chamando a rota direto (ver conta.test.ts, matriz papel x endpoint).
 import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { naoAutorizado } from '../../shared/http_errors'

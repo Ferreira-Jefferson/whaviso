@@ -1,4 +1,7 @@
 // Rotas de convite: /v1/conta/convites (gestao) e /v1/conta/convites/aceitar (qualquer autenticado).
+// Auth: so `autenticar`; a autorizacao vive no service (convites.ts -> contexto.ts), por desenho,
+// pois conta/convite nao dependem de `escopoLoja` (ver nota em routes.ts). Coberta por teste que
+// chama a rota direto (convites.test.ts).
 import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { naoAutorizado } from '../../shared/http_errors'

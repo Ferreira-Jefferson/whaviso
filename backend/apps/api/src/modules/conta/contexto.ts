@@ -41,6 +41,11 @@ export async function resolverAtor(exec: Executor, userId: string): Promise<Ator
   }
 }
 
+// Gestao de membros/convites = dono OU gerente, por desenho do produto
+// (historias/backend-api/conta.md, etapas 7-8): o gerente gere e convida dentro do seu alcance de
+// lojas e promove ate gerente, NUNCA a dono. A administracao da conta em si (renomear, billing) e
+// so do dono (`exigirDono`), coerente com o padrao da grade ("gerente: tudo na loja, exceto
+// conta/membros/billing"). Nao e furo de authz: e a politica declarada na fonte da verdade.
 export function exigirGestor(ator: Ator): void {
   if (!ator.podeGerir) throw new Proibido()
 }
