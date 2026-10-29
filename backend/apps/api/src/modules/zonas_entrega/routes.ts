@@ -26,9 +26,9 @@ export const zonasEntregaRoutes: FastifyPluginAsync = async (instancia) => {
   const app = instancia.withTypeProvider<ZodTypeProvider>()
   const config = { acesso: 'conteudo_de_loja' as const }
   // Ler e resolver: qualquer papel da loja (o atendente precifica a entrega na conversa).
-  const ler = { config, preHandler: [app.autenticar, app.escopoLoja] }
+  const ler = { config, preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('zonas_entrega:ver', { lojaAusente: 'obrigatoria' })] }
   // Escrever: configuracao da loja (dono e gerente).
-  const gerir = { config, preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')] }
+  const gerir = { config, preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('zonas_entrega:gerir')] }
 
   app.get(
     '/',

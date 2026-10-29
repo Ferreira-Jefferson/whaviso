@@ -28,16 +28,22 @@ function lojaAtiva(req: FastifyRequest): string {
 
 /** Membro autenticado, escopo de loja resolvido e permissão de gestão da loja (dono/gerente). */
 function guardaLoja(app: FastifyInstance) {
-  return [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('pagamentos:ver')]
+}
+
+/** Escrita (chave Pix, cobranca, conciliar, cancelar): `pagamentos:gerir`. */
+function guardaGerir(app: FastifyInstance) {
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('pagamentos:gerir')]
 }
 
 /** Monta as rotas com um resolvedor PREGUICOSO das dependências (cifra da chave Pix). */
 function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void {
   const r = app.withTypeProvider<ZodTypeProvider>()
   const loja = { config: { acesso: ACESSO_LOJA }, preHandler: guardaLoja(app) }
+  const lojaGerir = { config: { acesso: ACESSO_LOJA }, preHandler: guardaGerir(app) }
   const lojaSensivel = {
     config: { acesso: ACESSO_LOJA, rateLimit: LIMITE_SENSIVEL },
-    preHandler: guardaLoja(app),
+    preHandler: guardaGerir(app),
   }
 
   // GET /pagamentos/pix: metadado da chave Pix da loja (nunca a chave em claro nem a cifra).
@@ -101,7 +107,7 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void 
   // POST /pagamentos/:id/conciliar: marca pago (idempotente).
   r.post(
     '/:id/conciliar',
-    { ...loja, schema: { params: pagamentoIdParam, body: ConciliarEntrada, response: { 200: PagamentoSaida } } },
+    { ...lojaGerir, schema: { params: pagamentoIdParam, body: ConciliarEntrada, response: { 200: PagamentoSaida } } },
     async (req) => {
       const pag = await service.conciliar(app.pool, lojaAtiva(req), req.params.id, req.body)
       req.log.info({ pagamento_id: pag.id, loja_id: pag.loja_id, status: pag.status }, 'cobranca conciliada')
@@ -112,7 +118,7 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void 
   // POST /pagamentos/:id/cancelar: cancela uma pendente (idempotente).
   r.post(
     '/:id/cancelar',
-    { ...loja, schema: { params: pagamentoIdParam, response: { 200: PagamentoSaida } } },
+    { ...lojaGerir, schema: { params: pagamentoIdParam, response: { 200: PagamentoSaida } } },
     async (req) => {
       const pag = await service.cancelar(app.pool, lojaAtiva(req), req.params.id)
       req.log.info({ pagamento_id: pag.id, loja_id: pag.loja_id, status: pag.status }, 'cobranca cancelada')

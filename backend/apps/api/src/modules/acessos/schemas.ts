@@ -36,3 +36,9 @@ export const AcessosSaida = z.strictObject({
   grade: z.array(CelulaDTO),
 })
 export type AcessosSaida = z.infer<typeof AcessosSaida>
+
+/** Permissoes de loja que o usuario logado tem em cada loja do seu escopo (so as que ele tem). */
+export const MinhasPermissoesSaida = z.strictObject({
+  por_loja: z.record(z.string(), z.array(z.string())),
+})
+export type MinhasPermissoesSaida = z.infer<typeof MinhasPermissoesSaida>

@@ -29,11 +29,11 @@ export function criarDisponibilidadeRoutes(): FastifyPluginAsync {
     const app = instancia.withTypeProvider<ZodTypeProvider>()
     const svc = criarServicoDisponibilidade(app.pool)
     const config = { acesso: 'conteudo_de_loja' as const }
-    // Leitura: qualquer membro da loja. Escrita: gestor (dono/gerente), via permissao loja:gerir.
-    const ler = { config, preHandler: [app.autenticar, app.escopoLoja] }
+    // Leitura: qualquer membro da loja. Escrita: gestor (dono/gerente), via permissao disponibilidade:gerir.
+    const ler = { config, preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('disponibilidade:ver', { lojaAusente: 'obrigatoria' })] }
     const gerir = {
       config,
-      preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')],
+      preHandler: [app.autenticar, app.escopoLoja, app.exigirPermissao('disponibilidade:gerir')],
     }
 
     // --- Horarios de funcionamento ---

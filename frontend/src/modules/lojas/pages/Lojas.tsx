@@ -15,7 +15,7 @@ import {
   useToast,
 } from '@/shared/ui'
 import type { LojaSaida as Loja } from '@/shared/contracts/_generated/lojas'
-import { useAlterarAtivo, useLojas } from '../api'
+import { useAlterarAtivo, useLojas, useMinhasPermissoes } from '../api'
 import { CardLoja } from '../components/CardLoja'
 import { FormularioLoja } from '../components/FormularioLoja'
 
@@ -28,6 +28,7 @@ export default function Lojas() {
   const { mostrarToast } = useToast()
   const consulta = useLojas(incluirInativas)
   const alterar = useAlterarAtivo()
+  const minhas = useMinhasPermissoes()
 
   const lojas = useMemo(() => consulta.data ?? [], [consulta.data])
   // Sem conta: a api responde 403 (so o dono da conta lista/gere). A loja e liberada pela equipe.
@@ -123,7 +124,7 @@ export default function Lojas() {
                 <CardLoja
                   loja={loja}
                   ativaNoShell={ativaNoShell}
-                  podeGerir={loja.papel !== 'atendente'}
+                  podeGerir={minhas.data?.[loja.id]?.includes('lojas:gerir') ?? false}
                   ehDono={loja.papel === 'dono'}
                   alterandoAtivo={ocupadoId === loja.id}
                   onEditar={() => setForm({ loja })}

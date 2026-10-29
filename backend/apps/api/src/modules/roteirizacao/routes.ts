@@ -30,11 +30,12 @@ export function criarRoteirizacaoRoutes(mapas: ClienteMapas, op: OpcoesServico =
     const limite = (max: number) => ({ rateLimit: { max: max * fator, timeWindow: '1 minute' } })
     const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
     // Sugerir/aceitar e rotina do despacho (dono, gerente, atendente); a config da loja e de quem gere a loja.
-    const operar = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
-    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+    const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('roteirizacao:ver')]
+    const operar = [app.autenticar, app.escopoLoja, app.exigirPermissao('roteirizacao:operar')]
+    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('roteirizacao:gerir')]
 
     app.get('/config', {
-      ...loja(), preHandler: operar, schema: { response: { 200: DespachoConfigSaida } },
+      ...loja(), preHandler: ver, schema: { response: { 200: DespachoConfigSaida } },
     }, async (req) => svc.obterConfig(ator(req)))
 
     app.put('/config', {
@@ -49,8 +50,8 @@ export function criarRoteirizacaoRoutes(mapas: ClienteMapas, op: OpcoesServico =
     }, async (req) => svc.geocodificarPendentes(ator(req), req.body))
 
     // Seletor de mapa do painel (planta o icone da loja): geocodifica um endereco avulso, nao persiste.
-    // Custa uma chamada ao provedor (limite publico ~1 req/s): rate limit curto. Guard `loja:gerir`, de
-    // menor privilegio que cobre quem edita a area da loja E quem edita as zonas de entrega (ambos gerir).
+    // Custa uma chamada ao provedor (limite publico ~1 req/s): rate limit curto. Guard `roteirizacao:gerir`
+    // (padrao gerente): o seletor de mapa e ferramenta de configuracao do despacho.
     app.post('/geocodificar-endereco', {
       ...loja(limite(20)), preHandler: gerir,
       schema: { body: GeocodificarEnderecoEntrada, response: { 200: GeocodificarEnderecoSaida } },

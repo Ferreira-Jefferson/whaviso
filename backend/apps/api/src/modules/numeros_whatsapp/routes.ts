@@ -27,9 +27,10 @@ function lojaAtiva(req: FastifyRequest): string {
 function registrar(app: FastifyInstance, obterDeps: () => DepsNumeros): void {
   const r = app.withTypeProvider<ZodTypeProvider>()
   const loja = { config: { acesso: ACESSO_LOJA }, preHandler: guardaLoja(app) }
+  const lojaGerir = { config: { acesso: ACESSO_LOJA }, preHandler: guardaGerir(app) }
   const lojaSensivel = {
     config: { acesso: ACESSO_LOJA, rateLimit: LIMITE_SENSIVEL },
-    preHandler: guardaLoja(app),
+    preHandler: guardaGerir(app),
   }
 
   // POST /numeros: conclui o Embedded Signup (dono e gerente). SEC-101: rate limit.
@@ -67,7 +68,7 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsNumeros): void {
   r.patch(
     '/:id/status',
     {
-      ...loja,
+      ...lojaGerir,
       schema: { params: numeroIdParam, body: numeroStatusEntrada, response: { 200: numeroSaida } },
     },
     async (req) => {
@@ -104,7 +105,12 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsNumeros): void {
 
 /** Membro autenticado, escopo de loja resolvido e permissao de gestao da loja. */
 function guardaLoja(app: FastifyInstance) {
-  return [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('numeros_whatsapp:ver')]
+}
+
+/** Escrita (conectar, status, reconectar): `numeros_whatsapp:gerir`. */
+function guardaGerir(app: FastifyInstance) {
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('numeros_whatsapp:gerir')]
 }
 
 /** Plugin de PRODUCAO: resolve deps preguicosamente de `app.env` (MASTER_KEY + Meta). */

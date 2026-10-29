@@ -40,3 +40,11 @@ export async function registrarEvento(
         values (null, ${e.tipo}, 'papel_permissao', null, 'operador', ${JSON.stringify(e.detalhes)}::jsonb)`,
   )
 }
+
+/**
+ * Avisa todas as instancias da api (LISTEN) de que a grade mudou. Chamar DENTRO da transacao do
+ * save: o Postgres so entrega o NOTIFY no COMMIT (nunca antes do dado estar visivel).
+ */
+export async function notificarGrade(exec: Executor, canal: string): Promise<void> {
+  await consultar(exec, sql`select pg_notify(${canal}, '')`)
+}

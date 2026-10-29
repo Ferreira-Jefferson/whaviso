@@ -62,7 +62,11 @@ describe('loja: padroes reproduzem o comportamento anterior', () => {
   })
   it('convidado (novo) so tem leitura', () => {
     const tem = chavesLoja.filter((c) => papelPermite('convidado', c))
-    expect(tem.sort()).toEqual(['clientes:ver', 'pedidos:ver', 'relatorios:ver'])
+    // Leitura apenas: as 3 chaves originais + os `:ver` dos modulos granulares (ver granular.test.ts).
+    expect(tem.sort()).toEqual([
+      'cardapio:ver', 'clientes:ver', 'disponibilidade:ver', 'estoque_insumos:ver', 'estoque_itens:ver',
+      'pedidos:ver', 'relatorios:ver', 'zonas_entrega:ver',
+    ])
     for (const c of tem) expect(c).toMatch(/:ver$/)
   })
 })

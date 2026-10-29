@@ -54,13 +54,16 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
   return async (instancia) => {
     const app = instancia.withTypeProvider<ZodTypeProvider>()
     const acesso = { acesso: 'conteudo_de_loja' as const }
+    // Leitura (listar, abrir, historico): `conversas:ver`. Escrita (responder, assumir, devolver,
+    // encerrar, marcar lida): `conversas:atender`.
+    const guardasVer = [app.autenticar, app.escopoLoja, fixarLojaAtiva, app.exigirPermissao('conversas:ver')]
     const guardas = [app.autenticar, app.escopoLoja, fixarLojaAtiva, app.exigirPermissao('conversas:atender')]
 
     app.get(
       '/',
       {
         config: acesso,
-        preHandler: guardas,
+        preHandler: guardasVer,
         schema: { querystring: ConversaListaEntrada, response: { 200: ConversaListaSaida } },
       },
       async (req) => listar(app.pool, lojaDaRequisicao(req), req.query, agora()),
@@ -68,7 +71,7 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
 
     app.get(
       '/:id',
-      { config: acesso, preHandler: guardas, schema: { params: ParamConversa, response: { 200: ConversaDetalheSaida } } },
+      { config: acesso, preHandler: guardasVer, schema: { params: ParamConversa, response: { 200: ConversaDetalheSaida } } },
       async (req) => abrir(app.pool, lojaDaRequisicao(req), req.params.id, usuarioDaRequisicao(req), agora()),
     )
 
@@ -76,7 +79,7 @@ export function criarConversasRoutes(opcoes: OpcoesConversas = {}): FastifyPlugi
       '/:id/mensagens',
       {
         config: acesso,
-        preHandler: guardas,
+        preHandler: guardasVer,
         schema: { params: ParamConversa, querystring: MensagensEntrada, response: { 200: MensagensSaida } },
       },
       async (req) => historico(app.pool, lojaDaRequisicao(req), req.params.id, req.query),

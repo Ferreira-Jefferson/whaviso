@@ -21,12 +21,13 @@ export const conhecimentoRoutes: FastifyPluginAsync = async (instancia) => {
   const app = instancia.withTypeProvider<ZodTypeProvider>()
   const svc = criarServico(app.pool)
   const cfg = { config: { acesso: 'conteudo_de_loja' as const } }
-  // Curadoria e gestao: dono e gerente (`loja:gerir`). O atendente (cargo) nunca chega aqui.
-  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  // Curadoria e gestao: dono e gerente (`conhecimento:ver`/`conhecimento:gerir`). O atendente (cargo) nunca chega aqui.
+  const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('conhecimento:ver')]
+  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('conhecimento:gerir')]
 
   // ------------------------------------------------------------ documentos
   app.get('/documentos', {
-    ...cfg, preHandler: gerir,
+    ...cfg, preHandler: ver,
     schema: { querystring: DocumentosFiltro, response: { 200: DocumentosSaida } },
   }, async (req) => {
     const r = await svc.listarDocumentos(ator(req), req.query)
@@ -43,12 +44,12 @@ export const conhecimentoRoutes: FastifyPluginAsync = async (instancia) => {
   })
 
   app.get('/documentos/:id', {
-    ...cfg, preHandler: gerir,
+    ...cfg, preHandler: ver,
     schema: { params: ParamId, response: { 200: DocumentoSaida } },
   }, async (req) => docDto(await svc.obterDocumento(ator(req), req.params.id)))
 
   app.get('/documentos/:id/versoes', {
-    ...cfg, preHandler: gerir,
+    ...cfg, preHandler: ver,
     schema: { params: ParamId, response: { 200: DocumentoVersoesSaida } },
   }, async (req) => ({ versoes: (await svc.versoes(ator(req), req.params.id)).versoes.map(docDto) }))
 
@@ -69,7 +70,7 @@ export const conhecimentoRoutes: FastifyPluginAsync = async (instancia) => {
 
   // ------------------------------------------------------------ golden set
   app.get('/avaliacao', {
-    ...cfg, preHandler: gerir,
+    ...cfg, preHandler: ver,
     schema: { querystring: AvaliacaoFiltro, response: { 200: AvaliacoesGoldenSaida } },
   }, async (req) => ({ itens: (await svc.listarAvaliacoes(ator(req), req.query)).itens.map(avaliacaoDto) }))
 
@@ -89,7 +90,7 @@ export const conhecimentoRoutes: FastifyPluginAsync = async (instancia) => {
 
   // ------------------------------------------------------------ feedback (novo -> triado -> promovido)
   app.get('/feedback', {
-    ...cfg, preHandler: gerir,
+    ...cfg, preHandler: ver,
     schema: { querystring: FeedbackFiltro, response: { 200: FeedbacksSaida } },
   }, async (req) => ({ itens: (await svc.listarFeedback(ator(req), req.query)).itens.map(feedbackDto) }))
 

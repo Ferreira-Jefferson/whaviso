@@ -19,7 +19,8 @@ export function criarCaixaRoutes(): FastifyPluginAsync {
     const app = instancia.withTypeProvider<ZodTypeProvider>()
     const svc = criarServicoCaixa(app.pool)
     const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
-    const guarda = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
+    const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('caixa:ver')]
+    const guarda = [app.autenticar, app.escopoLoja, app.exigirPermissao('caixa:gerir')]
 
     app.post('/abrir', {
       ...loja(), preHandler: guarda,
@@ -27,7 +28,7 @@ export function criarCaixaRoutes(): FastifyPluginAsync {
     }, async (req, reply) => reply.status(201).send(await svc.abrir(ator(req), req.body)))
 
     app.get('/aberto', {
-      ...loja(), preHandler: guarda,
+      ...loja(), preHandler: ver,
       schema: { response: { 200: SessaoAbertaSaida } },
     }, async (req) => svc.sessaoAberta(ator(req)))
 
@@ -42,7 +43,7 @@ export function criarCaixaRoutes(): FastifyPluginAsync {
     }, async (req) => svc.fechar(ator(req), req.params.id, req.body))
 
     app.get('/:id/relatorio', {
-      ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: guarda,
+      ...loja({ rateLimit: { max: 60, timeWindow: '1 minute' } }), preHandler: ver,
       schema: { params: IdParams, response: { 200: CaixaRelatorioSaida } },
     }, async (req) => svc.relatorio(ator(req), req.params.id))
   }

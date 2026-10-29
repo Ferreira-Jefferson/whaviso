@@ -18,10 +18,10 @@ export const estoqueItensRoutes: FastifyPluginAsync = async (instancia) => {
   const app = instancia.withTypeProvider<ZodTypeProvider>()
   const svc = criarServicoEstoque(app.pool)
   const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
-  // Leitura do estoque: rotina de salao (inclui atendente) -> permissao pedidos:gerir.
-  const leitura = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
-  // Escrita (ligar controle, lancar movimento): gestao da loja -> permissao loja:gerir.
-  const escrita = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  // Leitura do estoque: rotina de salao (inclui atendente) -> permissao estoque_itens:ver.
+  const leitura = [app.autenticar, app.escopoLoja, app.exigirPermissao('estoque_itens:ver')]
+  // Escrita (ligar controle, lancar movimento): gestao da loja -> permissao estoque_itens:gerir.
+  const escrita = [app.autenticar, app.escopoLoja, app.exigirPermissao('estoque_itens:gerir')]
 
   app.get('/', {
     ...loja(), preHandler: leitura,

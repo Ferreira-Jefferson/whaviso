@@ -29,15 +29,16 @@ export function criarEstoqueRoutes(): FastifyPluginAsync {
     const svc = criarServicoEstoque(app.pool)
     const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
     // Insumos = configuracao/operacao da loja (como cardapio, zonas, motoboys): dono e gerente.
-    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+    const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('estoque_insumos:ver')]
+    const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('estoque_insumos:gerir')]
 
     app.get('/', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { querystring: ListaQuery, response: { 200: InsumoListaSaida } },
     }, async (req) => svc.listar(ator(req), req.query.incluir_inativos))
 
     app.get('/baixo-estoque', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { response: { 200: InsumoBaixoEstoqueSaida } },
     }, async (req) => svc.baixoEstoque(ator(req)))
 
@@ -47,7 +48,7 @@ export function criarEstoqueRoutes(): FastifyPluginAsync {
     }, async (req, reply) => reply.status(201).send(await svc.criar(ator(req), req.body)))
 
     app.get('/:id', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { params: IdParams, response: { 200: InsumoSaida } },
     }, async (req) => svc.detalhe(ator(req), req.params.id))
 
@@ -57,7 +58,7 @@ export function criarEstoqueRoutes(): FastifyPluginAsync {
     }, async (req) => svc.atualizar(ator(req), req.params.id, req.body))
 
     app.get('/:id/movimentos', {
-      ...loja(), preHandler: gerir,
+      ...loja(), preHandler: ver,
       schema: { params: IdParams, querystring: MovimentosInsumoBuscaEntrada, response: { 200: MovimentoInsumoListaSaida } },
     }, async (req) => svc.movimentos(ator(req), req.params.id, req.query.limite))
 

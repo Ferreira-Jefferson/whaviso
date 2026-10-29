@@ -6,11 +6,18 @@
 //   anterior (nunca abre acesso novo por erro).
 // - Linha ausente na grade cai no padrao do catalogo (permissao nova no codigo antes da migration).
 // - Papel fixo (`admin`, `dono`) e sempre tudo, independente do banco (anti-lockout).
-// - Salvar a grade chama `recarregarGrade()` (invalida o cache imediatamente neste processo).
-import { consultar, sqlBruto, type Executor } from '@whaviso/shared/db'
+// - Salvar a grade chama `recarregarGrade()` (invalida o cache imediatamente neste processo) e emite
+//   NOTIFY no canal `grade_permissoes` (na mesma transacao do save): cada processo da api faz LISTEN
+//   (conexao dedicada, `iniciarEscutaGrade`) e invalida o cache ao receber. Assim o efeito e imediato
+//   em QUALQUER instancia, sem janela de TTL. O TTL segue como rede de seguranca se a conexao LISTEN
+//   cair (ela reconecta com backoff e recarrega a grade ao voltar).
+import { consultar, criarEscuta, sqlBruto, type Escuta, type Executor } from '@whaviso/shared/db'
 import { definicaoDe, padraoPermite, PAPEL_FIXO, SO_PAPEL_FIXO, type EscopoAcesso } from './catalogo'
 
 const TTL_MS = 30_000
+
+/** Canal Postgres que avisa as instancias da api de que a grade mudou. */
+export const CANAL_GRADE = 'grade_permissoes'
 
 let fonte: Executor | null = null
 /** `${escopo}|${papel}|${chave}` -> permitido, so das linhas lidas do banco. */
@@ -74,4 +81,39 @@ export async function garantirGradeFresca(): Promise<void> {
 /** Volta aos padroes e solta a fonte (isolamento de testes). */
 export function resetarGrade(): void {
   configurarFonteGrade(null)
+}
+
+/** Invalida o cache AGORA (sincrono): a proxima decisao relê o banco antes de decidir. */
+export function invalidarGrade(): void {
+  carregadaEm = 0
+}
+
+export interface OpcoesEscutaGrade {
+  /** Connection string DIRETA/session (LISTEN nao funciona em pooler em modo transacao). */
+  connectionString: string
+  backoffMinMs?: number
+  /** Chamado a cada queda da conexao (sem dado sensivel). */
+  aoFalha?: (motivo: string) => void
+}
+
+/**
+ * Abre a conexao LISTEN dedicada no canal da grade. Ao receber (ou ao reconectar, pois um aviso
+ * pode ter se perdido) invalida o cache na hora e relê o banco. Devolve a escuta (iniciada).
+ */
+export function iniciarEscutaGrade(opcoes: OpcoesEscutaGrade): Escuta {
+  const recarregar = () => {
+    invalidarGrade()
+    void recarregarGrade().catch(() => undefined) // falhou: cache anterior + TTL cobrem
+  }
+  const escuta = criarEscuta({
+    connectionString: opcoes.connectionString,
+    canal: CANAL_GRADE,
+    backoffMinMs: opcoes.backoffMinMs,
+    applicationName: 'whaviso_grade_listen',
+    aoMensagem: recarregar,
+    aoReconectar: recarregar,
+    aoFalha: opcoes.aoFalha,
+  })
+  escuta.iniciar()
+  return escuta
 }

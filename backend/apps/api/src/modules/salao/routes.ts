@@ -20,12 +20,13 @@ export function criarSalaoRoutes(): FastifyPluginAsync {
     const svc = criarServicoSalao(app.pool)
     const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
     // Cadastro de mesa = config da loja; operar comandas = turno (como o kanban de pedidos).
-    const gerirLoja = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
-    const operar = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
+    const gerirLoja = [app.autenticar, app.escopoLoja, app.exigirPermissao('salao:gerir')]
+    const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('salao:ver')]
+    const operar = [app.autenticar, app.escopoLoja, app.exigirPermissao('salao:operar')]
 
     // ---------------------------------------------------------------- mesas (cadastro)
     app.get('/mesas', {
-      ...loja(), preHandler: operar,
+      ...loja(), preHandler: ver,
       schema: { response: { 200: MesaListaSaida } },
     }, async (req) => svc.listarMesas(ator(req)))
 
@@ -46,7 +47,7 @@ export function criarSalaoRoutes(): FastifyPluginAsync {
     }, async (req, reply) => reply.status(201).send(await svc.abrirComanda(ator(req), req.body)))
 
     app.get('/comandas/:id', {
-      ...loja(), preHandler: operar,
+      ...loja(), preHandler: ver,
       schema: { params: IdParams, response: { 200: ComandaSaida } },
     }, async (req) => svc.detalheComanda(ator(req), req.params.id))
 

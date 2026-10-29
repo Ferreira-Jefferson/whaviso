@@ -18,7 +18,7 @@ import type {
   preHandlerHookHandler,
 } from 'fastify'
 import type { EscopoLoja, PapelMembro } from '@whaviso/shared/contracts'
-import { HttpError, naoAutorizado, naoEncontrado, proibido } from '../http_errors'
+import { HttpError, naoAutorizado, naoEncontrado, proibido, regraNegocio } from '../http_errors'
 import { registrarEventoAcesso, type ExecutorAuditoria } from '../eventos_auth'
 import type { LeitorEscopo } from './leitor_escopo'
 import { ErroEscopoAmbiguo, montarEscopoLoja } from './escopo'
@@ -27,6 +27,14 @@ import type { Permissao } from './papeis'
 import { operadorPermite, papelPermite } from './papeis'
 import { definicaoDe } from './catalogo'
 import { garantirGradeFresca } from './grade'
+
+export interface OpcoesGuardaPermissao {
+  /**
+   * Resposta quando nao ha loja ativa. Padrao: 403 `proibido`. `'obrigatoria'`: 422
+   * `loja_ativa_obrigatoria` (contrato das leituras que antes nao tinham guard de permissao).
+   */
+  lojaAusente?: 'proibido' | 'obrigatoria'
+}
 
 export interface OpcoesEscopoLoja {
   leitor: LeitorEscopo
@@ -44,7 +52,7 @@ declare module 'fastify' {
     /** Guarda: exige que o papel na loja ativa esteja entre os informados. */
     exigirPapel: (...papeis: PapelMembro[]) => preHandlerHookHandler
     /** Guarda: exige uma permissao (tabela de papeis) na loja ativa. */
-    exigirPermissao: (permissao: Permissao) => preHandlerHookHandler
+    exigirPermissao: (permissao: Permissao, opcoes?: OpcoesGuardaPermissao) => preHandlerHookHandler
   }
 }
 
@@ -117,7 +125,7 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
   // Guarda central do motor de autorizacao. A chave decide o escopo: chave de CONSOLE resolve
   // o papel por `req.operador` (rodar depois de `escopoOperador`); chave de LOJA, pelo papel do
   // membro na loja ativa. Sempre le a grade (cache por processo, TTL + invalidacao ao salvar).
-  app.decorate('exigirPermissao', (permissao: Permissao) => {
+  app.decorate('exigirPermissao', (permissao: Permissao, opcoesGuarda?: OpcoesGuardaPermissao) => {
     const def = definicaoDe(permissao)
     if (!def) throw new Error(`permissao desconhecida: ${permissao}`) // erro de programacao, falha no boot
     return async (req: FastifyRequest) => {
@@ -129,7 +137,12 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
         return
       }
       const escopo = req.escopo
-      if (!escopo || !escopo.loja_ativa) throw proibido('Loja ativa nao definida')
+      if (!escopo || !escopo.loja_ativa) {
+        if (opcoesGuarda?.lojaAusente === 'obrigatoria') {
+          throw regraNegocio('loja_ativa_obrigatoria', 'Informe a loja ativa no header x-loja-id')
+        }
+        throw proibido('Loja ativa nao definida')
+      }
       const papel = escopo.papel_por_loja[escopo.loja_ativa]
       if (!papel || !papelPermite(papel, permissao)) throw proibido()
     }

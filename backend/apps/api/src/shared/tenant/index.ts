@@ -32,5 +32,8 @@ export {
   type DefinicaoPermissao,
   type EscopoAcesso,
 } from './catalogo'
-export { permite, configurarFonteGrade, recarregarGrade, garantirGradeFresca, resetarGrade } from './grade'
-export { escopoLojaPlugin, type OpcoesEscopoLoja } from './plugin'
+export {
+  permite, configurarFonteGrade, recarregarGrade, garantirGradeFresca, resetarGrade,
+  invalidarGrade, iniciarEscutaGrade, CANAL_GRADE, type OpcoesEscutaGrade,
+} from './grade'
+export { escopoLojaPlugin, type OpcoesEscopoLoja, type OpcoesGuardaPermissao } from './plugin'

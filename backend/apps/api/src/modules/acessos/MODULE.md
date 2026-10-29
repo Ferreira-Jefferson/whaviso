@@ -10,12 +10,19 @@ plataforma liga/desliga celulas. Grade GLOBAL (todas as contas). Papeis sao fixo
 - `index.ts`: `acessosRoutes` (registry, prefixo `acessos`) e `criarAcessosRoutes()` (teste).
 - `GET /v1/acessos`: catalogo + grade efetiva. `PATCH /v1/acessos/grade`: uma celula
   `{escopo, papel, permissao, permitido}`. Ambas exigem `acessos:gerir` (so admin).
+- `GET /v1/acessos/minhas`: permissoes de loja do proprio usuario em cada loja do escopo (qualquer membro; so a UI usa para nao oferecer o que o servidor negaria).
 
 ## Invariantes
 - `admin` (console) e `dono` (loja) sao sempre tudo e nao editaveis (CHECK no banco + service +
   `permite()` ignora a grade para eles). `acessos:gerir` nunca e delegavel.
 - Os guards leem a grade pelo kernel (`shared/tenant`: `permite`, `exigirPermissao`) com cache por
-  processo (TTL 30s) invalidado a cada save. Sem leitura do banco, vale o padrao do catalogo.
+  processo (TTL 30s, so rede de seguranca). Cada save emite `NOTIFY grade_permissoes` (mesma transacao);
+  todo processo da api faz `LISTEN` (conexao dedicada, `DATABASE_URL_LISTEN`) e invalida o cache na hora:
+  efeito imediato em qualquer instancia. Reconexao recarrega a grade.
+- Entrar no console = ter vinculo em `operadores` (`GET /plataforma-painel/eu`, sem permissao da grade);
+  `painel:ver` so gateia o CONTEUDO do painel. Desligar `painel:ver` nao expulsa ninguem.
+- Granularidade (0073): cada modulo de loja tem `:ver`/`:gerir` (+ `:operar`/`:configurar`/`:disponibilidade`).
+  `loja:gerir` resta so no onboarding. `convidado` so tem `:ver` (cardapio, estoque, disponibilidade, zonas). Sem leitura do banco, vale o padrao do catalogo.
 - Cada save grava `eventos` (`plataforma.acesso_alterado`, so chaves/ids, sem dado pessoal).
 - Fonte dos padroes: `shared/tenant/catalogo.ts` (espelhada na migration 0072; teste confere paridade).
 

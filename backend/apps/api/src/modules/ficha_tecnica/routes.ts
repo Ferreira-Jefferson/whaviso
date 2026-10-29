@@ -19,8 +19,8 @@ export const fichaTecnicaRoutes: FastifyPluginAsync = async (instancia) => {
   const app = instancia.withTypeProvider<ZodTypeProvider>()
   const svc = criarServicoFichaTecnica(app.pool)
   const acesso = { acesso: 'conteudo_de_loja' as const }
-  const aoLer = [app.autenticar, app.escopoLoja]
-  const aoEditar = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  const aoLer = [app.autenticar, app.escopoLoja, app.exigirPermissao('cardapio:ver', { lojaAusente: 'obrigatoria' })]
+  const aoEditar = [app.autenticar, app.escopoLoja, app.exigirPermissao('cardapio:gerir')]
 
   app.get('/itens/:itemId', {
     config: acesso,

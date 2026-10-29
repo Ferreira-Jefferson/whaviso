@@ -22,9 +22,11 @@ function lojaAtiva(req: FastifyRequest): string {
 
 function registrar(app: FastifyInstance, obterDeps: () => DepsCanais): void {
   const r = app.withTypeProvider<ZodTypeProvider>()
-  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
-  const dono = [app.autenticar, app.escopoLoja, app.exigirPapel('dono')]
-  const leitura = { config: { acesso: ACESSO }, preHandler: gerir }
+  const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('canais:ver')]
+  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('canais:gerir')]
+  // Conectar (credenciais): `canais:configurar`, padrao so o dono (fixo).
+  const dono = [app.autenticar, app.escopoLoja, app.exigirPermissao('canais:configurar')]
+  const leitura = { config: { acesso: ACESSO }, preHandler: ver }
 
   r.get('/', { ...leitura, schema: { response: { 200: CanaisSaida } } }, async (req) =>
     service.listar(app.pool, lojaAtiva(req)))

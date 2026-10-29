@@ -18,9 +18,9 @@ export const fluxoRoutes: FastifyPluginAsync = async (instancia) => {
   const app = instancia.withTypeProvider<ZodTypeProvider>()
   const svc = criarServicoFluxo(app.pool)
   const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
-  // Leitura: qualquer papel da loja (atendente so le). Editar e publicar: dono/gerente (loja:gerir).
-  const ler = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
-  const editar = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  // Leitura: qualquer papel da loja (atendente so le). Editar e publicar: dono/gerente (fluxo:gerir).
+  const ler = [app.autenticar, app.escopoLoja, app.exigirPermissao('fluxo:ver')]
+  const editar = [app.autenticar, app.escopoLoja, app.exigirPermissao('fluxo:gerir')]
   const limite = { rateLimit: { max: 60, timeWindow: '1 minute' } }
 
   app.get('/catalogo', {

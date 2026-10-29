@@ -7,7 +7,7 @@ uso de loja (SEC-003). Sem migration, sem escrita.
 
 ## Entry points
 - `index.ts`: `plataformaPainelRoutes` (registry) e `criarPlataformaPainelRoutes()` (teste).
-- Rotas (`/v1/plataforma-painel`): `GET /resumo`, `GET /serie?meses=1..24` (default 12).
+- Rotas (`/v1/plataforma-painel`): `GET /eu` (identidade do operador, so `escopoOperador`, sem permissao da grade), `GET /resumo`, `GET /serie?meses=1..24` (default 12; ambas exigem `painel:ver`).
 
 ## Escopo / permissoes
 - Toda rota: `config.acesso = 'plataforma'` + `preHandler [autenticar, escopoOperador]`. Membro de

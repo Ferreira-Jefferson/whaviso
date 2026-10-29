@@ -18,11 +18,12 @@ export const campanhasRoutes: FastifyPluginAsync = async (instancia) => {
   const app = instancia.withTypeProvider<ZodTypeProvider>()
   const svc = criarServicoCampanhas(app.pool)
   const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
-  // Campanha e marketing: gerir e privilegio de dono/gerente (`loja:gerir`), nunca do atendente.
-  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  // Campanha e marketing: gerir e privilegio de dono/gerente (`campanhas:gerir`), nunca do atendente.
+  const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('campanhas:ver')]
+  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('campanhas:gerir')]
 
   app.get('/', {
-    ...loja(), preHandler: gerir,
+    ...loja(), preHandler: ver,
     schema: { response: { 200: CampanhasSaida } },
   }, async (req) => svc.listar(ator(req)))
 
@@ -36,12 +37,12 @@ export const campanhasRoutes: FastifyPluginAsync = async (instancia) => {
   })
 
   app.get('/:id', {
-    ...loja(), preHandler: gerir,
+    ...loja(), preHandler: ver,
     schema: { params: IdParams, response: { 200: CampanhaDetalheSaida } },
   }, async (req) => svc.detalhe(ator(req), req.params.id))
 
   app.get('/:id/destinatarios', {
-    ...loja(), preHandler: gerir,
+    ...loja(), preHandler: ver,
     schema: { params: IdParams, response: { 200: CampanhaDestinatariosSaida } },
   }, async (req) => svc.destinatarios(ator(req), req.params.id))
 

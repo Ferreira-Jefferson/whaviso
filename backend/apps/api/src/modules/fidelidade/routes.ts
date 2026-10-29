@@ -19,12 +19,13 @@ export const fidelidadeRoutes: FastifyPluginAsync = async (instancia) => {
   const svc = criarServicoFidelidade(app.pool)
   const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
   // Configurar o programa e da gestao (dono/gerente). Operar o saldo no pedido: quem opera o turno.
-  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
-  const operar = [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
+  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('fidelidade:gerir')]
+  const ver = [app.autenticar, app.escopoLoja, app.exigirPermissao('fidelidade:ver')]
+  const operar = [app.autenticar, app.escopoLoja, app.exigirPermissao('fidelidade:operar')]
   const limite = { rateLimit: { max: 60, timeWindow: '1 minute' } }
 
   app.get('/programa', {
-    ...loja(), preHandler: operar,
+    ...loja(), preHandler: ver,
     schema: { response: { 200: ProgramaSaida } },
   }, async (req) => svc.programa(ator(req)))
 
@@ -34,12 +35,12 @@ export const fidelidadeRoutes: FastifyPluginAsync = async (instancia) => {
   }, async (req) => svc.salvarPrograma(ator(req), req.body))
 
   app.get('/clientes/:clienteId/saldo', {
-    ...loja(), preHandler: operar,
+    ...loja(), preHandler: ver,
     schema: { params: ClienteIdParams, response: { 200: SaldoSaida } },
   }, async (req) => svc.saldo(ator(req), req.params.clienteId))
 
   app.get('/clientes/:clienteId/movimentos', {
-    ...loja(limite), preHandler: operar,
+    ...loja(limite), preHandler: ver,
     schema: { params: ClienteIdParams, querystring: MovimentosEntrada, response: { 200: MovimentosSaida } },
   }, async (req) => svc.movimentos(ator(req), req.params.clienteId, req.query))
 

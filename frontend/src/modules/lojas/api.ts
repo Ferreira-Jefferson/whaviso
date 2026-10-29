@@ -3,6 +3,7 @@
 // MESMA raiz que o TenantProvider usa para o seletor do shell: invalida-la aqui faz o
 // switcher do topo acompanhar criacao, renome, troca de cores e ativar/desativar.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
 import {
   LojaListaSaida,
@@ -58,5 +59,21 @@ export function useAlterarAtivo() {
     mutationFn: ({ id, ativar }) =>
       apiClient.post<Loja>(`/lojas/${id}/${ativar ? 'reativar' : 'desativar'}`, { schema: LojaSaida }),
     onSuccess: () => invalidarLojas(qc),
+  })
+}
+
+const MinhasPermissoesSaida = z.object({ por_loja: z.record(z.string(), z.array(z.string())) })
+
+/**
+ * GET /v1/acessos/minhas: o que o usuario logado pode em cada loja (grade viva do servidor).
+ * Serve so para a UI nao mentir; o servidor decide cada acao. Enquanto carrega, nada e liberado.
+ */
+export function useMinhasPermissoes() {
+  return useQuery({
+    queryKey: [RAIZ, 'minhas-permissoes'],
+    staleTime: 30_000,
+    queryFn: ({ signal }) =>
+      apiClient.get<z.infer<typeof MinhasPermissoesSaida>>('/acessos/minhas', { schema: MinhasPermissoesSaida, signal }),
+    select: (d) => d.por_loja,
   })
 }

@@ -23,7 +23,7 @@ export const cardapioImportacaoRoutes: FastifyPluginAsync = async (instancia) =>
   const svc = criarServicoImportacao(app.pool)
   const loja = (extra: object = {}) => ({ config: { acesso: 'conteudo_de_loja' as const, ...extra } })
   // Importar cardapio e gestao: dono e gerente (`loja:gerir`), nunca o atendente.
-  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  const gerir = [app.autenticar, app.escopoLoja, app.exigirPermissao('cardapio:gerir')]
 
   // Upload: rate limit curto (SEC-101; cada job custa chamada de LLM) e bodyLimit proprio.
   app.post('/', {

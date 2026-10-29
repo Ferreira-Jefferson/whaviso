@@ -10,15 +10,15 @@ export function lojaDoEscopo(req: FastifyRequest): string {
 
 export const ACESSO = { acesso: 'conteudo_de_loja' as const }
 
-/** Leitura: qualquer membro da loja ativa. */
+/** Leitura: `cardapio:ver` (padrao: todo membro da loja, inclusive convidado). */
 export function aoLer(app: FastifyInstance): preHandlerHookHandler[] {
-  return [app.autenticar, app.escopoLoja]
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('cardapio:ver', { lojaAusente: 'obrigatoria' })]
 }
-/** Estrutura do cardapio: gerente e dono (permissao loja:gerir). */
+/** Estrutura do cardapio: `cardapio:gerir` (padrao: gerente e dono). */
 export function aoEditar(app: FastifyInstance): preHandlerHookHandler[] {
-  return [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('cardapio:gerir')]
 }
-/** Disponibilidade: rotina de salao, inclui atendente (permissao pedidos:gerir). */
+/** Disponibilidade: rotina de salao, `cardapio:disponibilidade` (padrao: inclui atendente). */
 export function aoLigarDesligar(app: FastifyInstance): preHandlerHookHandler[] {
-  return [app.autenticar, app.escopoLoja, app.exigirPermissao('pedidos:gerir')]
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('cardapio:disponibilidade')]
 }

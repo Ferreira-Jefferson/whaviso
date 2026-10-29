@@ -6,9 +6,10 @@ import { useSessao } from '@/shared/auth'
 import { ApiError, apiClient } from '@/shared/api_client'
 
 /**
- * Sonda se o usuario logado e operador da plataforma. Nao ha endpoint de "quem sou eu" do
- * operador ainda: usamos o resumo do painel (rota de operador, sem x-loja-id) como sonda.
- * 403/401/404 = nao e operador; erro transitorio propaga para o guard tratar.
+ * Sonda se o usuario logado e operador da plataforma. Usa o endpoint leve de identidade
+ * do operador, gated so pelo vinculo ativo (fato, nao permissao editavel): desligar `painel:ver` na
+ * grade de acessos nao expulsa ninguem do console. 403/401/404 = nao e operador; erro transitorio
+ * propaga para o guard tratar.
  */
 export function useEhOperador() {
   const { status } = useSessao()
@@ -19,7 +20,7 @@ export function useEhOperador() {
     retry: false,
     queryFn: async ({ signal }) => {
       try {
-        await apiClient.get('/plataforma-painel/resumo', { semLoja: true, signal })
+        await apiClient.get('/plataforma-painel/eu', { semLoja: true, signal })
         return true
       } catch (e) {
         if (e instanceof ApiError && (e.isForbidden || e.isUnauthorized || e.isNotFound)) return false

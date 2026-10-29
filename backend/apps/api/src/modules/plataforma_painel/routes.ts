@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { criarServicoPainel, type OpcoesPainel } from './service'
-import { PainelResumo, PainelSerie, PainelSerieQuery } from './schemas'
+import { OperadorEu, PainelResumo, PainelSerie, PainelSerieQuery } from './schemas'
 
 export function criarPlataformaPainelRoutes(opcoes: OpcoesPainel = {}): FastifyPluginAsync {
   return async (instancia) => {
@@ -13,6 +13,15 @@ export function criarPlataformaPainelRoutes(opcoes: OpcoesPainel = {}): FastifyP
       config: { acesso: 'plataforma' as const },
       preHandler: [app.autenticar, app.escopoOperador, app.exigirPermissao('painel:ver')],
     })
+
+    // Identidade do operador: gate SO por `escopoOperador` (vinculo ativo em `operadores`), sem
+    // `exigirPermissao`. Ser operador e fato, nao permissao editavel: desligar `painel:ver` na grade
+    // nao expulsa ninguem do console (so esconde o CONTEUDO do painel). Usada pela sonda do front.
+    app.get('/eu', {
+      config: { acesso: 'plataforma' as const },
+      preHandler: [app.autenticar, app.escopoOperador],
+      schema: { response: { 200: OperadorEu } },
+    }, async (req) => ({ operador: true as const, papel: req.operador?.papel ?? '' }))
 
     app.get('/resumo', {
       ...plataforma(),

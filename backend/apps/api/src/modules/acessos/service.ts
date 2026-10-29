@@ -8,12 +8,17 @@ import {
   PAPEIS_LOJA,
   PAPEL_FIXO,
   SO_PAPEL_FIXO,
+  PERMISSOES,
+  garantirGradeFresca,
+  papelPermite,
   permite,
   recarregarGrade,
+  CANAL_GRADE,
   type EscopoAcesso,
 } from '../../shared/tenant'
 import * as repo from './repo'
-import type { AcessosSaida, CelulaPatch } from './schemas'
+import type { EscopoLoja } from '@whaviso/shared/contracts'
+import type { AcessosSaida, CelulaPatch, MinhasPermissoesSaida } from './schemas'
 
 export interface AtorAcessos {
   userId: string
@@ -41,6 +46,20 @@ export function criarServicoAcessos(pool: Pool) {
       }
     },
 
+    /**
+     * O que o usuario logado pode em cada loja do escopo (grade viva). So para a UI nao mentir (esconder o
+     * que o servidor negaria); quem decide continua sendo o guard de cada rota.
+     */
+    async minhasPermissoes(escopo: EscopoLoja): Promise<MinhasPermissoesSaida> {
+      await garantirGradeFresca()
+      const por_loja: MinhasPermissoesSaida['por_loja'] = {}
+      for (const lojaId of escopo.loja_ids) {
+        const papel = escopo.papel_por_loja[lojaId]
+        por_loja[lojaId] = papel ? PERMISSOES.filter((c) => papelPermite(papel, c)) : []
+      }
+      return { por_loja }
+    },
+
     async alterar(ator: AtorAcessos, d: CelulaPatch): Promise<CelulaPatch> {
       const catalogo = await repo.listarPermissoes(pool)
       const perm = catalogo.find((p) => p.chave === d.permissao)
@@ -63,8 +82,10 @@ export function criarServicoAcessos(pool: Pool) {
             permissao: d.permissao, de: antes, para: d.permitido,
           },
         })
+        // Todas as instancias da api invalidam o cache ao receber (efeito imediato, sem TTL).
+        await repo.notificarGrade(tx, CANAL_GRADE)
       })
-      // Invalida o cache: a proxima decisao deste processo ja ve a grade nova.
+      // Invalida o cache deste processo ja (as demais recebem o NOTIFY emitido no commit).
       await recarregarGrade()
       return d
     },

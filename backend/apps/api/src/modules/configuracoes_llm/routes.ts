@@ -35,7 +35,7 @@ function lojaAtiva(req: FastifyRequest): string {
 function registrar(app: FastifyInstance, obterDeps: () => DepsConfigLlm): void {
   const r = app.withTypeProvider<ZodTypeProvider>()
 
-  // Leitura: dono e gerente (loja:gerir). Atendente nao alcanca a area.
+  // Leitura: `ia:ver` (dono e gerente). Atendente nao alcanca a area.
   const leitura = { config: { acesso: ACESSO_LOJA }, preHandler: guardaLeitura(app) }
   // Escrita: SO o dono; rate limit (SEC-101).
   const escrita = {
@@ -102,14 +102,14 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsConfigLlm): void {
   )
 }
 
-/** Leitura: membro autenticado, escopo resolvido e permissao de gestao da loja (dono/gerente). */
+/** Leitura: membro autenticado, escopo resolvido e permissao `ia:ver` (padrao: dono e gerente). */
 function guardaLeitura(app: FastifyInstance) {
-  return [app.autenticar, app.escopoLoja, app.exigirPermissao('loja:gerir')]
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('ia:ver')]
 }
 
-/** Escrita: idem, mas restrito ao papel `dono` (ativo mais caro; so o dono mexe na chave). */
+/** Escrita: idem, mas `ia:configurar` (padrao: so o `dono`, papel fixo) (ativo mais caro; so o dono mexe na chave). */
 function guardaEscrita(app: FastifyInstance) {
-  return [app.autenticar, app.escopoLoja, app.exigirPapel('dono')]
+  return [app.autenticar, app.escopoLoja, app.exigirPermissao('ia:configurar')]
 }
 
 /** Plugin de PRODUCAO: resolve deps preguicosamente (LLM_MASTER_KEY + validadores HTTP). */

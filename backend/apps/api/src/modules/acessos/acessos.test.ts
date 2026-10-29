@@ -14,6 +14,9 @@ import { envSchema } from '../../env'
 import { CATALOGO, PAPEIS_CONSOLE, PAPEIS_LOJA, padraoPermite, resetarGrade } from '../../shared/tenant'
 import { criarAcessosRoutes } from './routes'
 
+const NUM_CONSOLE = CATALOGO.filter((p) => p.escopo === 'console').length
+const NUM_LOJA = CATALOGO.filter((p) => p.escopo === 'loja').length
+
 const online = await bancoAcessivel()
 const d = online ? describe : describe.skip
 
@@ -119,7 +122,7 @@ d('modulo acessos (grade editavel)', () => {
     const grade = await poolSuper.query<{ escopo: string; papel: string; permissao_chave: string; permitido: boolean }>(
       'select escopo, papel, permissao_chave, permitido from public.papel_permissoes',
     )
-    expect(grade.rows).toHaveLength(12 * PAPEIS_CONSOLE.length + 20 * PAPEIS_LOJA.length)
+    expect(grade.rows).toHaveLength(NUM_CONSOLE * PAPEIS_CONSOLE.length + NUM_LOJA * PAPEIS_LOJA.length)
     for (const l of grade.rows) {
       expect(l.permitido, `${l.escopo}/${l.papel}/${l.permissao_chave}`).toBe(padraoPermite(l.escopo as 'console' | 'loja', l.papel, l.permissao_chave))
     }
@@ -134,7 +137,7 @@ d('modulo acessos (grade editavel)', () => {
     }
     const ok = await api(admin, 'GET', '/v1/acessos')
     expect(ok.status).toBe(200)
-    expect(ok.corpo.grade).toHaveLength(12 * 5 + 20 * 4)
+    expect(ok.corpo.grade).toHaveLength(NUM_CONSOLE * 5 + NUM_LOJA * 4)
     expect(ok.corpo.fixos).toEqual({ console: 'admin', loja: 'dono' })
     expect(ok.corpo.permissoes.find((p: { chave: string }) => p.chave === 'acessos:gerir').travada).toBe(true)
   })
