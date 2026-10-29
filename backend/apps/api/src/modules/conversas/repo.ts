@@ -15,10 +15,12 @@ export const TS_PRECISO = (col: string) =>
   `to_char(${col} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 // "Nao lida" derivada (decisao da Onda 1): entrada mais recente que a ultima saida.
-const NAO_LIDAS = `(select count(*)::int from public.mensagens mn
+// Com teto de 100 (a UI mostra 99+): evita varrer todas as entradas de conversas longas.
+const NAO_LIDAS = `(select count(*)::int from (select 1 from public.mensagens mn
    where mn.conversa_id = c.id and mn.direcao = 'entrada'
      and mn.criado_em > coalesce((select max(ms.criado_em) from public.mensagens ms
-                                   where ms.conversa_id = c.id and ms.direcao = 'saida'), '-infinity'::timestamptz))`
+                                   where ms.conversa_id = c.id and ms.direcao = 'saida'), '-infinity'::timestamptz)
+   limit 100) nl)`
 
 export interface LinhaConversa {
   id: string

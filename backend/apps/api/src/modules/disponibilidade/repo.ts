@@ -133,7 +133,7 @@ export function listarExcecoes(exec: Executor, lojaId: string) {
   return consultar<ExcecaoSaida>(
     exec,
     sql`select ${SAIDA_EXC} from public.excecoes_disponibilidade
-         where loja_id = ${lojaId} and ativo order by data, id`,
+         where loja_id = ${lojaId} and ativo order by data, id limit 366`,
   )
 }
 

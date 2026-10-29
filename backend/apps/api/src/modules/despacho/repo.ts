@@ -267,7 +267,8 @@ export function listarCorridasAbertas(ex: Executor, lojaId: string) {
     ex,
     sql`select ${COLUNAS_CORRIDA} from public.corridas c ${JUNTA_MOTOBOY}
          where c.loja_id = ${lojaId} and c.status in ('montando', 'despachada')
-         order by c.criado_em, c.id`,
+         order by c.criado_em, c.id
+         limit 200`,
   )
 }
 

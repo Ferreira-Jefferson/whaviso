@@ -48,11 +48,16 @@ export function buscar(ex: Executor, lojaId: string, id: string) {
 
 /** Zonas ativas, mais antigas primeiro (base do desempate do resolver). */
 export function listarAtivas(ex: Executor, lojaId: string) {
+  // Sem o count de pedidos em aberto (caro, e o resolver nao le): vem 0 so para manter o tipo.
   return consultar<ZonaLinha>(
     ex,
-    sql`select ${COLUNAS} from public.zonas_entrega z
-         where z.loja_id = ${lojaId} and z.ativo
-         order by z.criado_em, z.id`,
+    sql`select z.id, z.nome, z.tipo, z.bairro, z.area, z.taxa_cliente_centavos, z.valor_motoboy_centavos,
+                z.pedido_minimo_centavos, z.frete_gratis_acima_centavos, z.ativo,
+                0::int as pedidos_em_aberto,
+                ${TS('z.criado_em')} as criado_em, ${TS('z.atualizado_em')} as atualizado_em
+           from public.zonas_entrega z
+          where z.loja_id = ${lojaId} and z.ativo
+          order by z.criado_em, z.id`,
   )
 }
 
