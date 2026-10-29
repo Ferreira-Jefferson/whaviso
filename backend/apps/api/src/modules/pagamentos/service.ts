@@ -329,6 +329,10 @@ export async function criarCobrancaIntermediada(
     if (pendente) return pendente // idempotencia: reusa a pendente
 
     const taxa = await resolverTaxaIntermediacao(client, contaId)
+    // Em 'absorve' a taxa sai do repasse do restaurante: barra taxa >= total (repasse nunca <= 0).
+    if (encargoModo === 'absorve' && taxa >= pedido.total_centavos) {
+      throw regraNegocio('taxa_excede_total', 'A taxa de intermediacao e maior ou igual ao total do pedido')
+    }
     const comp = comporCobranca(pedido.total_centavos, taxa, encargoModo)
 
     const cobranca = await deps.clientePsp!.criarCobranca(
@@ -376,6 +380,8 @@ export async function processarWebhookPsp(
   corpoBruto: string,
 ): Promise<void> {
   if (!deps.clientePsp) throw erroPspNaoIntegrado()
+  // Rejeicao barata ANTES de decifrar a credencial: flood sem assinatura nao custa decifra.
+  if (!assinatura) throw naoAutorizado('Webhook sem assinatura')
   const cifrada = await repo.lerCredencialPspCifrada(pool, PROVIDER_PSP)
   if (!cifrada) throw naoAutorizado('Webhook sem credencial configurada')
   const segredo = deps.cripto.decifrar(cifrada)

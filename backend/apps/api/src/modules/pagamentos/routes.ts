@@ -58,6 +58,19 @@ function guardaGerir(app: FastifyInstance) {
 /** Monta as rotas com um resolvedor PREGUICOSO das dependências (cifra da chave Pix). */
 function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void {
   const r = app.withTypeProvider<ZodTypeProvider>()
+
+  // Captura o corpo CRU (bytes exatos recebidos) para a verificacao de assinatura do webhook do PSP,
+  // mantendo o parse JSON das demais rotas. Escopo encapsulado deste plugin. Uma assinatura HMAC so
+  // confere sobre o corpo original; re-serializar (JSON.stringify do body ja parseado) quebraria.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    ;(req as unknown as { rawBody?: string }).rawBody = body as string
+    try {
+      done(null, (body as string).length ? JSON.parse(body as string) : {})
+    } catch (e) {
+      done(e as Error)
+    }
+  })
+
   const loja = { config: { acesso: ACESSO_LOJA }, preHandler: guardaLoja(app) }
   const lojaGerir = { config: { acesso: ACESSO_LOJA }, preHandler: guardaGerir(app) }
   const lojaSensivel = {
@@ -134,13 +147,18 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsPagamentos): void 
       return pag
     })
 
-  // POST /pagamentos/webhooks/psp/asaas: webhook PUBLICO do PSP (sem auth; assinatura verificada no service).
-  r.post('/webhooks/psp/asaas', { schema: { response: { 200: WebhookResposta } } }, async (req) => {
-    const bruto = req.headers['asaas-signature'] ?? req.headers['x-psp-signature']
-    const assinatura = Array.isArray(bruto) ? bruto[0] : bruto
-    await service.processarWebhookPsp(app.pool, obterDeps(), assinatura, JSON.stringify(req.body ?? {}))
-    return { ok: true }
-  })
+  // POST /pagamentos/webhooks/psp/asaas: webhook PUBLICO do PSP (sem auth; assinatura verificada no
+  // service sobre o corpo CRU). Rate limit por IP: a decifra da credencial roda antes de poder checar
+  // a assinatura, entao limitamos o flood (requests sem assinatura ja sao rejeitados cedo, sem decifra).
+  r.post('/webhooks/psp/asaas',
+    { config: { rateLimit: { max: 300, timeWindow: '1 minute' } }, schema: { response: { 200: WebhookResposta } } },
+    async (req) => {
+      const bruto = req.headers['asaas-signature'] ?? req.headers['x-psp-signature']
+      const assinatura = Array.isArray(bruto) ? bruto[0] : bruto
+      const corpoBruto = (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {})
+      await service.processarWebhookPsp(app.pool, obterDeps(), assinatura, corpoBruto)
+      return { ok: true }
+    })
 
   // GET /pagamentos/pix: metadado da chave Pix da loja (nunca a chave em claro nem a cifra).
   r.get('/pix', { ...loja, schema: { response: { 200: LojaPixEstadoResposta } } }, async (req) => ({

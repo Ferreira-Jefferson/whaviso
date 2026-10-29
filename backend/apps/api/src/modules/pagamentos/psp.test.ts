@@ -207,25 +207,44 @@ describe('PSP: cobranca intermediada e webhook', () => {
     const { rows } = await poolApi.query('select charge_ref from public.pagamentos where id=$1', [criada.json().id])
     const chargeRef = rows[0].charge_ref as string
 
+    // O corpo CRU (string) e o que assinamos e enviamos: a verificacao e sobre os bytes recebidos.
     const corpo = JSON.stringify({ charge_ref: chargeRef, pago: true, taxa_psp: 99 })
     const assinatura = createHmac('sha256', 'asaas-key-xyz').update(corpo).digest('hex')
+    const post = (sig: string | undefined, corpoRaw: string) =>
+      app.inject({
+        method: 'POST', url: '/v1/pagamentos/webhooks/psp/asaas',
+        headers: { 'content-type': 'application/json', ...(sig ? { 'x-psp-signature': sig } : {}) },
+        payload: corpoRaw,
+      })
 
+    // sem assinatura -> 401 (rejeicao barata antes da decifra)
+    expect((await post(undefined, corpo)).statusCode).toBe(401)
     // assinatura invalida -> 401, nada concilia
-    const ruim = await app.inject({ method: 'POST', url: '/v1/pagamentos/webhooks/psp/asaas', headers: { 'x-psp-signature': 'errada' }, payload: JSON.parse(corpo) })
-    expect(ruim.statusCode).toBe(401)
+    expect((await post('errada', corpo)).statusCode).toBe(401)
 
     // assinatura valida -> concilia
-    const ok = await app.inject({ method: 'POST', url: '/v1/pagamentos/webhooks/psp/asaas', headers: { 'x-psp-signature': assinatura }, payload: JSON.parse(corpo) })
+    const ok = await post(assinatura, corpo)
     expect(ok.statusCode, ok.body).toBe(200)
     const pago1 = await poolApi.query('select status, taxa_psp_centavos from public.pagamentos where charge_ref=$1', [chargeRef])
     expect(pago1.rows[0]).toMatchObject({ status: 'pago', taxa_psp_centavos: 99 })
 
     // replay do mesmo evento -> idempotente (segue pago)
-    const replay = await app.inject({ method: 'POST', url: '/v1/pagamentos/webhooks/psp/asaas', headers: { 'x-psp-signature': assinatura }, payload: JSON.parse(corpo) })
+    const replay = await post(assinatura, corpo)
     await app.close()
     expect(replay.statusCode).toBe(200)
     const pago2 = await poolApi.query('select status from public.pagamentos where charge_ref=$1', [chargeRef])
     expect(pago2.rows[0].status).toBe('pago')
+  })
+
+  it('absorve: taxa >= total do pedido e barrada (repasse nunca <= 0)', async () => {
+    if (!disponivel) return
+    const { app, userId, lojaId } = await prepararLojaIntermediada('absorve')
+    // padrao de taxa = 50; pedido de 40 centavos em absorve -> taxa excede o total
+    const pedido = await criarPedido(lojaId, 40)
+    const res = await app.inject({ method: 'POST', url: `/v1/pagamentos/pedidos/${pedido}/intermediado`, headers: authLoja(userId, lojaId), payload: { meio: 'pix' } })
+    await app.close()
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error.code).toBe('taxa_excede_total')
   })
 })
 
