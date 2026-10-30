@@ -168,10 +168,6 @@ export function Comparador() {
           As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo é
           fixo e baixo, ou zero quando você recebe direto.
         </p>
-        <p className="mt-2 text-sm text-tinta-2 italic">
-          Nos cards abaixo, ajuste a entrega e o pagamento de cada canal para o que você realmente
-          usa, e veja o custo mudar na hora.
-        </p>
       </div>
 
       {/* Filtros globais: ticket, pedidos e plano do whaviso */}
