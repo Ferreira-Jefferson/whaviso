@@ -58,6 +58,20 @@ export const PlanoDTO = z.strictObject({
 export type PlanoDTO = z.infer<typeof PlanoDTO>
 export const PlanosLista = z.array(PlanoDTO)
 
+/**
+ * Vitrine PUBLICA de plano (landing, sem login). SO campos de marketing de planos ATIVOS:
+ * nome, valor e o que inclui. NUNCA adicionar aqui `ativo`, taxa de intermediacao, timestamps
+ * ou qualquer dado interno: este DTO sai por uma rota aberta.
+ */
+export const PlanoPublicoDTO = z.strictObject({
+  id: z.uuid(),
+  nome: z.string(),
+  valor_centavos: Centavos,
+  inclui: z.array(z.string()),
+})
+export type PlanoPublicoDTO = z.infer<typeof PlanoPublicoDTO>
+export const PlanosPublicosLista = z.array(PlanoPublicoDTO)
+
 export const PlanoCriar = z.strictObject({
   nome: z.string().trim().min(1).max(80),
   valor_centavos: Centavos,

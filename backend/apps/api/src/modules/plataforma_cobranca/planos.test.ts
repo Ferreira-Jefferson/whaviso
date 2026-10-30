@@ -139,4 +139,27 @@ d('plataforma_cobranca: planos (integracao)', () => {
     expect(nf.statusCode).toBe(404)
     expect((await req(admin, 'PATCH', '/planos/00000000-0000-4000-8000-000000000000', { ativo: false })).statusCode).toBe(404)
   })
+
+  it('vitrine publica: sem login, so planos ativos e so campos de marketing', async () => {
+    const ativo = (await req(admin, 'POST', '/planos', {
+      nome: `Vitrine ativo ${sufixo}`, valor_centavos: 4900, inclui: ['1 loja'],
+      taxa_intermediacao_centavos: 77,
+    })).json()
+    planosCriados.push(ativo.id)
+    const inativo = (await req(admin, 'POST', '/planos', {
+      nome: `Vitrine inativo ${sufixo}`, valor_centavos: 9900, ativo: false,
+    })).json()
+    planosCriados.push(inativo.id)
+
+    // Rota ABERTA: inject sem header de autorizacao.
+    const r = await app.inject({ method: 'GET', url: '/v1/plataforma-cobranca/planos-publicos' })
+    expect(r.statusCode, r.body).toBe(200)
+    const lista = r.json() as Array<Record<string, unknown>>
+
+    const vitrine = lista.find((p) => p.id === ativo.id)
+    expect(vitrine, 'plano ativo deve aparecer na vitrine').toBeTruthy()
+    expect(lista.some((p) => p.id === inativo.id), 'plano inativo nao pode vazar').toBe(false)
+    // So os campos de marketing: nada de `ativo`, taxa interna ou timestamps.
+    expect(Object.keys(vitrine!).sort()).toEqual(['id', 'inclui', 'nome', 'valor_centavos'])
+  })
 })

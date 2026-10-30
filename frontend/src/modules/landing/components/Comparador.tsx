@@ -6,7 +6,6 @@
 // repo). As taxas das plataformas sao as de 2026 (ver notas por plataforma). Os valores
 // do Asaas sao os REAIS, sem promocao (a promo acaba, o preco real permanece).
 import { useState } from 'react'
-import { Link } from 'react-router'
 import { MoneyInput, Select, SegmentedControl, Switch, type SelectOption } from '@/shared/ui'
 import { brl } from '@/shared/format'
 
@@ -130,7 +129,7 @@ export function Comparador() {
   const economiaPct = totalPlataforma > 0 ? economia / totalPlataforma : 0
 
   return (
-    <section className="mx-auto w-full max-w-5xl px-4 py-16">
+    <section id="comparar" className="mx-auto w-full max-w-5xl px-4 py-16">
       <div className="mx-auto max-w-2xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">
           Quanto voce deixa de pagar em taxa
@@ -285,12 +284,12 @@ export function Comparador() {
       </div>
 
       <div className="mt-10 flex flex-col items-center gap-3 text-center">
-        <Link
-          to="/entrar"
+        <a
+          href="#planos"
           className="rounded-input bg-salvia px-8 py-3 text-base font-semibold text-papel hover:bg-tinta"
         >
           Conhecer os planos
-        </Link>
+        </a>
         <span className="text-xs text-tinta-2">Comece a receber pedidos pelo seu WhatsApp.</span>
       </div>
     </section>

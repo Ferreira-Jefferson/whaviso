@@ -7,6 +7,7 @@ import {
   ApurarAtrasosResultado, AssinaturaCriar, AssinaturaDTO, AssinaturaPatch, AssinaturasLista, AssinaturasQuery,
   ConfigTaxaDTO, ConfigTaxaPatch, FaturaDTO, FaturaMarcarPaga, FaturasLista, FaturasQuery, GerarFaturasEntrada,
   GerarFaturasResultado, IdParams, MinhasFaturasLista, PlanoCriar, PlanoDTO, PlanoPatch, PlanosLista,
+  PlanosPublicosLista,
 } from './schemas'
 
 /** Ator = operador autenticado. O user_id vem SO do escopo resolvido (nunca do corpo/query). */
@@ -88,6 +89,18 @@ export function criarCobrancaRoutes(): FastifyPluginAsync {
       ...adminPlataforma,
       schema: { params: IdParams, body: PlanoPatch, response: { 200: PlanoDTO } },
     }, async (req) => svc.alterarPlano(operador(req), req.params.id, req.body))
+
+    // Vitrine PUBLICA de planos (landing, visitante sem login). Rota ABERTA de leitura: NAO encadeia
+    // autenticar/escopo. Devolve so planos ATIVOS e so campos de marketing (o DTO publico nao carrega
+    // taxa interna, `ativo` nem timestamps). Rate limit contra abuso/scraping; cache curto porque o
+    // catalogo muda pouco. O admin define em /plataforma/planos; aqui so refletimos o que esta ativo.
+    app.get('/planos-publicos', {
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      schema: { response: { 200: PlanosPublicosLista } },
+    }, async (_req, reply) => {
+      reply.header('cache-control', 'public, max-age=300')
+      return svc.listarPlanosPublicos()
+    })
 
     // Taxa de intermediacao PADRAO da plataforma (fallback de todos os planos). Config de preco:
     // mesmo gate do catalogo de planos (admin/financeiro). Nunca hardcoded; vive no banco.

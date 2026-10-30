@@ -12,7 +12,8 @@ import type {
   GerarFaturasResultado, MinhaFaturaDTO, StatusAssinatura,
 } from '@whaviso/shared/contracts'
 import type {
-  AssinaturaCriar, AssinaturaPatch, ConfigTaxaDTO, ConfigTaxaPatch, PlanoCriar, PlanoDTO, PlanoPatch,
+  AssinaturaCriar, AssinaturaPatch, ConfigTaxaDTO, ConfigTaxaPatch, PlanoCriar, PlanoDTO,
+  PlanoPatch, PlanoPublicoDTO,
 } from './schemas'
 import { conflito, naoEncontrado, regraNegocio } from '../../shared/http_errors'
 import * as repo from './repo'
@@ -56,6 +57,11 @@ function paraPlano(l: PlanoLinha): PlanoDTO {
     taxa_intermediacao_centavos: l.taxa_intermediacao_centavos,
     criado_em: l.criado_em, atualizado_em: l.atualizado_em,
   }
+}
+
+/** Projecao de vitrine: so os campos de marketing (o DTO publico nao carrega dado interno). */
+function paraPlanoPublico(l: PlanoLinha): PlanoPublicoDTO {
+  return { id: l.id, nome: l.nome, valor_centavos: l.valor_centavos, inclui: l.inclui }
 }
 
 function paraConfigTaxa(l: ConfigTaxaLinha): ConfigTaxaDTO {
@@ -157,6 +163,11 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
 
   async function listarPlanos(_a: Ator): Promise<PlanoDTO[]> {
     return (await repo.listarPlanos(pool)).map(paraPlano)
+  }
+
+  /** Vitrine publica (landing): SO planos ativos, SO campos de marketing. Sem ator (rota aberta). */
+  async function listarPlanosPublicos(): Promise<PlanoPublicoDTO[]> {
+    return (await repo.listarPlanos(pool)).filter((p) => p.ativo).map(paraPlanoPublico)
   }
 
   async function alterarPlano(_a: Ator, id: string, b: PlanoPatch): Promise<PlanoDTO> {
@@ -373,7 +384,7 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
 
   return {
     criar, listarAssinaturas, alterar, gerarFaturas, apurarAtrasos, marcarPaga, cancelarFatura,
-    listarFaturas, minhasFaturas, criarPlano, listarPlanos, alterarPlano,
+    listarFaturas, minhasFaturas, criarPlano, listarPlanos, listarPlanosPublicos, alterarPlano,
     obterConfigTaxa, alterarConfigTaxa,
   }
 }

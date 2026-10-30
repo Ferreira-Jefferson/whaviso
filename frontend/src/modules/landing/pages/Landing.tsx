@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router'
 import { BellLogo, RodapeSite } from '@/shared/ui'
 import { Comparador } from '../components/Comparador'
+import { Planos } from '../components/Planos'
 
 const BENEFICIOS = [
   {
@@ -31,12 +32,26 @@ export default function Landing() {
           <BellLogo className="size-9 text-dourado" />
           <span className="font-display text-xl font-semibold">whaviso</span>
         </span>
-        <Link
-          to="/entrar"
-          className="rounded-input bg-salvia px-5 py-2.5 text-sm font-semibold text-papel hover:bg-tinta"
-        >
-          Entrar
-        </Link>
+        <nav className="flex items-center gap-1 sm:gap-2">
+          <a
+            href="#comparar"
+            className="hidden rounded-input px-3 py-2 text-sm font-medium text-tinta-2 hover:text-tinta sm:block"
+          >
+            Comparar custos
+          </a>
+          <a
+            href="#planos"
+            className="hidden rounded-input px-3 py-2 text-sm font-medium text-tinta-2 hover:text-tinta sm:block"
+          >
+            Planos
+          </a>
+          <Link
+            to="/entrar"
+            className="rounded-input bg-salvia px-5 py-2.5 text-sm font-semibold text-papel hover:bg-tinta"
+          >
+            Entrar
+          </Link>
+        </nav>
       </header>
 
       <main className="flex-1">
@@ -67,6 +82,8 @@ export default function Landing() {
         </section>
 
         <Comparador />
+
+        <Planos />
       </main>
 
       <RodapeSite />
