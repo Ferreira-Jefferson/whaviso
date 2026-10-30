@@ -9,9 +9,14 @@ interface SwitchProps {
   rotulo: string
   carregando?: boolean
   disabled?: boolean
+  /**
+   * Sem o buffer de alvo de toque de 44px: so a pilula (24px). Use numa lista densa de
+   * varios switches empilhados, onde o buffer cria um vacuo grande entre as linhas.
+   */
+  compacto?: boolean
 }
 
-export function Switch({ ligado, onMudar, rotulo, carregando, disabled }: SwitchProps) {
+export function Switch({ ligado, onMudar, rotulo, carregando, disabled, compacto = false }: SwitchProps) {
   const inativo = disabled || carregando
   return (
     <button
@@ -23,7 +28,8 @@ export function Switch({ ligado, onMudar, rotulo, carregando, disabled }: Switch
       disabled={inativo}
       onClick={() => onMudar(!ligado)}
       className={cn(
-        'relative inline-flex min-h-11 items-center px-1.5',
+        'relative inline-flex items-center px-1.5',
+        !compacto && 'min-h-11',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia',
         inativo ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
       )}

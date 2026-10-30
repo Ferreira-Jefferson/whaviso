@@ -262,7 +262,7 @@ export function Comparador() {
             />
           </div>
 
-          <dl className="mt-6 grid gap-1.5 text-sm">
+          <dl className="mt-6 mb-3 grid gap-1.5 text-sm">
             <div className="flex justify-between">
               <dt className="text-tinta-2">Mensalidade ({plano?.nome ?? 'plano'})</dt>
               <dd className="tabular text-tinta">{brl(mensWhaviso)}</dd>
@@ -303,10 +303,11 @@ export function Comparador() {
               </span>
               <span className="tabular text-3xl font-bold text-barro">{brl(r.total)}</span>
 
-              <div className="mt-4 grid gap-1.5">
+              <div className="mt-4 grid gap-5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-tinta">{p.nome} faz a entrega</span>
                   <Switch
+                    compacto
                     ligado={cfg.entrega}
                     onMudar={(v) => ajustarConfig(key, { entrega: v })}
                     rotulo={`${p.nome} faz a entrega`}
@@ -315,6 +316,7 @@ export function Comparador() {
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-tinta">Cliente paga pelo app</span>
                   <Switch
+                    compacto
                     ligado={cfg.pagamento}
                     onMudar={(v) => ajustarConfig(key, { pagamento: v })}
                     rotulo={`Cliente paga pelo app no ${p.nome}`}
