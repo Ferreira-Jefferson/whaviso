@@ -56,22 +56,32 @@ const ULTIMA_ASSINATURA = sql`
      where s.conta_id = c.id order by s.criado_em desc, s.id desc limit 1
   ) a on true`
 
-/** Pagina de contas (criado_em desc, id desc). Devolve ate `limite + 1` linhas (sentinela). */
+/** Pagina de contas (criado_em desc, id desc). Devolve ate `limite + 1` linhas (sentinela).
+ * Primeiro pagina (CTE `pag`) usando o indice de contas + o lateral leve da assinatura (para o
+ * filtro de situacao); so entao computa as subconsultas pesadas (contagem de lojas, saude do
+ * WhatsApp) para as linhas da pagina. Antes, essas subconsultas rodavam por TODA conta antes do
+ * limit. Saida identica. */
 export async function listarContas(exec: Executor, f: FiltroContas): Promise<ContaLinha[]> {
   const like = f.busca === null ? null : `%${escaparLike(f.busca)}%`
   return consultar<ContaLinha>(
     exec,
-    sql`select ${COLUNAS_CONTA}
+    sql`with pag as (
+          select c.id, c.criado_em
+            from public.contas c ${ULTIMA_ASSINATURA}
+           where (${like}::text is null
+                  or c.nome ilike ${like} escape '\\'
+                  or exists (select 1 from public.lojas l
+                              where l.conta_id = c.id and l.nome ilike ${like} escape '\\'))
+             and (${f.situacao}::text is null or coalesce(a.status::text, 'sem_assinatura') = ${f.situacao})
+             and (${f.apos?.instante ?? null}::timestamptz is null
+                  or (c.criado_em, c.id) < (${f.apos?.instante ?? null}::timestamptz, ${f.apos?.id ?? null}::uuid))
+           order by c.criado_em desc, c.id desc
+           limit ${f.limite + 1}
+        )
+        select ${COLUNAS_CONTA}
           from public.contas c ${ULTIMA_ASSINATURA}
-         where (${like}::text is null
-                or c.nome ilike ${like} escape '\\'
-                or exists (select 1 from public.lojas l
-                            where l.conta_id = c.id and l.nome ilike ${like} escape '\\'))
-           and (${f.situacao}::text is null or coalesce(a.status::text, 'sem_assinatura') = ${f.situacao})
-           and (${f.apos?.instante ?? null}::timestamptz is null
-                or (c.criado_em, c.id) < (${f.apos?.instante ?? null}::timestamptz, ${f.apos?.id ?? null}::uuid))
-         order by c.criado_em desc, c.id desc
-         limit ${f.limite + 1}`,
+         where c.id in (select id from pag)
+         order by c.criado_em desc, c.id desc`,
   )
 }
 
