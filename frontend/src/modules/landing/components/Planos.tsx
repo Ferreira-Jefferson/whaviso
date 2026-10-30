@@ -4,6 +4,7 @@
 import { Link } from 'react-router'
 import { Check } from 'lucide-react'
 import { brl } from '@/shared/format'
+import { cn } from '@/shared/ui'
 import { usePlanosPublicos } from '../planos'
 
 export function Planos() {
@@ -27,31 +28,45 @@ export function Planos() {
         </div>
       ) : planos.length > 0 ? (
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {planos.map((p) => (
-            <div key={p.id} className="flex flex-col rounded-card border border-linha bg-cartao p-6">
-              <h3 className="font-display text-xl text-salvia">{p.nome}</h3>
-              <p className="mt-2">
-                <span className="tabular text-3xl font-bold text-tinta">{brl(p.valor_centavos)}</span>
-                <span className="text-sm text-tinta-2"> /mês</span>
-              </p>
-              {p.inclui.length > 0 && (
-                <ul className="mt-4 flex-1 space-y-2 text-sm text-tinta-2">
-                  {p.inclui.map((item, i) => (
-                    <li key={i} className="flex gap-2">
-                      <Check className="mt-0.5 size-4 shrink-0 text-folha" aria-hidden />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <Link
-                to="/entrar"
-                className="mt-6 rounded-input bg-salvia px-6 py-2.5 text-center text-sm font-semibold text-papel hover:bg-tinta"
+          {planos.map((p) => {
+            const destaque = /profissional/i.test(p.nome)
+            return (
+              <div
+                key={p.id}
+                className={cn(
+                  'relative flex flex-col rounded-card bg-cartao p-6',
+                  destaque ? 'border-2 border-salvia' : 'border border-linha',
+                )}
               >
-                Começar
-              </Link>
-            </div>
-          ))}
+                {destaque && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-pill bg-salvia px-3 py-1 text-xs font-semibold text-papel">
+                    Mais escolhido
+                  </span>
+                )}
+                <h3 className="font-display text-xl text-salvia">{p.nome}</h3>
+                <p className="mt-2">
+                  <span className="tabular text-3xl font-bold text-tinta">{brl(p.valor_centavos)}</span>
+                  <span className="text-sm text-tinta-2"> /mês</span>
+                </p>
+                {p.inclui.length > 0 && (
+                  <ul className="mt-4 flex-1 space-y-2 text-sm text-tinta-2">
+                    {p.inclui.map((item, i) => (
+                      <li key={i} className="flex gap-2">
+                        <Check className="mt-0.5 size-4 shrink-0 text-folha" aria-hidden />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Link
+                  to="/entrar"
+                  className="mt-6 rounded-input bg-salvia px-6 py-2.5 text-center text-sm font-semibold text-papel hover:bg-tinta"
+                >
+                  Começar
+                </Link>
+              </div>
+            )
+          })}
         </div>
       ) : (
         <div className="mt-10 flex flex-col items-center gap-3 text-center">
