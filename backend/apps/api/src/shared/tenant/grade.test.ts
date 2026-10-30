@@ -76,7 +76,7 @@ describe('console: padroes reproduzem o comportamento anterior', () => {
   const SO_ADMIN_ANTES = ['clientes_plataforma:criar', 'equipe:gerir', 'chaves_api:gerir', 'planos:gerir', 'acessos:gerir']
   const OPERADOR_ANTES = [
     'clientes_plataforma:ver', 'cobranca:ver', 'cobranca:gerir', 'funil:ver', 'funil:gerir',
-    'painel:ver', 'custos_plataforma:ver',
+    'painel:ver', 'custos_plataforma:ver', 'evals:ver', 'evals:rodar',
   ]
   it('operador: faz tudo que fazia (rotas plataforma sem guard) e nada do que era so admin', () => {
     for (const c of OPERADOR_ANTES) expect(operadorPermite('operador', c as never), c).toBe(true)

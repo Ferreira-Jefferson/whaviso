@@ -26,6 +26,7 @@ import { plataformaClientesRoutes } from './modules/plataforma_clientes'
 import { cobrancaRoutes } from './modules/plataforma_cobranca'
 import { plataformaFunilRoutes } from './modules/plataforma_funil'
 import { plataformaPainelRoutes } from './modules/plataforma_painel'
+import { plataformaEvalsRoutes } from './modules/plataforma_evals'
 import { despachoRoutes } from './modules/despacho'
 import { avaliacoesRoutes } from './modules/avaliacoes'
 import { campanhasRoutes } from './modules/campanhas'
@@ -79,6 +80,7 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'plataforma-cobranca', plugin: cobrancaRoutes },
   { prefixo: 'plataforma-funil', plugin: plataformaFunilRoutes },
   { prefixo: 'plataforma-painel', plugin: plataformaPainelRoutes },
+  { prefixo: 'plataforma-evals', plugin: plataformaEvalsRoutes },
   { prefixo: 'despacho', plugin: despachoRoutes },
   { prefixo: 'avaliacoes', plugin: avaliacoesRoutes },
   { prefixo: 'campanhas', plugin: campanhasRoutes },

@@ -41,6 +41,8 @@ const CONSOLE = [
   { chave: 'equipe:gerir', rotulo: 'Gerir equipe da plataforma', padrao: [] },
   { chave: 'chaves_api:gerir', rotulo: 'Gerir chaves de API das contas', padrao: [] },
   { chave: 'acessos:gerir', rotulo: 'Gerir acessos (esta grade)', padrao: [] },
+  { chave: 'evals:ver', rotulo: 'Ver a central de evals (suites, casos e execucoes)', padrao: ['operador'] },
+  { chave: 'evals:rodar', rotulo: 'Gerir suites e casos e disparar execucoes de evals', padrao: ['operador'] },
 ] as const satisfies readonly Def<PapelOperador>[]
 
 const LOJA = [
