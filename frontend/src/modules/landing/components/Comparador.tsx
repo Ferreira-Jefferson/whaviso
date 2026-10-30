@@ -1,21 +1,21 @@
-// Comparador de custo da landing: o visitante informa ticket medio, pedidos/mes e o
-// plano do whaviso; cada plataforma vira um card estatico (ordem fixa) com os proprios
-// controles de entrega e pagamento, mostrando o custo mensal e a diferenca pro whaviso.
+// Comparador de custo da landing: o visitante informa ticket médio, pedidos/mês e o
+// plano do whaviso; cada plataforma vira um card estático (ordem fixa) com os próprios
+// controles de entrega e pagamento, mostrando o custo mensal e a diferença pro whaviso.
 //
-// Dinheiro SEMPRE em centavos (int); conversao so via MoneyInput/brl (convencao do
-// repo). As taxas das plataformas sao as de 2026 (ver notas por plataforma). Os valores
-// do Asaas sao os REAIS, sem promocao (a promo acaba, o preco real permanece).
+// Dinheiro SEMPRE em centavos (int); conversão só via MoneyInput/brl (convenção do
+// repo). As taxas das plataformas são as de 2026 (ver notas por plataforma). Os valores
+// do Asaas são os REAIS, sem promoção (a promo acaba, o preço real permanece).
 import { useState } from 'react'
 import { SegmentedControl, Switch } from '@/shared/ui'
 import { brl } from '@/shared/format'
 import { usePlanosPublicos } from '../planos'
 
 // --- Custos do whaviso ---
-// A taxa de intermediacao vem do PLANO escolhido (0,50/0,40/0,30); estes sao os custos do PSP.
-const ASAAS_PIX_CENTAVOS = 199 // Asaas: Pix recebido, preco real pos-promocao
-const ASAAS_CARTAO_FIXO_CENTAVOS = 49 // Asaas: fixo por cobranca no credito
-const ASAAS_CARTAO_PCT = 0.0299 // Asaas: credito a vista (preco real)
-// Fallback enquanto os planos nao carregaram (ou nenhum ativo): mantem o comparador funcional.
+// A taxa de intermediação vem do PLANO escolhido (0,50/0,40/0,30); estes são os custos do PSP.
+const ASAAS_PIX_CENTAVOS = 199 // Asaas: Pix recebido, preço real pós-promoção
+const ASAAS_CARTAO_FIXO_CENTAVOS = 49 // Asaas: fixo por cobrança no crédito
+const ASAAS_CARTAO_PCT = 0.0299 // Asaas: crédito à vista (preço real)
+// Fallback enquanto os planos não carregaram (ou nenhum ativo): mantém o comparador funcional.
 const FALLBACK_MENS_CENTAVOS = 14900
 const FALLBACK_TAXA_CENTAVOS = 50
 
@@ -23,26 +23,26 @@ type PlatKey = 'ifood' | '99food' | 'aiqfome'
 
 interface Plataforma {
   nome: string
-  comissaoPropria: number // fracao: comissao de uso quando o restaurante entrega
-  comissaoEntrega: number // fracao: comissao quando a plataforma entrega
-  pagamentoOnline: number // fracao: taxa sobre pedido pago pelo app
+  comissaoPropria: number // fração: comissão de uso quando o restaurante entrega
+  comissaoEntrega: number // fração: comissão quando a plataforma entrega
+  pagamentoOnline: number // fração: taxa sobre pedido pago pelo app
   mensalidadePropriaCentavos: number
   mensalidadeEntregaCentavos: number
   isencaoAteCentavos: number // mensalidade isenta se o faturamento mensal for menor que isso
   nota: string
 }
 
-// Ordem de declaracao = ordem dos cards (fixa, nunca reordena).
+// Ordem de declaração = ordem dos cards (fixa, nunca reordena).
 const PLATAFORMAS: Record<PlatKey, Plataforma> = {
   ifood: {
     nome: 'iFood',
-    comissaoPropria: 0.12, // Plano Basico
+    comissaoPropria: 0.12, // Plano Básico
     comissaoEntrega: 0.23, // Plano Entrega
     pagamentoOnline: 0.032,
     mensalidadePropriaCentavos: 11000,
     mensalidadeEntregaCentavos: 15000,
-    isencaoAteCentavos: 180000, // mensalidade so acima de R$ 1.800/mes
-    nota: 'Comissao 12% (voce entrega) ou 23% (iFood entrega) + 3,2% no pagamento pelo app. Mensalidade so acima de R$ 1.800/mes.',
+    isencaoAteCentavos: 180000, // mensalidade só acima de R$ 1.800/mês
+    nota: 'Comissão 12% (você entrega) ou 23% (iFood entrega) + 3,2% no pagamento pelo app. Mensalidade só acima de R$ 1.800/mês.',
   },
   '99food': {
     nome: '99Food',
@@ -52,7 +52,7 @@ const PLATAFORMAS: Record<PlatKey, Plataforma> = {
     mensalidadePropriaCentavos: 0,
     mensalidadeEntregaCentavos: 0,
     isencaoAteCentavos: 0,
-    nota: 'Comissao 10,9% (voce entrega) ou 8,9% (99Food entrega) + ~3,2% no pagamento pelo app. Mensalidade gratis para contratos novos.',
+    nota: 'Comissão 10,9% (você entrega) ou 8,9% (99Food entrega) + ~3,2% no pagamento pelo app. Mensalidade grátis para contratos novos.',
   },
   aiqfome: {
     nome: 'aiqfome',
@@ -61,8 +61,8 @@ const PLATAFORMAS: Record<PlatKey, Plataforma> = {
     pagamentoOnline: 0.0299,
     mensalidadePropriaCentavos: 8990,
     mensalidadeEntregaCentavos: 8990,
-    isencaoAteCentavos: 150000, // mensalidade isenta ate R$ 1.500/mes
-    nota: 'Comissao 9,99% (voce entrega) ou 22% (aiqfome entrega) + 2,99% no pagamento online. Mensalidade R$ 89,90, isenta ate R$ 1.500/mes.',
+    isencaoAteCentavos: 150000, // mensalidade isenta até R$ 1.500/mês
+    nota: 'Comissão 9,99% (você entrega) ou 22% (aiqfome entrega) + 2,99% no pagamento online. Mensalidade R$ 89,90, isenta até R$ 1.500/mês.',
   },
 }
 
@@ -81,8 +81,8 @@ interface ConfigPlataforma {
   pagamento: boolean // cliente paga pelo app
 }
 
-// Entrega comeca desligada nos tres: o whaviso nao tem entrega propria, entao comparar
-// com a entrega do concorrente tambem desligada e a comparacao mais justa por padrao.
+// Entrega começa desligada nos três: o whaviso não tem entrega própria, então comparar
+// com a entrega do concorrente também desligada é a comparação mais justa por padrão.
 const CONFIG_INICIAL: Record<PlatKey, ConfigPlataforma> = {
   ifood: { entrega: false, pagamento: true },
   '99food': { entrega: false, pagamento: true },
@@ -92,7 +92,7 @@ const CONFIG_INICIAL: Record<PlatKey, ConfigPlataforma> = {
 const pct = (f: number) =>
   `${(f * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
 
-// Diferenca com sinal: "+R$ 100" quando positivo; negativo ja vem com o "-" do brl
+// Diferença com sinal: "+R$ 100" quando positivo; negativo já vem com o "-" do brl
 // (nunca "+-"); zero sai sem sinal.
 const sinalBrl = (centavos: number) => (centavos > 0 ? `+${brl(centavos)}` : brl(centavos))
 
@@ -147,11 +147,11 @@ export function Comparador() {
   const ticket = ticketCentavos ?? 0
   const faturamento = ticket * pedidos
 
-  // --- Whaviso, tres cenarios ---
+  // --- Whaviso, três cenários ---
   const porPedidoPix = taxaWhaviso + ASAAS_PIX_CENTAVOS
-  // Parte fixa do cartao: taxa whaviso (varia por PLANO: 0,50/0,40/0,30) + fixo do
-  // gateway, somadas num so numero. Mostrar os dois fixos lado a lado (ex.: "R$ 0,50 +
-  // R$ 0,49") le como erro de digitacao, nao como duas cobrancas distintas.
+  // Parte fixa do cartão: taxa whaviso (varia por PLANO: 0,50/0,40/0,30) + fixo do
+  // gateway, somadas num só número. Mostrar os dois fixos lado a lado (ex.: "R$ 0,50 +
+  // R$ 0,49") lê como erro de digitação, não como duas cobranças distintas.
   const fixoCartao = taxaWhaviso + ASAAS_CARTAO_FIXO_CENTAVOS
   const porPedidoCartao = fixoCartao + Math.round(ticket * ASAAS_CARTAO_PCT)
   const porPedidoWhaviso =
@@ -162,11 +162,11 @@ export function Comparador() {
     <section id="comparar" className="mx-auto w-full max-w-7xl px-4 py-16">
       <div className="mx-auto max-w-2xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">
-          Quanto voce deixa de pagar em taxa
+          Quanto você deixa de pagar em taxa
         </h2>
         <p className="mt-3 text-tinta-2">
-          As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo e
-          fixo e baixo, ou zero quando voce recebe direto. Ajuste cada canal do seu jeito: quem faz
+          As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo é
+          fixo e baixo, ou zero quando você recebe direto. Ajuste cada canal do seu jeito: quem faz
           a entrega e quem recebe o pagamento muda de app pra app.
         </p>
       </div>
@@ -176,7 +176,7 @@ export function Comparador() {
         <div className="grid gap-5 md:grid-cols-3">
           <label className="block">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <span className="text-sm font-semibold text-tinta">Ticket medio</span>
+              <span className="text-sm font-semibold text-tinta">Ticket médio</span>
               <span className="tabular text-sm font-semibold text-salvia">{brl(ticket)}</span>
             </div>
             <div className="rounded-pill border border-linha bg-papel-2 px-4 py-2.5">
@@ -187,14 +187,14 @@ export function Comparador() {
                 step={5}
                 value={Math.round(ticket / 100)}
                 onChange={(e) => setTicketCentavos(Number(e.target.value) * 100)}
-                aria-label="Ticket medio"
+                aria-label="Ticket médio"
                 className="block w-full cursor-pointer accent-salvia"
               />
             </div>
           </label>
           <label className="block">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <span className="text-sm font-semibold text-tinta">Pedidos por mes</span>
+              <span className="text-sm font-semibold text-tinta">Pedidos por mês</span>
               <span className="tabular text-sm font-semibold text-salvia">
                 {pedidos.toLocaleString('pt-BR')}
               </span>
@@ -207,7 +207,7 @@ export function Comparador() {
                 step={10}
                 value={pedidos}
                 onChange={(e) => setPedidos(Number(e.target.value))}
-                aria-label="Pedidos por mes"
+                aria-label="Pedidos por mês"
                 className="block w-full cursor-pointer accent-salvia"
               />
             </div>
@@ -247,17 +247,17 @@ export function Comparador() {
         <div className="flex flex-col rounded-card border-2 border-salvia bg-salvia-claro p-5">
           <span className="font-display text-lg text-salvia">whaviso</span>
           <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-tinta-2">
-            Custo por mes
+            Custo por mês
           </span>
           <span className="tabular text-3xl font-bold text-folha">{brl(totalWhaviso)}</span>
 
           <div className="mt-4">
-            <span className="mb-1.5 block text-sm font-semibold text-tinta">Como voce recebe</span>
+            <span className="mb-1.5 block text-sm font-semibold text-tinta">Como você recebe</span>
             <SegmentedControl
               value={recebimento}
               onChange={setRecebimento}
               options={OPCOES_RECEBIMENTO}
-              ariaLabel="Como voce recebe no whaviso"
+              ariaLabel="Como você recebe no whaviso"
               preencher
             />
           </div>
@@ -274,14 +274,14 @@ export function Comparador() {
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-tinta-2">Taxas no mes</dt>
+              <dt className="text-tinta-2">Taxas no mês</dt>
               <dd className="tabular text-tinta">{brl(totalWhaviso - mensWhaviso)}</dd>
             </div>
           </dl>
 
           <p className="mt-auto border-t border-salvia/30 pt-3 text-xs text-tinta-2">
             {recebimento === 'direto'
-              ? 'So a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
+              ? 'Só a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
               : recebimento === 'pix'
                 ? `Mensalidade + ${brl(porPedidoPix)} por pedido.`
                 : `Mensalidade + ${brl(fixoCartao)} + 2,99% por pedido.`}
@@ -299,7 +299,7 @@ export function Comparador() {
             <div key={key} className="flex flex-col rounded-card border border-linha bg-cartao p-5">
               <span className="font-display text-lg text-tinta">{p.nome}</span>
               <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-tinta-2">
-                Custo por mes
+                Custo por mês
               </span>
               <span className="tabular text-3xl font-bold text-barro">{brl(r.total)}</span>
 
@@ -324,7 +324,7 @@ export function Comparador() {
 
               <dl className="mt-4 grid gap-1.5 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-tinta-2">Comissao ({pct(r.comissaoFracao)})</dt>
+                  <dt className="text-tinta-2">Comissão ({pct(r.comissaoFracao)})</dt>
                   <dd className="tabular text-tinta">{brl(r.custoComissao)}</dd>
                 </div>
                 <div className="flex justify-between">
@@ -359,8 +359,9 @@ export function Comparador() {
       </div>
 
       <p className="mt-6 text-center text-xs text-tinta-2">
-        O whaviso atende quem ja e seu cliente, sem comissao por pedido, e convive com os canais que
-        voce ja usa. Mantenha o que vende por fora e traga para ca o seu proprio movimento.
+        O whaviso atende quem já é seu cliente, sem comissão por pedido, e coexiste com os canais
+        que você já usa: continue vendendo nos apps de entrega e traga para cá o movimento que já é
+        seu.
       </p>
 
       <div className="mt-8 flex flex-col items-center gap-3 text-center">
