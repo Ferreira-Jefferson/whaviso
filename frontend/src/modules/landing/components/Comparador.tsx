@@ -96,6 +96,11 @@ const pct = (f: number) =>
 // (nunca "+-"); zero sai sem sinal.
 const sinalBrl = (centavos: number) => (centavos > 0 ? `+${brl(centavos)}` : brl(centavos))
 
+// Valor sem o prefixo "R$": usado numa discriminacao "R$ 0,89 = 0,40 (whaviso) + 0,49
+// (gateway)", onde o "R$" ja apareceu uma vez no total e nao precisa se repetir.
+const semPrefixo = (centavos: number) =>
+  (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+
 interface CustoPlataforma {
   comissaoFracao: number
   custoComissao: number
@@ -290,14 +295,14 @@ export function Comparador() {
               <>
                 Mensalidade + {brl(porPedidoPix)} por pedido.
                 <span className="mt-0.5 block">
-                  {brl(porPedidoPix)} = {brl(taxaWhaviso)} (whaviso) + {brl(ASAAS_PIX_CENTAVOS)} (gateway)
+                  {brl(porPedidoPix)} = {semPrefixo(taxaWhaviso)} (whaviso) + {semPrefixo(ASAAS_PIX_CENTAVOS)} (gateway)
                 </span>
               </>
             ) : (
               <>
                 Mensalidade + {brl(fixoCartao)} + 2,99% por pedido.
                 <span className="mt-0.5 block">
-                  {brl(fixoCartao)} = {brl(taxaWhaviso)} (whaviso) + {brl(ASAAS_CARTAO_FIXO_CENTAVOS)} (gateway)
+                  {brl(fixoCartao)} = {semPrefixo(taxaWhaviso)} (whaviso) + {semPrefixo(ASAAS_CARTAO_FIXO_CENTAVOS)} (gateway)
                 </span>
               </>
             )}
