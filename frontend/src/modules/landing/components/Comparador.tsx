@@ -162,12 +162,11 @@ export function Comparador() {
     <section id="comparar" className="mx-auto w-full max-w-7xl px-4 py-16">
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">
-          Seu dinheiro, na mesa de outro
+          Quanto você está deixando na mesa?
         </h2>
         <p className="mt-3 text-tinta-2">
           As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo é
-          fixo e baixo, sem taxa por pedido quando você recebe direto. Calcule quanto você está
-          deixando na mesa de cada aplicativo.
+          fixo e baixo. Calcule quanto você está deixando na mesa de cada aplicativo.
         </p>
       </div>
 
