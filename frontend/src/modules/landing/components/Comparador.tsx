@@ -166,8 +166,11 @@ export function Comparador() {
         </h2>
         <p className="mt-3 text-tinta-2">
           As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo é
-          fixo e baixo, ou zero quando você recebe direto. Nos cards abaixo, ajuste a entrega e o
-          pagamento de cada canal para o que você realmente usa, e veja o custo mudar na hora.
+          fixo e baixo, ou zero quando você recebe direto.
+        </p>
+        <p className="mt-2 text-sm text-tinta-2 italic">
+          Nos cards abaixo, ajuste a entrega e o pagamento de cada canal para o que você realmente
+          usa, e veja o custo mudar na hora.
         </p>
       </div>
 
