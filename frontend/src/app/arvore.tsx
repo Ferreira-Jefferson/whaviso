@@ -20,6 +20,7 @@ const PlataformaPlanos = lazy(() => import('@/modules/plataforma_cobranca').then
 const PlataformaFunil = lazy(() => import('@/modules/plataforma_funil'))
 const PlataformaAcessos = lazy(() => import('@/modules/acessos'))
 const PlataformaAcessosLogin = lazy(() => import('@/modules/acessos_login'))
+const PlataformaEvals = lazy(() => import('@/modules/plataforma_evals'))
 // Paginas publicas de compliance ja em producao (politica e termos): seguem servidas pelo
 // modulo legado ate o FR de compliance reassumir. Unica dependencia de modules/** do shell.
 import { Landing } from '@/modules/landing'
@@ -83,6 +84,7 @@ export const rotas: RouteObject[] = [
           { path: '/plataforma/funil', element: <PlataformaFunil /> },
           { path: '/plataforma/acessos', element: <PlataformaAcessos /> },
           { path: '/plataforma/acessos-login', element: <PlataformaAcessosLogin /> },
+          { path: '/plataforma/evals', element: <PlataformaEvals /> },
         ],
       },
       { path: '*', element: <NotFound /> },
