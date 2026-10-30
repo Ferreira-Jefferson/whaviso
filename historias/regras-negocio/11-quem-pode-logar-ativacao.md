@@ -111,15 +111,19 @@ A autoridade do acesso é o servidor; a tela de login apenas reflete o resultado
   painel deve liberar quem está **ativo** (ainda que sem loja), e barrar apenas quem **não** está ativo.
   Barrar por "não tem loja" é errado: expulsaria o cliente legítimo antes de ele criar a primeira loja.
 
+## Registro de autenticação é mantido (decidido)
+
+- Autenticar no Google cria, por si, um registro de identidade no provedor (Supabase Auth) para
+  qualquer e-mail válido, mesmo sem cadastro nem plano. **Decisão: manter** esse registro (não bloquear
+  na porta, não limpar). Serve de **funil/lead**: dá para analisar quantas pessoas tentaram logar x
+  quantas ativaram, e eventualmente contatar quem tentou mas não ativou. Não é risco: o registro não
+  concede acesso (o gate de entrada e a API negam tudo para quem não está ativo).
+- Mensagens distintas na porta por estado: **cadastrado mas pagamento/aprovação pendente** mostra
+  "pagamento ainda não aprovado / aguardando"; **não cadastrado ou revogado** mostra "acesso não
+  permitido, contate o suporte".
+
 ## Decisões em aberto (a confirmar, não assumir)
 
-- **Registro órfão de autenticação.** Esta tela é só de **login**, não de cadastro. Mas autenticar no
-  Google cria, por si, um registro de identidade no provedor (Supabase Auth) para qualquer e-mail válido,
-  mesmo sem cadastro nem plano. Decidir como evitar acumular e-mails não cadastrados: (a) **bloquear na
-  porta** com um hook de autenticação do Supabase (rejeitar a criação do usuário quando o e-mail não está
-  na allowlist ativa), que é o mais limpo e casa com "só login, não cadastro"; ou (b) **limpar depois**:
-  ao detectar sessão de e-mail não ativo, o servidor remove o registro de identidade e devolve a pessoa
-  ao `/entrar`. Preferência indicada: bloquear na porta.
 - **PSP e cartão.** `plataforma/cobranca.md` ainda descreve conferência manual v1 sem gateway. O modelo
   aqui (PSP Asaas notifica o pagamento; link de cartão além do PIX) **supersede** aquela nota: atualizar
   `plataforma/cobranca.md` para refletir o gancho de pagamento automático e a geração de cobrança
@@ -134,7 +138,8 @@ A autoridade do acesso é o servidor; a tela de login apenas reflete o resultado
   módulo `conta` (`criarConta`), que exige o e-mail aprovado. O `plataforma_cobranca` também marca o
   e-mail como aprovado no gancho de pagamento (origem pagamento), por coordenação via banco.
 - O gate de **entrada no painel** (front-shell) barra quem autenticou mas não está ativo, deslogando e
-  voltando para `/entrar` com aviso. O critério correto é o **estado de ativação** do e-mail (está ativo
-  na allowlist? ou é operador?), não a presença de loja: um cliente ativo cria a própria loja depois,
-  então "sem loja" não pode barrar. Isso exige uma sonda de "estou ativo?" (consultar o estado de
-  ativação do e-mail autenticado), em vez de inferir acesso por ter loja.
+  voltando para `/entrar` com aviso. O critério é o **estado de ativação** do e-mail, não a presença de
+  loja (um cliente ativo cria a própria loja depois). Implementado: a api expõe `GET /v1/acessos-login/eu`
+  (só autenticado), que resolve o e-mail pelo token e devolve `estado` (`ativo` | `pendente` | `revogado`
+  | `nao_cadastrado`); o guard do shell decide por esse estado (ou por ser operador), e mostra a mensagem
+  conforme o motivo.

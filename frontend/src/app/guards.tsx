@@ -7,7 +7,7 @@ import { useSessao } from '@/shared/auth'
 import { ErrorState, Spinner } from '@/shared/ui'
 import { ROTA_INICIAL } from './rotas'
 import { useEhOperador } from './sonda_operador'
-import { marcarAcessoNegado, useTemAcessoLoja } from './sonda_acesso'
+import { marcarBarrado, useMinhaElegibilidade, type MotivoBarrado } from './sonda_acesso'
 
 function Splash() {
   return (
@@ -52,50 +52,51 @@ export function RequireOperador({ children }: { children: ReactNode }) {
 }
 
 /**
- * Gate de entrada do shell da loja. Logado mas sem acesso NENHUM (nem operador de plataforma, nem
- * vinculo com alguma loja) nunca entra: desloga e volta para /entrar com aviso. Operador sem loja
- * vai para o console. Erro transitorio nas sondas NAO desloga (mostra tentar de novo).
+ * Gate de entrada do shell da loja. O critério é o ESTADO DE ATIVAÇÃO do e-mail (não "tem loja":
+ * um cliente ativo cria a própria loja depois). Ativo entra (mesmo sem loja, cai em "criar primeira
+ * loja"). Operador sem acesso de loja vai para o console. Pendente ou não liberado nunca entra:
+ * desloga e volta para /entrar com a mensagem certa. Erro transitório nas sondas NÃO desloga.
  */
 export function RequireAcessoApp({ children }: { children: ReactNode }) {
   const { status, signOut } = useSessao()
   const op = useEhOperador()
-  const loja = useTemAcessoLoja()
+  const eleg = useMinhaElegibilidade()
 
-  // Negacao so e definitiva quando as duas sondas responderam (sem pendencia nem erro) e ambas
-  // deram "sem acesso". Nesse caso marca o motivo e desloga; o RequireAuth externo leva a /entrar.
-  const negado =
-    status === 'logado' &&
-    !op.isPending &&
-    !loja.isPending &&
-    !op.isError &&
-    !loja.isError &&
-    op.data === false &&
-    loja.data === false
+  const pronto =
+    status === 'logado' && !op.isPending && !eleg.isPending && !op.isError && !eleg.isError
+  const ativo = eleg.data === 'ativo'
+  const ehOperador = op.data === true
+
+  // Barra só quando as sondas responderam e a pessoa não é ativa nem operador. `pendente` recebe
+  // mensagem própria; o resto (revogado/não cadastrado) cai em "acesso negado". Marca e desloga; o
+  // RequireAuth externo leva a /entrar, onde a mensagem é exibida.
+  const motivoBarrado: MotivoBarrado | null =
+    pronto && !ativo && !ehOperador ? (eleg.data === 'pendente' ? 'pendente' : 'negado') : null
 
   useEffect(() => {
-    if (!negado) return
-    marcarAcessoNegado()
+    if (!motivoBarrado) return
+    marcarBarrado(motivoBarrado)
     void signOut()
-  }, [negado, signOut])
+  }, [motivoBarrado, signOut])
 
   if (status === 'carregando') return <Splash />
   if (status === 'deslogado') return <Navigate to="/entrar" replace />
-  if (op.isPending || loja.isPending) return <Splash />
-  if (op.isError || loja.isError) {
+  if (op.isPending || eleg.isPending) return <Splash />
+  if (op.isError || eleg.isError) {
     return (
       <div className="mx-auto w-full max-w-[1180px] px-4 pt-8 md:px-8">
         <ErrorState
           aoTentarDeNovo={() => {
             void op.refetch()
-            void loja.refetch()
+            void eleg.refetch()
           }}
           descricao="Não foi possível confirmar o seu acesso."
         />
       </div>
     )
   }
-  if (loja.data === true) return <>{children}</>
-  if (op.data === true) return <Navigate to="/plataforma" replace />
-  // Sem acesso: o efeito acima esta deslogando; segura num splash ate o RequireAuth levar a /entrar.
+  if (ativo) return <>{children}</>
+  if (ehOperador) return <Navigate to="/plataforma" replace />
+  // Barrado: o efeito acima está deslogando; segura num splash até o RequireAuth levar a /entrar.
   return <Splash />
 }

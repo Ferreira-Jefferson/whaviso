@@ -1,55 +1,58 @@
-// Sonda de acesso de LOJA e sinal de "acesso negado", isolados em arquivo proprio (sem
+// Sonda de ELEGIBILIDADE do usuario e sinal de "barrado", isolados em arquivo proprio (sem
 // componentes) para os guards reusarem sem quebrar o fast-refresh, igual a sonda_operador.
 import { useQuery } from '@tanstack/react-query'
 import { useSessao } from '@/shared/auth'
-import { ApiError, apiClient } from '@/shared/api_client'
+import { apiClient } from '@/shared/api_client'
+
+/** Estado de acesso do e-mail autenticado (espelha o contrato de GET /v1/acessos-login/eu). */
+export type Elegibilidade = 'ativo' | 'pendente' | 'revogado' | 'nao_cadastrado'
 
 /**
- * Sonda se o usuario logado tem acesso a ALGUMA loja (vinculo de membro). Usa GET /lojas, que
- * passa pelo `escopoLoja` do backend: 200 = tem vinculo; 403/401/404 = sem vinculo nenhum. Erro
- * transitorio propaga para o guard tratar (nunca deslogar "na duvida"). `semLoja` evita mandar um
- * x-loja-id salvo que poderia enviesar a resposta.
+ * Pergunta ao backend "eu posso entrar?" (GET /acessos-login/eu): resolve o e-mail pelo proprio
+ * token e devolve o estado na allowlist. `ativo` entra (mesmo sem loja: cria a loja depois);
+ * `pendente` aguarda pagamento/aprovacao; `revogado`/`nao_cadastrado` nao entram. Erro transitorio
+ * propaga para o guard tratar (nunca deslogar "na duvida"). `semLoja` evita enviar x-loja-id salvo.
  */
-export function useTemAcessoLoja() {
+export function useMinhaElegibilidade() {
   const { status } = useSessao()
   return useQuery({
-    queryKey: ['acesso', 'loja'],
+    queryKey: ['elegibilidade', 'eu'],
     enabled: status === 'logado',
     staleTime: 5 * 60_000,
     retry: false,
     queryFn: async ({ signal }) => {
-      try {
-        await apiClient.get('/lojas', { query: { incluir_inativas: 'false' }, semLoja: true, signal })
-        return true
-      } catch (e) {
-        if (e instanceof ApiError && (e.isForbidden || e.isUnauthorized || e.isNotFound)) return false
-        throw e
-      }
+      const r = await apiClient.get<{ estado: Elegibilidade }>('/acessos-login/eu', {
+        semLoja: true,
+        signal,
+      })
+      return r.estado
     },
   })
 }
 
-// Sinal, por aba, de que o usuario foi barrado por falta de acesso: o guard marca antes de
-// deslogar e a tela /entrar consome para exibir a mensagem. sessionStorage tolera bloqueio.
-const CHAVE_ACESSO_NEGADO = 'whaviso:acesso-negado'
+// Motivo pelo qual a pessoa foi barrada, passado do guard (que desloga) para a tela /entrar.
+// `pendente` = cadastrado mas pagamento/aprovacao nao saiu; `negado` = nao cadastrado ou revogado.
+export type MotivoBarrado = 'pendente' | 'negado'
+const CHAVE_BARRADO = 'whaviso:acesso-barrado'
 
-export function marcarAcessoNegado(): void {
+export function marcarBarrado(motivo: MotivoBarrado): void {
   try {
-    sessionStorage.setItem(CHAVE_ACESSO_NEGADO, '1')
+    sessionStorage.setItem(CHAVE_BARRADO, motivo)
   } catch {
     /* storage indisponivel: sem a mensagem, mas o bounce ainda acontece */
   }
 }
 
-/** Le e LIMPA o sinal (so vale para a proxima tela de /entrar). */
-export function consumirAcessoNegado(): boolean {
+/** Le e LIMPA o motivo (so vale para a proxima tela de /entrar). */
+export function consumirBarrado(): MotivoBarrado | null {
   try {
-    if (sessionStorage.getItem(CHAVE_ACESSO_NEGADO) === '1') {
-      sessionStorage.removeItem(CHAVE_ACESSO_NEGADO)
-      return true
+    const v = sessionStorage.getItem(CHAVE_BARRADO)
+    if (v === 'pendente' || v === 'negado') {
+      sessionStorage.removeItem(CHAVE_BARRADO)
+      return v
     }
   } catch {
     /* storage indisponivel */
   }
-  return false
+  return null
 }

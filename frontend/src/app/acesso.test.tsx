@@ -35,8 +35,6 @@ import { RequireAcessoApp, RequireAuth } from './guards'
 import { criarQueryClient } from './query_client'
 import Entrar from './pages/Entrar'
 
-const LOJA = { id: '11111111-1111-4111-8111-111111111111', nome: 'Cantina do Ze', logo_url: null, cores: { primaria: '#b4532a' } }
-
 type Resposta = Response
 
 function montarFetch(mapa: (url: string) => Resposta) {
@@ -83,38 +81,45 @@ describe('RequireAcessoApp (gate de entrada)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('logado sem loja e sem operador: desloga e volta para /entrar com aviso', async () => {
-    montarFetch((url) => {
-      if (url.includes('/v1/lojas')) return new Response('{"error":{}}', { status: 403 })
-      if (url.includes('/v1/plataforma-painel/eu')) return new Response('{"error":{}}', { status: 403 })
+  // Resposta padrao das sondas, sobreposta por `estado`/`operador` em cada caso.
+  function sondas(estado: string, operadorOk = false) {
+    return (url: string) => {
+      if (url.includes('/v1/acessos-login/eu')) return new Response(JSON.stringify({ estado }), { status: 200 })
+      if (url.includes('/v1/plataforma-painel/eu')) {
+        return operadorOk
+          ? new Response(JSON.stringify({ operador: true, papel: 'suporte' }), { status: 200 })
+          : new Response('{"error":{}}', { status: 403 })
+      }
       return new Response('{}', { status: 404 })
-    })
+    }
+  }
+
+  it('nao cadastrado: desloga e volta para /entrar com "acesso nao permitido"', async () => {
+    montarFetch(sondas('nao_cadastrado'))
     renderApp()
-    // Nunca renderiza o conteudo do shell.
     await waitFor(() => expect(h.signOutMock).toHaveBeenCalled())
     await screen.findByText(/Acesso não permitido/i)
     expect(screen.queryByText('CONTEUDO DO SHELL')).toBeNull()
-    // Caiu na tela de login.
     expect(screen.getByRole('heading', { name: /Entrar no Whaviso/i })).toBeTruthy()
   })
 
-  it('logado com loja: entra no shell', async () => {
-    montarFetch((url) => {
-      if (url.includes('/v1/lojas')) return new Response(JSON.stringify([LOJA]), { status: 200 })
-      if (url.includes('/v1/plataforma-painel/eu')) return new Response('{"error":{}}', { status: 403 })
-      return new Response('{}', { status: 404 })
-    })
+  it('pendente: desloga e volta para /entrar com aviso de pagamento nao aprovado', async () => {
+    montarFetch(sondas('pendente'))
+    renderApp()
+    await waitFor(() => expect(h.signOutMock).toHaveBeenCalled())
+    await screen.findByText(/pagamento ainda não foi aprovado/i)
+    expect(screen.queryByText('CONTEUDO DO SHELL')).toBeNull()
+  })
+
+  it('ativo: entra no shell (mesmo sem loja)', async () => {
+    montarFetch(sondas('ativo'))
     renderApp()
     await screen.findByText('CONTEUDO DO SHELL')
     expect(h.signOutMock).not.toHaveBeenCalled()
   })
 
-  it('operador sem loja: vai para o console, nao desloga', async () => {
-    montarFetch((url) => {
-      if (url.includes('/v1/lojas')) return new Response('{"error":{}}', { status: 403 })
-      if (url.includes('/v1/plataforma-painel/eu')) return new Response(JSON.stringify({ operador: true, papel: 'suporte' }), { status: 200 })
-      return new Response('{}', { status: 404 })
-    })
+  it('operador sem acesso de loja: vai para o console, nao desloga', async () => {
+    montarFetch(sondas('nao_cadastrado', true))
     renderApp()
     await screen.findByText('CONSOLE DA PLATAFORMA')
     expect(h.signOutMock).not.toHaveBeenCalled()

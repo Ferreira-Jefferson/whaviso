@@ -35,3 +35,16 @@ export const AcessoAdicionar = z.strictObject({
 export type AcessoAdicionar = z.infer<typeof AcessoAdicionar>
 
 export const IdParams = z.strictObject({ id: z.uuid() })
+
+/**
+ * Elegibilidade do PROPRIO usuario autenticado (sonda da porta de entrada do painel):
+ * - `ativo`: e-mail aprovado na allowlist (pode entrar; cria a propria loja depois).
+ * - `pendente`: e-mail cadastrado, aguardando pagamento/aprovacao (mensagem distinta no login).
+ * - `revogado`: acesso revogado.
+ * - `nao_cadastrado`: e-mail autenticado nao esta na allowlist.
+ */
+export const elegibilidadeEstado = z.enum(['ativo', 'pendente', 'revogado', 'nao_cadastrado'])
+export type ElegibilidadeEstado = z.infer<typeof elegibilidadeEstado>
+
+export const MinhaElegibilidade = z.strictObject({ estado: elegibilidadeEstado })
+export type MinhaElegibilidade = z.infer<typeof MinhaElegibilidade>

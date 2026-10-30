@@ -6,7 +6,7 @@ import { conflito, naoEncontrado } from '../../shared/http_errors'
 import { enfileirarBoasVindas } from '../../shared/emails_outbox'
 import * as repo from './repo'
 import type { AcessoLinha } from './repo'
-import type { AcessoAdicionar, AcessoDTO, AcessoStatus } from './schemas'
+import type { AcessoAdicionar, AcessoDTO, AcessoStatus, MinhaElegibilidade } from './schemas'
 
 /** Ator = operador autenticado (equipe Whaviso). Nunca recebe o e-mail do corpo como identidade. */
 export interface Ator {
@@ -71,7 +71,21 @@ export function criarServicoAcessosLogin(pool: Pool) {
     return paraDTO(linha)
   }
 
-  return { listar, adicionar, aprovar, revogar }
+  /**
+   * Elegibilidade do proprio usuario autenticado: resolve o e-mail e mapeia o status da allowlist.
+   * Serve a sonda da porta de entrada do painel (nao vaza status de terceiros: so o do caller).
+   */
+  async function minhaElegibilidade(userId: string): Promise<MinhaElegibilidade> {
+    const email = await repo.emailDoUsuario(pool, userId)
+    if (!email) return { estado: 'nao_cadastrado' }
+    const status = await repo.statusDoEmail(pool, email)
+    if (status === 'aprovado') return { estado: 'ativo' }
+    if (status === 'pendente') return { estado: 'pendente' }
+    if (status === 'revogado') return { estado: 'revogado' }
+    return { estado: 'nao_cadastrado' }
+  }
+
+  return { listar, adicionar, aprovar, revogar, minhaElegibilidade }
 }
 
 export type ServicoAcessosLogin = ReturnType<typeof criarServicoAcessosLogin>

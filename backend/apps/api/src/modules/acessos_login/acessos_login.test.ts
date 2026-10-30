@@ -115,4 +115,39 @@ d('acessos_login: allowlist pelo operador (integracao)', () => {
   it('aprovar id inexistente -> 404', async () => {
     expect((await chamar(operador, 'POST', `/${randomUUID()}/aprovar`)).statusCode).toBe(404)
   })
+
+  it('GET /eu: estado de elegibilidade do proprio usuario (ativo/pendente/nao_cadastrado); 401 sem auth', async () => {
+    // sem token -> 401
+    expect((await chamar(null, 'GET', '/eu')).statusCode).toBe(401)
+
+    // ativo: e-mail aprovado na allowlist
+    const uAtivo = await criarUsuario(c)
+    const eAtivo = `eu.ativo.${randomUUID().slice(0, 8)}@exemplo.com`
+    emails.push(eAtivo)
+    await poolSuper.query('update auth.users set email = $2 where id = $1', [uAtivo, eAtivo])
+    await poolSuper.query(
+      `insert into public.acessos_permitidos (email, status, origem, aprovado_em) values ($1, 'aprovado', 'admin', now())`,
+      [eAtivo],
+    )
+    const rAtivo = await chamar(uAtivo, 'GET', '/eu')
+    expect(rAtivo.statusCode).toBe(200)
+    expect(rAtivo.json()).toEqual({ estado: 'ativo' })
+
+    // pendente: cadastrado, aguardando aprovacao/pagamento
+    const uPend = await criarUsuario(c)
+    const ePend = `eu.pend.${randomUUID().slice(0, 8)}@exemplo.com`
+    emails.push(ePend)
+    await poolSuper.query('update auth.users set email = $2 where id = $1', [uPend, ePend])
+    await poolSuper.query(
+      `insert into public.acessos_permitidos (email, status, origem) values ($1, 'pendente', 'admin')`,
+      [ePend],
+    )
+    expect((await chamar(uPend, 'GET', '/eu')).json()).toEqual({ estado: 'pendente' })
+
+    // nao cadastrado: e-mail autenticado fora da allowlist
+    const uNao = await criarUsuario(c)
+    const eNao = `eu.nao.${randomUUID().slice(0, 8)}@exemplo.com`
+    await poolSuper.query('update auth.users set email = $2 where id = $1', [uNao, eNao])
+    expect((await chamar(uNao, 'GET', '/eu')).json()).toEqual({ estado: 'nao_cadastrado' })
+  })
 })

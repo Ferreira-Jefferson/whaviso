@@ -26,6 +26,27 @@ const SAIDA = sql`
   ${TS('aprovado_em')} as aprovado_em, ${TS('boas_vindas_enviado_em')} as boas_vindas_enviado_em,
   ${TS('criado_em')} as criado_em, ${TS('atualizado_em')} as atualizado_em`
 
+/**
+ * Resolve o e-mail do usuario autenticado via a funcao `plataforma_auth_info` (mesma fonte que o
+ * gate de bootstrap do modulo `conta`). Null se o usuario nao existir no Auth. O e-mail nunca vai a log.
+ */
+export async function emailDoUsuario(exec: Executor, userId: string): Promise<string | null> {
+  const r = await consultarUm<{ email: string }>(
+    exec,
+    sql`select email from public.plataforma_auth_info(array[${userId}]::uuid[]) limit 1`,
+  )
+  return r?.email ?? null
+}
+
+/** Status da allowlist para um e-mail (case-insensitive). Null quando o e-mail nao esta cadastrado. */
+export async function statusDoEmail(exec: Executor, email: string): Promise<AcessoStatus | null> {
+  const r = await consultarUm<{ status: AcessoStatus }>(
+    exec,
+    sql`select status from public.acessos_permitidos where lower(email) = lower(${email}) limit 1`,
+  )
+  return r?.status ?? null
+}
+
 export async function listar(exec: Executor, status?: AcessoStatus): Promise<AcessoLinha[]> {
   const s = status ?? null
   return consultar<AcessoLinha>(

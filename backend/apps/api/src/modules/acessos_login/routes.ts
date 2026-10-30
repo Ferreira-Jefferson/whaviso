@@ -5,7 +5,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { proibido } from '../../shared/http_errors'
 import { criarServicoAcessosLogin, type Ator } from './service'
-import { AcessoAdicionar, AcessoDTO, AcessosLista, AcessosQuery, IdParams } from './schemas'
+import { AcessoAdicionar, AcessoDTO, AcessosLista, AcessosQuery, IdParams, MinhaElegibilidade } from './schemas'
 
 /** Ator = operador autenticado. O user_id vem SO do escopo resolvido (nunca do corpo/query). */
 function operador(req: FastifyRequest): Ator {
@@ -30,6 +30,19 @@ export function criarAcessosLoginRoutes(): FastifyPluginAsync {
       ...plataforma,
       schema: { querystring: AcessosQuery, response: { 200: AcessosLista } },
     }, async (req) => svc.listar(operador(req), req.query.status))
+
+    // Elegibilidade do PROPRIO usuario (sonda da porta de entrada do painel). Qualquer autenticado
+    // pode perguntar o proprio estado; nao usa escopo de loja nem de operador (um recem-aprovado
+    // ainda nao tem loja, e a resposta e so sobre o e-mail do caller). Nao vaza status de terceiros.
+    app.get('/eu', {
+      config: { acesso: 'conteudo_de_loja' as const },
+      preHandler: [app.autenticar],
+      schema: { response: { 200: MinhaElegibilidade } },
+    }, async (req) => {
+      const u = req.usuario
+      if (!u) throw proibido('Nao autenticado')
+      return svc.minhaElegibilidade(u.user_id)
+    })
 
     app.post('/', {
       ...plataforma,

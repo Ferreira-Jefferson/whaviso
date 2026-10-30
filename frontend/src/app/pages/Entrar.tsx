@@ -4,14 +4,20 @@
 import { useEffect, useState } from 'react'
 import { BellLogo, Banner } from '@/shared/ui'
 import { GoogleLoginButton } from '@/modules/auth'
-import { consumirAcessoNegado } from '../sonda_acesso'
+import { consumirBarrado } from '../sonda_acesso'
 
 export default function Entrar() {
   const [erro, setErro] = useState<string | null>(null)
 
-  // Veio barrado do shell por falta de acesso: mostra o aviso uma vez (o sinal se consome).
+  // Veio barrado do shell: mostra o aviso uma vez (o sinal se consome). Mensagem por motivo:
+  // pagamento pendente (cadastrado, aguardando) x acesso negado (não cadastrado/revogado).
   useEffect(() => {
-    if (consumirAcessoNegado()) {
+    const motivo = consumirBarrado()
+    if (motivo === 'pendente') {
+      setErro(
+        'Seu pagamento ainda não foi aprovado. Assim que confirmarmos, você recebe um e-mail e já pode entrar.',
+      )
+    } else if (motivo === 'negado') {
       setErro('Acesso não permitido. Se você deveria ter acesso, entre em contato com o suporte.')
     }
   }, [])

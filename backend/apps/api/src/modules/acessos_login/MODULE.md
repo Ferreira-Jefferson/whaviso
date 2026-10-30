@@ -10,6 +10,11 @@ conta depois** (ver migration `0082_acessos_login.sql`).
 
 ## Rotas (registry: prefixo `acessos-login` -> `/v1/acessos-login/*`)
 
+Qualquer autenticado (sem escopo de loja/operador), so `autenticar`:
+- `GET /eu` elegibilidade do PROPRIO usuario: resolve o e-mail pelo token (`plataforma_auth_info`)
+  e devolve `{ estado }` (`ativo` | `pendente` | `revogado` | `nao_cadastrado`). Sonda da porta de
+  entrada do painel (front-shell). So reporta o caller: nao vaza status de terceiros.
+
 Operador (equipe Whaviso), `config.acesso: 'plataforma'` + `escopoOperador` + permissao
 `cobranca:gerir` (JA EXISTENTE; nao foi criada permissao nova):
 - `GET  /` lista e-mails (filtro `status`).
