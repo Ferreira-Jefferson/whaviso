@@ -162,7 +162,7 @@ export function Comparador() {
     <section id="comparar" className="mx-auto w-full max-w-7xl px-4 py-16">
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">
-          Quanto você deixa de pagar em taxa
+          Quanto dinheiro você está deixando na mesa?
         </h2>
         <p className="mt-3 text-tinta-2">
           As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo é
