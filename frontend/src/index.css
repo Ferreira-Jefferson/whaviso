@@ -156,6 +156,70 @@
   }
 }
 
+/* =====================================================================
+   Trilho recolhido da lateral (AppShell): balao de subitens e a borda
+   direita inteira como puxador de expandir. O balao abre/fecha por estado
+   (data-aberto), com carencia de fechamento no JS; aqui ficam so as partes
+   que o Tailwind nao expressa: o rabinho e a ponte invisivel do balao, e o
+   hover-intent do puxador (a cor so troca depois de ~0,3s com o mouse
+   pousado, atraso so na entrada, para passar de raspao nao piscar nada).
+   ===================================================================== */
+@layer components {
+  .whv-pop {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.97);
+    transform-origin: left top;
+    pointer-events: none;
+    transition:
+      opacity 0.14s cubic-bezier(0.2, 0.8, 0.2, 1),
+      transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .whv-pop[data-aberto='true'] {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    pointer-events: auto;
+  }
+  /* rabinho apontando para o icone */
+  .whv-pop::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 18px;
+    width: 10px;
+    height: 10px;
+    background: var(--color-cartao);
+    border-left: 1px solid var(--color-linha);
+    border-bottom: 1px solid var(--color-linha);
+    transform: rotate(45deg);
+  }
+  /* ponte invisivel: cobre o vao entre o icone e o balao para o trajeto na
+     diagonal cair dentro da area sensivel (reforca a carencia de fechamento) */
+  .whv-pop::after {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 0;
+    bottom: 0;
+    width: 16px;
+  }
+
+  /* borda direita inteira = puxador de expandir */
+  .whv-edge::before {
+    content: '';
+    position: absolute;
+    right: 5px;
+    top: 8px;
+    bottom: 8px;
+    border-right: 2px solid var(--cor-primaria);
+    opacity: 0;
+    transition: opacity 0.16s ease;
+  }
+  .whv-edge:hover::before {
+    opacity: 0.7;
+    transition-delay: 0.3s;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

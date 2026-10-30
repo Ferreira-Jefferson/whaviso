@@ -4,7 +4,7 @@
 // mostra carregando, erro ou o estado "sem loja".
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { ChevronRight, LayoutDashboard, MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
+import { ChevronRight, LayoutDashboard, MoreHorizontal, Plus, Store } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { SeletorLoja, useTenant } from '@/shared/tenant'
 import { useEstadoRealtime } from '@/shared/realtime'
@@ -130,31 +130,168 @@ function Sidebar({ onRecolher }: { onRecolher: () => void }) {
   const { abertos, alternar } = useGruposAbertos()
   const grupoAtivo = useGrupoAtivo()
   const granted = usePermissoesLojaAtiva()
+  // O conteudo rola num div interno; o `aside` fica sem corte horizontal para o puxador da borda
+  // (whv-edge) poder vazar 6px e pintar a linha verde no hover, igual ao trilho recolhido.
   return (
-    <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-linha bg-papel-2 px-3 py-4 md:flex">
-      <div className="flex items-center gap-2.5 px-2.5 pb-4 font-display text-xl font-bold">
-        <span className="flex size-[30px] items-center justify-center rounded-[9px] bg-salvia text-sobre-marca">
-          <BellLogo className="size-5" />
-        </span>
-        Whaviso
-        <button
-          type="button"
-          onClick={onRecolher}
-          aria-label="Ocultar menu lateral"
-          className={cn('ml-auto flex size-8 items-center justify-center rounded-lg text-tinta-2 hover:bg-black/5 hover:text-tinta', FOCO)}
-        >
-          <PanelLeftClose className="size-5" strokeWidth={1.75} aria-hidden />
-        </button>
+    <aside className="sticky top-0 hidden h-dvh border-r border-linha bg-papel-2 md:flex">
+      <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
+        <div className="flex items-center gap-2.5 px-2.5 pb-4 font-display text-xl font-bold">
+          <span className="flex size-[30px] flex-none items-center justify-center rounded-[9px] bg-salvia text-sobre-marca">
+            <BellLogo className="size-5" />
+          </span>
+          Whaviso
+        </div>
+        <div className="flex flex-col gap-0.5">
+          {GRUPOS_NAV.map((g) => (
+            <GrupoSecao key={g.id} id={g.id} rotulo={g.rotulo} aberto={abertos[g.id] ?? false} ativo={grupoAtivo === g.id} onAlternar={alternar} granted={granted} />
+          ))}
+        </div>
+        <div className="mt-auto flex flex-col gap-0.5">
+          <LinkConsole />
+          <BotaoSair />
+        </div>
       </div>
-      <div className="flex flex-col gap-0.5">
-        {GRUPOS_NAV.map((g) => (
-          <GrupoSecao key={g.id} id={g.id} rotulo={g.rotulo} aberto={abertos[g.id] ?? false} ativo={grupoAtivo === g.id} onAlternar={alternar} granted={granted} />
-        ))}
-      </div>
-      <div className="mt-auto flex flex-col gap-0.5">
-        <LinkConsole />
-        <BotaoSair />
-      </div>
+      {/* Puxador de recolher: a borda direita inteira. Hover-intent no CSS (whv-edge): a cor so troca
+          para verde depois de ~0,3s pousado; clicar em qualquer ponto recolhe. */}
+      <div
+        className="whv-edge absolute right-[-6px] top-0 z-[16] h-full w-3.5 cursor-pointer"
+        role="button"
+        tabIndex={0}
+        title="Recolher menu"
+        aria-label="Ocultar menu lateral"
+        onClick={onRecolher}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onRecolher()
+          }
+        }}
+      />
+    </aside>
+  )
+}
+
+/** Lateral recolhida: um trilho fino (estilo Ubuntu) com o logo no topo e um icone por grupo.
+ *  Passar o mouse num icone abre um balao com os subitens daquele grupo; ao sair do icone, o balao
+ *  so fecha depois de uma carencia (CARENCIA_MS), cancelada se o mouse alcancar o balao ou a ponte
+ *  invisivel ao lado, para o subitem seguir acessivel na diagonal, devagar ou rapido. A borda direita
+ *  inteira e o puxador de expandir (hover-intent no CSS: a cor so troca depois de ~0,3s pousado). */
+const CARENCIA_MS = 290
+function RailColapsado({ onExpandir }: { onExpandir: () => void }) {
+  const grupoAtivo = useGrupoAtivo()
+  const granted = usePermissoesLojaAtiva()
+  const navegar = useNavigate()
+  const [aberto, setAberto] = useState<GrupoNav | null>(null)
+  const timer = useRef<number | null>(null)
+
+  const cancelar = () => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current)
+      timer.current = null
+    }
+  }
+  const agendarFechar = () => {
+    cancelar()
+    timer.current = window.setTimeout(() => setAberto(null), CARENCIA_MS)
+  }
+  useEffect(() => cancelar, [])
+
+  const grupos = GRUPOS_NAV.map((g) => ({
+    ...g,
+    itens: ROTAS.filter((r) => r.grupo === g.id && !r.ocultoNoMenu && podeVerRota(r, granted)),
+  })).filter((g) => g.itens.length > 0)
+
+  return (
+    <aside className="sticky top-0 hidden h-dvh flex-col items-center gap-1 overflow-visible border-r border-linha bg-papel-2 py-3 md:flex">
+      <span className="mb-2.5 flex size-[30px] flex-none items-center justify-center rounded-[9px] bg-salvia text-sobre-marca">
+        <BellLogo className="size-5" />
+      </span>
+      {grupos.map((g) => {
+        const Icone = g.icone
+        const estaAberto = aberto === g.id
+        const ehAtivo = grupoAtivo === g.id
+        const primeiro = g.itens[0]
+        return (
+          <div
+            key={g.id}
+            className="relative"
+            onMouseEnter={() => {
+              cancelar()
+              setAberto(g.id)
+            }}
+            onMouseLeave={agendarFechar}
+            onFocus={() => {
+              cancelar()
+              setAberto(g.id)
+            }}
+            onBlur={agendarFechar}
+          >
+            <button
+              type="button"
+              onClick={() => primeiro && navegar(`/${primeiro.caminho}`)}
+              aria-label={g.rotulo}
+              aria-haspopup="menu"
+              aria-expanded={estaAberto}
+              className={cn(
+                'flex size-10 items-center justify-center rounded-[11px]',
+                FOCO,
+                ehAtivo
+                  ? 'bg-cartao text-salvia shadow-[inset_0_0_0_1px_var(--color-linha)]'
+                  : 'text-tinta-2 hover:bg-black/5 hover:text-tinta',
+              )}
+            >
+              <Icone className="size-5" strokeWidth={1.75} aria-hidden />
+            </button>
+            <div
+              role="menu"
+              aria-label={g.rotulo}
+              data-aberto={estaAberto}
+              className="whv-pop absolute left-[46px] top-[-8px] z-30 min-w-[184px] rounded-[14px] border border-linha bg-cartao p-[7px] shadow-[0_10px_30px_-8px_rgba(32,50,42,.28),0_2px_8px_rgba(32,50,42,.08)]"
+            >
+              <p className="px-[9px] pb-1.5 pt-[5px] text-[10.5px] font-bold uppercase tracking-wider text-tinta-2">{g.rotulo}</p>
+              {g.itens.map((r) => {
+                const IconeItem = r.icone
+                return (
+                  <NavLink
+                    key={r.caminho}
+                    to={`/${r.caminho}`}
+                    role="menuitem"
+                    onClick={() => setAberto(null)}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-2.5 whitespace-nowrap rounded-[9px] px-[9px] py-[7px] text-[13px] font-medium',
+                        FOCO,
+                        isActive ? 'bg-salvia-claro font-bold text-salvia' : 'text-tinta hover:bg-black/5',
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <IconeItem className={cn('size-4 flex-none', isActive ? 'text-salvia' : 'text-tinta-2')} strokeWidth={1.75} aria-hidden />
+                        {r.rotulo}
+                      </>
+                    )}
+                  </NavLink>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+      <div
+        className="whv-edge absolute right-[-6px] top-0 z-[16] h-full w-3.5 cursor-pointer"
+        role="button"
+        tabIndex={0}
+        title="Expandir menu"
+        aria-label="Mostrar menu lateral"
+        onClick={onExpandir}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onExpandir()
+          }
+        }}
+      />
     </aside>
   )
 }
@@ -325,29 +462,12 @@ function useLateralAberta() {
 export function AppShell() {
   const lateral = useLateralAberta()
   return (
-    <div className={cn('grid min-h-dvh', lateral.aberta ? 'md:grid-cols-[248px_1fr]' : 'md:grid-cols-1')}>
-      {lateral.aberta && <Sidebar onRecolher={lateral.alternar} />}
+    <div className={cn('grid min-h-dvh', lateral.aberta ? 'md:grid-cols-[248px_1fr]' : 'md:grid-cols-[60px_1fr]')}>
+      {lateral.aberta ? <Sidebar onRecolher={lateral.alternar} /> : <RailColapsado onExpandir={lateral.alternar} />}
       <div className="flex min-w-0 flex-col">
         <header className="sticky top-0 z-20 flex h-[60px] items-center gap-3 border-b border-linha bg-papel/90 px-4 backdrop-blur md:px-6">
-          {/* Com a lateral oculta, a marca e o botao de mostrar vivem no header (desktop), espelhando
-              o cabecalho da lateral aberta; quando aberta, marca e botao de recolher ficam na lateral. */}
-          {!lateral.aberta && (
-            <div className="hidden items-center gap-2.5 font-display text-xl font-bold md:flex">
-              <span className="flex size-[30px] flex-none items-center justify-center rounded-[9px] bg-salvia text-sobre-marca">
-                <BellLogo className="size-5" />
-              </span>
-              Whaviso
-              <button
-                type="button"
-                onClick={lateral.alternar}
-                aria-label="Mostrar menu lateral"
-                aria-expanded={false}
-                className={cn('flex size-8 flex-none items-center justify-center rounded-lg text-tinta-2 hover:bg-black/5 hover:text-tinta', FOCO)}
-              >
-                <PanelLeft className="size-5" strokeWidth={1.75} aria-hidden />
-              </button>
-            </div>
-          )}
+          {/* Marca e os controles da lateral (recolher/expandir) vivem na propria lateral: aberta, no
+              cabecalho da sidebar; recolhida, no logo do trilho e no puxador da borda direita. */}
           <div className="min-w-0 max-md:flex-1">
             <SeletorLoja />
           </div>

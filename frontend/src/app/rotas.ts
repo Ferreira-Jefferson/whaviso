@@ -24,6 +24,7 @@ import {
   Receipt,
   ReceiptText,
   Rocket,
+  Settings,
   Star,
   Store,
   TicketPercent,
@@ -103,17 +104,19 @@ export const ROTAS: readonly RotaModulo[] = [
 export interface GrupoInfo {
   id: GrupoNav
   rotulo: string
+  /** Icone do grupo (um por secao), usado no trilho recolhido da lateral. */
+  icone: LucideIcon
   /** Começa aberto no primeiro acesso (sem preferência salva). */
   abertoPadrao?: boolean
 }
 
 export const GRUPOS_NAV: readonly GrupoInfo[] = [
-  { id: 'operacao', rotulo: 'Operação', abertoPadrao: true },
-  { id: 'cardapio', rotulo: 'Cardápio e estoque' },
-  { id: 'clientes', rotulo: 'Clientes e marketing' },
-  { id: 'analise', rotulo: 'Análise' },
-  { id: 'financeiro', rotulo: 'Financeiro' },
-  { id: 'config', rotulo: 'Configuração' },
+  { id: 'operacao', rotulo: 'Operação', icone: ClipboardList, abertoPadrao: true },
+  { id: 'cardapio', rotulo: 'Cardápio e estoque', icone: UtensilsCrossed },
+  { id: 'clientes', rotulo: 'Clientes e marketing', icone: Users },
+  { id: 'analise', rotulo: 'Análise', icone: BarChart3 },
+  { id: 'financeiro', rotulo: 'Financeiro', icone: Wallet },
+  { id: 'config', rotulo: 'Configuração', icone: Settings },
 ]
 
 export const ROTULO_GRUPO: Record<GrupoNav, string> = Object.fromEntries(
