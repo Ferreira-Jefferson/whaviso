@@ -90,6 +90,10 @@ const CONFIG_INICIAL: Record<PlatKey, ConfigPlataforma> = {
 const pct = (f: number) =>
   `${(f * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
 
+// Diferenca com sinal: "+R$ 100" quando positivo; negativo ja vem com o "-" do brl
+// (nunca "+-"); zero sai sem sinal.
+const sinalBrl = (centavos: number) => (centavos > 0 ? `+${brl(centavos)}` : brl(centavos))
+
 interface CustoPlataforma {
   comissaoFracao: number
   custoComissao: number
@@ -223,7 +227,7 @@ export function Comparador() {
             />
             <p className="mt-2 text-xs text-tinta-2">
               {recebimento === 'direto'
-                ? 'So a mensalidade: o Pix cai na sua conta ou voce passa na maquininha da entrega, sem taxa por pedido.'
+                ? 'So a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
                 : recebimento === 'pix'
                   ? `Mensalidade + ${brl(porPedidoPix)} por pedido (taxa ${brl(taxaWhaviso)} + Pix ${brl(ASAAS_PIX_CENTAVOS)}).`
                   : `Mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido.`}
@@ -303,21 +307,14 @@ export function Comparador() {
               </dl>
 
               <div className="mt-4 border-t border-linha pt-3 text-sm">
-                {diff >= 0 ? (
-                  <>
-                    <span className="text-tinta-2">vs whaviso: </span>
-                    <span className="tabular font-semibold text-barro">+{brl(diff)}</span>
-                    <span className="text-tinta-2">/mês</span>
-                    {pedidos > 0 && (
-                      <span className="mt-0.5 block text-xs text-tinta-2">
-                        +{brl(diffPorPedido)} por pedido
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-tinta-2">
-                    <span className="tabular font-semibold text-folha">{brl(-diff)}</span> mais barato
-                    que o whaviso neste cenario
+                <span className="text-tinta-2">vs whaviso: </span>
+                <span className={`tabular font-semibold ${diff >= 0 ? 'text-barro' : 'text-folha'}`}>
+                  {sinalBrl(diff)}
+                </span>
+                <span className="text-tinta-2">/mês</span>
+                {pedidos > 0 && (
+                  <span className="mt-0.5 block text-xs text-tinta-2">
+                    {sinalBrl(diffPorPedido)} por pedido
                   </span>
                 )}
               </div>
