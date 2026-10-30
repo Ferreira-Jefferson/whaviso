@@ -68,6 +68,9 @@ export const PlanoPublicoDTO = z.strictObject({
   nome: z.string(),
   valor_centavos: Centavos,
   inclui: z.array(z.string()),
+  /** Taxa de intermediacao JA RESOLVIDA (override do plano, ou o padrao da plataforma se null).
+   *  Nao e segredo: o proprio card do plano ja mostra esse valor; o comparador da landing usa. */
+  taxa_intermediacao_centavos: Centavos,
 })
 export type PlanoPublicoDTO = z.infer<typeof PlanoPublicoDTO>
 export const PlanosPublicosLista = z.array(PlanoPublicoDTO)

@@ -8,12 +8,16 @@
 import { useState } from 'react'
 import { MoneyInput, Select, SegmentedControl, Switch, type SelectOption } from '@/shared/ui'
 import { brl } from '@/shared/format'
+import { usePlanosPublicos } from '../planos'
 
-// --- Custos do whaviso (fixos, nao percentuais) ---
-const TAXA_WHAVISO_CENTAVOS = 50 // intermediacao por transacao (migration 0084)
+// --- Custos do whaviso ---
+// A taxa de intermediacao vem do PLANO escolhido (0,50/0,40/0,30); estes sao os custos do PSP.
 const ASAAS_PIX_CENTAVOS = 199 // Asaas: Pix recebido, preco real pos-promocao
 const ASAAS_CARTAO_FIXO_CENTAVOS = 49 // Asaas: fixo por cobranca no credito
 const ASAAS_CARTAO_PCT = 0.0299 // Asaas: credito a vista (preco real)
+// Fallback enquanto os planos nao carregaram (ou nenhum ativo): mantem o comparador funcional.
+const FALLBACK_MENS_CENTAVOS = 14900
+const FALLBACK_TAXA_CENTAVOS = 50
 
 type PlatKey = 'ifood' | '99food' | 'aiqfome' | 'keeta'
 
@@ -94,11 +98,22 @@ export function Comparador() {
   const [plataforma, setPlataforma] = useState<PlatKey>('ifood')
   const [plataformaEntrega, setPlataformaEntrega] = useState(false)
   const [pagamentoApp, setPagamentoApp] = useState(true)
-  const [mensalidadeWhaviso, setMensalidadeWhaviso] = useState<number | null>(14900) // R$ 149 (estimativa)
+  const [planoEscolhido, setPlanoEscolhido] = useState('')
   const [recebimento, setRecebimento] = useState<Recebimento>('direto')
 
+  // Planos reais da vitrine: o visitante escolhe qual comparar; default = Profissional (o do meio).
+  const { data: planosData } = usePlanosPublicos()
+  const planos = planosData ?? []
+  const idDefault =
+    planos.find((p) => /profissional/i.test(p.nome))?.id ??
+    planos[Math.min(1, Math.max(0, planos.length - 1))]?.id ??
+    ''
+  const planoId = planoEscolhido || idDefault
+  const plano = planos.find((p) => p.id === planoId)
+  const mensWhaviso = plano?.valor_centavos ?? FALLBACK_MENS_CENTAVOS
+  const taxaWhaviso = plano?.taxa_intermediacao_centavos ?? FALLBACK_TAXA_CENTAVOS
+
   const ticket = ticketCentavos ?? 0
-  const mensWhaviso = mensalidadeWhaviso ?? 0
   const faturamento = ticket * pedidos
 
   // --- Plataforma escolhida ---
@@ -117,10 +132,10 @@ export function Comparador() {
 
   // --- Whaviso, tres cenarios ---
   const whDireto = mensWhaviso
-  const whPix = mensWhaviso + pedidos * (TAXA_WHAVISO_CENTAVOS + ASAAS_PIX_CENTAVOS)
+  const whPix = mensWhaviso + pedidos * (taxaWhaviso + ASAAS_PIX_CENTAVOS)
   const whCartao =
     mensWhaviso +
-    pedidos * (TAXA_WHAVISO_CENTAVOS + ASAAS_CARTAO_FIXO_CENTAVOS) +
+    pedidos * (taxaWhaviso + ASAAS_CARTAO_FIXO_CENTAVOS) +
     Math.round(faturamento * ASAAS_CARTAO_PCT)
   const totalWhaviso =
     recebimento === 'direto' ? whDireto : recebimento === 'pix' ? whPix : whCartao
@@ -202,11 +217,24 @@ export function Comparador() {
 
             <label className="block border-t border-linha pt-4">
               <span className="mb-1.5 block text-sm font-semibold text-tinta">
-                Mensalidade do whaviso
+                Plano do whaviso
               </span>
-              <MoneyInput value={mensalidadeWhaviso} onChange={setMensalidadeWhaviso} />
+              {planos.length > 0 ? (
+                <Select
+                  value={planoId}
+                  onChange={setPlanoEscolhido}
+                  options={planos.map((p) => ({
+                    value: p.id,
+                    label: `${p.nome}: ${brl(p.valor_centavos)}/mês`,
+                  }))}
+                  ariaLabel="Plano do whaviso para comparar"
+                />
+              ) : (
+                <span className="block text-sm text-tinta-2">Carregando planos...</span>
+              )}
               <span className="mt-1 block text-xs text-tinta-2">
-                Valor de exemplo para voce simular; ajuste ao seu plano.
+                {brl(mensWhaviso)}/mês + {brl(taxaWhaviso)} por transação intermediada (ou Pix próprio
+                sem taxa).
               </span>
             </label>
           </div>
@@ -261,8 +289,8 @@ export function Comparador() {
               {recebimento === 'direto'
                 ? '(so a mensalidade: Pix na sua conta ou maquininha na entrega)'
                 : recebimento === 'pix'
-                  ? '(mensalidade + R$ 0,50 + R$ 1,99 de Pix por pedido)'
-                  : '(mensalidade + R$ 0,50 + 2,99% + R$ 0,49 por pedido)'}
+                  ? `(mensalidade + ${brl(taxaWhaviso)} + ${brl(ASAAS_PIX_CENTAVOS)} de Pix por pedido)`
+                  : `(mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido)`}
             </span>
 
             {economia > 0 && (

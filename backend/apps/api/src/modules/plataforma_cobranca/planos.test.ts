@@ -159,7 +159,11 @@ d('plataforma_cobranca: planos (integracao)', () => {
     const vitrine = lista.find((p) => p.id === ativo.id)
     expect(vitrine, 'plano ativo deve aparecer na vitrine').toBeTruthy()
     expect(lista.some((p) => p.id === inativo.id), 'plano inativo nao pode vazar').toBe(false)
-    // So os campos de marketing: nada de `ativo`, taxa interna ou timestamps.
-    expect(Object.keys(vitrine!).sort()).toEqual(['id', 'inclui', 'nome', 'valor_centavos'])
+    // So os campos de marketing + taxa resolvida: nada de `ativo` ou timestamps.
+    expect(Object.keys(vitrine!).sort()).toEqual(
+      ['id', 'inclui', 'nome', 'taxa_intermediacao_centavos', 'valor_centavos'],
+    )
+    // Taxa resolvida = o override do plano (77), nao o padrao da plataforma.
+    expect(vitrine!.taxa_intermediacao_centavos).toBe(77)
   })
 })

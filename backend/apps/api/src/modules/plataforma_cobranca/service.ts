@@ -59,9 +59,12 @@ function paraPlano(l: PlanoLinha): PlanoDTO {
   }
 }
 
-/** Projecao de vitrine: so os campos de marketing (o DTO publico nao carrega dado interno). */
-function paraPlanoPublico(l: PlanoLinha): PlanoPublicoDTO {
-  return { id: l.id, nome: l.nome, valor_centavos: l.valor_centavos, inclui: l.inclui }
+/** Projecao de vitrine: campos de marketing + taxa JA RESOLVIDA (override do plano ou o padrao). */
+function paraPlanoPublico(l: PlanoLinha, taxaPadrao: number): PlanoPublicoDTO {
+  return {
+    id: l.id, nome: l.nome, valor_centavos: l.valor_centavos, inclui: l.inclui,
+    taxa_intermediacao_centavos: l.taxa_intermediacao_centavos ?? taxaPadrao,
+  }
 }
 
 function paraConfigTaxa(l: ConfigTaxaLinha): ConfigTaxaDTO {
@@ -165,9 +168,13 @@ export function criarServicoCobranca(pool: Pool, carenciaDias: number = CARENCIA
     return (await repo.listarPlanos(pool)).map(paraPlano)
   }
 
-  /** Vitrine publica (landing): SO planos ativos, SO campos de marketing. Sem ator (rota aberta). */
+  /** Vitrine publica (landing): SO planos ativos; taxa resolvida com o padrao da plataforma. Sem ator. */
   async function listarPlanosPublicos(): Promise<PlanoPublicoDTO[]> {
-    return (await repo.listarPlanos(pool)).filter((p) => p.ativo).map(paraPlanoPublico)
+    const cfg = await repo.obterConfigTaxa(pool)
+    const taxaPadrao = cfg?.taxa_intermediacao_padrao_centavos ?? 0
+    return (await repo.listarPlanos(pool))
+      .filter((p) => p.ativo)
+      .map((p) => paraPlanoPublico(p, taxaPadrao))
   }
 
   async function alterarPlano(_a: Ator, id: string, b: PlanoPatch): Promise<PlanoDTO> {

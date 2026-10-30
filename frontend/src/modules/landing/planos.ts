@@ -10,6 +10,8 @@ export const PlanoPublicoDTO = z.object({
   nome: z.string(),
   valor_centavos: z.number().int(),
   inclui: z.array(z.string()),
+  /** Taxa de intermediacao ja resolvida (centavos). O comparador usa como taxa do whaviso. */
+  taxa_intermediacao_centavos: z.number().int(),
 })
 export type PlanoPublicoDTO = z.infer<typeof PlanoPublicoDTO>
 export const PlanosPublicosLista = z.array(PlanoPublicoDTO)
