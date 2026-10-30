@@ -172,7 +172,7 @@ export function Comparador() {
       {/* Filtros globais: ticket, pedidos e plano do whaviso */}
       <div className="mt-10 rounded-card border border-linha bg-cartao p-6">
         <div className="grid gap-5 md:grid-cols-3">
-          <label className="block">
+          <label className="block rounded-input border border-linha bg-papel-2 p-4">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <span className="text-sm font-semibold text-tinta">Ticket medio</span>
               <span className="tabular text-sm font-semibold text-salvia">{brl(ticket)}</span>
@@ -188,7 +188,7 @@ export function Comparador() {
               className="w-full cursor-pointer accent-salvia"
             />
           </label>
-          <label className="block">
+          <label className="block rounded-input border border-linha bg-papel-2 p-4">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <span className="text-sm font-semibold text-tinta">Pedidos por mes</span>
               <span className="tabular text-sm font-semibold text-salvia">
@@ -206,7 +206,7 @@ export function Comparador() {
               className="w-full cursor-pointer accent-salvia"
             />
           </label>
-          <label className="block">
+          <label className="block rounded-input border border-linha bg-papel-2 p-4">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <span className="text-sm font-semibold text-tinta">Plano do whaviso</span>
               {plano && (
@@ -222,6 +222,7 @@ export function Comparador() {
                 options={planos.map((p) => ({ value: p.id, label: p.nome }))}
                 ariaLabel="Plano do whaviso para comparar"
                 preencher
+                fino
               />
             ) : (
               <span className="block py-2.5 text-sm text-tinta-2">Carregando planos...</span>
