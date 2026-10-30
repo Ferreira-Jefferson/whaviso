@@ -1,4 +1,4 @@
-// Apoio dos testes de integracao de plataforma_clientes (nao e codigo de producao): monta a app
+// Apoio dos testes de integracao de plataforma_usuarios (nao e codigo de producao): monta a app
 // real com o modulo injetado, verificador fake (token = user_id), duas contas com nome unico
 // (isola a busca de outros testes), um operador, um admin e um membro de loja.
 import { Writable } from 'node:stream'
@@ -12,7 +12,7 @@ import {
 import { verificadorFake } from '../../../../test/app'
 import { construirApp } from '../../../app'
 import { envSchema } from '../../../env'
-import { criarPlataformaClientesRoutes } from '../routes'
+import { criarPlataformaUsuariosRoutes } from '../routes'
 
 export const online = await bancoAcessivel()
 export const logs: string[] = []
@@ -65,9 +65,9 @@ export async function montarMundo(): Promise<Mundo> {
   const adminOpId = await criarOperador(admin, 'admin')
   const destino = new Writable({ write(c: Buffer, _e, cb) { logs.push(c.toString('utf8')); cb() } })
   const app = await construirApp({
-    env, pool: poolApi, logger: criarLogger('plataforma-clientes-teste', 'info', destino),
+    env, pool: poolApi, logger: criarLogger('plataforma-usuarios-teste', 'info', destino),
     verificador: verificadorFake,
-    modulos: [{ prefixo: 'plataforma-clientes', plugin: criarPlataformaClientesRoutes() }],
+    modulos: [{ prefixo: 'plataforma-usuarios', plugin: criarPlataformaUsuariosRoutes() }],
   })
   await app.ready()
   return {
@@ -78,12 +78,16 @@ export async function montarMundo(): Promise<Mundo> {
 
 export async function encerrar(m: Mundo): Promise<void> {
   await m.app.close()
-  const contas = [m.contaA, m.contaB, m.contaC]
-  await poolSuper.query('delete from public.assinaturas where conta_id = any($1)', [contas])
+  // `m.cenario.contas` cobre A/B/C (criadas pelo helper, que ja as empilha) e qualquer conta nova
+  // que os testes de cadastro de usuario tenham empilhado (push manual do conta_id retornado).
+  await poolSuper.query('delete from public.assinaturas where conta_id = any($1)', [m.cenario.contas])
   await poolSuper.query(
     "delete from public.eventos where entidade = 'operador' and detalhes->>'por_user_id' = any($1)",
     [[m.admin, m.operador]],
   )
+  // E-mails da allowlist e planos criados pelos testes de cadastro de usuario (escopados pela marca).
+  await poolSuper.query('delete from public.acessos_permitidos where email ilike $1', [`${m.marca.toLowerCase()}%`])
+  await poolSuper.query('delete from public.planos where nome ilike $1', [`${m.marca}%`])
   await limpar(m.cenario)
   await fecharPools()
 }
@@ -96,7 +100,7 @@ export async function chamar(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- corpo JSON livre nos testes
 ): Promise<{ status: number; corpo: any; headers: Record<string, unknown> }> {
   const res = await m.app.inject({
-    method: metodo, url: `/v1/plataforma-clientes${url}`, headers: como(user),
+    method: metodo, url: `/v1/plataforma-usuarios${url}`, headers: como(user),
     ...(corpo === undefined ? {} : { payload: corpo as object }),
   })
   return { status: res.statusCode, corpo: res.body ? res.json() : null, headers: res.headers }

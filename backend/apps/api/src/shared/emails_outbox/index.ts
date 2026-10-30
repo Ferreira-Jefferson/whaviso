@@ -82,3 +82,37 @@ export async function aprovarDonoPorPagamento(exec: Executor, contaId: string): 
   }
   return true
 }
+
+/**
+ * Define o acesso de login de um e-mail no cadastro de usuario pelo operador (origem admin):
+ * aprovado na hora (`ativo`) ou pendente (aguardando aprovacao, ex. pagamento). Idempotente por
+ * e-mail (upsert); nao sobrescreve um `conta_id` ja gravado. Enfileira o boas-vindas uma unica vez
+ * quando aprova. Helper compartilhado para o modulo plataforma_usuarios chamar sem escrever a
+ * allowlist nele (coordenacao so por banco, sem import de modulo). Nenhum e-mail vai para log.
+ */
+export async function definirAcessoAdmin(
+  exec: Executor,
+  d: { email: string; ativo: boolean; contaId: string | null },
+): Promise<void> {
+  const acesso = await consultarUm<{ id: string; boas_vindas_enviado_em: string | null }>(
+    exec,
+    sql`insert into public.acessos_permitidos (email, status, origem, conta_id, aprovado_em)
+        values (${d.email}, ${d.ativo ? 'aprovado' : 'pendente'}::acesso_status, 'admin', ${d.contaId},
+                ${d.ativo ? sql`now()` : null})
+        on conflict (lower(email)) do update set
+          status = excluded.status,
+          conta_id = coalesce(public.acessos_permitidos.conta_id, excluded.conta_id),
+          aprovado_em = case when excluded.status = 'aprovado'
+                             then coalesce(public.acessos_permitidos.aprovado_em, now())
+                             else null end
+        returning id, boas_vindas_enviado_em`,
+  )
+  if (d.ativo && acesso && !acesso.boas_vindas_enviado_em) {
+    await enfileirarBoasVindas(exec, d.email)
+    await consultar(
+      exec,
+      sql`update public.acessos_permitidos set boas_vindas_enviado_em = now()
+           where id = ${acesso.id} and boas_vindas_enviado_em is null`,
+    )
+  }
+}

@@ -34,6 +34,24 @@ async function semearAcesso(email: string, status: 'pendente' | 'aprovado' | 're
   )
 }
 
+/** Conta pre-provisionada (como o cadastro de usuario do operador cria para quem nunca logou):
+ * sem dono ainda, com um nome-rotulo provisorio. */
+async function semearContaPreProvisionada(nomeProvisorio: string): Promise<string> {
+  const r = await poolSuper.query<{ id: string }>(
+    'insert into public.contas (dono_user_id, nome) values (null, $1) returning id', [nomeProvisorio],
+  )
+  return r.rows[0]!.id
+}
+
+/** Aprova o e-mail ja vinculado a uma conta pre-provisionada (origem admin). */
+async function semearAcessoComConta(email: string, contaId: string): Promise<void> {
+  await poolSuper.query(
+    `insert into public.acessos_permitidos (email, status, origem, conta_id, aprovado_em)
+     values ($1, 'aprovado', 'admin', $2, now())`,
+    [email, contaId],
+  )
+}
+
 d('gate de allowlist de login no POST /conta (integracao)', () => {
   let app: App
   let chamar: ReturnType<typeof criarChamador>
@@ -85,6 +103,27 @@ d('gate de allowlist de login no POST /conta (integracao)', () => {
     const r = await chamar(u, 'POST', '/', { nome: 'Sem email' })
     expect(r.statusCode).toBe(403)
     expect(r.json().error.code).toBe('acesso_nao_aprovado')
+  })
+
+  it('conta pre-provisionada (cadastro de usuario do operador): vincula o dono nela, nao cria conta nova', async () => {
+    const u = await criarUsuario(c)
+    const email = `gate.preprov.${randomUUID().slice(0, 8)}@exemplo.com`
+    await definirEmail(u, email)
+    const contaId = await semearContaPreProvisionada('Rotulo provisorio do operador')
+    await semearAcessoComConta(email, contaId)
+    emailsCriados.push(email)
+    c.contas.push(contaId)
+
+    const r = await chamar(u, 'POST', '/', { nome: 'Nome escolhido pelo dono' })
+    expect(r.statusCode, JSON.stringify(r.json())).toBe(201)
+    expect(r.json().id).toBe(contaId)
+    const row = await poolSuper.query('select dono_user_id, nome from public.contas where id = $1', [contaId])
+    expect(row.rows[0]).toMatchObject({ dono_user_id: u, nome: 'Nome escolhido pelo dono' })
+
+    // Idempotente: logar de novo devolve a mesma conta (ja tem dono), sem recriar.
+    const r2 = await chamar(u, 'POST', '/', { nome: 'Outro nome' })
+    expect(r2.statusCode).toBe(200)
+    expect(r2.json().id).toBe(contaId)
   })
 
   it('convidado de outra conta NAO e afetado pelo gate (ja_possui_conta, 409)', async () => {

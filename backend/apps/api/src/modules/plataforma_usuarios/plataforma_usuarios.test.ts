@@ -1,5 +1,6 @@
 // Integracao do console do operador contra o Postgres local: escopo (401/403), listagem, busca,
-// paginacao, ficha, allowlist de payload (SEC-003), gestao da equipe e invariantes de admin.
+// paginacao, ficha, allowlist de payload (SEC-003), gestao da equipe, cadastro de usuario (3
+// caminhos) e invariantes de admin.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { poolSuper, criarUsuario } from '../../../test/db'
 import { chamar, encerrar, logs, montarMundo, online, type Mundo } from './tests/harness'
@@ -11,7 +12,14 @@ const CHAVES_FICHA = [
   'assinatura', 'criado_em', 'dono_user_id', 'id', 'lojas', 'membros', 'nome', 'saude_whatsapp', 'situacao',
 ]
 
-d('modulo plataforma_clientes', () => {
+async function statusAllowlist(email: string): Promise<{ status: string; conta_id: string | null } | null> {
+  const r = await poolSuper.query(
+    'select status, conta_id from public.acessos_permitidos where lower(email) = lower($1)', [email],
+  )
+  return r.rows[0] ?? null
+}
+
+d('modulo plataforma_usuarios', () => {
   let m: Mundo
   beforeAll(async () => { m = await montarMundo() })
   afterAll(async () => { if (m) await encerrar(m) })
@@ -22,7 +30,7 @@ d('modulo plataforma_clientes', () => {
     const rotas: [Parameters<typeof chamar>[2], string, unknown?][] = [
       ['GET', '/contas'], ['GET', `/contas/${id}`], ['GET', '/operadores'],
       ['POST', '/operadores', { email: 'x@exemplo.com', nome: 'X' }],
-      ['POST', '/contas', { nome_restaurante: 'Novo', email_dono: 'x@exemplo.com' }],
+      ['POST', '/usuarios', { nome: 'XX', email: 'x@exemplo.com', ativo: true }],
       ['PATCH', `/operadores/${m.operadorOpId}`, { ativo: false }],
     ]
     for (const [metodo, url, corpo] of rotas) {
@@ -85,7 +93,7 @@ d('modulo plataforma_clientes', () => {
     expect(new Set(vistos).size).toBe(3)
   })
 
-  it('ficha: conta + lojas + membros (sem contato) + numero (so status) + assinatura', async () => {
+  it('ficha: conta + lojas (com codigo publico) + membros (sem contato) + numero (so status) + assinatura', async () => {
     const loja = m.lojaA
     await poolSuper.query(
       `insert into public.numeros_whatsapp (loja_id, phone_number_id, waba_id, numero_hash, status, verificado)
@@ -98,6 +106,8 @@ d('modulo plataforma_clientes', () => {
       expect(Object.keys(r.corpo).sort()).toEqual(CHAVES_FICHA)
       expect(r.corpo.saude_whatsapp).toBe('ok')
       expect(r.corpo.dono_user_id).toBe(m.dono)
+      expect(typeof r.corpo.lojas[0].codigo_publico).toBe('string')
+      expect(r.corpo.lojas[0].codigo_publico.length).toBeGreaterThan(0)
       expect(r.corpo.lojas[0].numero).toMatchObject({ status: 'conectado', verificado: true })
       expect(Object.keys(r.corpo.lojas[0].numero).sort()).toEqual(['criado_em', 'status', 'verificado'])
       expect(Object.keys(r.corpo.membros[0]).sort()).toEqual(['ativo', 'criado_em', 'loja_id', 'papel', 'user_id'])
@@ -148,36 +158,88 @@ d('modulo plataforma_clientes', () => {
     expect(JSON.stringify(ev.rows[0].detalhes)).not.toMatch(/nome|telefone|email/i)
   })
 
-  it('admin provisiona cliente por e-mail do dono: conta + loja + dono (SEC-041)', async () => {
+  it('cadastro de usuario: conta nova com dono ja existente no Auth + plano (SEC-041)', async () => {
     const dono = await criarUsuario(m.cenario)
     const email = `${m.marca.toLowerCase()}.dono@exemplo.com`
     await poolSuper.query('update auth.users set email = $2 where id = $1', [dono, email])
-    const nome = `${m.marca} Novo Cliente`
-    const ok = await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: nome, email_dono: email })
+    const plano = await poolSuper.query(
+      'insert into public.planos (nome, valor_centavos) values ($1, $2) returning id', [`${m.marca} Plano`, 19900],
+    )
+    const planoId = plano.rows[0].id
+    const nome = `${m.marca} Novo Usuario`
+    const ok = await chamar(m, m.admin, 'POST', '/usuarios', { nome, email, ativo: true, plano_id: planoId })
     expect(ok.status, JSON.stringify(ok.corpo)).toBe(201)
+    expect(ok.corpo.vinculado_loja_existente).toBe(false)
     m.cenario.contas.push(ok.corpo.conta_id) // limpeza no encerramento
     const c = await poolSuper.query('select dono_user_id, nome from public.contas where id = $1', [ok.corpo.conta_id])
     expect(c.rows[0]).toMatchObject({ dono_user_id: dono, nome })
-    const l = await poolSuper.query('select conta_id, nome from public.lojas where id = $1', [ok.corpo.loja_id])
+    const l = await poolSuper.query('select conta_id, nome, codigo_publico from public.lojas where id = $1', [ok.corpo.loja_id])
     expect(l.rows[0]).toMatchObject({ conta_id: ok.corpo.conta_id, nome })
+    expect(l.rows[0].codigo_publico).toBeTruthy()
     const mb = await poolSuper.query(
       'select papel, loja_id from public.membros where conta_id = $1 and user_id = $2', [ok.corpo.conta_id, dono],
     )
     expect(mb.rows).toEqual([{ papel: 'dono', loja_id: null }])
+    const assinatura = await poolSuper.query(
+      'select status, plano_id, valor_mensal_centavos from public.assinaturas where conta_id = $1', [ok.corpo.conta_id],
+    )
+    expect(assinatura.rows[0]).toMatchObject({ status: 'trial', plano_id: planoId, valor_mensal_centavos: 19900 })
+    expect(await statusAllowlist(email)).toMatchObject({ status: 'aprovado', conta_id: ok.corpo.conta_id })
     const ev = await poolSuper.query(
-      "select detalhes from public.eventos where tipo = 'plataforma.cliente_provisionado' and entidade_id = $1", [ok.corpo.conta_id],
+      "select detalhes from public.eventos where tipo = 'plataforma.usuario_provisionado' and entidade_id = $1", [ok.corpo.conta_id],
     )
     expect(ev.rows).toHaveLength(1)
     expect(JSON.stringify(ev.rows[0].detalhes)).not.toMatch(/@|email|nome/i)
     // mesmo dono de novo: ja possui conta
-    const dup = await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: 'Outro', email_dono: email })
+    const dup = await chamar(m, m.admin, 'POST', '/usuarios', { nome: 'Outro', email, ativo: true })
     expect(dup.status).toBe(409)
     expect(dup.corpo.error.code).toBe('ja_possui_conta')
-    // e-mail inexistente no Auth: mensagem clara; corpo estrito (sem loja_id)
-    const sem = await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: 'Outro', email_dono: `${m.marca.toLowerCase()}.zz@exemplo.com` })
-    expect(sem.status).toBe(422)
-    expect(sem.corpo.error.code).toBe('usuario_sem_acesso')
-    expect((await chamar(m, m.admin, 'POST', '/contas', { nome_restaurante: 'Outro', email_dono: email, loja_id: m.lojaA })).status).toBe(400)
+    expect((await chamar(m, m.admin, 'POST', '/usuarios', { nome: 'Outro', email, ativo: true, loja_id: m.lojaA })).status).toBe(400)
+  })
+
+  it('cadastro de usuario: e-mail que nunca logou pre-provisiona a conta (ativo e pendente)', async () => {
+    const emailAtivo = `${m.marca.toLowerCase()}.preprov.ativo@exemplo.com`
+    const ok = await chamar(m, m.admin, 'POST', '/usuarios', { nome: 'Dono Futuro', email: emailAtivo, ativo: true })
+    expect(ok.status, JSON.stringify(ok.corpo)).toBe(201)
+    expect(ok.corpo).toMatchObject({ loja_id: null, membro_id: null, vinculado_loja_existente: false })
+    m.cenario.contas.push(ok.corpo.conta_id)
+    const c = await poolSuper.query('select dono_user_id from public.contas where id = $1', [ok.corpo.conta_id])
+    expect(c.rows[0].dono_user_id).toBeNull()
+    expect(await statusAllowlist(emailAtivo)).toMatchObject({ status: 'aprovado', conta_id: ok.corpo.conta_id })
+
+    const emailPendente = `${m.marca.toLowerCase()}.preprov.pendente@exemplo.com`
+    const pendente = await chamar(m, m.admin, 'POST', '/usuarios', { nome: 'Dona Futura', email: emailPendente, ativo: false })
+    expect(pendente.status, JSON.stringify(pendente.corpo)).toBe(201)
+    m.cenario.contas.push(pendente.corpo.conta_id)
+    expect(await statusAllowlist(emailPendente)).toMatchObject({ status: 'pendente', conta_id: pendente.corpo.conta_id })
+  })
+
+  it('cadastro de usuario: vincula a uma loja ja cadastrada pelo codigo publico', async () => {
+    const membro = await criarUsuario(m.cenario)
+    const email = `${m.marca.toLowerCase()}.membro@exemplo.com`
+    await poolSuper.query('update auth.users set email = $2 where id = $1', [membro, email])
+    const loja = await poolSuper.query('select codigo_publico from public.lojas where id = $1', [m.lojaA])
+    const codigo = loja.rows[0].codigo_publico
+
+    const ok = await chamar(m, m.admin, 'POST', '/usuarios', { nome: 'Novo Gerente', email, ativo: true, loja_codigo_publico: codigo })
+    expect(ok.status, JSON.stringify(ok.corpo)).toBe(201)
+    expect(ok.corpo).toMatchObject({ conta_id: m.contaA, loja_id: m.lojaA, vinculado_loja_existente: true })
+    const mb = await poolSuper.query('select papel, loja_id from public.membros where id = $1', [ok.corpo.membro_id])
+    expect(mb.rows[0]).toMatchObject({ papel: 'gerente', loja_id: m.lojaA })
+    expect(await statusAllowlist(email)).toMatchObject({ status: 'aprovado', conta_id: m.contaA })
+
+    const semCodigo = await chamar(m, m.admin, 'POST', '/usuarios', {
+      nome: 'Fantasma Dois', email: `${m.marca.toLowerCase()}.fantasma2@exemplo.com`, ativo: true, loja_codigo_publico: 'codigo-que-nao-existe',
+    })
+    expect(semCodigo.status).toBe(422) // e-mail tambem nunca logou: cai no erro de acesso antes de checar a loja
+
+    const semAcesso = await criarUsuario(m.cenario)
+    const emailSemAcesso = `${m.marca.toLowerCase()}.semacesso@exemplo.com`
+    await poolSuper.query('update auth.users set email = $2 where id = $1', [semAcesso, emailSemAcesso])
+    const codigoInvalido = await chamar(m, m.admin, 'POST', '/usuarios', {
+      nome: 'Sem Acesso', email: emailSemAcesso, ativo: true, loja_codigo_publico: 'codigo-que-nao-existe',
+    })
+    expect(codigoInvalido.status).toBe(404)
   })
 
   it('admin troca papel e desativa; ultimo admin ativo nao cai (invariante)', async () => {

@@ -1,9 +1,9 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { naoAutorizado } from '../../shared/http_errors'
-import { criarServicoPlataformaClientes, type AtorOperador } from './service'
+import { criarServicoPlataformaUsuarios, type AtorOperador } from './service'
 import {
-  IdParams, NovoCliente, NovoClienteSaida, OperadorConvite, OperadorDTO, OperadorListaSaida, OperadorPatch,
+  IdParams, NovoUsuario, NovoUsuarioSaida, OperadorConvite, OperadorDTO, OperadorListaSaida, OperadorPatch,
   PlataformaContaFicha, PlataformaContaPagina, PlataformaContasQuery,
 } from './schemas'
 
@@ -14,15 +14,15 @@ function ator(req: FastifyRequest): AtorOperador {
   return { userId: o.user_id, papel: o.papel }
 }
 
-export function criarPlataformaClientesRoutes(): FastifyPluginAsync {
+export function criarPlataformaUsuariosRoutes(): FastifyPluginAsync {
   return async (instancia) => {
     const app = instancia.withTypeProvider<ZodTypeProvider>()
-    const svc = criarServicoPlataformaClientes(app.pool)
+    const svc = criarServicoPlataformaUsuarios(app.pool)
     // Toda rota e 'plataforma' (escopo de operador); membro de loja recebe 403 do escopoOperador.
     const plataforma = (extra: object = {}) => ({ config: { acesso: 'plataforma' as const, ...extra } })
-    // Permissoes da grade (padrao: so admin cria cliente e gere a equipe; SEC-041). Rodam depois de `escopoOperador`.
-    const leitura = [app.autenticar, app.escopoOperador, app.exigirPermissao('clientes_plataforma:ver')]
-    const criarCliente = [app.autenticar, app.escopoOperador, app.exigirPermissao('clientes_plataforma:criar')]
+    // Permissoes da grade (padrao: so admin cadastra usuario e gere a equipe; SEC-041). Rodam depois de `escopoOperador`.
+    const leitura = [app.autenticar, app.escopoOperador, app.exigirPermissao('usuarios_plataforma:ver')]
+    const criarUsuario = [app.autenticar, app.escopoOperador, app.exigirPermissao('usuarios_plataforma:criar')]
     const equipe = [app.autenticar, app.escopoOperador, app.exigirPermissao('equipe:gerir')]
 
     app.get('/contas', {
@@ -35,10 +35,10 @@ export function criarPlataformaClientesRoutes(): FastifyPluginAsync {
       schema: { params: IdParams, response: { 200: PlataformaContaFicha } },
     }, async (req) => svc.fichaConta(req.params.id))
 
-    app.post('/contas', {
-      ...plataforma({ rateLimit: { max: 20, timeWindow: '1 minute' } }), preHandler: criarCliente,
-      schema: { body: NovoCliente, response: { 201: NovoClienteSaida } },
-    }, async (req, reply) => reply.status(201).send(await svc.provisionarCliente(ator(req), req.body)))
+    app.post('/usuarios', {
+      ...plataforma({ rateLimit: { max: 20, timeWindow: '1 minute' } }), preHandler: criarUsuario,
+      schema: { body: NovoUsuario, response: { 201: NovoUsuarioSaida } },
+    }, async (req, reply) => reply.status(201).send(await svc.criarUsuario(ator(req), req.body)))
 
     app.get('/operadores', {
       ...plataforma(), preHandler: equipe,
@@ -58,5 +58,5 @@ export function criarPlataformaClientesRoutes(): FastifyPluginAsync {
 }
 
 /** Plugin do registry: sem dependencia de segredo (sem PII). */
-export const plataformaClientesRoutes: FastifyPluginAsync = async (instancia, opts) =>
-  criarPlataformaClientesRoutes()(instancia, opts)
+export const plataformaUsuariosRoutes: FastifyPluginAsync = async (instancia, opts) =>
+  criarPlataformaUsuariosRoutes()(instancia, opts)

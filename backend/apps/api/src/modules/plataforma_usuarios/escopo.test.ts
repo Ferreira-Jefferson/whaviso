@@ -17,7 +17,7 @@ function fontes(): { arquivo: string; texto: string }[] {
     .map((f) => ({ arquivo: f, texto: readFileSync(join(__dirname, f), 'utf8') }))
 }
 
-describe('plataforma_clientes: guarda estatica', () => {
+describe('plataforma_usuarios: guarda estatica', () => {
   it('nenhum arquivo cita tabela de conteudo em SQL', () => {
     for (const { arquivo, texto } of fontes()) {
       for (const t of PROIBIDAS) {

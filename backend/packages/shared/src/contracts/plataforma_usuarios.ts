@@ -1,7 +1,8 @@
-// Contratos de borda do modulo plataforma_clientes (console do operador: restaurantes como
-// clientes da Whaviso). Fonte unica; o codegen reemite para o front. Schemas Zod estritos
-// (SEC-081). O operador ve metadado e saude agregada, NUNCA conteudo de loja (conversa, pedido,
-// cliente final, endereco) nem contato (telefone/e-mail). Dinheiro em centavos.
+// Contratos de borda do modulo plataforma_usuarios (console do operador: cadastro de usuarios do
+// Whaviso, sejam donos de restaurante, equipe de um restaurante ou equipe interna da Whaviso).
+// Fonte unica; o codegen reemite para o front. Schemas Zod estritos (SEC-081). O operador ve
+// metadado e saude agregada, NUNCA conteudo de loja (conversa, pedido, cliente final, endereco)
+// nem contato (telefone/e-mail). Dinheiro em centavos.
 import { z } from 'zod'
 import { papelMembro, papelOperador, statusAssinatura, statusNumero } from './enums'
 import { Centavos, DataHoraIso, UuidSchema } from './primitivos'
@@ -53,6 +54,9 @@ export const PlataformaLojaResumo = z.strictObject({
   nome: z.string(),
   ativo: z.boolean(),
   criado_em: DataHoraIso,
+  /** Identificador publico curto da loja (futuro link do cardapio virtual; serve hoje tambem
+   * para vincular um novo usuario a esta loja no cadastro de usuarios). */
+  codigo_publico: z.string(),
   /** Numero WhatsApp mais recente nao removido da loja; so status, nunca o numero. */
   numero: PlataformaNumeroSaude.nullable(),
 })
@@ -84,7 +88,8 @@ export const PlataformaContaFicha = z.strictObject({
   id: UuidSchema,
   nome: z.string(),
   criado_em: DataHoraIso,
-  dono_user_id: UuidSchema,
+  /** null ate o primeiro login: conta pre-provisionada pelo admin aguardando o dono entrar. */
+  dono_user_id: UuidSchema.nullable(),
   situacao: plataformaSituacaoConta,
   saude_whatsapp: plataformaSaudeWhatsapp,
   lojas: z.array(PlataformaLojaResumo),

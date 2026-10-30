@@ -22,7 +22,7 @@ import { pagamentosRoutes } from './modules/pagamentos'
 import { dashboardRoutes } from './modules/dashboard'
 import { crmRoutes } from './modules/crm'
 import { configuracoesLlmRoutes } from './modules/configuracoes_llm'
-import { plataformaClientesRoutes } from './modules/plataforma_clientes'
+import { plataformaUsuariosRoutes } from './modules/plataforma_usuarios'
 import { cobrancaRoutes } from './modules/plataforma_cobranca'
 import { plataformaFunilRoutes } from './modules/plataforma_funil'
 import { plataformaPainelRoutes } from './modules/plataforma_painel'
@@ -76,7 +76,7 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'dashboard', plugin: dashboardRoutes },
   { prefixo: 'crm', plugin: crmRoutes },
   { prefixo: 'llm', plugin: configuracoesLlmRoutes },
-  { prefixo: 'plataforma-clientes', plugin: plataformaClientesRoutes },
+  { prefixo: 'plataforma-usuarios', plugin: plataformaUsuariosRoutes },
   { prefixo: 'plataforma-cobranca', plugin: cobrancaRoutes },
   { prefixo: 'plataforma-funil', plugin: plataformaFunilRoutes },
   { prefixo: 'plataforma-painel', plugin: plataformaPainelRoutes },

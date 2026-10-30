@@ -1,15 +1,31 @@
-# P-clientes plataforma_clientes
+# P-usuarios plataforma_usuarios
 
-- **ID:** P-clientes  ·  **Área:** P  ·  **Onda:** 4
-- **Modelo sugerido:** Sonnet  ·  **Status:** `A FAZER`
+- **ID:** P-usuarios (antigo P-clientes)  ·  **Área:** P  ·  **Onda:** 4
+- **Modelo sugerido:** Sonnet  ·  **Status:** `CONCLUIDO` (backend; ver nota 2026-10-30)
 - **Reivindicado por:** (livre)
 
 ## Objetivo
 
-Console do operador para enxergar os **restaurantes como clientes da Whaviso**: lista de contas, as
-lojas de cada uma, quem é o dono, situação da assinatura (só leitura aqui), saúde do número de
-WhatsApp (status, nunca o número em claro) e data de cadastro. Entrega também a **gestão da equipe
-Whaviso** (`operadores`: convidar, trocar papel, desativar), restrita a `admin`.
+Console do operador para enxergar os **restaurantes e as pessoas que usam a Whaviso**: lista de
+contas, as lojas de cada uma, quem é o dono, situação da assinatura (só leitura aqui), saúde do
+número de WhatsApp (status, nunca o número em claro) e data de cadastro. O conceito de borda é o
+**usuário**, não "cliente": um usuário pode ser o dono de um restaurante, alguém da equipe desse
+dono (cadastrado por ele próprio depois), ou alguém da equipe interna da Whaviso sem restaurante
+nenhum. Quem cadastra a própria loja é sempre o usuário, nunca o operador (ver [[11-quem-pode-logar-ativacao]]).
+
+O cadastro de usuário pelo operador (`POST /plataforma-usuarios/usuarios`) cobre três caminhos:
+1. **Vincular a uma loja já cadastrada**, pelo código público dela (`lojas.codigo_publico`, hash
+   curta visível na ficha da conta; mesmo código que o cardápio virtual, futuro, vai usar no link
+   público). Exige que o e-mail já tenha acessado o Whaviso uma vez.
+2. **Criar uma conta nova** (dono ainda sem loja; ele mesmo cria a loja depois, `POST /v1/lojas`),
+   com `plano_id` opcional associando uma assinatura inicial (`trial`) à conta.
+3. Em qualquer caminho, um toggle `ativo` decide se o acesso de login já fica aprovado na hora
+   (allowlist, [[10-acessos-permissoes]]) ou pendente, aguardando aprovação (ex.: pagamento). Se a
+   pessoa nunca logou, a conta fica "pré-provisionada" (sem dono) até o primeiro login.
+
+Entrega também a **gestão da equipe Whaviso** (`operadores`: convidar, trocar papel, desativar),
+restrita a `admin`, que continua separada (tela "Equipe"): é gente da Whaviso, não um usuário do
+restaurante.
 
 "Pronto" observável: um operador autenticado lista e busca contas, abre a ficha de uma conta com lojas,
 membros (nome e papel, sem contato) e situação de cobrança; um membro de loja recebe 403 em todos os
@@ -34,20 +50,21 @@ mensagem, cliente final ou endereço (SEC-003).
   `mensagens`, `clientes`, `enderecos`, `pagamentos`, `loja_pix`, `credenciais_llm`, `uso_llm`,
   `base_conhecimento`, `cache_semantico`, `motoboys*`, `envios`. Nenhuma delas pode aparecer em SQL deste
   módulo.
-- **Contratos Zod (kernel `contracts`):** `PlataformaContaResumo`, `PlataformaContaFicha`,
-  `PlataformaLojaResumo`, `OperadorDTO`, `OperadorConvite`, `OperadorPatch`, paginação padrão
-  (`cursor`, `limite` máx 100).
-- **Rotas:** `GET /plataforma/contas`, `GET /plataforma/contas/:id`, `GET /plataforma/operadores`,
-  `POST /plataforma/operadores`, `PATCH /plataforma/operadores/:id` (admin).
+- **Contratos Zod (kernel `contracts`):** `PlataformaContaResumo`, `PlataformaContaFicha`
+  (`lojas[].codigo_publico` incluso), `PlataformaLojaResumo`, `NovoUsuario`, `NovoUsuarioSaida`,
+  `OperadorDTO`, `OperadorConvite`, `OperadorPatch`, paginação padrão (`cursor`, `limite` máx 100).
+- **Rotas:** `GET /plataforma-usuarios/contas`, `GET /plataforma-usuarios/contas/:id`,
+  `POST /plataforma-usuarios/usuarios`, `GET /plataforma-usuarios/operadores`,
+  `POST /plataforma-usuarios/operadores`, `PATCH /plataforma-usuarios/operadores/:id` (admin).
 
 ## Arquivos (escopo de edição)
 
-- `backend/apps/api/src/modules/plataforma_clientes/**` (rotas, serviço, queries, contratos locais,
+- `backend/apps/api/src/modules/plataforma_usuarios/**` (rotas, serviço, queries, contratos locais,
   testes, `MODULE.md`)
 - `backend/apps/api/src/routes.ts` (**1 linha** de registro)
-- `backend/packages/shared/src/contracts/plataforma_clientes.ts` (contratos do módulo no kernel, só
+- `backend/packages/shared/src/contracts/plataforma_usuarios.ts` (contratos do módulo no kernel, só
   este arquivo; regenerar `_generated` via `gen_contracts`)
-- `backend/apps/api/test/security/plataforma_clientes.*.test.ts` (arquivos novos, prefixo do módulo)
+- `backend/apps/api/test/security/plataforma_usuarios.*.test.ts` (arquivos novos, prefixo do módulo)
 
 ## Etapas
 
@@ -106,3 +123,21 @@ mensagem, cliente final ou endereço (SEC-003).
   resultado, para não ter dois donos da mesma transição.
 - Cobertura multi-loja: ficha lista todas as lojas da conta; conta sem loja é válida (cadastro
   incompleto) e aparece com contagem 0.
+
+## 2026-10-30: rename para "usuários" + pré-provisionamento
+
+Jeff decidiu que "cliente" não era o conceito certo para este módulo: existe uma distinção entre o
+**usuário** (quem tem acesso ao Whaviso) e o **dono de restaurante** (só um tipo de usuário). Módulo,
+rotas e contratos renomeados de `plataforma_clientes` para `plataforma_usuarios`. Implementado:
+
+- `lojas.codigo_publico` (migration `0095_usuarios_plataforma.sql`): hash curta e única por loja,
+  exposta na ficha da conta. Hoje só identifica a loja para o vínculo de usuário por código; é o
+  mesmo código que o futuro cardápio virtual (ainda não construído) vai usar no link público.
+- `contas.dono_user_id` passou a aceitar `NULL`: o operador pode pré-criar a conta (com plano) para
+  um e-mail que nunca logou. O bootstrap do módulo `conta` (`criarConta`) vincula o dono de verdade
+  no primeiro login, lendo `acessos_permitidos.conta_id`, em vez de criar uma conta nova.
+  Este é o "Caso 3" de [[11-quem-pode-logar-ativacao]]: o operador aprova o acesso por dentro do
+  sistema, sem exigir login prévio.
+- Permissões da grade renomeadas: `clientes_plataforma:ver`/`:criar` → `usuarios_plataforma:ver`/`:criar`.
+- Frontend (modal "Novo usuário", exibição do código público na ficha da loja): ver trabalho em
+  andamento após esta nota.

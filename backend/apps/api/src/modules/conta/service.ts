@@ -8,6 +8,7 @@ import {
   buscarConta,
   buscarMembro,
   contaDoDono,
+  contaPreProvisionadaPorEmail,
   contarDonosAtivos,
   emailAprovado,
   emailDoUsuario,
@@ -17,6 +18,7 @@ import {
   renomearConta,
   travarConta,
   travarUsuario,
+  vincularDonoContaPreProvisionada,
   vinculosAtivos,
   type ContaLinha,
   type MembroLinha,
@@ -48,7 +50,12 @@ export async function criarConta(
     if (!email || !(await emailAprovado(tx, email))) {
       throw new Proibido('Seu acesso ainda nao foi liberado', 'acesso_nao_aprovado')
     }
-    const conta = await inserirConta(tx, userId, nome)
+    // Conta pre-provisionada pelo operador (plataforma_usuarios, cadastro de usuario que nunca
+    // tinha logado): vincula o dono nela em vez de criar uma conta nova.
+    const preProvisionada = await contaPreProvisionadaPorEmail(tx, email)
+    const conta =
+      (preProvisionada && (await vincularDonoContaPreProvisionada(tx, preProvisionada.id, userId, nome))) ||
+      (await inserirConta(tx, userId, nome))
     const dono = await inserirMembro(tx, {
       contaId: conta.id,
       lojaId: null,

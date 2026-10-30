@@ -118,6 +118,42 @@ export async function buscarConta(exec: Executor, contaId: string): Promise<Cont
   return r ? mapConta(r) : null
 }
 
+/**
+ * Conta pre-provisionada pelo operador (modulo `plataforma_usuarios`) para este e-mail: ja
+ * aprovada na allowlist, vinculada por `acessos_permitidos.conta_id`, mas ainda sem dono
+ * (`dono_user_id` null) porque a pessoa nunca tinha logado quando foi cadastrada.
+ */
+export async function contaPreProvisionadaPorEmail(exec: Executor, email: string): Promise<ContaLinha | null> {
+  const r = await consultarUm<Bruto<ContaLinha>>(
+    exec,
+    sql`select c.id, c.nome, c.criado_em from public.acessos_permitidos a
+          join public.contas c on c.id = a.conta_id
+         where lower(a.email) = lower(${email}) and a.status = 'aprovado' and c.dono_user_id is null
+         limit 1`,
+  )
+  return r ? mapConta(r) : null
+}
+
+/**
+ * Vincula o dono a uma conta pre-provisionada e aplica o nome escolhido agora pelo dono (o nome
+ * gravado na criacao pelo operador era so um rotulo provisorio). Null se perdeu a corrida (a conta
+ * ja ganhou dono entre a leitura e esta escrita).
+ */
+export async function vincularDonoContaPreProvisionada(
+  exec: Executor,
+  contaId: string,
+  userId: string,
+  nome: string,
+): Promise<ContaLinha | null> {
+  const r = await consultarUm<Bruto<ContaLinha>>(
+    exec,
+    sql`update public.contas set dono_user_id = ${userId}, nome = ${nome}
+         where id = ${contaId} and dono_user_id is null
+         returning id, nome, criado_em`,
+  )
+  return r ? mapConta(r) : null
+}
+
 export async function renomearConta(exec: Executor, contaId: string, nome: string): Promise<ContaLinha> {
   const r = await consultarUm<Bruto<ContaLinha>>(
     exec,

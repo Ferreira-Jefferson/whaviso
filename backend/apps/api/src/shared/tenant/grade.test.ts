@@ -73,9 +73,9 @@ describe('loja: padroes reproduzem o comportamento anterior', () => {
 
 describe('console: padroes reproduzem o comportamento anterior', () => {
   // Antes: exigirAdmin -> so admin. Rota 'plataforma' sem guard extra -> qualquer operador ativo.
-  const SO_ADMIN_ANTES = ['clientes_plataforma:criar', 'equipe:gerir', 'chaves_api:gerir', 'planos:gerir', 'acessos:gerir']
+  const SO_ADMIN_ANTES = ['usuarios_plataforma:criar', 'equipe:gerir', 'chaves_api:gerir', 'planos:gerir', 'acessos:gerir']
   const OPERADOR_ANTES = [
-    'clientes_plataforma:ver', 'cobranca:ver', 'cobranca:gerir', 'funil:ver', 'funil:gerir',
+    'usuarios_plataforma:ver', 'cobranca:ver', 'cobranca:gerir', 'funil:ver', 'funil:gerir',
     'painel:ver', 'custos_plataforma:ver', 'evals:ver', 'evals:rodar',
   ]
   it('operador: faz tudo que fazia (rotas plataforma sem guard) e nada do que era so admin', () => {
@@ -94,8 +94,8 @@ describe('console: padroes reproduzem o comportamento anterior', () => {
     // o papel de menor privilegio NAO le cobranca de nenhum tenant.
     expect(operadorPermite('convidado', 'cobranca:ver')).toBe(false)
     expect(operadorPermite('convidado', 'cobranca:gerir')).toBe(false)
-    // Mantidos por desenho: `vê clientes e relatórios` (nao regredir ao remover cobranca).
-    expect(operadorPermite('convidado', 'clientes_plataforma:ver')).toBe(true)
+    // Mantidos por desenho: `vê usuarios e relatórios` (nao regredir ao remover cobranca).
+    expect(operadorPermite('convidado', 'usuarios_plataforma:ver')).toBe(true)
     expect(operadorPermite('convidado', 'painel:ver')).toBe(true)
   })
   it('papeis novos nunca gerem equipe nem acessos', () => {

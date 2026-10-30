@@ -86,7 +86,7 @@ export async function listarContas(exec: Executor, f: FiltroContas): Promise<Con
 }
 
 export interface FichaContaLinha extends ContaLinha {
-  dono_user_id: string
+  dono_user_id: string | null
 }
 
 export async function obterConta(exec: Executor, id: string): Promise<FichaContaLinha | null> {
@@ -103,6 +103,7 @@ export interface LojaLinha {
   nome: string
   ativo: boolean
   criado_em: string
+  codigo_publico: string
   numero_status: 'conectado' | 'pausado' | 'removido' | null
   numero_verificado: boolean | null
   numero_criado_em: string | null
@@ -112,7 +113,7 @@ export interface LojaLinha {
 export async function lojasDaConta(exec: Executor, contaId: string): Promise<LojaLinha[]> {
   return consultar<LojaLinha>(
     exec,
-    sql`select l.id, l.nome, l.ativo, ${TS('l.criado_em')} as criado_em,
+    sql`select l.id, l.nome, l.ativo, ${TS('l.criado_em')} as criado_em, l.codigo_publico,
                n.status as numero_status, n.verificado as numero_verificado,
                ${TS('n.criado_em')} as numero_criado_em
           from public.lojas l
@@ -124,6 +125,29 @@ export async function lojasDaConta(exec: Executor, contaId: string): Promise<Loj
           ) n on true
          where l.conta_id = ${contaId}
          order by l.criado_em asc, l.id asc`,
+  )
+}
+
+/** Resolve a loja pelo codigo publico (cadastro de usuario vinculado a loja ja existente). */
+export async function lojaPorCodigoPublico(
+  exec: Executor,
+  codigoPublico: string,
+): Promise<{ id: string; contaId: string } | null> {
+  const r = await consultarUm<{ id: string; conta_id: string }>(
+    exec,
+    sql`select id, conta_id from public.lojas where codigo_publico = ${codigoPublico}`,
+  )
+  return r ? { id: r.id, contaId: r.conta_id } : null
+}
+
+/** Plano do catalogo (so os campos usados para gerar a assinatura inicial da conta nova). */
+export async function obterPlano(
+  exec: Executor,
+  planoId: string,
+): Promise<{ id: string; valor_centavos: number } | null> {
+  return consultarUm<{ id: string; valor_centavos: number }>(
+    exec,
+    sql`select id, valor_centavos from public.planos where id = ${planoId} and ativo`,
   )
 }
 
