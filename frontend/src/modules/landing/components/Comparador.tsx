@@ -6,7 +6,7 @@
 // repo). As taxas das plataformas sao as de 2026 (ver notas por plataforma). Os valores
 // do Asaas sao os REAIS, sem promocao (a promo acaba, o preco real permanece).
 import { useState } from 'react'
-import { Select, Switch } from '@/shared/ui'
+import { SegmentedControl, Switch } from '@/shared/ui'
 import { brl } from '@/shared/format'
 import { usePlanosPublicos } from '../planos'
 
@@ -71,9 +71,9 @@ const ORDEM_PLATAFORMAS = Object.keys(PLATAFORMAS) as PlatKey[]
 type Recebimento = 'direto' | 'pix' | 'cartao'
 
 const OPCOES_RECEBIMENTO: ReadonlyArray<{ value: Recebimento; label: string }> = [
-  { value: 'direto', label: 'Pix/maquininha seus' },
-  { value: 'pix', label: 'Intermediado (Pix)' },
-  { value: 'cartao', label: 'Intermediado (cartao)' },
+  { value: 'direto', label: 'Próprio' },
+  { value: 'pix', label: 'Pix' },
+  { value: 'cartao', label: 'Cartão' },
 ]
 
 interface ConfigPlataforma {
@@ -204,16 +204,21 @@ export function Comparador() {
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-tinta">Plano do whaviso</span>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <span className="text-sm font-semibold text-tinta">Plano do whaviso</span>
+              {plano && (
+                <span className="tabular text-sm font-semibold text-salvia">
+                  {brl(plano.valor_centavos)}/mês
+                </span>
+              )}
+            </div>
             {planos.length > 0 ? (
-              <Select
+              <SegmentedControl
                 value={planoId}
                 onChange={setPlanoEscolhido}
-                options={planos.map((p) => ({
-                  value: p.id,
-                  label: `${p.nome}: ${brl(p.valor_centavos)}/mês`,
-                }))}
+                options={planos.map((p) => ({ value: p.id, label: p.nome }))}
                 ariaLabel="Plano do whaviso para comparar"
+                preencher
               />
             ) : (
               <span className="block py-2.5 text-sm text-tinta-2">Carregando planos...</span>
@@ -239,11 +244,12 @@ export function Comparador() {
 
           <div className="mt-4">
             <span className="mb-1.5 block text-sm font-semibold text-tinta">Como voce recebe</span>
-            <Select
+            <SegmentedControl
               value={recebimento}
               onChange={setRecebimento}
               options={OPCOES_RECEBIMENTO}
               ariaLabel="Como voce recebe no whaviso"
+              preencher
             />
           </div>
 
