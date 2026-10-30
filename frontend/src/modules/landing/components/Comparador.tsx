@@ -6,7 +6,7 @@
 // repo). As taxas das plataformas sao as de 2026 (ver notas por plataforma). Os valores
 // do Asaas sao os REAIS, sem promocao (a promo acaba, o preco real permanece).
 import { useState } from 'react'
-import { MoneyInput, Select, Switch } from '@/shared/ui'
+import { Select, Switch } from '@/shared/ui'
 import { brl } from '@/shared/format'
 import { usePlanosPublicos } from '../planos'
 
@@ -170,18 +170,37 @@ export function Comparador() {
       <div className="mt-10 rounded-card border border-linha bg-cartao p-6">
         <div className="grid gap-5 md:grid-cols-3">
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-tinta">Ticket medio</span>
-            <MoneyInput value={ticketCentavos} onChange={setTicketCentavos} />
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <span className="text-sm font-semibold text-tinta">Ticket medio</span>
+              <span className="tabular text-sm font-semibold text-salvia">{brl(ticket)}</span>
+            </div>
+            <input
+              type="range"
+              min={10}
+              max={300}
+              step={5}
+              value={Math.round(ticket / 100)}
+              onChange={(e) => setTicketCentavos(Number(e.target.value) * 100)}
+              aria-label="Ticket medio"
+              className="w-full cursor-pointer accent-salvia"
+            />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-tinta">Pedidos por mes</span>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <span className="text-sm font-semibold text-tinta">Pedidos por mes</span>
+              <span className="tabular text-sm font-semibold text-salvia">
+                {pedidos.toLocaleString('pt-BR')}
+              </span>
+            </div>
             <input
-              type="number"
-              min={0}
-              inputMode="numeric"
-              value={pedidos === 0 ? '' : pedidos}
-              onChange={(e) => setPedidos(Math.max(0, Math.round(Number(e.target.value) || 0)))}
-              className="w-full rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta tabular focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+              type="range"
+              min={10}
+              max={1500}
+              step={10}
+              value={pedidos}
+              onChange={(e) => setPedidos(Number(e.target.value))}
+              aria-label="Pedidos por mes"
+              className="w-full cursor-pointer accent-salvia"
             />
           </label>
           <label className="block">
