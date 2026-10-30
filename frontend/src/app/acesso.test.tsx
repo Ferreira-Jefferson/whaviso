@@ -31,7 +31,8 @@ vi.mock('@/shared/supabase', () => ({
 }))
 
 import { AuthProvider } from '@/shared/auth'
-import { RequireAcessoApp, RequireAuth } from './guards'
+import { RedirectSeLogado, RequireAcessoApp, RequireAuth } from './guards'
+import { ROTA_INICIAL } from './rotas'
 import { criarQueryClient } from './query_client'
 import Entrar from './pages/Entrar'
 
@@ -123,6 +124,76 @@ describe('RequireAcessoApp (gate de entrada)', () => {
     renderApp()
     await screen.findByText('CONSOLE DA PLATAFORMA')
     expect(h.signOutMock).not.toHaveBeenCalled()
+    expect(screen.queryByText('CONTEUDO DO SHELL')).toBeNull()
+  })
+})
+
+// RedirectSeLogado: estando em /entrar ja logado, NAO redireciona so por ter sessao; espera as sondas
+// e so entao navega (ativo -> rota inicial; operador -> console) ou mantem em /entrar quando barrado.
+describe('RedirectSeLogado (espera confirmar acesso antes de redirecionar)', () => {
+  beforeEach(() => {
+    h.signOutMock.mockClear()
+    sessionStorage.clear()
+  })
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  function sondas(estado: string, operadorOk = false) {
+    return (url: string) => {
+      if (url.includes('/v1/acessos-login/eu')) return new Response(JSON.stringify({ estado }), { status: 200 })
+      if (url.includes('/v1/plataforma-painel/eu')) {
+        return operadorOk
+          ? new Response(JSON.stringify({ operador: true, papel: 'suporte' }), { status: 200 })
+          : new Response('{"error":{}}', { status: 403 })
+      }
+      return new Response('{}', { status: 404 })
+    }
+  }
+
+  function renderEntrar() {
+    return render(
+      <QueryClientProvider client={criarQueryClient()}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/entrar']}>
+            <Routes>
+              <Route
+                path="/entrar"
+                element={
+                  <RedirectSeLogado>
+                    <Entrar />
+                  </RedirectSeLogado>
+                }
+              />
+              <Route path={ROTA_INICIAL} element={<div>CONTEUDO DO SHELL</div>} />
+              <Route path="/plataforma" element={<div>CONSOLE DA PLATAFORMA</div>} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('ativo: redireciona para a rota inicial, nao desloga', async () => {
+    montarFetch(sondas('ativo'))
+    renderEntrar()
+    await screen.findByText('CONTEUDO DO SHELL')
+    expect(h.signOutMock).not.toHaveBeenCalled()
+  })
+
+  it('operador sem loja: redireciona para o console', async () => {
+    montarFetch(sondas('nao_cadastrado', true))
+    renderEntrar()
+    await screen.findByText('CONSOLE DA PLATAFORMA')
+    expect(h.signOutMock).not.toHaveBeenCalled()
+  })
+
+  it('barrado: permanece em /entrar com aviso e desloga, sem piscar na rota protegida', async () => {
+    montarFetch(sondas('nao_cadastrado'))
+    renderEntrar()
+    await waitFor(() => expect(h.signOutMock).toHaveBeenCalled())
+    await screen.findByText(/Acesso não permitido/i)
     expect(screen.queryByText('CONTEUDO DO SHELL')).toBeNull()
   })
 })
