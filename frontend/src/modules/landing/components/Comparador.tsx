@@ -147,8 +147,10 @@ export function Comparador() {
 
   // --- Whaviso, tres cenarios ---
   const porPedidoPix = taxaWhaviso + ASAAS_PIX_CENTAVOS
-  const porPedidoCartao =
-    taxaWhaviso + ASAAS_CARTAO_FIXO_CENTAVOS + Math.round(ticket * ASAAS_CARTAO_PCT)
+  // Parte fixa do cartao (taxa whaviso + fixo do gateway), somada num so numero: mostrar
+  // "R$ 0,50 + R$ 0,49" lado a lado le como erro de digitacao, nao como duas cobrancas.
+  const fixoCartao = taxaWhaviso + ASAAS_CARTAO_FIXO_CENTAVOS
+  const porPedidoCartao = fixoCartao + Math.round(ticket * ASAAS_CARTAO_PCT)
   const porPedidoWhaviso =
     recebimento === 'direto' ? 0 : recebimento === 'pix' ? porPedidoPix : porPedidoCartao
   const totalWhaviso = mensWhaviso + pedidos * porPedidoWhaviso
@@ -274,8 +276,8 @@ export function Comparador() {
             {recebimento === 'direto'
               ? 'So a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
               : recebimento === 'pix'
-                ? `Mensalidade + ${brl(porPedidoPix)} por pedido (taxa ${brl(taxaWhaviso)} + Pix ${brl(ASAAS_PIX_CENTAVOS)}).`
-                : `Mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido.`}
+                ? `Mensalidade + ${brl(porPedidoPix)} por pedido.`
+                : `Mensalidade + ${brl(fixoCartao)} + 2,99% por pedido.`}
           </p>
         </div>
 
