@@ -160,7 +160,7 @@ export function Comparador() {
 
   return (
     <section id="comparar" className="mx-auto w-full max-w-7xl px-4 py-16">
-      <div className="mx-auto max-w-2xl text-center">
+      <div className="mx-auto max-w-3xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">
           Quanto você deixa de pagar em taxa
         </h2>
@@ -373,7 +373,6 @@ export function Comparador() {
         >
           Conhecer os planos
         </a>
-        <span className="text-xs text-tinta-2">Comece a receber pedidos pelo seu WhatsApp.</span>
       </div>
     </section>
   )
