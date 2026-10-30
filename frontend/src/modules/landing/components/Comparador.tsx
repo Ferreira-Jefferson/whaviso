@@ -278,13 +278,30 @@ export function Comparador() {
             </div>
           </dl>
 
-          <p className="mt-auto border-t border-salvia/30 pt-3 text-xs text-tinta-2">
-            {recebimento === 'direto'
-              ? 'Só a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
-              : recebimento === 'pix'
-                ? `Mensalidade + ${brl(porPedidoPix)} por pedido.`
-                : `Mensalidade + ${brl(fixoCartao)} + 2,99% por pedido.`}
-          </p>
+          {/* Duas linhas sempre (nao depende de quebra de texto): alinha com o rodape dos
+              concorrentes, que tambem tem duas linhas (vs whaviso + por pedido). */}
+          <div className="mt-auto border-t border-salvia/30 pt-3 text-xs text-tinta-2">
+            {recebimento === 'direto' ? (
+              <>
+                Só a mensalidade.
+                <span className="mt-0.5 block">Pix ou maquininha seus, sem taxa por pedido.</span>
+              </>
+            ) : recebimento === 'pix' ? (
+              <>
+                Mensalidade + {brl(porPedidoPix)} por pedido.
+                <span className="mt-0.5 block">
+                  {brl(taxaWhaviso)} do whaviso + {brl(ASAAS_PIX_CENTAVOS)} do gateway.
+                </span>
+              </>
+            ) : (
+              <>
+                Mensalidade + {brl(fixoCartao)} + 2,99% por pedido.
+                <span className="mt-0.5 block">
+                  {brl(taxaWhaviso)} do whaviso + {brl(ASAAS_CARTAO_FIXO_CENTAVOS)} do gateway.
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Cards dos concorrentes (ordem fixa, cada um com seus controles) */}
