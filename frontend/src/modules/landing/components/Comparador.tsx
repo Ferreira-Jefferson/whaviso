@@ -1,12 +1,12 @@
-// Comparador de custo da landing: o visitante informa ticket medio, pedidos/mes,
-// escolhe a plataforma e liga/desliga as camadas de taxa (entrega pela plataforma,
-// pagamento no app); mostramos o custo mensal dela contra os cenarios do whaviso.
+// Comparador de custo da landing: o visitante informa ticket medio, pedidos/mes e o
+// plano do whaviso; cada plataforma vira um card estatico (ordem fixa) com os proprios
+// controles de entrega e pagamento, mostrando o custo mensal e a diferenca pro whaviso.
 //
 // Dinheiro SEMPRE em centavos (int); conversao so via MoneyInput/brl (convencao do
 // repo). As taxas das plataformas sao as de 2026 (ver notas por plataforma). Os valores
 // do Asaas sao os REAIS, sem promocao (a promo acaba, o preco real permanece).
 import { useState } from 'react'
-import { MoneyInput, Select, SegmentedControl, Switch, type SelectOption } from '@/shared/ui'
+import { MoneyInput, Select, SegmentedControl, Switch } from '@/shared/ui'
 import { brl } from '@/shared/format'
 import { usePlanosPublicos } from '../planos'
 
@@ -19,7 +19,7 @@ const ASAAS_CARTAO_PCT = 0.0299 // Asaas: credito a vista (preco real)
 const FALLBACK_MENS_CENTAVOS = 14900
 const FALLBACK_TAXA_CENTAVOS = 50
 
-type PlatKey = 'ifood' | '99food' | 'aiqfome' | 'keeta'
+type PlatKey = 'ifood' | '99food' | 'aiqfome'
 
 interface Plataforma {
   nome: string
@@ -29,10 +29,10 @@ interface Plataforma {
   mensalidadePropriaCentavos: number
   mensalidadeEntregaCentavos: number
   isencaoAteCentavos: number // mensalidade isenta se o faturamento mensal for menor que isso
-  estimativa?: boolean
   nota: string
 }
 
+// Ordem de declaracao = ordem dos cards (fixa, nunca reordena).
 const PLATAFORMAS: Record<PlatKey, Plataforma> = {
   ifood: {
     nome: 'iFood',
@@ -64,22 +64,9 @@ const PLATAFORMAS: Record<PlatKey, Plataforma> = {
     isencaoAteCentavos: 150000, // mensalidade isenta ate R$ 1.500/mes
     nota: 'Comissao 9,99% (voce entrega) ou 22% (aiqfome entrega) + 2,99% no pagamento online. Mensalidade R$ 89,90, isenta ate R$ 1.500/mes.',
   },
-  keeta: {
-    nome: 'Keeta',
-    comissaoPropria: 0.1,
-    comissaoEntrega: 0.13,
-    pagamentoOnline: 0.03,
-    mensalidadePropriaCentavos: 0,
-    mensalidadeEntregaCentavos: 0,
-    isencaoAteCentavos: 0,
-    estimativa: true,
-    nota: 'A Keeta nao publica tabela oficial; usamos uma estimativa (~2 a 3 pontos abaixo da media de mercado). Confirme os valores no seu contrato.',
-  },
 }
 
-const OPCOES_PLATAFORMA: ReadonlyArray<SelectOption<PlatKey>> = (
-  Object.keys(PLATAFORMAS) as PlatKey[]
-).map((k) => ({ value: k, label: PLATAFORMAS[k].nome }))
+const ORDEM_PLATAFORMAS = Object.keys(PLATAFORMAS) as PlatKey[]
 
 type Recebimento = 'direto' | 'pix' | 'cartao'
 
@@ -89,17 +76,55 @@ const OPCOES_RECEBIMENTO: ReadonlyArray<{ value: Recebimento; label: string }> =
   { value: 'cartao', label: 'Intermediado (cartao)' },
 ]
 
+interface ConfigPlataforma {
+  entrega: boolean // a plataforma faz a entrega
+  pagamento: boolean // cliente paga pelo app
+}
+
+const CONFIG_INICIAL: Record<PlatKey, ConfigPlataforma> = {
+  ifood: { entrega: true, pagamento: true },
+  '99food': { entrega: true, pagamento: true },
+  aiqfome: { entrega: true, pagamento: true },
+}
+
 const pct = (f: number) =>
   `${(f * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
+
+interface CustoPlataforma {
+  comissaoFracao: number
+  custoComissao: number
+  custoPagamento: number
+  mens: number
+  total: number
+}
+
+function calcularPlataforma(
+  p: Plataforma,
+  cfg: ConfigPlataforma,
+  faturamento: number,
+): CustoPlataforma {
+  const comissaoFracao = cfg.entrega ? p.comissaoEntrega : p.comissaoPropria
+  const pagFracao = cfg.pagamento ? p.pagamentoOnline : 0
+  const custoComissao = Math.round(faturamento * comissaoFracao)
+  const custoPagamento = Math.round(faturamento * pagFracao)
+  const mens =
+    faturamento >= p.isencaoAteCentavos
+      ? cfg.entrega
+        ? p.mensalidadeEntregaCentavos
+        : p.mensalidadePropriaCentavos
+      : 0
+  return { comissaoFracao, custoComissao, custoPagamento, mens, total: custoComissao + custoPagamento + mens }
+}
 
 export function Comparador() {
   const [ticketCentavos, setTicketCentavos] = useState<number | null>(7000) // R$ 70
   const [pedidos, setPedidos] = useState(300)
-  const [plataforma, setPlataforma] = useState<PlatKey>('ifood')
-  const [plataformaEntrega, setPlataformaEntrega] = useState(false)
-  const [pagamentoApp, setPagamentoApp] = useState(true)
   const [planoEscolhido, setPlanoEscolhido] = useState('')
   const [recebimento, setRecebimento] = useState<Recebimento>('direto')
+  const [config, setConfig] = useState<Record<PlatKey, ConfigPlataforma>>(CONFIG_INICIAL)
+
+  const ajustarConfig = (key: PlatKey, patch: Partial<ConfigPlataforma>) =>
+    setConfig((c) => ({ ...c, [key]: { ...c[key], ...patch } }))
 
   // Planos reais da vitrine: o visitante escolhe qual comparar; default = Profissional (o do meio).
   const { data: planosData } = usePlanosPublicos()
@@ -116,32 +141,13 @@ export function Comparador() {
   const ticket = ticketCentavos ?? 0
   const faturamento = ticket * pedidos
 
-  // --- Plataforma escolhida ---
-  const p = PLATAFORMAS[plataforma]
-  const comissaoFracao = plataformaEntrega ? p.comissaoEntrega : p.comissaoPropria
-  const pagFracao = pagamentoApp ? p.pagamentoOnline : 0
-  const custoComissao = Math.round(faturamento * comissaoFracao)
-  const custoPagamento = Math.round(faturamento * pagFracao)
-  const mensPlataforma =
-    faturamento >= p.isencaoAteCentavos
-      ? plataformaEntrega
-        ? p.mensalidadeEntregaCentavos
-        : p.mensalidadePropriaCentavos
-      : 0
-  const totalPlataforma = custoComissao + custoPagamento + mensPlataforma
-
   // --- Whaviso, tres cenarios ---
-  const whDireto = mensWhaviso
-  const whPix = mensWhaviso + pedidos * (taxaWhaviso + ASAAS_PIX_CENTAVOS)
-  const whCartao =
-    mensWhaviso +
-    pedidos * (taxaWhaviso + ASAAS_CARTAO_FIXO_CENTAVOS) +
-    Math.round(faturamento * ASAAS_CARTAO_PCT)
-  const totalWhaviso =
-    recebimento === 'direto' ? whDireto : recebimento === 'pix' ? whPix : whCartao
-
-  const economia = totalPlataforma - totalWhaviso
-  const economiaPct = totalPlataforma > 0 ? economia / totalPlataforma : 0
+  const porPedidoPix = taxaWhaviso + ASAAS_PIX_CENTAVOS
+  const porPedidoCartao =
+    taxaWhaviso + ASAAS_CARTAO_FIXO_CENTAVOS + Math.round(ticket * ASAAS_CARTAO_PCT)
+  const porPedidoWhaviso =
+    recebimento === 'direto' ? 0 : recebimento === 'pix' ? porPedidoPix : porPedidoCartao
+  const totalWhaviso = mensWhaviso + pedidos * porPedidoWhaviso
 
   return (
     <section id="comparar" className="mx-auto w-full max-w-5xl px-4 py-16">
@@ -151,167 +157,181 @@ export function Comparador() {
         </h2>
         <p className="mt-3 text-tinta-2">
           As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo e
-          fixo e baixo, ou zero quando voce recebe direto. Faca a conta com os seus numeros.
+          fixo e baixo, ou zero quando voce recebe direto. Ajuste cada canal do seu jeito: quem faz
+          a entrega e quem recebe o pagamento muda de app pra app.
         </p>
       </div>
 
-      <div className="mt-10 grid gap-6 md:grid-cols-2">
-        {/* Controles */}
-        <div className="rounded-card border border-linha bg-cartao p-6">
-          <div className="grid gap-5">
-            <div className="grid grid-cols-2 gap-4">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-tinta">
-                  Ticket medio
-                </span>
-                <MoneyInput value={ticketCentavos} onChange={setTicketCentavos} />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-tinta">
-                  Pedidos por mes
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  value={pedidos === 0 ? '' : pedidos}
-                  onChange={(e) => setPedidos(Math.max(0, Math.round(Number(e.target.value) || 0)))}
-                  className="w-full rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta tabular focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
-                />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-tinta">
-                Comparar com
-              </span>
+      {/* Filtros globais: ticket, pedidos e plano do whaviso */}
+      <div className="mt-10 rounded-card border border-linha bg-cartao p-6">
+        <div className="grid gap-5 md:grid-cols-3">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-tinta">Ticket medio</span>
+            <MoneyInput value={ticketCentavos} onChange={setTicketCentavos} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-tinta">Pedidos por mes</span>
+            <input
+              type="number"
+              min={0}
+              inputMode="numeric"
+              value={pedidos === 0 ? '' : pedidos}
+              onChange={(e) => setPedidos(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+              className="w-full rounded-input border border-linha bg-cartao px-3 py-2.5 text-sm text-tinta tabular focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-salvia"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-tinta">Plano do whaviso</span>
+            {planos.length > 0 ? (
               <Select
-                value={plataforma}
-                onChange={setPlataforma}
-                options={OPCOES_PLATAFORMA}
-                ariaLabel="Plataforma para comparar"
+                value={planoId}
+                onChange={setPlanoEscolhido}
+                options={planos.map((p) => ({
+                  value: p.id,
+                  label: `${p.nome}: ${brl(p.valor_centavos)}/mês`,
+                }))}
+                ariaLabel="Plano do whaviso para comparar"
               />
-            </label>
-
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-tinta">A plataforma faz a entrega</span>
-              <Switch
-                ligado={plataformaEntrega}
-                onMudar={setPlataformaEntrega}
-                rotulo="A plataforma faz a entrega"
-              />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-tinta">Clientes pagam pelo aplicativo</span>
-              <Switch
-                ligado={pagamentoApp}
-                onMudar={setPagamentoApp}
-                rotulo="Clientes pagam pelo aplicativo"
-              />
-            </div>
-
-            <p className="rounded-input bg-papel-2 p-3 text-xs text-tinta-2">
-              {p.estimativa ? 'Estimativa. ' : ''}
-              {p.nota}
-            </p>
-
-            <label className="block border-t border-linha pt-4">
-              <span className="mb-1.5 block text-sm font-semibold text-tinta">
-                Plano do whaviso
-              </span>
-              {planos.length > 0 ? (
-                <Select
-                  value={planoId}
-                  onChange={setPlanoEscolhido}
-                  options={planos.map((p) => ({
-                    value: p.id,
-                    label: `${p.nome}: ${brl(p.valor_centavos)}/mês`,
-                  }))}
-                  ariaLabel="Plano do whaviso para comparar"
-                />
-              ) : (
-                <span className="block text-sm text-tinta-2">Carregando planos...</span>
-              )}
-              <span className="mt-1 block text-xs text-tinta-2">
-                {brl(mensWhaviso)}/mês + {brl(taxaWhaviso)} por transação intermediada (ou Pix próprio
-                sem taxa).
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* Resultados */}
-        <div className="grid content-start gap-4">
-          <div className="rounded-card border border-linha bg-cartao p-6">
-            <div className="flex items-baseline justify-between">
-              <span className="font-display text-lg text-tinta">No {p.nome}</span>
-              <span className="tabular text-2xl font-bold text-barro">{brl(totalPlataforma)}</span>
-            </div>
-            <span className="text-xs text-tinta-2">por mes</span>
-            <dl className="mt-4 grid gap-1.5 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-tinta-2">
-                  Comissao ({pct(comissaoFracao)})
-                </dt>
-                <dd className="tabular text-tinta">{brl(custoComissao)}</dd>
-              </div>
-              {pagamentoApp && (
-                <div className="flex justify-between">
-                  <dt className="text-tinta-2">Pagamento no app ({pct(p.pagamentoOnline)})</dt>
-                  <dd className="tabular text-tinta">{brl(custoPagamento)}</dd>
-                </div>
-              )}
-              {mensPlataforma > 0 && (
-                <div className="flex justify-between">
-                  <dt className="text-tinta-2">Mensalidade</dt>
-                  <dd className="tabular text-tinta">{brl(mensPlataforma)}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-
-          <div className="rounded-card border-2 border-salvia bg-salvia-claro p-6">
-            <div className="mb-3">
-              <SegmentedControl
-                value={recebimento}
-                onChange={setRecebimento}
-                options={OPCOES_RECEBIMENTO}
-                ariaLabel="Como voce recebe no whaviso"
-                preencher
-              />
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-display text-lg text-salvia">No whaviso</span>
-              <span className="tabular text-2xl font-bold text-folha">{brl(totalWhaviso)}</span>
-            </div>
-            <span className="text-xs text-tinta-2">
-              por mes{' '}
-              {recebimento === 'direto'
-                ? '(so a mensalidade: Pix na sua conta ou maquininha na entrega)'
-                : recebimento === 'pix'
-                  ? `(mensalidade + ${brl(taxaWhaviso)} + ${brl(ASAAS_PIX_CENTAVOS)} de Pix por pedido)`
-                  : `(mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido)`}
-            </span>
-
-            {economia > 0 && (
-              <div className="mt-4 rounded-input bg-cartao p-4 text-center">
-                <span className="block text-sm text-tinta-2">Voce economiza por mes</span>
-                <span className="tabular block text-3xl font-bold text-folha">{brl(economia)}</span>
-                <span className="text-sm text-tinta-2">
-                  {pct(economiaPct)} a menos que no {p.nome} ({brl(economia * 12)} por ano)
-                </span>
-              </div>
+            ) : (
+              <span className="block py-2.5 text-sm text-tinta-2">Carregando planos...</span>
             )}
-          </div>
+          </label>
+        </div>
+        <p className="mt-3 text-xs text-tinta-2">
+          Faturamento considerado: <span className="tabular font-semibold text-tinta">{brl(faturamento)}</span>/mês.
+          {' '}
+          Whaviso: {brl(mensWhaviso)}/mês + {brl(taxaWhaviso)} por transação intermediada (ou Pix próprio
+          sem taxa). A entrega e o pagamento de cada app você ajusta no próprio card.
+        </p>
+      </div>
 
-          <p className="text-xs text-tinta-2">
-            O whaviso atende quem ja e seu cliente, sem comissao por pedido, e convive com os canais
-            que voce ja usa. Mantenha o que vende por fora e traga para ca o seu proprio movimento.
-          </p>
+      {/* Card do whaviso (destaque, posicao fixa) */}
+      <div className="mt-6 rounded-card border-2 border-salvia bg-salvia-claro p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <span className="font-display text-xl text-salvia">No whaviso</span>
+          <span className="tabular text-3xl font-bold text-folha">{brl(totalWhaviso)}</span>
+        </div>
+        <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:items-start">
+          <div>
+            <span className="mb-1.5 block text-sm font-semibold text-tinta">Como voce recebe</span>
+            <SegmentedControl
+              value={recebimento}
+              onChange={setRecebimento}
+              options={OPCOES_RECEBIMENTO}
+              ariaLabel="Como voce recebe no whaviso"
+              preencher
+            />
+            <p className="mt-2 text-xs text-tinta-2">
+              {recebimento === 'direto'
+                ? 'So a mensalidade: o Pix cai na sua conta ou voce passa na maquininha da entrega, sem taxa por pedido.'
+                : recebimento === 'pix'
+                  ? `Mensalidade + ${brl(porPedidoPix)} por pedido (taxa ${brl(taxaWhaviso)} + Pix ${brl(ASAAS_PIX_CENTAVOS)}).`
+                  : `Mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido.`}
+            </p>
+          </div>
+          <dl className="grid gap-1.5 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-tinta-2">Mensalidade ({plano?.nome ?? 'plano'})</dt>
+              <dd className="tabular text-tinta">{brl(mensWhaviso)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-tinta-2">Taxa por pedido</dt>
+              <dd className="tabular text-tinta">
+                {porPedidoWhaviso === 0 ? 'sem taxa' : brl(porPedidoWhaviso)}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-tinta-2">Custo variavel no mes</dt>
+              <dd className="tabular text-tinta">{brl(totalWhaviso - mensWhaviso)}</dd>
+            </div>
+          </dl>
         </div>
       </div>
 
-      <div className="mt-10 flex flex-col items-center gap-3 text-center">
+      {/* Cards dos concorrentes (ordem fixa, cada um com seus controles) */}
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        {ORDEM_PLATAFORMAS.map((key) => {
+          const p = PLATAFORMAS[key]
+          const cfg = config[key]
+          const r = calcularPlataforma(p, cfg, faturamento)
+          const diff = r.total - totalWhaviso
+          const diffPorPedido = pedidos > 0 ? Math.round(diff / pedidos) : 0
+          return (
+            <div key={key} className="flex flex-col rounded-card border border-linha bg-cartao p-5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-display text-lg text-tinta">{p.nome}</span>
+                <span className="tabular text-2xl font-bold text-barro">{brl(r.total)}</span>
+              </div>
+              <span className="text-xs text-tinta-2">por mes</span>
+
+              <div className="mt-4 grid gap-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-tinta">{p.nome} faz a entrega</span>
+                  <Switch
+                    ligado={cfg.entrega}
+                    onMudar={(v) => ajustarConfig(key, { entrega: v })}
+                    rotulo={`${p.nome} faz a entrega`}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-tinta">Cliente paga pelo app</span>
+                  <Switch
+                    ligado={cfg.pagamento}
+                    onMudar={(v) => ajustarConfig(key, { pagamento: v })}
+                    rotulo={`Cliente paga pelo app no ${p.nome}`}
+                  />
+                </div>
+              </div>
+
+              <dl className="mt-4 grid gap-1.5 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-tinta-2">Comissao ({pct(r.comissaoFracao)})</dt>
+                  <dd className="tabular text-tinta">{brl(r.custoComissao)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-tinta-2">
+                    {cfg.pagamento ? `Pagamento no app (${pct(p.pagamentoOnline)})` : 'Pagamento'}
+                  </dt>
+                  <dd className="tabular text-tinta">
+                    {cfg.pagamento ? brl(r.custoPagamento) : 'por fora'}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-tinta-2">Mensalidade</dt>
+                  <dd className="tabular text-tinta">{r.mens > 0 ? brl(r.mens) : 'sem'}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-4 border-t border-linha pt-3 text-sm">
+                {diff >= 0 ? (
+                  <>
+                    <span className="text-tinta-2">vs whaviso: </span>
+                    <span className="tabular font-semibold text-barro">+{brl(diff)}</span>
+                    <span className="text-tinta-2">/mês</span>
+                    {pedidos > 0 && (
+                      <span className="mt-0.5 block text-xs text-tinta-2">
+                        +{brl(diffPorPedido)} por pedido
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-tinta-2">
+                    <span className="tabular font-semibold text-folha">{brl(-diff)}</span> mais barato
+                    que o whaviso neste cenario
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="mt-6 text-center text-xs text-tinta-2">
+        O whaviso atende quem ja e seu cliente, sem comissao por pedido, e convive com os canais que
+        voce ja usa. Mantenha o que vende por fora e traga para ca o seu proprio movimento.
+      </p>
+
+      <div className="mt-8 flex flex-col items-center gap-3 text-center">
         <a
           href="#planos"
           className="rounded-input bg-salvia px-8 py-3 text-base font-semibold text-papel hover:bg-tinta"
