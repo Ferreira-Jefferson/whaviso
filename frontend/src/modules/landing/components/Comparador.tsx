@@ -6,7 +6,7 @@
 // repo). As taxas das plataformas sao as de 2026 (ver notas por plataforma). Os valores
 // do Asaas sao os REAIS, sem promocao (a promo acaba, o preco real permanece).
 import { useState } from 'react'
-import { MoneyInput, Select, SegmentedControl, Switch } from '@/shared/ui'
+import { MoneyInput, Select, Switch } from '@/shared/ui'
 import { brl } from '@/shared/format'
 import { usePlanosPublicos } from '../planos'
 
@@ -210,29 +210,6 @@ export function Comparador() {
         </p>
       </div>
 
-      {/* Recebimento do whaviso: controle no topo, define o cenario do card do whaviso */}
-      <div className="mt-6 rounded-card border border-linha bg-cartao p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm font-semibold text-tinta">No whaviso, como voce recebe</span>
-          <div className="w-full sm:w-auto sm:min-w-[22rem]">
-            <SegmentedControl
-              value={recebimento}
-              onChange={setRecebimento}
-              options={OPCOES_RECEBIMENTO}
-              ariaLabel="Como voce recebe no whaviso"
-              preencher
-            />
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-tinta-2">
-          {recebimento === 'direto'
-            ? 'So a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
-            : recebimento === 'pix'
-              ? `Mensalidade + ${brl(porPedidoPix)} por pedido (taxa ${brl(taxaWhaviso)} + Pix ${brl(ASAAS_PIX_CENTAVOS)}).`
-              : `Mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido.`}
-        </p>
-      </div>
-
       {/* Quatro canais lado a lado, ordem fixa: whaviso como primeiro card */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card do whaviso (sempre o primeiro, em destaque) */}
@@ -242,6 +219,17 @@ export function Comparador() {
             Custo por mes
           </span>
           <span className="tabular text-3xl font-bold text-folha">{brl(totalWhaviso)}</span>
+
+          <div className="mt-4">
+            <span className="mb-1.5 block text-sm font-semibold text-tinta">Como voce recebe</span>
+            <Select
+              value={recebimento}
+              onChange={setRecebimento}
+              options={OPCOES_RECEBIMENTO}
+              ariaLabel="Como voce recebe no whaviso"
+            />
+          </div>
+
           <dl className="mt-4 grid gap-1.5 text-sm">
             <div className="flex justify-between">
               <dt className="text-tinta-2">Mensalidade ({plano?.nome ?? 'plano'})</dt>
@@ -258,9 +246,13 @@ export function Comparador() {
               <dd className="tabular text-tinta">{brl(totalWhaviso - mensWhaviso)}</dd>
             </div>
           </dl>
-          <p className="mt-auto pt-4 text-xs text-tinta-2">
-            Sem comissao por pedido: voce paga a mensalidade e, so quando intermedia o
-            pagamento, a taxa por pedido.
+
+          <p className="mt-auto border-t border-salvia/30 pt-3 text-xs text-tinta-2">
+            {recebimento === 'direto'
+              ? 'So a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
+              : recebimento === 'pix'
+                ? `Mensalidade + ${brl(porPedidoPix)} por pedido (taxa ${brl(taxaWhaviso)} + Pix ${brl(ASAAS_PIX_CENTAVOS)}).`
+                : `Mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido.`}
           </p>
         </div>
 
