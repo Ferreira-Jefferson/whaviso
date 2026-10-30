@@ -166,8 +166,8 @@ export function Comparador() {
         </h2>
         <p className="mt-3 text-tinta-2">
           As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo é
-          fixo e baixo, ou zero quando você recebe direto. Ajuste cada canal do seu jeito: quem faz
-          a entrega e quem recebe o pagamento muda de app pra app.
+          fixo e baixo, ou zero quando você recebe direto. Nos cards abaixo, ajuste a entrega e o
+          pagamento de cada canal para o que você realmente usa, e veja o custo mudar na hora.
         </p>
       </div>
 
