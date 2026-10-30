@@ -49,6 +49,9 @@ declare module 'fastify' {
   }
   interface FastifyInstance {
     escopoLoja: preHandlerHookHandler
+    /** Como `escopoLoja`, mas usuario sem vinculo NAO e negado: deixa `req.escopo = null` e o
+     *  handler decide (ex.: GET /lojas devolve lista vazia para quem ainda vai criar a 1a loja). */
+    escopoLojaOpcional: preHandlerHookHandler
     /** Guarda: exige que o papel na loja ativa esteja entre os informados. */
     exigirPapel: (...papeis: PapelMembro[]) => preHandlerHookHandler
     /** Guarda: exige uma permissao (tabela de papeis) na loja ativa. */
@@ -72,7 +75,8 @@ function lerLojaSolicitada(req: FastifyRequest): string | null {
 const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
   app.decorateRequest('escopo', null)
 
-  app.decorate('escopoLoja', async (req: FastifyRequest, reply: FastifyReply) => {
+  // Nucleo compartilhado. `tolerante`: usuario sem vinculo nao e negado (req.escopo fica null).
+  const resolver = async (req: FastifyRequest, reply: FastifyReply, tolerante: boolean) => {
     const userId = req.usuario?.user_id
     if (!userId) throw naoAutorizado()
 
@@ -96,6 +100,13 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
     }
 
     if (!escopo) {
+      // Sem vinculo. No modo tolerante o usuario ainda vai criar a 1a loja: nao nega, deixa o
+      // handler decidir (lista vazia). Conta ambigua acima continua negando nos dois modos.
+      if (tolerante) {
+        req.escopo = null
+        reply.header('cache-control', 'no-store')
+        return
+      }
       await auditarNegacao(opcoes, userId, 'sem_vinculo_loja')
       throw proibido('Sem acesso a nenhuma loja')
     }
@@ -112,7 +123,12 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
 
     req.escopo = escopo
     reply.header('cache-control', 'no-store')
-  })
+  }
+
+  app.decorate('escopoLoja', (req: FastifyRequest, reply: FastifyReply) => resolver(req, reply, false))
+  app.decorate('escopoLojaOpcional', (req: FastifyRequest, reply: FastifyReply) =>
+    resolver(req, reply, true),
+  )
 
   app.decorate('exigirPapel', (...papeis: PapelMembro[]) => {
     return async (req: FastifyRequest) => {

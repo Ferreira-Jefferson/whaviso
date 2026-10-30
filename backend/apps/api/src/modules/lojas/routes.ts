@@ -28,6 +28,9 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
     )
     const config = { acesso: 'conteudo_de_loja' as const }
     const comEscopo = { config, preHandler: [app.autenticar, app.escopoLoja] }
+    // Listar as lojas da conta tolera quem ainda nao tem loja (vai criar a 1a): sem vinculo o
+    // escopo fica null e a rota devolve lista vazia, em vez de 403 (evita o beco do onboarding).
+    const comEscopoOpcional = { config, preHandler: [app.autenticar, app.escopoLojaOpcional] }
     // Guarda de rota (defesa em profundidade; o service re-checa por id). As rotas de loja
     // operam pela loja do :id (nao pela loja ativa), entao o guard le o papel dessa loja e
     // exige a permissao na grade, espelhando exigirGestor/contaDoDono do service. Fora do
@@ -57,9 +60,11 @@ export function criarLojasRoutes(opcoes: OpcoesLojas = {}): FastifyPluginAsync {
 
     app.get(
       '/',
-      { ...comEscopo, schema: { querystring: LojaListaQuery, response: { 200: LojaListaSaida } } },
+      { ...comEscopoOpcional, schema: { querystring: LojaListaQuery, response: { 200: LojaListaSaida } } },
       async (req) => ({
-        itens: await service.listar(app.pool, req.escopo!, req.query.incluir_inativas === 'true'),
+        itens: req.escopo
+          ? await service.listar(app.pool, req.escopo, req.query.incluir_inativas === 'true')
+          : [],
       }),
     )
 

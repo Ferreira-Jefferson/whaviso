@@ -3,12 +3,12 @@
 // com 4 areas fixas e "Mais". O conteudo (Outlet) so aparece com loja ativa; antes disso o shell
 // mostra carregando, erro ou o estado "sem loja".
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ChevronRight, LayoutDashboard, MoreHorizontal, PanelLeft, PanelLeftClose, Plus, Store } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { SeletorLoja, useTenant } from '@/shared/tenant'
 import { useEstadoRealtime } from '@/shared/realtime'
-import { BellLogo, EmptyState, ErrorState, Skeleton, cn } from '@/shared/ui'
+import { BellLogo, Button, EmptyState, ErrorState, Skeleton, cn } from '@/shared/ui'
 import { GRUPOS_NAV, ROTAS, podeVerRota, type GrupoNav, type RotaModulo } from '../rotas'
 import { useEhOperador } from '../sonda_operador'
 import { useMinhasPermissoes } from '@/modules/lojas/api'
@@ -257,6 +257,8 @@ function BarraInferior() {
 
 function ConteudoComLoja() {
   const { status, lojaAtiva, lojas, erro, recarregar, lojaSemeada } = useTenant()
+  const { pathname } = useLocation()
+  const navegar = useNavigate()
 
   // Loja salva semeia o x-loja-id: monta a pagina ja, em paralelo com /lojas.
   if (status === 'carregando' && lojaSemeada) return <Outlet />
@@ -278,16 +280,18 @@ function ConteudoComLoja() {
     return <ErrorState aoTentarDeNovo={recarregar} descricao={erro instanceof Error ? erro.message : undefined} />
   }
   if (!lojaAtiva || lojas.length === 0) {
-    // Onboarding minimo: a tela de criar loja e do FR-nucleo (modulo lojas).
+    // A tela de Lojas gere o proprio estado "sem loja" (cadastro da 1a loja, com o modal). As demais
+    // telas exigem loja: mostram o vazio e levam o dono para /lojas com o cadastro ja aberto.
+    if (pathname === '/lojas' || pathname.startsWith('/lojas/')) return <Outlet />
     return (
       <EmptyState
         icone={<Store className="size-8" strokeWidth={1.75} aria-hidden />}
-        titulo="Vamos criar sua primeira loja"
-        descricao="Para começar, cadastre a loja do seu restaurante. Depois é só conectar o WhatsApp e montar o cardápio."
+        titulo="Nenhuma loja definida"
         acao={
-          <span className="inline-flex items-center gap-2 text-sm text-tinta-2">
-            <Plus className="size-4" aria-hidden />O cadastro de loja chega com o módulo de lojas.
-          </span>
+          <Button type="button" onClick={() => navegar('/lojas?novo=1')}>
+            <Plus className="size-4" aria-hidden />
+            Criar loja
+          </Button>
         }
       />
     )

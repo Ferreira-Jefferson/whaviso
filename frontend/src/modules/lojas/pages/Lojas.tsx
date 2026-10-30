@@ -1,7 +1,8 @@
 // Gestao das lojas da conta (multi-tenant): uma conta pode ter varias lojas. Lista as lojas,
 // abre o editor da loja (perfil, entrega e horarios, em abas; ver FormularioLoja), permite tornar
 // uma loja a ativa do painel e ativar/desativar (so o dono). Rota `/lojas`.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { Plus, Store } from 'lucide-react'
 import { ApiError } from '@/shared/api_client'
 import { useTenant } from '@/shared/tenant'
@@ -23,6 +24,15 @@ export default function Lojas() {
   const [incluirInativas, setIncluirInativas] = useState(false)
   const [form, setForm] = useState<{ loja: Loja | null } | null>(null)
   const [paraDesativar, setParaDesativar] = useState<Loja | null>(null)
+  const [params, setParams] = useSearchParams()
+
+  // Chegou de /lojas?novo=1 (do estado "sem loja" do shell): abre o cadastro ja e limpa o parametro.
+  useEffect(() => {
+    if (params.get('novo') !== '1') return
+    setForm({ loja: null })
+    params.delete('novo')
+    setParams(params, { replace: true })
+  }, [params, setParams])
 
   const { lojaAtiva, selecionarLoja } = useTenant()
   const { mostrarToast } = useToast()
@@ -31,7 +41,8 @@ export default function Lojas() {
   const minhas = useMinhasPermissoes()
 
   const lojas = useMemo(() => consulta.data ?? [], [consulta.data])
-  // Sem conta: a api responde 403 (so o dono da conta lista/gere). A loja e liberada pela equipe.
+  // 403 raro (ex.: escopo de conta ambiguo). Sem loja NAO e 403: a api devolve lista vazia e o
+  // usuario cai no mesmo estado vazio, de onde cria a 1a loja.
   const semConta = consulta.error instanceof ApiError && consulta.error.status === 403
   const algumDono =lojas.some((l) => l.papel === 'dono')
   const total = lojas.length
@@ -110,8 +121,13 @@ export default function Lojas() {
         <EmptyState
           className="mt-2"
           icone={<Store className="size-7" aria-hidden />}
-          titulo="Nenhuma loja por aqui"
-          descricao="Sua loja é liberada pela equipe Whaviso."
+          titulo="Nenhuma loja definida"
+          acao={
+            <Button type="button" onClick={() => setForm({ loja: null })}>
+              <Plus aria-hidden strokeWidth={1.75} className="size-4" />
+              Criar loja
+            </Button>
+          }
         />
       )}
 

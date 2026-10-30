@@ -12,6 +12,7 @@ import {
   type LojaCriarEntrada,
   type LojaSaida as Loja,
 } from '@/shared/contracts/_generated/lojas'
+import { ContaSaida } from '@/shared/contracts/_generated/conta'
 
 export const RAIZ = 'lojas'
 
@@ -34,6 +35,17 @@ export function useLojas(incluirInativas: boolean) {
 function invalidarLojas(qc: ReturnType<typeof useQueryClient>) {
   // Raiz ['lojas']: cobre a lista deste modulo E a lista do TenantProvider (seletor do shell).
   void qc.invalidateQueries({ queryKey: [RAIZ] })
+}
+
+/**
+ * POST /v1/conta: bootstrap idempotente da conta do dono (cria conta + membro dono, ou devolve a
+ * existente). Necessario ANTES de criar a 1a loja: POST /lojas exige o vinculo de dono. `semLoja`
+ * porque ainda nao ha loja ativa para o header x-loja-id.
+ */
+export function useCriarConta() {
+  return useMutation<z.infer<typeof ContaSaida>, Error, { nome: string }>({
+    mutationFn: (body) => apiClient.post('/conta', { body, schema: ContaSaida, semLoja: true }),
+  })
 }
 
 /** POST /v1/lojas: cria uma loja (so o dono da conta; a conta vem do vinculo, nunca do corpo). */

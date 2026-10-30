@@ -14,7 +14,7 @@ import {
   LojaCriarEntrada,
   type LojaSaida as Loja,
 } from '@/shared/contracts/_generated/lojas'
-import { useAtualizarLoja, useCriarLoja } from '../api'
+import { useAtualizarLoja, useCriarConta, useCriarLoja } from '../api'
 import { enderecoParaForm, montarEndereco, type EnderecoForm } from '../campos'
 import { GestaoEntrega } from '../entrega/GestaoEntrega'
 import { PainelDisponibilidade } from '../disponibilidade/Painel'
@@ -50,8 +50,9 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
   const prontaParaConfig = lojaAtual != null && lojaAtiva?.id === lojaAtual.id
 
   const criar = useCriarLoja()
+  const criarConta = useCriarConta()
   const atualizar = useAtualizarLoja()
-  const salvando = criar.isPending || atualizar.isPending
+  const salvando = criar.isPending || criarConta.isPending || atualizar.isPending
 
   const [nome, setNome] = useState(loja?.nome ?? '')
   const [endereco, setEndereco] = useState<EnderecoForm>(() => enderecoParaForm(loja?.endereco ?? null))
@@ -86,16 +87,32 @@ export function FormularioLoja({ loja, onFechar }: { loja: Loja | null; onFechar
     }
     const r = LojaCriarEntrada.safeParse(corpo)
     if (!r.success) return setErro(mensagemDeIssue(r.error.issues[0]!))
-    criar.mutate(r.data, {
-      onSuccess: (nova) => {
-        // Criar-depois-configurar: passa para modo edicao, torna a nova loja ativa (quando a lista
-        // do tenant a conhecer) e libera Entrega/Horarios no mesmo editor.
-        setLojaAtual(nova)
-        setAlvoSelecao(nova.id)
-        mostrarToast('Loja criada. Agora configure a entrega e os horários.', { tom: 'sucesso' })
-      },
-      onError: (e2) => setErro(e2 instanceof ApiError ? e2.message : 'Não foi possível criar a loja.'),
-    })
+    const dados = r.data
+    const criarLoja = () =>
+      criar.mutate(dados, {
+        onSuccess: (nova) => {
+          // Criar-depois-configurar: passa para modo edicao, torna a nova loja ativa (quando a lista
+          // do tenant a conhecer) e libera Entrega/Horarios no mesmo editor.
+          setLojaAtual(nova)
+          setAlvoSelecao(nova.id)
+          mostrarToast('Loja criada. Agora configure a entrega e os horários.', { tom: 'sucesso' })
+        },
+        onError: (e2) => setErro(e2 instanceof ApiError ? e2.message : 'Não foi possível criar a loja.'),
+      })
+
+    // 1a loja: garante a conta (bootstrap idempotente) antes, senao POST /lojas nega por falta de
+    // vinculo de dono. Com lojas ja existentes, a conta ja existe: cria direto.
+    if (lojas.length === 0) {
+      criarConta.mutate(
+        { nome: nomeLimpo },
+        {
+          onSuccess: criarLoja,
+          onError: (e2) => setErro(e2 instanceof ApiError ? e2.message : 'Não foi possível criar a conta.'),
+        },
+      )
+      return
+    }
+    criarLoja()
   }
 
   const dicaConfig = (

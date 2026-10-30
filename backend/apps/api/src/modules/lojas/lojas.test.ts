@@ -191,7 +191,10 @@ d('lojas (integracao)', () => {
     expect((await req(gerente, 'POST', '', { nome: 'Outra' })).statusCode).toBe(403)
     expect((await req(gerente, 'POST', `/${lojaA}/desativar`)).statusCode).toBe(403)
     expect((await req(gerente, 'POST', `/${lojaA}/reativar`)).statusCode).toBe(403)
-    expect((await req(semConta, 'GET', '')).statusCode).toBe(403)
+    // Sem vinculo de loja: a listagem tolera (vai criar a 1a loja) e devolve lista vazia, nao 403.
+    const semLoja = await req(semConta, 'GET', '')
+    expect(semLoja.statusCode).toBe(200)
+    expect(semLoja.json().itens).toEqual([])
     const sem = await app.inject({ method: 'GET', url: '/v1/lojas' })
     expect(sem.statusCode).toBe(401)
   })
