@@ -159,7 +159,7 @@ export function Comparador() {
   const totalWhaviso = mensWhaviso + pedidos * porPedidoWhaviso
 
   return (
-    <section id="comparar" className="mx-auto w-full max-w-7xl px-4 py-16">
+    <section id="comparar" className="mx-auto w-full max-w-7xl px-4 pt-16 pb-6">
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">
           Quanto você está deixando na mesa?
@@ -364,15 +364,6 @@ export function Comparador() {
         que você já usa: continue vendendo nos apps de entrega e traga para cá o movimento que já é
         seu.
       </p>
-
-      <div className="mt-8 flex flex-col items-center gap-3 text-center">
-        <a
-          href="#planos"
-          className="rounded-input bg-salvia px-8 py-3 text-base font-semibold text-papel hover:bg-tinta"
-        >
-          Conhecer os planos
-        </a>
-      </div>
     </section>
   )
 }
