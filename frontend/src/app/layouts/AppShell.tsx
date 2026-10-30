@@ -329,18 +329,24 @@ export function AppShell() {
       {lateral.aberta && <Sidebar onRecolher={lateral.alternar} />}
       <div className="flex min-w-0 flex-col">
         <header className="sticky top-0 z-20 flex h-[60px] items-center gap-3 border-b border-linha bg-papel/90 px-4 backdrop-blur md:px-6">
-          {/* Com a lateral oculta, o botao de mostrar vive no header (desktop); quando aberta,
-              o botao de recolher fica dentro da propria lateral, junto da marca. */}
+          {/* Com a lateral oculta, a marca e o botao de mostrar vivem no header (desktop), espelhando
+              o cabecalho da lateral aberta; quando aberta, marca e botao de recolher ficam na lateral. */}
           {!lateral.aberta && (
-            <button
-              type="button"
-              onClick={lateral.alternar}
-              aria-label="Mostrar menu lateral"
-              aria-expanded={false}
-              className={cn('hidden size-11 flex-none items-center justify-center rounded-full border border-linha bg-cartao text-tinta-2 hover:text-tinta md:inline-flex', FOCO)}
-            >
-              <PanelLeft className="size-5" strokeWidth={1.75} aria-hidden />
-            </button>
+            <div className="hidden items-center gap-2.5 font-display text-xl font-bold md:flex">
+              <span className="flex size-[30px] flex-none items-center justify-center rounded-[9px] bg-salvia text-sobre-marca">
+                <BellLogo className="size-5" />
+              </span>
+              Whaviso
+              <button
+                type="button"
+                onClick={lateral.alternar}
+                aria-label="Mostrar menu lateral"
+                aria-expanded={false}
+                className={cn('flex size-8 flex-none items-center justify-center rounded-lg text-tinta-2 hover:bg-black/5 hover:text-tinta', FOCO)}
+              >
+                <PanelLeft className="size-5" strokeWidth={1.75} aria-hidden />
+              </button>
+            </div>
           )}
           <div className="min-w-0 max-md:flex-1">
             <SeletorLoja />
