@@ -68,6 +68,12 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   enderecos: { apiDelete: 'negado' },
   envios: { apiDelete: 'negado' },
   escalas: { apiDelete: 'negado' },
+  // Central de Evals (0090/0092): suites e casos sao config, mas a api so desativa (coluna `ativo`),
+  // nunca apaga (DELETE revogado na 0092); execucoes e resultados sao auditoria. Nenhuma tem DELETE.
+  eval_casos: { apiDelete: 'negado' },
+  eval_execucoes: { apiDelete: 'negado' },
+  eval_resultados: { apiDelete: 'negado' },
+  eval_suites: { apiDelete: 'negado' },
   eventos: { apiDelete: 'negado' },
   eventos_auth: { apiDelete: 'negado' },
   eventos_custo: { apiDelete: 'negado' },
