@@ -138,6 +138,12 @@ export interface SerieLinha {
  * Serie dos ultimos `n` meses (mais antigo primeiro). Por mes [ini, fim): ativa no fim = com
  * inicio antes de `fim` e sem cancelamento ate `fim`; MRR usa o valor ATUAL da assinatura
  * (aproximacao documentada). `n` ja validado (1..24) e passado como parametro.
+ *
+ * ANTES: por mes rodava 6 subconsultas escalares (4 varrendo `assinaturas`, 1 `contas`, 1
+ * `faturas`); com n=24 eram ~144 varreduras por abertura. AGORA cada tabela e varrida UMA vez,
+ * casada com a serie de meses: `assinaturas` num cross join contra os <=24 meses (poucas linhas,
+ * em memoria) agregando os 4 numeros por FILTER; `contas`/`faturas` por range join no mes. Os
+ * predicados de cada metrica sao os MESMOS da versao anterior, entao a saida e identica.
  */
 export async function serieMensal(exec: Executor, n: number): Promise<SerieLinha[]> {
   return consultar<SerieLinha>(
@@ -149,25 +155,36 @@ export async function serieMensal(exec: Executor, n: number): Promise<SerieLinha
             from generate_series(
                    date_trunc('month', now() at time zone ${FUSO}) - ((${n}::int - 1) * interval '1 month'),
                    date_trunc('month', now() at time zone ${FUSO}),
-                   interval '1 month') as m(ini))
-        select lim.mes,
-          coalesce((select sum(a.valor_mensal_centavos) from public.assinaturas a
-                     where a.inicio_em < lim.fim
+                   interval '1 month') as m(ini)),
+        asx as (
+          select lim.mes,
+            coalesce(sum(a.valor_mensal_centavos) filter (where a.inicio_em < lim.fim
                        and (a.cancelada_em is null or a.cancelada_em >= lim.fim)), 0)::float8 as mrr_centavos,
-          (select count(*) from public.assinaturas a
-            where a.inicio_em < lim.fim
-              and (a.cancelada_em is null or a.cancelada_em >= lim.fim))::int as assinaturas_ativas,
-          (select count(*) from public.assinaturas a
-            where a.inicio_em < lim.ini
-              and (a.cancelada_em is null or a.cancelada_em >= lim.ini))::int as ativas_inicio,
-          (select count(*) from public.contas c
-            where c.criado_em >= lim.ini and c.criado_em < lim.fim)::int as novas_contas,
-          (select count(*) from public.assinaturas a
-            where a.cancelada_em >= lim.ini and a.cancelada_em < lim.fim
-              and a.inicio_em < lim.ini)::int as cancelamentos,
-          coalesce((select sum(f.valor_centavos) from public.faturas f
-                     where f.status = 'paga' and f.pago_em >= lim.ini
-                       and f.pago_em < lim.fim), 0)::float8 as receita_centavos
-        from lim order by lim.ini`,
+            (count(a.id) filter (where a.inicio_em < lim.fim
+                       and (a.cancelada_em is null or a.cancelada_em >= lim.fim)))::int as assinaturas_ativas,
+            (count(a.id) filter (where a.inicio_em < lim.ini
+                       and (a.cancelada_em is null or a.cancelada_em >= lim.ini)))::int as ativas_inicio,
+            (count(a.id) filter (where a.cancelada_em >= lim.ini and a.cancelada_em < lim.fim
+                       and a.inicio_em < lim.ini))::int as cancelamentos
+            from lim left join public.assinaturas a on true
+           group by lim.mes),
+        ctx as (
+          select lim.mes, (count(c.id))::int as novas_contas
+            from lim left join public.contas c
+              on c.criado_em >= lim.ini and c.criado_em < lim.fim
+           group by lim.mes),
+        ftx as (
+          select lim.mes,
+            coalesce(sum(f.valor_centavos) filter (where f.status = 'paga'), 0)::float8 as receita_centavos
+            from lim left join public.faturas f
+              on f.pago_em >= lim.ini and f.pago_em < lim.fim
+           group by lim.mes)
+        select lim.mes, asx.mrr_centavos, asx.assinaturas_ativas, asx.ativas_inicio,
+               ctx.novas_contas, asx.cancelamentos, ftx.receita_centavos
+          from lim
+          join asx on asx.mes = lim.mes
+          join ctx on ctx.mes = lim.mes
+          join ftx on ftx.mes = lim.mes
+         order by lim.ini`,
   )
 }
