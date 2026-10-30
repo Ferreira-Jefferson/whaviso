@@ -2,6 +2,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
 import { BellLogo, RodapeSite } from '@/shared/ui'
+import { Comparador } from '../components/Comparador'
 
 const BENEFICIOS = [
   {
@@ -64,6 +65,8 @@ export default function Landing() {
             </div>
           ))}
         </section>
+
+        <Comparador />
       </main>
 
       <RodapeSite />
