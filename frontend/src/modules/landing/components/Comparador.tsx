@@ -172,41 +172,45 @@ export function Comparador() {
       {/* Filtros globais: ticket, pedidos e plano do whaviso */}
       <div className="mt-10 rounded-card border border-linha bg-cartao p-6">
         <div className="grid gap-5 md:grid-cols-3">
-          <label className="block rounded-input border border-linha bg-papel-2 p-4">
+          <label className="block">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <span className="text-sm font-semibold text-tinta">Ticket medio</span>
               <span className="tabular text-sm font-semibold text-salvia">{brl(ticket)}</span>
             </div>
-            <input
-              type="range"
-              min={10}
-              max={300}
-              step={5}
-              value={Math.round(ticket / 100)}
-              onChange={(e) => setTicketCentavos(Number(e.target.value) * 100)}
-              aria-label="Ticket medio"
-              className="w-full cursor-pointer accent-salvia"
-            />
+            <div className="rounded-pill border border-linha bg-papel-2 px-4 py-2.5">
+              <input
+                type="range"
+                min={10}
+                max={300}
+                step={5}
+                value={Math.round(ticket / 100)}
+                onChange={(e) => setTicketCentavos(Number(e.target.value) * 100)}
+                aria-label="Ticket medio"
+                className="block w-full cursor-pointer accent-salvia"
+              />
+            </div>
           </label>
-          <label className="block rounded-input border border-linha bg-papel-2 p-4">
+          <label className="block">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <span className="text-sm font-semibold text-tinta">Pedidos por mes</span>
               <span className="tabular text-sm font-semibold text-salvia">
                 {pedidos.toLocaleString('pt-BR')}
               </span>
             </div>
-            <input
-              type="range"
-              min={10}
-              max={1500}
-              step={10}
-              value={pedidos}
-              onChange={(e) => setPedidos(Number(e.target.value))}
-              aria-label="Pedidos por mes"
-              className="w-full cursor-pointer accent-salvia"
-            />
+            <div className="rounded-pill border border-linha bg-papel-2 px-4 py-2.5">
+              <input
+                type="range"
+                min={10}
+                max={1500}
+                step={10}
+                value={pedidos}
+                onChange={(e) => setPedidos(Number(e.target.value))}
+                aria-label="Pedidos por mes"
+                className="block w-full cursor-pointer accent-salvia"
+              />
+            </div>
           </label>
-          <label className="block rounded-input border border-linha bg-papel-2 p-4">
+          <label className="block">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <span className="text-sm font-semibold text-tinta">Plano do whaviso</span>
               {plano && (
@@ -222,7 +226,6 @@ export function Comparador() {
                 options={planos.map((p) => ({ value: p.id, label: p.nome }))}
                 ariaLabel="Plano do whaviso para comparar"
                 preencher
-                fino
               />
             ) : (
               <span className="block py-2.5 text-sm text-tinta-2">Carregando planos...</span>

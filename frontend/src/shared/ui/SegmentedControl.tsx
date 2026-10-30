@@ -25,11 +25,6 @@ interface SegmentedControlProps<T extends string> {
    * colunas estreitas: todos aparecem, sem quebra nem corte. Padding menor.
    */
   preencher?: boolean
-  /**
-   * Versão mais fina (menos padding), para ficar com a mesma altura de um campo
-   * vizinho enxuto (ex.: um slider) num grupo de campos padronizados.
-   */
-  fino?: boolean
   className?: string
 }
 
@@ -40,7 +35,6 @@ export function SegmentedControl<T extends string>({
   ariaLabel,
   semQuebra = false,
   preencher = false,
-  fino = false,
   className,
 }: SegmentedControlProps<T>) {
   return (
@@ -52,8 +46,7 @@ export function SegmentedControl<T extends string>({
         // esticaria; fit-content trava na largura do conteúdo. Por padrão quebra
         // linha quando não cabe; `semQuebra` fica numa linha só (o container de
         // fora rola na horizontal); `preencher` estica e divide por igual.
-        'gap-1 rounded-pill border border-linha bg-papel-2',
-        fino ? 'p-0.5' : 'p-1',
+        'gap-1 rounded-pill border border-linha bg-papel-2 p-1',
         preencher ? 'flex w-full' : 'inline-flex w-fit',
         preencher || semQuebra ? 'flex-nowrap' : 'flex-wrap',
         className,
@@ -69,8 +62,7 @@ export function SegmentedControl<T extends string>({
             aria-checked={ativo}
             onClick={() => onChange(op.value)}
             className={cn(
-              'whitespace-nowrap rounded-pill text-center transition-colors',
-              fino ? 'py-1' : 'py-1.5',
+              'whitespace-nowrap rounded-pill py-1.5 text-center transition-colors',
               preencher ? 'min-w-0 flex-1 px-2 text-[13px]' : 'px-4 text-sm',
               !preencher && semQuebra && 'flex-none',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia',
