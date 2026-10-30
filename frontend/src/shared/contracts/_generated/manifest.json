@@ -39,6 +39,7 @@
     "pix.ts",
     "plataforma_clientes.ts",
     "plataforma_cobranca.ts",
+    "plataforma_evals.ts",
     "plataforma_funil.ts",
     "plataforma_painel.ts",
     "primitivos.ts",
@@ -50,5 +51,5 @@
     "tool.ts",
     "zonas_entrega.ts"
   ],
-  "hash": "978dcd7878e7096e2f00b6cc7f643335c9e2123bcb3d73239502b16236f495d9"
+  "hash": "563d8784ff86b2c71c5e374c8f90b914be2424e7acd4190c683971e7d19121f4"
 }
