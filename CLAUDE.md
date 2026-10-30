@@ -79,4 +79,5 @@ Decisões de **engenharia**. Não são regra de negócio (essas estão em `histo
 Valem para tudo que você escreve (código, comentários, commits, docs). Não são regra de negócio, mas são inegociáveis:
 
 - **Nunca usar travessão (—, em dash)** em texto algum: prefira vírgula, dois-pontos, parênteses ou reescreva a frase. (A linguagem das mensagens ao usuário, palavras proibidas e gênero neutro, é regra de produto: ver `historias/13-compliance.md`.)
+- **Acentuação correta sempre**: o conteúdo é em português, então todo texto (comentários, strings de tela, commits, docs) leva acento e cedilha normalmente (não/está/é/você/código, etc.), nunca a forma sem acento. Erro recorrente: escrever uma tela ou um arquivo inteiro sem acentuação por hábito de outro idioma/contexto; revise antes de entregar.
 - **Nenhum modelo de IA (Claude, Anthropic, etc.) pode aparecer como autor ou co-autor** em commits nem em qualquer lugar do projeto. Proibido: trailer `Co-Authored-By: Claude...`, rodapés tipo `Generated with Claude Code`, ou menção a modelo/IA em mensagens de commit, código, comentários e docs. Commits saem **apenas** no nome do humano (autor do git).

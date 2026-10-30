@@ -262,7 +262,7 @@ export function Comparador() {
             />
           </div>
 
-          <dl className="mt-4 grid gap-1.5 text-sm">
+          <dl className="mt-6 grid gap-1.5 text-sm">
             <div className="flex justify-between">
               <dt className="text-tinta-2">Mensalidade ({plano?.nome ?? 'plano'})</dt>
               <dd className="tabular text-tinta">{brl(mensWhaviso)}</dd>
@@ -303,7 +303,7 @@ export function Comparador() {
               </span>
               <span className="tabular text-3xl font-bold text-barro">{brl(r.total)}</span>
 
-              <div className="mt-4 grid gap-2.5">
+              <div className="mt-4 grid gap-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-tinta">{p.nome} faz a entrega</span>
                   <Switch
@@ -322,7 +322,7 @@ export function Comparador() {
                 </div>
               </div>
 
-              <dl className="mt-4 grid gap-1.5 text-sm">
+              <dl className="mt-6 grid gap-1.5 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-tinta-2">Comissão ({pct(r.comissaoFracao)})</dt>
                   <dd className="tabular text-tinta">{brl(r.custoComissao)}</dd>
