@@ -121,7 +121,7 @@ function LinkConsole({ onNavegar }: { onNavegar?: () => void }) {
       className={cn('flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-2.5 font-medium text-tinta hover:bg-black/5', FOCO)}
     >
       <LayoutDashboard className="size-5 flex-none" strokeWidth={1.75} aria-hidden />
-      Console da plataforma
+      Console
     </NavLink>
   )
 }

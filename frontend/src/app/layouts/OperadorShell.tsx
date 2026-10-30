@@ -5,9 +5,9 @@
 import { NavLink, Outlet } from 'react-router'
 import { BarChart3, FlaskConical, Filter, KeyRound, Package, ShieldCheck, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
-import { useTenant } from '@/shared/tenant'
 import { BellLogo, cn } from '@/shared/ui'
 import { ROTA_INICIAL } from '../rotas'
+import { useDecisaoAcesso } from '../sonda_acesso'
 
 const FOCO = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-salvia'
 
@@ -52,10 +52,13 @@ function ItemNav({ item }: { item: ItemOperador }) {
   )
 }
 
-/** "Ver loja": so para quem e membro de alguma loja (operador puro nao ve). */
-function useTemLoja(): boolean {
-  const { status, lojas } = useTenant()
-  return status === 'ok' && lojas.length > 0
+/** "Ver loja": aparece para quem pode entrar no painel da loja (ativo na allowlist), mesmo que ainda
+ *  nao tenha loja criada (cai no onboarding de criar a primeira loja). Operador puro, sem acesso de
+ *  loja, nao ve: o guard RequireAcessoApp o mandaria de volta ao console. Espelha o LinkConsole do
+ *  AppShell, que aparece para quem pode entrar no console. */
+function usePodeVerLoja(): boolean {
+  const decisao = useDecisaoAcesso()
+  return decisao.estado === 'ok' && decisao.ativo
 }
 
 function LinkVerLoja({ className }: { className?: string }) {
@@ -68,7 +71,7 @@ function LinkVerLoja({ className }: { className?: string }) {
 }
 
 function Sidebar() {
-  const temLoja = useTemLoja()
+  const podeVerLoja = usePodeVerLoja()
   return (
     <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-linha bg-papel-2 px-3 py-4 md:flex">
       <div className="flex items-center gap-2.5 px-2.5 pb-4 font-display text-xl font-bold">
@@ -83,20 +86,20 @@ function Sidebar() {
           <ItemNav key={item.caminho} item={item} />
         ))}
       </nav>
-      {temLoja && <LinkVerLoja className="mt-auto" />}
-      <BotaoSair className={temLoja ? undefined : 'mt-auto'} />
+      {podeVerLoja && <LinkVerLoja className="mt-auto" />}
+      <BotaoSair className={podeVerLoja ? undefined : 'mt-auto'} />
     </aside>
   )
 }
 
 export function OperadorShell() {
-  const temLoja = useTemLoja()
+  const podeVerLoja = usePodeVerLoja()
   return (
     <div className="grid min-h-dvh md:grid-cols-[248px_1fr]">
       <Sidebar />
       <div className="flex min-w-0 flex-col">
         <header className="sticky top-0 z-20 flex h-[60px] items-center gap-3 border-b border-linha bg-papel/90 px-4 backdrop-blur md:px-6">
-          <span className="font-display text-sm font-bold text-tinta-2">Console da plataforma</span>
+          <span className="font-display text-sm font-bold text-tinta-2">Console</span>
           <span className="flex-1" />
         </header>
         {/* Mobile: nav horizontal rolavel (sem barra inferior; console e desktop-first). */}
@@ -115,7 +118,7 @@ export function OperadorShell() {
               {item.rotulo}
             </NavLink>
           ))}
-          {temLoja && (
+          {podeVerLoja && (
             <NavLink to={ROTA_INICIAL} className={cn('whitespace-nowrap rounded-pill border border-linha px-3 py-1.5 text-sm font-medium text-tinta-2', FOCO)}>
               Ver loja
             </NavLink>
