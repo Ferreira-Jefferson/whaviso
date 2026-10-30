@@ -12,7 +12,7 @@
 //   POST  /v1/plataforma-cobranca/cobranca/apurar-atrasos
 //   GET   /v1/plataforma-cobranca/minha-fatura             (dono da loja)
 // Nomes de conta: o DTO de cobranca so tem conta_id; resolvemos nome por HTTP em
-// `/plataforma-clientes/contas` (read-only, mesmo escopo de operador), sem importar o modulo.
+// `/plataforma-usuarios/contas` (read-only, mesmo escopo de operador), sem importar o modulo.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api_client'
 import {
@@ -32,7 +32,7 @@ import {
   type StatusFatura,
 } from '@/shared/contracts/_generated/plataforma_cobranca'
 import { ConfigTaxa, PlanoDTO, PlanosLista, type PlanoCriar, type PlanoPatch } from './planos'
-import { PlataformaContaPagina } from '@/shared/contracts/_generated/plataforma_clientes'
+import { PlataformaContaPagina } from '@/shared/contracts/_generated/plataforma_usuarios'
 
 export const RAIZ = 'plataforma_cobranca'
 
@@ -162,7 +162,7 @@ export function useBuscaContas(busca: string) {
     enabled: termo.length >= 2,
     staleTime: 30_000,
     queryFn: ({ signal }) =>
-      apiClient.get<PlataformaContaPagina>('/plataforma-clientes/contas', {
+      apiClient.get<PlataformaContaPagina>('/plataforma-usuarios/contas', {
         query: { busca: termo, limite: 8 },
         schema: PlataformaContaPagina,
         signal,
@@ -177,7 +177,7 @@ export function useNomesContas() {
     queryKey: [RAIZ, 'nomes_contas'],
     staleTime: 5 * 60_000,
     queryFn: async ({ signal }) => {
-      const pagina = await apiClient.get<PlataformaContaPagina>('/plataforma-clientes/contas', {
+      const pagina = await apiClient.get<PlataformaContaPagina>('/plataforma-usuarios/contas', {
         query: { limite: 100 },
         schema: PlataformaContaPagina,
         signal,

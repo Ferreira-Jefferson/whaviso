@@ -8,7 +8,7 @@ import { brl, formatarData, formatarDataHora } from '@/shared/format'
 import type {
   PlataformaContaFicha,
   PlataformaLojaResumo,
-} from '@/shared/contracts/_generated/plataforma_clientes'
+} from '@/shared/contracts/_generated/plataforma_usuarios'
 import type { StatusNumero } from '@/shared/contracts/_generated/enums'
 import { useChavesApi, useCriarChaveApi, useFichaConta, useRevogarChaveApi } from '../api'
 import type { ChaveApiDTO, SituacaoChave } from '../schemas'
@@ -86,7 +86,7 @@ function Conteudo({ ficha }: { ficha: PlataformaContaFicha }) {
             <Badge tom={TOM_SITUACAO[ficha.situacao]}>{ROTULO_SITUACAO[ficha.situacao]}</Badge>
             <Badge tom={TOM_SAUDE[ficha.saude_whatsapp]}>{ROTULO_SAUDE[ficha.saude_whatsapp]}</Badge>
           </div>
-          <p className="mt-1 text-xs text-tinta-2">Cliente desde {formatarData(ficha.criado_em)}</p>
+          <p className="mt-1 text-xs text-tinta-2">Conta desde {formatarData(ficha.criado_em)}</p>
         </div>
       </div>
 
@@ -146,6 +146,7 @@ function Conteudo({ ficha }: { ficha: PlataformaContaFicha }) {
 }
 
 function LojaItem({ loja }: { loja: PlataformaLojaResumo }) {
+  const [copiado, setCopiado] = useState(false)
   return (
     <li className="rounded-input border border-linha p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -163,6 +164,25 @@ function LojaItem({ loja }: { loja: PlataformaLojaResumo }) {
         ) : (
           <span>Sem número de WhatsApp</span>
         )}
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-xs text-tinta-2">
+        <span>Código da loja:</span>
+        <code className="rounded bg-papel-2 px-1.5 py-0.5 font-mono text-tinta">{loja.codigo_publico}</code>
+        <button
+          type="button"
+          className="font-medium text-salvia underline-offset-2 hover:underline"
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(loja.codigo_publico)
+              .then(() => {
+                setCopiado(true)
+                setTimeout(() => setCopiado(false), 2000)
+              })
+              .catch(() => {})
+          }}
+        >
+          {copiado ? 'Copiado!' : 'Copiar'}
+        </button>
       </div>
     </li>
   )

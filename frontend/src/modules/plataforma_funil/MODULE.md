@@ -17,7 +17,7 @@ Console do OPERADOR (equipe Whaviso): CRM de aquisicao. Espelha
 
 ## Dados
 - `/v1/plataforma-funil/*` (todas `semLoja`). Contratos: `@/shared/contracts/_generated/plataforma_funil`.
-- Contas para vincular: busca por HTTP em `/plataforma-clientes/contas` (sem importar o modulo).
+- Contas para vincular: busca por HTTP em `/plataforma-usuarios/contas` (sem importar o modulo).
 - Cache raiz `['plataforma_funil']`; toda mutacao invalida a raiz.
 
 ## Regras

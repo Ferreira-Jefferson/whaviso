@@ -1,8 +1,8 @@
-// Rotulos e tons de exibicao do console de clientes. Significado nunca so por cor: sempre texto.
+// Rotulos e tons de exibicao do console de usuarios. Significado nunca so por cor: sempre texto.
 import type {
   PlataformaSaudeWhatsapp,
   PlataformaSituacaoConta,
-} from '@/shared/contracts/_generated/plataforma_clientes'
+} from '@/shared/contracts/_generated/plataforma_usuarios'
 import type { PapelMembro, PapelOperador, StatusNumero } from '@/shared/contracts/_generated/enums'
 
 export type TomBadge = 'neutro' | 'marca' | 'sucesso' | 'atencao' | 'erro'

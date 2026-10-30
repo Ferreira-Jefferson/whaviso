@@ -1,4 +1,4 @@
-// Lista de contas (restaurantes clientes): busca por nome (min. 2 caracteres, com debounce),
+// Lista de contas (restaurantes que usam a Whaviso): busca por nome (min. 2 caracteres, com debounce),
 // filtro por situacao da assinatura, paginacao por cursor ("Carregar mais") e ficha ao clicar.
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Store } from 'lucide-react'
@@ -19,12 +19,12 @@ import {
   plataformaSituacaoConta,
   type PlataformaContaResumo,
   type PlataformaSituacaoConta,
-} from '@/shared/contracts/_generated/plataforma_clientes'
+} from '@/shared/contracts/_generated/plataforma_usuarios'
 import { useContas } from '../api'
 import { ROTULO_SAUDE, ROTULO_SITUACAO, TOM_SAUDE, TOM_SITUACAO } from '../rotulos'
 import { AreaErro } from './AreaErro'
 import { FichaContaDialog } from './FichaContaDialog'
-import { NovoClienteDialog } from './NovoClienteDialog'
+import { NovoUsuarioDialog } from './NovoUsuarioDialog'
 
 type FiltroSituacao = PlataformaSituacaoConta | 'todas'
 
@@ -64,7 +64,7 @@ const COLUNAS: ReadonlyArray<ColunaTabela<PlataformaContaResumo>> = [
     titulo: 'WhatsApp',
     render: (c) => <Badge tom={TOM_SAUDE[c.saude_whatsapp]}>{ROTULO_SAUDE[c.saude_whatsapp]}</Badge>,
   },
-  { chave: 'criado', titulo: 'Cliente desde', render: (c) => <span className="tabular text-tinta-2">{formatarData(c.criado_em)}</span> },
+  { chave: 'criado', titulo: 'Conta desde', render: (c) => <span className="tabular text-tinta-2">{formatarData(c.criado_em)}</span> },
 ]
 
 /** Debounce simples do texto de busca para nao disparar uma requisicao por tecla. */
@@ -109,7 +109,7 @@ export function PainelContas() {
         <Select ariaLabel="Filtrar por situação" value={situacao} onChange={setSituacao} options={OPCOES_SITUACAO} className="w-full sm:w-56" />
         <Button onClick={() => setCriando(true)}>
           <Plus className="size-4" aria-hidden />
-          Novo cliente
+          Novo usuário
         </Button>
       </div>
       {texto.trim().length === 1 && <p className="-mt-2 text-xs text-tinta-2">Digite ao menos 2 letras para buscar.</p>}
@@ -138,7 +138,7 @@ export function PainelContas() {
             {lista.hasNextPage ? (itens.length === 1 ? ' carregada' : ' carregadas') : ''}
             {filtrando ? ' no filtro atual' : ''}
           </p>
-          <TableResponsive colunas={COLUNAS} linhas={itens} chaveLinha={(c) => c.id} onRowClick={(c) => setAberta(c.id)} legenda="Contas clientes" />
+          <TableResponsive colunas={COLUNAS} linhas={itens} chaveLinha={(c) => c.id} onRowClick={(c) => setAberta(c.id)} legenda="Contas" />
           {lista.hasNextPage && (
             <div className="flex justify-center">
               <Button variante="secondary" loading={lista.isFetchingNextPage} onClick={() => void lista.fetchNextPage()}>
@@ -149,7 +149,7 @@ export function PainelContas() {
         </>
       )}
 
-      <NovoClienteDialog aberto={criando} aoFechar={() => setCriando(false)} />
+      <NovoUsuarioDialog aberto={criando} aoFechar={() => setCriando(false)} />
       <FichaContaDialog contaId={aberta} aoFechar={() => setAberta(null)} />
     </div>
   )

@@ -14,7 +14,7 @@ import NotFound from './NotFound'
 
 // Console do operador da plataforma (equipe Whaviso): shell proprio, sem loja ativa.
 const PlataformaPainel = lazy(() => import('@/modules/plataforma_painel'))
-const PlataformaClientes = lazy(() => import('@/modules/plataforma_clientes'))
+const PlataformaUsuarios = lazy(() => import('@/modules/plataforma_usuarios'))
 const PlataformaCobranca = lazy(() => import('@/modules/plataforma_cobranca'))
 const PlataformaPlanos = lazy(() => import('@/modules/plataforma_cobranca').then((m) => ({ default: m.PlanosPage })))
 const PlataformaFunil = lazy(() => import('@/modules/plataforma_funil'))
@@ -78,7 +78,7 @@ export const rotas: RouteObject[] = [
         children: [
           { path: '/plataforma', element: <Navigate to="/plataforma/painel" replace /> },
           { path: '/plataforma/painel', element: <PlataformaPainel /> },
-          { path: '/plataforma/clientes', element: <PlataformaClientes /> },
+          { path: '/plataforma/usuarios', element: <PlataformaUsuarios /> },
           { path: '/plataforma/cobranca', element: <PlataformaCobranca /> },
           { path: '/plataforma/planos', element: <PlataformaPlanos /> },
           { path: '/plataforma/funil', element: <PlataformaFunil /> },

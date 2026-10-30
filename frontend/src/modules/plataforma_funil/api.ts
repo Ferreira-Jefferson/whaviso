@@ -12,7 +12,7 @@
 //   GET   /v1/plataforma-funil/funil/quadro?limite_por_estagio
 //   GET   /v1/plataforma-funil/funil/agenda?dias&todos
 // PII: o telefone claro so existe no detalhe e na entrada do formulario; nunca em cache de lista,
-// nunca em log. Contas (para vincular) sao buscadas por HTTP em `/plataforma-clientes/contas`.
+// nunca em log. Contas (para vincular) sao buscadas por HTTP em `/plataforma-usuarios/contas`.
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { z } from 'zod'
 import { apiClient } from '@/shared/api_client'
@@ -28,7 +28,7 @@ import {
   type ProspectoAtualizacao,
   type ProspectoNovo,
 } from '@/shared/contracts/_generated/plataforma_funil'
-import { PlataformaContaPagina } from '@/shared/contracts/_generated/plataforma_clientes'
+import { PlataformaContaPagina } from '@/shared/contracts/_generated/plataforma_usuarios'
 import type { EstagioProspecto } from '@/shared/contracts/_generated/enums'
 
 export const RAIZ = 'plataforma_funil'
@@ -203,7 +203,7 @@ export function useBuscaContas(busca: string) {
     enabled: termo.length >= 2,
     staleTime: 30_000,
     queryFn: ({ signal }) =>
-      apiClient.get<PlataformaContaPagina>('/plataforma-clientes/contas', {
+      apiClient.get<PlataformaContaPagina>('/plataforma-usuarios/contas', {
         query: { busca: termo, limite: 8 },
         schema: PlataformaContaPagina,
         signal,

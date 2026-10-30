@@ -16,8 +16,8 @@ DONO DA LOJA (`MinhaFaturaPage`). Espelha `backend/apps/api/src/modules/platafor
 
 ## Dados
 - `/v1/plataforma-cobranca/*` (operador: `semLoja`), `/minha-fatura` (escopo de loja, com x-loja-id).
-- Nome da conta: o DTO so tem `conta_id`; resolvido por HTTP em `/plataforma-clientes/contas` (limite 100,
-  melhor esforco; resto cai em "Conta <id curto>"). Sem import do modulo plataforma_clientes.
+- Nome da conta: o DTO so tem `conta_id`; resolvido por HTTP em `/plataforma-usuarios/contas` (limite 100,
+  melhor esforco; resto cai em "Conta <id curto>"). Sem import do modulo plataforma_usuarios.
 - Cache raiz `['plataforma_cobranca']`; toda mutacao invalida a raiz.
 - Contratos: `@/shared/contracts/_generated/plataforma_cobranca`.
 

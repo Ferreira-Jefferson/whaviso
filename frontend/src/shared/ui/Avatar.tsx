@@ -1,6 +1,6 @@
 // Avatar: inicial do nome num circulo (ou quadrado), identidade de pessoa/conta/loja.
 // Consolida as copias locais (clientes, pessoas, motoboys, conversas, avaliacoes,
-// fidelidade, despacho, plataforma_clientes). Decorativo (aria-hidden): o nome sempre
+// fidelidade, despacho, plataforma_usuarios). Decorativo (aria-hidden): o nome sempre
 // aparece ao lado em texto.
 import { cn } from './cn'
 
