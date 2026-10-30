@@ -290,14 +290,14 @@ export function Comparador() {
               <>
                 Mensalidade + {brl(porPedidoPix)} por pedido.
                 <span className="mt-0.5 block">
-                  {brl(taxaWhaviso)} do whaviso + {brl(ASAAS_PIX_CENTAVOS)} do gateway.
+                  {brl(porPedidoPix)} = {brl(taxaWhaviso)} (whaviso) + {brl(ASAAS_PIX_CENTAVOS)} (gateway)
                 </span>
               </>
             ) : (
               <>
                 Mensalidade + {brl(fixoCartao)} + 2,99% por pedido.
                 <span className="mt-0.5 block">
-                  {brl(taxaWhaviso)} do whaviso + {brl(ASAAS_CARTAO_FIXO_CENTAVOS)} do gateway.
+                  {brl(fixoCartao)} = {brl(taxaWhaviso)} (whaviso) + {brl(ASAAS_CARTAO_FIXO_CENTAVOS)} (gateway)
                 </span>
               </>
             )}
