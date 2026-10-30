@@ -60,5 +60,9 @@ export {
   avaliarFaithfulness,
   type CasoAvaliacao,
   type ResultadoHitAtK,
+  ORIGEM_JUIZ,
   type EntradaFaithfulness,
+  type ResultadoFaithfulness,
+  type VereditoFaithfulness,
+  type DepsJuiz,
 } from './avaliacao'

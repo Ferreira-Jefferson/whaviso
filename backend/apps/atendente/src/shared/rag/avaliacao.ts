@@ -4,10 +4,15 @@
 //
 //   RAG-EVAL-001 (gate): hit@k e context recall sobre o golden set `base_avaliacao` da loja, por
 //                        comparacao de ids de documento (sem LLM). Regressao barra o merge.
-//   RAG-EVAL-002 (fora): faithfulness/relevance amostrado; aqui so o esqueleto do job.
+//   RAG-EVAL-002 (fora): faithfulness por LLM-judge, rodado pelo runner de evals (Central de Evals).
 import { consultar, sql, type Executor } from '@whaviso/shared/db'
+import { ok, type ErroProvedor, type Resultado, type UsoLlm } from '@whaviso/shared/clientes'
 import { idLoja, type Escopo } from '../escopo'
+import type { ServicoLlm } from '../llm_client'
+import { montarMensagensJuiz, SaidaJuiz, VEREDITOS_JUIZ } from './juiz_prompt'
 import { buscarConhecimento, type DepsRetriever } from './retriever'
+
+export const ORIGEM_JUIZ = 'eval_juiz'
 
 export interface CasoAvaliacao {
   pergunta: string
@@ -56,15 +61,53 @@ export async function avaliarHitAtK(
   return { casos: casos.length, hitAtK: hits / casos.length, contextRecall: somaRecall / casos.length }
 }
 
-/**
- * RAG-EVAL-002 (esqueleto, FORA do gate): faithfulness/relevance por LLM-judge, amostrado, noturno.
- * Nao implementado nesta onda (caro e nao-determinista); documentado para o job de monitoramento.
- */
+/** Entrada do juiz: o que foi perguntado, o que o modelo respondeu e os trechos que ele tinha. */
 export interface EntradaFaithfulness {
   pergunta: string
   respostaGerada: string
   trechos: string[]
+  /** Modelo do juiz (ideal: familia diferente da do gerador, para nao se auto-favorecer). */
+  modeloJuiz?: string
 }
-export function avaliarFaithfulness(_e: EntradaFaithfulness): never {
-  throw new Error('RAG-EVAL-002 (faithfulness) e job amostrado fora do gate; nao implementado nesta onda')
+
+export type VereditoFaithfulness = (typeof VEREDITOS_JUIZ)[number]
+
+export interface ResultadoFaithfulness {
+  veredito: VereditoFaithfulness
+  /** fiel=1, parcial=0.5, infiel=0; `null` quando o juiz respondeu `incerto` (nao entra na media). */
+  score: number | null
+  justificativa: string
+  uso: UsoLlm
+}
+
+export interface DepsJuiz {
+  servico: ServicoLlm
+  exec: Executor
+}
+
+const SCORE_POR_VEREDITO: Record<VereditoFaithfulness, number | null> = { fiel: 1, parcial: 0.5, infiel: 0, incerto: null }
+
+/**
+ * RAG-EVAL-002: faithfulness por LLM-judge (caro, nao-determinista; roda no runner de evals, fora do
+ * gate). A credencial/uso sao da loja do `escopo` (a chave dela paga o juiz). Nunca lanca: o erro do
+ * provedor volta no Resultado.
+ */
+export async function avaliarFaithfulness(
+  deps: DepsJuiz,
+  escopo: Escopo,
+  e: EntradaFaithfulness,
+): Promise<Resultado<ResultadoFaithfulness, ErroProvedor>> {
+  const r = await deps.servico.completarEstruturado(
+    {
+      exec: deps.exec,
+      escopo,
+      origem: ORIGEM_JUIZ,
+      mensagens: montarMensagensJuiz(e),
+      ...(e.modeloJuiz ? { modelo: e.modeloJuiz } : {}),
+    },
+    SaidaJuiz,
+  )
+  if (!r.ok) return r
+  const { veredito, justificativa } = r.valor.dados
+  return ok({ veredito, score: SCORE_POR_VEREDITO[veredito], justificativa, uso: r.valor.resposta.uso })
 }

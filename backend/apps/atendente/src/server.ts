@@ -15,6 +15,7 @@ import { criarRepoHarness } from './shared/harness'
 import { criarServicoLlmProducao } from './shared/llm_client'
 import { criarClienteEmbeddingsProducao, criarRerankerNulo, limparCacheExpirado, type DepsRetriever } from './shared/rag'
 import { drenarConhecimento } from './drenar_conhecimento'
+import { drenarEvals } from './drenar_evals'
 import { iniciarScheduler } from './scheduler'
 import { iniciarSaude } from './saude'
 
@@ -95,6 +96,23 @@ const tick = async () => {
   }
 }
 const scheduler = iniciarScheduler({ logger, intervaloMs, tick })
+
+// Runner da Central de Evals: scheduler proprio. Uma eval pode levar minutos; no tick do inbound ela
+// atrasaria o atendimento (os ticks nao se sobrepoem). Env-gated (desliga com ATENDENTE_EVALS_ATIVO=0);
+// parado no encerrar. A ferramenta e do operador: enfileira pela api, o atendente drena aqui.
+const evalsAtivo = process.env.ATENDENTE_EVALS_ATIVO !== '0'
+const evalsIntervaloMs = Number(process.env.ATENDENTE_EVALS_INTERVALO_MS ?? 15000)
+const schedulerEvals = evalsAtivo
+  ? iniciarScheduler({
+      logger,
+      intervaloMs: evalsIntervaloMs,
+      tick: async () => {
+        const r = await drenarEvals({ pool, logger, servico: servicoLlm, rag })
+        if (r.concluidas || r.falhas) logger.info(r, 'dreno de evals')
+      },
+    })
+  : undefined
+
 const saude = iniciarSaude(env.HOST, env.PORT)
 
 // Encerramento limpo e idempotente: para o scheduler antes de fechar o pool.
@@ -103,6 +121,7 @@ const encerrar = async () => {
   if (encerrando) return
   encerrando = true
   scheduler.parar()
+  schedulerEvals?.parar()
   saude.close()
   await pool.end().catch(() => undefined)
   process.exit(0)
