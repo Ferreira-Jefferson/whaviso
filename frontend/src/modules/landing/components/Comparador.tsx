@@ -166,8 +166,8 @@ export function Comparador() {
         </h2>
         <p className="mt-3 text-tinta-2">
           As plataformas cobram uma porcentagem que cresce a cada pedido. No whaviso o custo é
-          fixo e baixo, ou zero quando você recebe direto. Calcule quanto você está deixando na
-          mesa de cada aplicativo.
+          fixo e baixo, sem taxa por pedido quando você recebe direto. Calcule quanto você está
+          deixando na mesa de cada aplicativo.
         </p>
       </div>
 
