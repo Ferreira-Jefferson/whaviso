@@ -81,10 +81,12 @@ interface ConfigPlataforma {
   pagamento: boolean // cliente paga pelo app
 }
 
+// Entrega comeca desligada nos tres: o whaviso nao tem entrega propria, entao comparar
+// com a entrega do concorrente tambem desligada e a comparacao mais justa por padrao.
 const CONFIG_INICIAL: Record<PlatKey, ConfigPlataforma> = {
-  ifood: { entrega: true, pagamento: true },
-  '99food': { entrega: true, pagamento: true },
-  aiqfome: { entrega: true, pagamento: true },
+  ifood: { entrega: false, pagamento: true },
+  '99food': { entrega: false, pagamento: true },
+  aiqfome: { entrega: false, pagamento: true },
 }
 
 const pct = (f: number) =>
@@ -121,8 +123,8 @@ function calcularPlataforma(
 }
 
 export function Comparador() {
-  const [ticketCentavos, setTicketCentavos] = useState<number | null>(7000) // R$ 70
-  const [pedidos, setPedidos] = useState(300)
+  const [ticketCentavos, setTicketCentavos] = useState<number | null>(3000) // R$ 30
+  const [pedidos, setPedidos] = useState(100)
   const [planoEscolhido, setPlanoEscolhido] = useState('')
   const [recebimento, setRecebimento] = useState<Recebimento>('direto')
   const [config, setConfig] = useState<Record<PlatKey, ConfigPlataforma>>(CONFIG_INICIAL)
