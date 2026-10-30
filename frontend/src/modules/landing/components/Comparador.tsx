@@ -147,8 +147,9 @@ export function Comparador() {
 
   // --- Whaviso, tres cenarios ---
   const porPedidoPix = taxaWhaviso + ASAAS_PIX_CENTAVOS
-  // Parte fixa do cartao (taxa whaviso + fixo do gateway), somada num so numero: mostrar
-  // "R$ 0,50 + R$ 0,49" lado a lado le como erro de digitacao, nao como duas cobrancas.
+  // Parte fixa do cartao: taxa whaviso (varia por PLANO: 0,50/0,40/0,30) + fixo do
+  // gateway, somadas num so numero. Mostrar os dois fixos lado a lado (ex.: "R$ 0,50 +
+  // R$ 0,49") le como erro de digitacao, nao como duas cobrancas distintas.
   const fixoCartao = taxaWhaviso + ASAAS_CARTAO_FIXO_CENTAVOS
   const porPedidoCartao = fixoCartao + Math.round(ticket * ASAAS_CARTAO_PCT)
   const porPedidoWhaviso =
