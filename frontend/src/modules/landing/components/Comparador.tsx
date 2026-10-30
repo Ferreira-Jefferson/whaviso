@@ -202,11 +202,9 @@ export function Comparador() {
           </label>
         </div>
         <p className="mt-3 text-xs text-tinta-2">
-          Faturamento considerado: <span className="tabular font-semibold text-tinta">{brl(faturamento)}</span>/mês.
-          {' '}
-          Os cards mostram o <span className="font-semibold text-tinta">custo mensal</span> de cada canal
-          (mensalidade + taxas), ou seja, quanto você paga, não o seu faturamento. A entrega e o pagamento de
-          cada app você ajusta no próprio card.
+          Faturamento de <span className="tabular font-semibold text-tinta">{brl(faturamento)}</span>/mês. Os
+          cards mostram o <span className="font-semibold text-tinta">custo mensal</span> (mensalidade + taxas)
+          de cada canal, não o faturamento.
         </p>
       </div>
 
