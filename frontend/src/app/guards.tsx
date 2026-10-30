@@ -7,7 +7,7 @@ import { useSessao } from '@/shared/auth'
 import { ErrorState, Spinner } from '@/shared/ui'
 import { ROTA_INICIAL } from './rotas'
 import { useEhOperador } from './sonda_operador'
-import { marcarBarrado, useMinhaElegibilidade, type MotivoBarrado } from './sonda_acesso'
+import { marcarBarrado, useDecisaoAcesso } from './sonda_acesso'
 
 function Splash() {
   return (
@@ -25,12 +25,28 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-/** Com sessao: a pagina de entrada (e a landing) nunca aparecem; vai para a rota inicial. */
+/**
+ * Com sessao: a pagina de entrada (e a landing) nunca aparecem para quem tem acesso; vai para a rota
+ * certa. Mas NAO redireciona so por estar logado: espera as sondas confirmarem o acesso (splash), e
+ * so entao navega (ativo -> loja; operador -> console). Quem esta logado mas barrado e deslogado aqui
+ * mesmo e PERMANECE em /entrar com a mensagem, sem piscar na rota protegida e voltar.
+ */
 export function RedirectSeLogado({ children }: { children: ReactNode }) {
-  const { status } = useSessao()
-  if (status === 'logado') return <Navigate to={ROTA_INICIAL} replace />
-  if (status === 'carregando') return <Splash />
-  return <>{children}</>
+  const { status, signOut } = useSessao()
+  const decisao = useDecisaoAcesso()
+
+  useEffect(() => {
+    if (decisao.estado !== 'barrado') return
+    marcarBarrado(decisao.motivo)
+    void signOut()
+  }, [decisao, signOut])
+
+  if (status === 'deslogado') return <>{children}</>
+  if (decisao.estado === 'ok') {
+    return <Navigate to={decisao.operador && !decisao.ativo ? '/plataforma' : ROTA_INICIAL} replace />
+  }
+  // Logado: aguarda a decisao (carregando/erro/barrado-deslogando) sem redirecionar para rota protegida.
+  return <Splash />
 }
 
 /** Console do operador: sem sessao vai para /entrar; logado mas sem acesso volta a rota da loja. */
@@ -59,44 +75,28 @@ export function RequireOperador({ children }: { children: ReactNode }) {
  */
 export function RequireAcessoApp({ children }: { children: ReactNode }) {
   const { status, signOut } = useSessao()
-  const op = useEhOperador()
-  const eleg = useMinhaElegibilidade()
+  const decisao = useDecisaoAcesso()
 
-  const pronto =
-    status === 'logado' && !op.isPending && !eleg.isPending && !op.isError && !eleg.isError
-  const ativo = eleg.data === 'ativo'
-  const ehOperador = op.data === true
-
-  // Barra só quando as sondas responderam e a pessoa não é ativa nem operador. `pendente` recebe
-  // mensagem própria; o resto (revogado/não cadastrado) cai em "acesso negado". Marca e desloga; o
-  // RequireAuth externo leva a /entrar, onde a mensagem é exibida.
-  const motivoBarrado: MotivoBarrado | null =
-    pronto && !ativo && !ehOperador ? (eleg.data === 'pendente' ? 'pendente' : 'negado') : null
-
+  // Barrado: marca o motivo (`pendente` tem mensagem própria; revogado/não cadastrado caem em "acesso
+  // negado") e desloga; o RequireAuth externo leva a /entrar, onde a mensagem é exibida.
   useEffect(() => {
-    if (!motivoBarrado) return
-    marcarBarrado(motivoBarrado)
+    if (decisao.estado !== 'barrado') return
+    marcarBarrado(decisao.motivo)
     void signOut()
-  }, [motivoBarrado, signOut])
+  }, [decisao, signOut])
 
-  if (status === 'carregando') return <Splash />
   if (status === 'deslogado') return <Navigate to="/entrar" replace />
-  if (op.isPending || eleg.isPending) return <Splash />
-  if (op.isError || eleg.isError) {
+  if (decisao.estado === 'erro') {
     return (
       <div className="mx-auto w-full max-w-[1180px] px-4 pt-8 md:px-8">
-        <ErrorState
-          aoTentarDeNovo={() => {
-            void op.refetch()
-            void eleg.refetch()
-          }}
-          descricao="Não foi possível confirmar o seu acesso."
-        />
+        <ErrorState aoTentarDeNovo={decisao.refetch} descricao="Não foi possível confirmar o seu acesso." />
       </div>
     )
   }
-  if (ativo) return <>{children}</>
-  if (ehOperador) return <Navigate to="/plataforma" replace />
-  // Barrado: o efeito acima está deslogando; segura num splash até o RequireAuth levar a /entrar.
+  if (decisao.estado === 'ok') {
+    if (decisao.ativo) return <>{children}</>
+    return <Navigate to="/plataforma" replace />
+  }
+  // Carregando ou barrado (o efeito acima está deslogando): segura num splash.
   return <Splash />
 }

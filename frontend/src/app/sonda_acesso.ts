@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSessao } from '@/shared/auth'
 import { apiClient } from '@/shared/api_client'
+import { useEhOperador } from './sonda_operador'
 
 /** Estado de acesso do e-mail autenticado (espelha o contrato de GET /v1/acessos-login/eu). */
 export type Elegibilidade = 'ativo' | 'pendente' | 'revogado' | 'nao_cadastrado'
@@ -41,6 +42,38 @@ export function marcarBarrado(motivo: MotivoBarrado): void {
   } catch {
     /* storage indisponivel: sem a mensagem, mas o bounce ainda acontece */
   }
+}
+
+/**
+ * Decisao de acesso combinando as duas sondas (operador + elegibilidade), FONTE UNICA usada pelos
+ * guards (RedirectSeLogado e RequireAcessoApp) para nao divergirem. `ok` so aparece quando ha acesso
+ * (ativo e/ou operador); barrado traz o motivo. Erro transitorio nunca vira barramento (nao desloga
+ * "na duvida"). As sondas so disparam quando logado (enabled: status === 'logado').
+ */
+export type DecisaoAcesso =
+  | { estado: 'carregando' }
+  | { estado: 'erro'; refetch: () => void }
+  | { estado: 'ok'; ativo: boolean; operador: boolean }
+  | { estado: 'barrado'; motivo: MotivoBarrado }
+
+export function useDecisaoAcesso(): DecisaoAcesso {
+  const { status } = useSessao()
+  const op = useEhOperador()
+  const eleg = useMinhaElegibilidade()
+  if (status !== 'logado' || op.isPending || eleg.isPending) return { estado: 'carregando' }
+  if (op.isError || eleg.isError) {
+    return {
+      estado: 'erro',
+      refetch: () => {
+        void op.refetch()
+        void eleg.refetch()
+      },
+    }
+  }
+  const operador = op.data === true
+  const ativo = eleg.data === 'ativo'
+  if (ativo || operador) return { estado: 'ok', ativo, operador }
+  return { estado: 'barrado', motivo: eleg.data === 'pendente' ? 'pendente' : 'negado' }
 }
 
 /** Le e LIMPA o motivo (so vale para a proxima tela de /entrar). */
