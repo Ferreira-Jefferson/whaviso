@@ -154,7 +154,7 @@ export function Comparador() {
   const totalWhaviso = mensWhaviso + pedidos * porPedidoWhaviso
 
   return (
-    <section id="comparar" className="mx-auto w-full max-w-5xl px-4 py-16">
+    <section id="comparar" className="mx-auto w-full max-w-7xl px-4 py-16">
       <div className="mx-auto max-w-2xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">
           Quanto voce deixa de pagar em taxa
@@ -204,20 +204,17 @@ export function Comparador() {
         <p className="mt-3 text-xs text-tinta-2">
           Faturamento considerado: <span className="tabular font-semibold text-tinta">{brl(faturamento)}</span>/mês.
           {' '}
-          Whaviso: {brl(mensWhaviso)}/mês + {brl(taxaWhaviso)} por transação intermediada (ou Pix próprio
-          sem taxa). A entrega e o pagamento de cada app você ajusta no próprio card.
+          Os cards mostram o <span className="font-semibold text-tinta">custo mensal</span> de cada canal
+          (mensalidade + taxas), ou seja, quanto você paga, não o seu faturamento. A entrega e o pagamento de
+          cada app você ajusta no próprio card.
         </p>
       </div>
 
-      {/* Card do whaviso (destaque, posicao fixa) */}
-      <div className="mt-6 rounded-card border-2 border-salvia bg-salvia-claro p-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="font-display text-xl text-salvia">No whaviso</span>
-          <span className="tabular text-3xl font-bold text-folha">{brl(totalWhaviso)}</span>
-        </div>
-        <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:items-start">
-          <div>
-            <span className="mb-1.5 block text-sm font-semibold text-tinta">Como voce recebe</span>
+      {/* Recebimento do whaviso: controle no topo, define o cenario do card do whaviso */}
+      <div className="mt-6 rounded-card border border-linha bg-cartao p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-sm font-semibold text-tinta">No whaviso, como voce recebe</span>
+          <div className="w-full sm:w-auto sm:min-w-[22rem]">
             <SegmentedControl
               value={recebimento}
               onChange={setRecebimento}
@@ -225,15 +222,27 @@ export function Comparador() {
               ariaLabel="Como voce recebe no whaviso"
               preencher
             />
-            <p className="mt-2 text-xs text-tinta-2">
-              {recebimento === 'direto'
-                ? 'So a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
-                : recebimento === 'pix'
-                  ? `Mensalidade + ${brl(porPedidoPix)} por pedido (taxa ${brl(taxaWhaviso)} + Pix ${brl(ASAAS_PIX_CENTAVOS)}).`
-                  : `Mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido.`}
-            </p>
           </div>
-          <dl className="grid gap-1.5 text-sm">
+        </div>
+        <p className="mt-2 text-xs text-tinta-2">
+          {recebimento === 'direto'
+            ? 'So a mensalidade: Pix ou maquininha seus, sem taxa por pedido.'
+            : recebimento === 'pix'
+              ? `Mensalidade + ${brl(porPedidoPix)} por pedido (taxa ${brl(taxaWhaviso)} + Pix ${brl(ASAAS_PIX_CENTAVOS)}).`
+              : `Mensalidade + ${brl(taxaWhaviso)} + 2,99% + ${brl(ASAAS_CARTAO_FIXO_CENTAVOS)} por pedido.`}
+        </p>
+      </div>
+
+      {/* Quatro canais lado a lado, ordem fixa: whaviso como primeiro card */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Card do whaviso (sempre o primeiro, em destaque) */}
+        <div className="flex flex-col rounded-card border-2 border-salvia bg-salvia-claro p-5">
+          <span className="font-display text-lg text-salvia">whaviso</span>
+          <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-tinta-2">
+            Custo por mes
+          </span>
+          <span className="tabular text-3xl font-bold text-folha">{brl(totalWhaviso)}</span>
+          <dl className="mt-4 grid gap-1.5 text-sm">
             <div className="flex justify-between">
               <dt className="text-tinta-2">Mensalidade ({plano?.nome ?? 'plano'})</dt>
               <dd className="tabular text-tinta">{brl(mensWhaviso)}</dd>
@@ -245,15 +254,17 @@ export function Comparador() {
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-tinta-2">Custo variavel no mes</dt>
+              <dt className="text-tinta-2">Taxas no mes</dt>
               <dd className="tabular text-tinta">{brl(totalWhaviso - mensWhaviso)}</dd>
             </div>
           </dl>
+          <p className="mt-auto pt-4 text-xs text-tinta-2">
+            Sem comissao por pedido: voce paga a mensalidade e, so quando intermedia o
+            pagamento, a taxa por pedido.
+          </p>
         </div>
-      </div>
 
-      {/* Cards dos concorrentes (ordem fixa, cada um com seus controles) */}
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        {/* Cards dos concorrentes (ordem fixa, cada um com seus controles) */}
         {ORDEM_PLATAFORMAS.map((key) => {
           const p = PLATAFORMAS[key]
           const cfg = config[key]
@@ -262,11 +273,11 @@ export function Comparador() {
           const diffPorPedido = pedidos > 0 ? Math.round(diff / pedidos) : 0
           return (
             <div key={key} className="flex flex-col rounded-card border border-linha bg-cartao p-5">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-display text-lg text-tinta">{p.nome}</span>
-                <span className="tabular text-2xl font-bold text-barro">{brl(r.total)}</span>
-              </div>
-              <span className="text-xs text-tinta-2">por mes</span>
+              <span className="font-display text-lg text-tinta">{p.nome}</span>
+              <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-tinta-2">
+                Custo por mes
+              </span>
+              <span className="tabular text-3xl font-bold text-barro">{brl(r.total)}</span>
 
               <div className="mt-4 grid gap-2.5">
                 <div className="flex items-center justify-between gap-3">
@@ -306,7 +317,7 @@ export function Comparador() {
                 </div>
               </dl>
 
-              <div className="mt-4 border-t border-linha pt-3 text-sm">
+              <div className="mt-auto border-t border-linha pt-3 text-sm">
                 <span className="text-tinta-2">vs whaviso: </span>
                 <span className={`tabular font-semibold ${diff >= 0 ? 'text-barro' : 'text-folha'}`}>
                   {sinalBrl(diff)}

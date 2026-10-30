@@ -11,7 +11,7 @@ export function Planos() {
   const planos = data ?? []
 
   return (
-    <section id="planos" className="mx-auto w-full max-w-5xl px-4 py-16">
+    <section id="planos" className="mx-auto w-full max-w-7xl px-4 py-16">
       <div className="mx-auto max-w-2xl text-center">
         <h2 className="font-display text-3xl text-salvia md:text-4xl">Planos</h2>
         <p className="mt-3 text-tinta-2">

@@ -27,7 +27,7 @@ export default function Landing() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-4">
+      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4">
         <span className="inline-flex items-center gap-2 text-salvia">
           <BellLogo className="size-9 text-dourado" />
           <span className="font-display text-xl font-semibold">whaviso</span>
@@ -72,7 +72,7 @@ export default function Landing() {
           </Link>
         </section>
 
-        <section className="mx-auto grid w-full max-w-5xl gap-4 px-4 pb-16 md:grid-cols-3">
+        <section className="mx-auto grid w-full max-w-7xl gap-4 px-4 pb-16 md:grid-cols-3">
           {BENEFICIOS.map((b) => (
             <div key={b.titulo} className="rounded-card border border-linha bg-cartao p-6">
               <h2 className="font-display text-xl text-salvia">{b.titulo}</h2>
