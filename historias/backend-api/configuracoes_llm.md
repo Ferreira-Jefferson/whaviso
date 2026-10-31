@@ -124,4 +124,19 @@ Segurança:
   ciphertext para permitir rotação da KEK sem migrar tudo de uma vez. Rotação da KEK é tarefa futura.
 - **Uma credencial por loja** (unique em `loja_id`): trocar de provedor sobrescreve a linha.
 - Sem credencial ativa, o módulo do atendente degrada; este módulo não decide isso, só expõe o estado.
+
+## Addendum (CONCLUÍDO): pool de chaves da plataforma
+
+Adicionado depois da v1 acima (migration 0097): além da chave BYO por loja, o módulo agora também é
+dono de um **pool de chaves de LLM da plataforma**, que o admin mantém em
+`/plataforma/configuracoes` e pode **atribuir** a uma loja específica (em `/plataforma/usuarios`, na
+ficha da conta) em vez de exigir que ela cadastre a própria. Ver `../plataforma/configuracoes.md` para
+a história completa do pool (tabela `credenciais_llm_pool`, rotas `GET/POST/PATCH /llm/pool` e
+`PUT /llm/pool/atribuicoes/:lojaId`). Mudança relevante para ESTA história: `credenciais_llm` ganhou a
+coluna `pool_chave_id` (nullable, FK) e `chave_cifrada` deixou de ser `NOT NULL` — a loja tem
+**exatamente uma fonte** (`chave_cifrada` XOR `pool_chave_id`, check de banco). A resolução do
+atendente (`lerCredencialAtiva`) passou a juntar com o pool quando `pool_chave_id` está setado; chave
+do pool desativada pelo admin faz a loja falhar fechada (`llm_indisponivel`), nunca cai em outra
+chave. Cadastrar a própria chave (`PUT /credencial`, fluxo original desta história) sempre limpa uma
+atribuição de pool anterior.
 - O contrato `CredencialLlmEstado` inclui `configurada: boolean` derivado de `ativo` + existência.

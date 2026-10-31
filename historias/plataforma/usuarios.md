@@ -141,3 +141,13 @@ rotas e contratos renomeados de `plataforma_clientes` para `plataforma_usuarios`
 - Permissões da grade renomeadas: `clientes_plataforma:ver`/`:criar` → `usuarios_plataforma:ver`/`:criar`.
 - Frontend (modal "Novo usuário", exibição do código público na ficha da loja): ver trabalho em
   andamento após esta nota.
+
+## 2026-10-31: atribuição de chave do pool de IA por loja
+
+Adicionado à ficha da conta (`FichaContaDialog`, cada item de `Lojas`): quando há pelo menos uma
+chave ATIVA no pool de LLM da plataforma (ver `../backend-api/configuracoes_llm.md#addendum` e
+`configuracoes.md`), aparece um seletor "Usar chave de IA do pool" por loja. O operador escolhe a
+chave e confirma (`PUT /v1/llm/pool/atribuicoes/:lojaId`, dono é o módulo `configuracoes_llm`, não
+este); este módulo só chama a rota por HTTP (nunca importa o outro módulo) e invalida a própria
+`ficha` ao salvar. Não há "desatribuir" aqui: a loja volta a usar a própria chave quando cadastra
+uma (`PUT /llm/credencial`, ação dela mesma, fora deste console).

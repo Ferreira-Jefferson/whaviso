@@ -179,6 +179,7 @@ pronto para começar e volte depois. Nunca dois agentes no mesmo módulo.
 | API-pag-int | pagamentos_intermediado | PSP (Asaas) atrás de interface: Pix intermediado + cartão com split pra subconta, taxa do whaviso, webhook; modo por loja | API-pagamentos, P-taxas, F2 | Opus | backend-api/pagamentos-intermediado.md | A FAZER |
 | P-funil | plataforma_funil | CRM de aquisição (prospectos, atividades) | F4, F3 | Sonnet | plataforma/funil.md | A FAZER |
 | P-painel | plataforma_painel | Crescimento da base (MRR, churn, lojas ativas) | P-cobranca, P-clientes | Sonnet | plataforma/painel.md | A FAZER |
+| P-configuracoes | plataforma_configuracoes | Credenciais de plataforma (Asaas, WhatsApp oficial, e-mail, pool de LLM) | F4, F3, API-pagamentos, API-config-llm | Opus | plataforma/configuracoes.md | CONCLUIDO (cloud push e verificação no navegador pendentes) |
 | FR-negocio | telas de negócio | Dashboard da loja + console da plataforma | F6 + API/P-*; **mock HTML + autoverificação visual** | Sonnet | frontend/negocio.md | A FAZER |
 
 ## Onda 5: Roteirização e builder
