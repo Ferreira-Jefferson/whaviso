@@ -121,7 +121,7 @@ function FormNovoUsuario({ aoFechar }: { aoFechar: () => void }) {
           <p className="text-xs text-tinta-2">
             {ativo
               ? 'A pessoa já consegue entrar no Whaviso agora.'
-              : 'Fica aguardando aprovação (ex.: pagamento) antes de poder entrar.'}
+              : 'Fica aguardando aprovação.'}
           </p>
         </div>
         <Switch ligado={ativo} onMudar={setAtivo} rotulo="Já liberar o acesso" />
