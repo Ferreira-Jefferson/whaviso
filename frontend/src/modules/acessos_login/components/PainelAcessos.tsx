@@ -22,11 +22,6 @@ import { useAcessos, useAdicionarAcesso, useAprovarAcesso, useRevogarAcesso } fr
 
 type FiltroStatus = AcessoStatus | 'todos'
 
-const OPCOES_STATUS: ReadonlyArray<SelectOption<FiltroStatus>> = [
-  { value: 'todos', label: 'Todos' },
-  ...acessoStatus.options.map((s) => ({ value: s, label: ROTULO[s] })),
-]
-
 const ROTULO: Record<AcessoStatus, string> = {
   pendente: 'Pendente',
   aprovado: 'Aprovado',
@@ -37,6 +32,11 @@ const TOM: Record<AcessoStatus, 'neutro' | 'sucesso' | 'atencao'> = {
   aprovado: 'sucesso',
   revogado: 'neutro',
 }
+
+const OPCOES_STATUS: ReadonlyArray<SelectOption<FiltroStatus>> = [
+  { value: 'todos', label: 'Todos' },
+  ...acessoStatus.options.map((s) => ({ value: s, label: ROTULO[s] })),
+]
 
 function mensagem(e: unknown, padrao: string): string {
   return e instanceof ApiError ? e.message : padrao
