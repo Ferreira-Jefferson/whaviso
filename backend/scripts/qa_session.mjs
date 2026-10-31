@@ -20,14 +20,13 @@
 import { writeFileSync } from 'node:fs'
 import { obterSessaoQa } from './qa_lib.mjs'
 
-const ROOT = process.env.WROOT ?? '..'
 const OUT = process.env.OUT
 if (!OUT) { console.error('faltou OUT=<arquivo fora do repo p/ gravar a sessao>'); process.exit(1) }
 const EMAIL = process.env.QA_EMAIL ?? 'qa@whaviso.com'
 const permitirProducao = process.argv.includes('--permitir-producao')
 
 try {
-  const sessao = await obterSessaoQa({ root: ROOT, email: EMAIL, permitirProducao })
+  const sessao = await obterSessaoQa({ root: process.env.WROOT, email: EMAIL, permitirProducao })
   writeFileSync(OUT, JSON.stringify({
     key: sessao.key, session: sessao.session, userId: sessao.userId, email: sessao.email,
   }))

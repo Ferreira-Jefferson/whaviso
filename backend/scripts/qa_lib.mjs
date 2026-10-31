@@ -3,6 +3,13 @@
 // navegador ja logado). O guardrail de producao e o unico lugar que decide isso, para as duas
 // ferramentas nunca divergirem.
 import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Raiz do repo calculada a partir da localizacao deste arquivo (backend/scripts/qa_lib.mjs), nao
+// do cwd: assim os scripts rodam igual de dentro de backend/ ou da raiz do projeto. WROOT ainda
+// pode sobrepor, se precisar.
+export const RAIZ_PADRAO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 export function lerEnv(caminho, chave) {
   for (const linha of readFileSync(caminho, 'utf8').split(/\r?\n/)) {
@@ -17,7 +24,7 @@ export function lerEnv(caminho, chave) {
  * Nunca imprime o token: devolve a sessao pro chamador decidir onde ela vai (arquivo fora do
  * repo, ou servida so em 127.0.0.1 para o navegador buscar).
  */
-export async function obterSessaoQa({ root = '..', email, permitirProducao = false } = {}) {
+export async function obterSessaoQa({ root = RAIZ_PADRAO, email, permitirProducao = false } = {}) {
   const URL = lerEnv(`${root}/frontend/.env`, 'VITE_SUPABASE_URL')
   const ANON = lerEnv(`${root}/frontend/.env`, 'VITE_SUPABASE_PUBLISHABLE_KEY')
   const SERVICE = lerEnv(`${root}/secrets/production.env`, 'SUPABASE_SERVICE_ROLE_KEY')

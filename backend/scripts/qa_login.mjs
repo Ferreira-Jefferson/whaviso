@@ -10,11 +10,10 @@ import { createServer } from 'node:http'
 import { execFile } from 'node:child_process'
 import { obterSessaoQa } from './qa_lib.mjs'
 
-const ROOT = process.env.WROOT ?? '..'
 const FRONT_URL = process.env.QA_FRONT_URL ?? 'http://localhost:5173'
 const permitirProducao = process.argv.includes('--permitir-producao')
 
-const sessao = await obterSessaoQa({ root: ROOT, permitirProducao })
+const sessao = await obterSessaoQa({ root: process.env.WROOT, permitirProducao })
 
 const corpo = JSON.stringify({ key: sessao.key, session: sessao.session })
 const server = createServer((_req, res) => {
