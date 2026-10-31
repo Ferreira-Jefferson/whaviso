@@ -74,11 +74,13 @@ export function PainelAcessos() {
     {
       chave: 'status',
       titulo: 'Situação',
+      render: (a) => <Badge tom={TOM[a.status]}>{ROTULO[a.status]}</Badge>,
+    },
+    {
+      chave: 'aprovado_em',
+      titulo: 'Aprovado em',
       render: (a) => (
-        <span className="flex flex-col gap-0.5">
-          <Badge tom={TOM[a.status]}>{ROTULO[a.status]}</Badge>
-          {a.aprovado_em && <span className="text-xs text-tinta-2">em {formatarDataHora(a.aprovado_em)}</span>}
-        </span>
+        <span className="text-tinta-2">{a.aprovado_em ? formatarDataHora(a.aprovado_em) : 'Ainda não'}</span>
       ),
     },
     { chave: 'origem', titulo: 'Origem', render: (a) => <span className="text-tinta-2">{a.origem === 'pagamento' ? 'Pagamento' : 'Manual'}</span> },
