@@ -17,10 +17,15 @@ const MARGEM = 8
 
 // Topo (em coords de viewport) do ancestral mais próximo que recorta a rolagem; se não
 // houver, o topo da viewport. É o limite acima do qual o tooltip seria cortado/cobriria.
+// Num <dialog>, o título (h2) sempre vem antes do conteúdo: o espaço livre de verdade começa
+// depois dele, não no topo bruto do elemento (que incluiria a altura do título e cobriria ele).
 function topoDoContainer(node: HTMLElement): number {
   for (let el = node.parentElement; el; el = el.parentElement) {
     const oy = getComputedStyle(el).overflowY
-    if (oy === 'auto' || oy === 'scroll' || oy === 'hidden') return el.getBoundingClientRect().top
+    if (oy === 'auto' || oy === 'scroll' || oy === 'hidden') {
+      const titulo = el.tagName === 'DIALOG' ? el.querySelector(':scope > h2') : null
+      return titulo ? titulo.getBoundingClientRect().bottom : el.getBoundingClientRect().top
+    }
   }
   return 0
 }

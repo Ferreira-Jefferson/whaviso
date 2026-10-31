@@ -21,8 +21,15 @@ export function Dialog({ aberto, onFechar, titulo, children, acoes, className }:
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    if (aberto && !el.open) el.showModal()
-    else if (!aberto && el.open) el.close()
+    if (aberto && !el.open) {
+      el.showModal()
+      // showModal() foca por padrao o PRIMEIRO elemento focavel do dialog, que pode ser o
+      // botao de dica (?) de um campo (InfoHint), antes do proprio input: isso abre a dica
+      // sozinha ja na abertura. Move o foco pro primeiro controle de verdade, se houver.
+      el.querySelector<HTMLElement>('input, textarea, select')?.focus()
+    } else if (!aberto && el.open) {
+      el.close()
+    }
   }, [aberto])
 
   return (
