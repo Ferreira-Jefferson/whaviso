@@ -91,3 +91,12 @@ export const PlanoResumo = z.object({
 })
 export type PlanoResumo = z.infer<typeof PlanoResumo>
 export const PlanosResumoLista = z.array(PlanoResumo)
+
+/** Pool de chaves de LLM (modulo configuracoes_llm). Espelho minimo so pro seletor aqui. */
+export const PoolLlmResumo = z.object({ id: z.uuid(), nome: z.string(), ativo: z.boolean() })
+export type PoolLlmResumo = z.infer<typeof PoolLlmResumo>
+export const PoolLlmResumoLista = z.array(PoolLlmResumo)
+
+/** Resposta da atribuicao: so o que a tela precisa pra refletir "configurada" na hora. */
+export const CredencialLlmResumo = z.object({ configurada: z.boolean(), provedor: z.string().nullable() })
+export type CredencialLlmResumo = z.infer<typeof CredencialLlmResumo>

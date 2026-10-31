@@ -3,14 +3,16 @@
 // Suspender/reativar assinatura NAO mora aqui (modulo de cobranca).
 import { useState, type ReactNode } from 'react'
 import { ApiError } from '@/shared/api_client'
-import { Avatar, Badge, Banner, ConfirmDialog, Dialog, Button, Field, Input, Skeleton, useToast } from '@/shared/ui'
+import { Avatar, Badge, Banner, ConfirmDialog, Dialog, Button, Field, Input, Select, Skeleton, useToast } from '@/shared/ui'
 import { brl, formatarData, formatarDataHora } from '@/shared/format'
 import type {
   PlataformaContaFicha,
   PlataformaLojaResumo,
 } from '@/shared/contracts/_generated/plataforma_usuarios'
 import type { StatusNumero } from '@/shared/contracts/_generated/enums'
-import { useChavesApi, useCriarChaveApi, useFichaConta, useRevogarChaveApi } from '../api'
+import {
+  useAtribuirPoolLlm, useChavesApi, useCriarChaveApi, useFichaConta, usePoolLlmAtivo, useRevogarChaveApi,
+} from '../api'
 import type { ChaveApiDTO, SituacaoChave } from '../schemas'
 import {
   ROTULO_PAPEL_MEMBRO,
@@ -184,7 +186,52 @@ function LojaItem({ loja }: { loja: PlataformaLojaResumo }) {
           {copiado ? 'Copiado!' : 'Copiar'}
         </button>
       </div>
+      <AtribuicaoPoolLlm lojaId={loja.id} />
     </li>
+  )
+}
+
+/**
+ * Chave de IA do pool da plataforma, atribuída pelo operador em vez de a loja cadastrar a
+ * própria (área de loja em /llm continua valendo: cadastrar a própria sempre substitui a
+ * atribuição do pool). Só mostra quando há ao menos uma chave ATIVA no pool pra escolher.
+ */
+function AtribuicaoPoolLlm({ lojaId }: { lojaId: string }) {
+  const pool = usePoolLlmAtivo()
+  const atribuir = useAtribuirPoolLlm(lojaId)
+  const { mostrarToast } = useToast()
+  const [selecionada, setSelecionada] = useState('')
+
+  if (!pool.isSuccess || pool.data.length === 0) return null
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-linha pt-2 text-xs text-tinta-2">
+      <span>Usar chave de IA do pool:</span>
+      <Select
+        ariaLabel="Chave de IA do pool para esta loja"
+        value={selecionada}
+        onChange={setSelecionada}
+        options={[{ value: '', label: 'Selecionar…' }, ...pool.data.map((p) => ({ value: p.id, label: p.nome }))]}
+        className="min-w-40"
+      />
+      <Button
+        type="button"
+        variante="secondary"
+        disabled={!selecionada}
+        loading={atribuir.isPending}
+        onClick={() =>
+          atribuir.mutate(selecionada, {
+            onSuccess: () => {
+              setSelecionada('')
+              mostrarToast('Loja passou a usar a chave do pool.', { tom: 'sucesso' })
+            },
+            onError: (e) => mostrarToast(e instanceof ApiError ? e.message : 'Não foi possível atribuir a chave.', { tom: 'erro' }),
+          })
+        }
+      >
+        Atribuir
+      </Button>
+    </div>
   )
 }
 

@@ -3,7 +3,7 @@
 // (as telas usam apiClient semLoja). A guarda RequireOperador decide quem entra; a seguranca
 // real e a autorizacao por rota na api. Nav fixa: Painel, Usuários, Cobranca, Planos, Funil, Acessos.
 import { NavLink, Outlet } from 'react-router'
-import { BarChart3, FlaskConical, Filter, KeyRound, Package, ShieldCheck, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { BarChart3, FlaskConical, Filter, KeyRound, Package, Settings, ShieldCheck, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { BellLogo, cn } from '@/shared/ui'
 import { ROTA_INICIAL } from '../rotas'
@@ -29,6 +29,9 @@ const NAV_OPERADOR: readonly ItemOperador[] = [
   { caminho: 'acessos-login', rotulo: 'Logins', icone: KeyRound },
   // Central de Evals: mede a LLM e o RAG do atendente (so operador; a api responde 403 aos demais).
   { caminho: 'evals', rotulo: 'Evals', icone: FlaskConical },
+  // Credenciais/segredos da plataforma (Asaas, numero oficial, e-mail, pool de IA); a api responde
+  // 403 a quem nao tem chaves_api:gerir.
+  { caminho: 'configuracoes', rotulo: 'Configurações', icone: Settings },
 ]
 
 function ItemNav({ item }: { item: ItemOperador }) {

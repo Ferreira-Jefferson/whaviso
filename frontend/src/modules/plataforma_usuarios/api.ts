@@ -21,14 +21,17 @@ import {
   ChaveApiCriada,
   ChaveApiDTO,
   ChaveApiLista,
+  CredencialLlmResumo,
   NovoUsuarioSaida,
   OperadorDTO,
   OperadorListaSaida,
   PlanosResumoLista,
+  PoolLlmResumoLista,
   type NovaChaveApi,
   type NovoUsuario,
   type OperadorConvite,
   type PlanoResumo,
+  type PoolLlmResumo,
 } from './schemas'
 
 export const RAIZ = 'plataforma_usuarios'
@@ -168,5 +171,30 @@ export function useRevogarChaveApi(contaId: string) {
         semLoja: true,
       }),
     onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'chaves', contaId] }),
+  })
+}
+
+// Pool de chaves de LLM (modulo configuracoes_llm): so as ATIVAS entram no seletor de atribuicao.
+//   GET /v1/llm/pool                              lista (admin)
+//   PUT /v1/llm/pool/atribuicoes/:lojaId           atribui uma chave do pool a uma loja
+export function usePoolLlmAtivo() {
+  return useQuery({
+    queryKey: [RAIZ, 'pool_llm'],
+    queryFn: ({ signal }) =>
+      apiClient.get<PoolLlmResumo[]>('/llm/pool', { schema: PoolLlmResumoLista, signal, semLoja: true }),
+    select: (itens) => itens.filter((p) => p.ativo),
+  })
+}
+
+export function useAtribuirPoolLlm(lojaId: string) {
+  const qc = useQueryClient()
+  return useMutation<CredencialLlmResumo, Error, string>({
+    mutationFn: (poolChaveId) =>
+      apiClient.put<CredencialLlmResumo>(`/llm/pool/atribuicoes/${lojaId}`, {
+        body: { pool_chave_id: poolChaveId },
+        schema: CredencialLlmResumo,
+        semLoja: true,
+      }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: [RAIZ, 'ficha'] }),
   })
 }
