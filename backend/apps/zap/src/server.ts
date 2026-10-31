@@ -8,6 +8,7 @@ import { criarClienteWhatsMeta } from './shared/meta_client'
 import { iniciarScheduler } from './scheduler'
 import { drenarEnvios } from './modules/enviar'
 import { drenarEmails, criarClienteResend } from './modules/enviar_email'
+import { lerCredencialEmailPlataforma } from './shared/credenciais_plataforma/repo'
 
 // Fonte unica local: o .env da raiz traz vars prefixadas por servico (ZAP_*).
 // Em prod o host pode definir PORT/DATABASE_URL direto; o alias so preenche se faltarem.
@@ -20,17 +21,11 @@ const env = parseEnv(envSchema)
 const logger = criarLogger('zap', env.LOG_LEVEL)
 const pool = criarPool({ connectionString: env.DATABASE_URL, max: 3 })
 
-// Transporte oficial (Meta Cloud API): exige as 4 credenciais essenciais. Sem elas o zap
-// nao envia nem recebe nada, entao falha o boot com mensagem clara (em vez de subir mudo).
-if (
-  !env.META_ACCESS_TOKEN ||
-  !env.META_PHONE_NUMBER_ID ||
-  !env.META_APP_SECRET ||
-  !env.META_VERIFY_TOKEN
-) {
-  logger.error(
-    'META_* ausentes: defina META_ACCESS_TOKEN, META_PHONE_NUMBER_ID, META_APP_SECRET e META_VERIFY_TOKEN',
-  )
+// Segredo do App Meta (HMAC do webhook) + verify token do handshake: unicos por app registrado,
+// compartilhados por todos os numeros (loja e oficial), entao continuam em env (nao mudam em
+// runtime). Sem eles o webhook nao valida nada, entao falha o boot com mensagem clara.
+if (!env.META_APP_SECRET || !env.META_VERIFY_TOKEN) {
+  logger.error('META_APP_SECRET/META_VERIFY_TOKEN ausentes: o webhook do WhatsApp nao valida sem eles')
   process.exit(1)
 }
 
@@ -63,16 +58,17 @@ const tick = cifra
   : async () => undefined
 const scheduler = iniciarScheduler({ logger, intervaloMs: env.SCHEDULER_INTERVAL_MS, tick })
 
-// Dreno da outbox de e-mail (Resend): independente da cifra (e-mail nao usa MASTER_KEY). Sem
-// ZAP_RESEND_API_KEY o cliente fica indefinido e o dreno fica idle (os e-mails ficam na fila).
-const clienteEmail = env.ZAP_RESEND_API_KEY
-  ? criarClienteResend({ apiKey: env.ZAP_RESEND_API_KEY, remetente: env.ZAP_RESEND_REMETENTE, logger })
-  : undefined
-if (!clienteEmail) logger.warn('ZAP_RESEND_API_KEY ausente: dreno de e-mail idle (fila retida)')
+// Dreno da outbox de e-mail (Resend): credencial lida do banco A CADA TICK (admin em
+// /plataforma/configuracoes, migration 0096), nao uma vez no boot. Sem MASTER_KEY (cifra) ou
+// sem credencial configurada, o cliente fica indefinido e o dreno fica idle (fila retida).
 const schedulerEmail = iniciarScheduler({
   logger,
   intervaloMs: env.SCHEDULER_INTERVAL_MS,
   tick: async () => {
+    const credencial = cifra ? await lerCredencialEmailPlataforma(pool, cifra) : null
+    const clienteEmail = credencial
+      ? criarClienteResend({ apiKey: credencial.apiKey, remetente: credencial.remetente, logger })
+      : undefined
     const r = await drenarEmails({ pool, logger, cliente: clienteEmail })
     if (r.reivindicados || r.orfaos) logger.info(r, 'dreno de e-mail')
   },

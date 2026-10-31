@@ -60,6 +60,10 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   credenciais_llm: { apiDelete: 'negado' },
   // Credencial do PSP (nivel plataforma): chave_cifrada e segredo; api escreve/le a cifra, nunca DELETE.
   credenciais_psp: { apiDelete: 'negado' },
+  // Credenciais de plataforma (0096): numero oficial do WhatsApp e e-mail transacional (Resend).
+  // api escreve a cifra (write-only), zap le (decifra para enviar); nunca DELETE.
+  credenciais_whatsapp_oficial: { apiDelete: 'negado' },
+  credenciais_email_plataforma: { apiDelete: 'negado' },
   despacho_config: { apiDelete: 'negado' },
   documentos: { apiDelete: 'negado' },
   documentos_fiscais: { apiDelete: 'negado' },
@@ -165,6 +169,13 @@ export const CASOS_ESPECIFICOS: readonly LinhaMatriz[] = [
   { role: 'whaviso_atendente', tabela: 'credenciais_llm', coluna: 'chave_cifrada', operacao: 'select', esperado: 'permitido', sec: 'SEC-022', nota: 'unico role que le a chave' },
   { role: 'whaviso_atendente', tabela: 'credenciais_llm', coluna: 'provedor', operacao: 'select', esperado: 'permitido', sec: 'SEC-022' },
   { role: 'whaviso_atendente', tabela: 'credenciais_llm', coluna: 'ativo', operacao: 'update', esperado: 'negado', sec: 'SEC-022', nota: 'atendente so le; nao escreve credencial' },
+
+  // SEC-022: credenciais de plataforma (0096). api escreve (write-only, nunca le a cifra de
+  // volta por convencao de codigo); zap le (precisa decifrar para enviar); atendente nao toca.
+  { role: 'whaviso_zap', tabela: 'credenciais_whatsapp_oficial', operacao: 'select', esperado: 'permitido', sec: 'SEC-022' },
+  { role: 'whaviso_atendente', tabela: 'credenciais_whatsapp_oficial', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'atendente nao toca credencial de plataforma' },
+  { role: 'whaviso_zap', tabela: 'credenciais_email_plataforma', operacao: 'select', esperado: 'permitido', sec: 'SEC-022' },
+  { role: 'whaviso_atendente', tabela: 'credenciais_email_plataforma', operacao: 'select', esperado: 'negado', sec: 'SEC-032', nota: 'atendente nao toca credencial de plataforma' },
 
   // SEC-022 / SEC-032: numeros_whatsapp.token_cifrado. zap le (precisa enviar), atendente nao.
   { role: 'whaviso_zap', tabela: 'numeros_whatsapp', coluna: 'token_cifrado', operacao: 'select', esperado: 'permitido', sec: 'SEC-022' },

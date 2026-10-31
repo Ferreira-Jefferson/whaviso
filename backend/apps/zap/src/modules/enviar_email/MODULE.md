@@ -7,13 +7,14 @@ orfaos, retentativa com backoff, gravacao so das colunas de transporte, SEC-031)
 
 ## Fiacao (app-root; o modulo nao se auto-registra)
 
-Chamado pelo scheduler, como `ZAP-enviar`. Em `src/server.ts`:
-- constroi o `ClienteEmail` via `criarClienteResend({ apiKey, remetente, logger })` SE
-  `ZAP_RESEND_API_KEY` existir; senao passa `cliente: undefined`.
-- adiciona um tick `drenarEmails({ pool, logger, cliente })`.
+Chamado pelo scheduler, como `ZAP-enviar`. Em `src/server.ts`, A CADA TICK (nao uma vez no
+boot): le `credenciais_email_plataforma` (migration 0096, `shared/credenciais_plataforma/repo.ts`),
+decifra com a MASTER_KEY e, se configurada, constroi o `ClienteEmail` via
+`criarClienteResend({ apiKey, remetente, logger })`; senao passa `cliente: undefined`.
 
-**Sem `ZAP_RESEND_API_KEY` o boot NAO quebra:** o dreno recebe `cliente: undefined`, devolve
-`idle: true` e deixa os e-mails na fila (enviados quando a chave existir).
+**Sem credencial configurada o boot NAO quebra:** o dreno recebe `cliente: undefined`, devolve
+`idle: true` e deixa os e-mails na fila (enviados no primeiro tick apos o admin configurar em
+`/plataforma/configuracoes`, sem precisar reiniciar o processo).
 
 ## Propriedade de dados
 
@@ -34,7 +35,7 @@ destinatario nao vai para log (so `provider_id` e o codigo de erro). 4xx (exceto
 Renderizados EM CODIGO (`template.ts`), o zap e so transporte. Linguagem neutra quanto a genero,
 sem travessao, sem emoji. Chave atual: `boas_vindas` (acesso de login liberado).
 
-## Env
+## Credencial
 
-- `ZAP_RESEND_API_KEY` (opcional): chave da API Resend. Ausente -> dreno idle.
-- `ZAP_RESEND_REMETENTE` (opcional): remetente, "Nome <endereco@dominio>". Default do schema.
+Nao e env: `credenciais_email_plataforma` (singleton, `id = 1`), administrada pelo operador em
+`/plataforma/configuracoes` (modulo api `credenciais_plataforma`). Ausente/zerada -> dreno idle.

@@ -15,26 +15,24 @@ export const envSchema = z.object({
   // schema para o harness de teste; sem ela o dreno de envios não sobe (server.ts avisa).
   MASTER_KEY: z.string().min(32, 'minimo 32 caracteres').optional(),
 
-  // Meta Cloud API (transporte oficial do WhatsApp). Opcionais no schema para o harness
-  // de teste e o typecheck; o server.ts EXIGE as 4 essenciais no boot (token, phone_id,
-  // app_secret, verify_token) e encerra com mensagem clara se faltarem. O token NUNCA é
-  // logado. WABA id só é usado pelo sync de templates (futuro).
-  META_ACCESS_TOKEN: z.string().optional().describe('token do System User (permanente) ou de teste'),
-  META_PHONE_NUMBER_ID: z.string().optional().describe('Phone Number ID do número na WABA'),
-  META_WABA_ID: z.string().optional().describe('WhatsApp Business Account ID'),
+  // Meta Cloud API (transporte oficial do WhatsApp). App Secret + verify token sao do APP
+  // registrado na Meta (HMAC do webhook + handshake), compartilhados por todos os numeros
+  // (loja e oficial): continuam em env porque nao mudam em runtime. Opcionais no schema para
+  // o harness de teste e o typecheck; o server.ts EXIGE os dois no boot e encerra com mensagem
+  // clara se faltarem.
+  //
+  // O access_token/phone_number_id/waba_id do NUMERO OFICIAL (usado em OTP/notificacao futura)
+  // saiu daqui: agora e credencial administravel em /plataforma/configuracoes (migration 0096,
+  // modulo credenciais_plataforma), lida do banco pelo zap a cada tick, nao mais env+redeploy.
   META_APP_SECRET: z.string().optional().describe('App Secret p/ validar a assinatura do webhook'),
   META_VERIFY_TOKEN: z.string().optional().describe('verify token do handshake do webhook'),
   META_GRAPH_URL: z.url().default('https://graph.facebook.com'),
   META_API_VERSION: z.string().default('v23.0'),
 
-  // E-mail transacional (Resend) para o dreno da outbox de e-mail (ZAP-enviar-email, migration
-  // 0082). OPCIONAL: sem a chave o dreno fica idle e deixa os e-mails na fila (o boot nao quebra).
-  // A chave NUNCA é logada.
-  ZAP_RESEND_API_KEY: z.string().optional().describe('chave da API Resend (re_...)'),
-  ZAP_RESEND_REMETENTE: z
-    .string()
-    .default('Whaviso <nao-responda@whaviso.com>')
-    .describe('remetente dos e-mails, "Nome <endereco@dominio>"'),
+  // E-mail transacional (Resend): a chave saiu daqui tambem (mesmo motivo acima) e agora e
+  // credencial administravel em /plataforma/configuracoes (migration 0096), lida do banco a
+  // cada tick do dreno (ZAP-enviar-email). Sem credencial configurada o dreno fica idle (fila
+  // retida; o boot nao quebra).
 
   // Admin API do Supabase (service role key). OPCIONAIS. NUNCA vão ao bundle do front.
   SUPABASE_URL: z.url().optional().describe('URL do Supabase para a Admin API'),
