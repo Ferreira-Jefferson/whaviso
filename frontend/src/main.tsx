@@ -18,11 +18,22 @@ import '@fontsource/karla/700.css'
 import './index.css'
 import { App } from './app/providers'
 
-const root = document.getElementById('root')
-if (!root) throw new Error('Elemento #root não encontrado.')
+async function bootstrap() {
+  // So em dev, e so quando a URL pede (scripts/qa_login.mjs): injeta a sessao do usuario de
+  // teste antes de montar o app, sem precisar colar token no console.
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa_session_port')) {
+    const { injetarSessaoQa } = await import('./dev/qaSessionBootstrap')
+    if (await injetarSessaoQa()) return // location.replace ja disparou a navegacao seguinte
+  }
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+  const root = document.getElementById('root')
+  if (!root) throw new Error('Elemento #root não encontrado.')
+
+  createRoot(root).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+void bootstrap()
