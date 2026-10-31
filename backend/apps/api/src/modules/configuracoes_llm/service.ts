@@ -5,15 +5,18 @@
 // valida com a chave EM MAOS (antes de cifrar): como ela nunca le a chave gravada de volta,
 // "revalidar a chave salva" nao existe aqui (fica com o atendente, que decifra). `validada_em`
 // so marca o momento do set/rotate.
-import { comTransacao, type Pool, type Executor } from '@whaviso/shared/db'
-import { HttpError, naoEncontrado, regraNegocio } from '../../shared/http_errors'
-import type { CredencialMeta } from './repo'
+import { comTransacao, ErroBanco, type Pool, type Executor } from '@whaviso/shared/db'
+import { conflito, HttpError, naoEncontrado, regraNegocio } from '../../shared/http_errors'
+import type { CredencialMeta, PoolLlmMeta } from './repo'
 import * as repo from './repo'
 import type { CifraLlm } from './cifra'
 import type { RegistroValidadores } from './provedores'
 import type {
   CredencialLlmEstado,
   CredencialLlmPatch,
+  PoolLlmCriar,
+  PoolLlmItem,
+  PoolLlmPatch,
   ProvedorLlm,
   ResultadoValidacaoLlm,
   UsoLlmResumo,
@@ -192,4 +195,69 @@ export async function obterUso(exec: Executor, lojaId: string): Promise<UsoLlmRe
     por_modelo: modelos.map((m) => ({ rotulo: m.rotulo, custo_estimado_centavos: m.custo })),
     pico: calcularPico(dias),
   }
+}
+
+// ---- Pool de chaves de LLM da plataforma (admin) ----------------------------------------------
+
+function paraPoolItem(m: PoolLlmMeta): PoolLlmItem {
+  return {
+    id: m.id, nome: m.nome, provedor: m.provedor, ultimos4: m.ultimos4, ativo: m.ativo,
+    criado_em: m.criado_em, atualizado_em: m.atualizado_em,
+  }
+}
+
+/** Violacao do indice unico de nome (case-insensitive) vira 409; qualquer outro erro segue. */
+function traduzirNomePoolDuplicado(e: unknown): unknown {
+  if (e instanceof ErroBanco && e.tipo === 'unique') {
+    return conflito('pool_llm_nome_duplicado', 'Ja existe uma chave do pool com esse nome')
+  }
+  return e
+}
+
+export async function listarPool(exec: Executor): Promise<PoolLlmItem[]> {
+  return (await repo.listarPool(exec)).map(paraPoolItem)
+}
+
+/** Cria uma chave nova do pool (cifra em repouso; a chave em claro nunca volta nem e logada). */
+export async function criarPool(exec: Executor, deps: DepsConfigLlm, entrada: PoolLlmCriar): Promise<PoolLlmItem> {
+  try {
+    const chaveCifrada = deps.cifra.cifrar(entrada.chave)
+    const ultimos4 = extrairUltimos4(entrada.chave)
+    const criada = await repo.inserirPool(exec, {
+      nome: entrada.nome, provedor: entrada.provedor, chaveCifrada, ultimos4,
+    })
+    return paraPoolItem(criada)
+  } catch (e) {
+    throw traduzirNomePoolDuplicado(e)
+  }
+}
+
+/** Ajusta uma chave do pool: renomear, ativar/desativar e/ou rotacionar. 404 se o id nao existe. */
+export async function ajustarPool(exec: Executor, deps: DepsConfigLlm, id: string, patch: PoolLlmPatch): Promise<PoolLlmItem> {
+  try {
+    const campos: { nome?: string; ativo?: boolean; chaveCifrada?: Buffer; ultimos4?: string } = {}
+    if (patch.nome !== undefined) campos.nome = patch.nome
+    if (patch.ativo !== undefined) campos.ativo = patch.ativo
+    if (patch.chave !== undefined) {
+      campos.chaveCifrada = deps.cifra.cifrar(patch.chave)
+      campos.ultimos4 = extrairUltimos4(patch.chave)
+    }
+    const atualizada = await repo.ajustarPool(exec, id, campos)
+    if (!atualizada) throw naoEncontrado('Chave do pool nao encontrada')
+    return paraPoolItem(atualizada)
+  } catch (e) {
+    throw traduzirNomePoolDuplicado(e)
+  }
+}
+
+/**
+ * Atribuicao pelo OPERADOR: a loja passa a usar a chave `poolChaveId` do pool em vez da propria.
+ * So aceita chave ATIVA do pool (atribuir uma inativa deixaria a loja sem IA de forma confusa).
+ */
+export async function atribuirPool(exec: Executor, lojaId: string, poolChaveId: string): Promise<CredencialLlmEstado> {
+  const chave = await repo.obterPool(exec, poolChaveId)
+  if (!chave) throw naoEncontrado('Chave do pool nao encontrada')
+  if (!chave.ativo) throw regraNegocio('pool_chave_inativa', 'Esta chave do pool esta inativa')
+  const estado = await repo.atribuirPool(exec, lojaId, poolChaveId, chave.provedor)
+  return paraEstado(estado)
 }

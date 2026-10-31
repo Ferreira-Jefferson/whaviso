@@ -58,6 +58,8 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   corridas: { apiDelete: 'negado' },
   contas_pagar: { apiDelete: 'negado' },
   credenciais_llm: { apiDelete: 'negado' },
+  // Pool de chaves de LLM da plataforma (0097): mesmo molde de credenciais_llm.
+  credenciais_llm_pool: { apiDelete: 'negado' },
   // Credencial do PSP (nivel plataforma): chave_cifrada e segredo; api escreve/le a cifra, nunca DELETE.
   credenciais_psp: { apiDelete: 'negado' },
   // Credenciais de plataforma (0096): numero oficial do WhatsApp e e-mail transacional (Resend).
@@ -169,6 +171,20 @@ export const CASOS_ESPECIFICOS: readonly LinhaMatriz[] = [
   { role: 'whaviso_atendente', tabela: 'credenciais_llm', coluna: 'chave_cifrada', operacao: 'select', esperado: 'permitido', sec: 'SEC-022', nota: 'unico role que le a chave' },
   { role: 'whaviso_atendente', tabela: 'credenciais_llm', coluna: 'provedor', operacao: 'select', esperado: 'permitido', sec: 'SEC-022' },
   { role: 'whaviso_atendente', tabela: 'credenciais_llm', coluna: 'ativo', operacao: 'update', esperado: 'negado', sec: 'SEC-022', nota: 'atendente so le; nao escreve credencial' },
+
+  // SEC-021 / SEC-022: credenciais_llm_pool (0097), mesmo molde write-only de credenciais_llm.
+  { role: 'whaviso_api', tabela: 'credenciais_llm_pool', coluna: 'chave_cifrada', operacao: 'select', esperado: 'negado', sec: 'SEC-021' },
+  { role: 'whaviso_api', tabela: 'credenciais_llm_pool', coluna: 'chave_cifrada', operacao: 'insert', esperado: 'permitido', sec: 'SEC-021', nota: 'write-only: api grava a cifra' },
+  { role: 'whaviso_api', tabela: 'credenciais_llm_pool', coluna: 'chave_cifrada', operacao: 'update', esperado: 'permitido', sec: 'SEC-021', nota: 'write-only: api rotaciona a cifra' },
+  { role: 'whaviso_api', tabela: 'credenciais_llm_pool', coluna: 'nome', operacao: 'select', esperado: 'permitido', sec: 'SEC-021', nota: 'metadado liberado' },
+  { role: 'whaviso_zap', tabela: 'credenciais_llm_pool', coluna: 'chave_cifrada', operacao: 'select', esperado: 'negado', sec: 'SEC-022', nota: 'zap nao tem grant algum na tabela' },
+  { role: 'whaviso_atendente', tabela: 'credenciais_llm_pool', coluna: 'chave_cifrada', operacao: 'select', esperado: 'permitido', sec: 'SEC-022', nota: 'unico role que le a chave do pool' },
+  { role: 'whaviso_atendente', tabela: 'credenciais_llm_pool', coluna: 'nome', operacao: 'select', esperado: 'negado', sec: 'SEC-022', nota: 'atendente nao precisa do rotulo, so da cifra/provedor/ativo' },
+
+  // SEC-021: credenciais_llm.pool_chave_id (0097). api le/atribui; atendente le pra resolver.
+  { role: 'whaviso_api', tabela: 'credenciais_llm', coluna: 'pool_chave_id', operacao: 'select', esperado: 'permitido', sec: 'SEC-021' },
+  { role: 'whaviso_api', tabela: 'credenciais_llm', coluna: 'pool_chave_id', operacao: 'update', esperado: 'permitido', sec: 'SEC-021', nota: 'atribuicao de pool pelo operador' },
+  { role: 'whaviso_atendente', tabela: 'credenciais_llm', coluna: 'pool_chave_id', operacao: 'select', esperado: 'permitido', sec: 'SEC-021', nota: 'decide se junta com o pool na resolucao' },
 
   // SEC-022: credenciais de plataforma (0096). api escreve (write-only, nunca le a cifra de
   // volta por convencao de codigo); zap le (precisa decifrar para enviar); atendente nao toca.

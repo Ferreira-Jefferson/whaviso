@@ -60,11 +60,14 @@ export async function upsert(exec: Executor, d: DadosUpsert): Promise<string> {
   const linha = await consultarUm<{ id: string }>(
     exec,
     sql`insert into public.credenciais_llm
-          (loja_id, provedor, chave_cifrada, ultimos4, modelo_preferido, ativo)
-        values (${d.lojaId}, ${d.provedor}, ${d.chaveCifrada}, ${d.ultimos4}, ${d.modeloPreferido}, true)
+          (loja_id, provedor, chave_cifrada, pool_chave_id, ultimos4, modelo_preferido, ativo)
+        values (${d.lojaId}, ${d.provedor}, ${d.chaveCifrada}, null, ${d.ultimos4}, ${d.modeloPreferido}, true)
         on conflict (loja_id) do update set
           provedor = excluded.provedor,
           chave_cifrada = ${d.chaveCifrada},
+          -- BYO (a propria loja cadastrando a chave) sempre limpa uma eventual atribuicao de pool
+          -- anterior: a partir daqui a credencial da loja e so a propria (fonte unica, SEC-021).
+          pool_chave_id = null,
           ultimos4 = excluded.ultimos4,
           modelo_preferido = coalesce(${d.modeloPreferido}, public.credenciais_llm.modelo_preferido),
           ativo = true
@@ -192,4 +195,99 @@ export async function porModelo(exec: Executor, lojaId: string): Promise<UsoRotu
          where loja_id = ${lojaId} and ${FILTRO_MES}
          group by 1 order by custo desc, rotulo`,
   )
+}
+
+// ---- Pool de chaves de LLM da plataforma (admin; SEC-021 write-only sobre chave_cifrada) -----
+
+/** Linha de metadado do pool (SEM chave_cifrada). */
+export interface PoolLlmMeta {
+  id: string
+  nome: string
+  provedor: ProvedorLlm
+  ultimos4: string | null
+  ativo: boolean
+  criado_em: string | null
+  atualizado_em: string | null
+}
+
+const SAIDA_POOL = sql`${sqlBruto('id, nome, provedor, ultimos4, ativo')},
+  ${TS('criado_em')} as criado_em, ${TS('atualizado_em')} as atualizado_em`
+
+/** Lista o pool inteiro (ativo e inativo; o service/front decide o que mostrar). */
+export async function listarPool(exec: Executor): Promise<PoolLlmMeta[]> {
+  return consultar<PoolLlmMeta>(exec, sql`select ${SAIDA_POOL} from public.credenciais_llm_pool order by nome`)
+}
+
+export interface DadosInserirPool {
+  nome: string
+  provedor: ProvedorLlm
+  chaveCifrada: Buffer
+  ultimos4: string
+}
+
+/** Cria uma chave nova do pool. Nome e unico (case-insensitive); colisao vira ErroBanco 'unique'. */
+export async function inserirPool(exec: Executor, d: DadosInserirPool): Promise<PoolLlmMeta> {
+  const linha = await consultarUm<PoolLlmMeta>(
+    exec,
+    sql`insert into public.credenciais_llm_pool (nome, provedor, chave_cifrada, ultimos4, ativo)
+        values (${d.nome}, ${d.provedor}, ${d.chaveCifrada}, ${d.ultimos4}, true)
+        returning ${SAIDA_POOL}`,
+  )
+  return linha!
+}
+
+/**
+ * Ajusta uma chave do pool: renomear, ativar/desativar e/ou rotacionar a chave. Sem DELETE.
+ *
+ * IMPORTANTE (write-only, SEC-021): so entram no SET os campos REALMENTE informados, cada um com
+ * o PARAMETRO direto (nunca lendo `chave_cifrada` de volta via coalesce/excluded). Ler essa coluna
+ * exigiria SELECT nela, que a api NAO tem (grant por coluna) e abortaria por privilegio.
+ */
+export async function ajustarPool(
+  exec: Executor,
+  id: string,
+  campos: { nome?: string; ativo?: boolean; chaveCifrada?: Buffer; ultimos4?: string },
+): Promise<PoolLlmMeta | null> {
+  const sets: Consulta[] = []
+  if (campos.nome !== undefined) sets.push(sql`nome = ${campos.nome}`)
+  if (campos.ativo !== undefined) sets.push(sql`ativo = ${campos.ativo}`)
+  if (campos.chaveCifrada !== undefined) sets.push(sql`chave_cifrada = ${campos.chaveCifrada}`)
+  if (campos.ultimos4 !== undefined) sets.push(sql`ultimos4 = ${campos.ultimos4}`)
+  if (sets.length === 0) return obterPool(exec, id)
+  let clausula = sets[0]!
+  for (let i = 1; i < sets.length; i++) clausula = sql`${clausula}, ${sets[i]!}`
+  return consultarUm<PoolLlmMeta>(
+    exec,
+    sql`update public.credenciais_llm_pool set ${clausula} where id = ${id} returning ${SAIDA_POOL}`,
+  )
+}
+
+/** Metadado de uma chave do pool (para validar o id antes de atribuir a uma loja). */
+export async function obterPool(exec: Executor, id: string): Promise<PoolLlmMeta | null> {
+  return consultarUm<PoolLlmMeta>(exec, sql`select ${SAIDA_POOL} from public.credenciais_llm_pool where id = ${id}`)
+}
+
+/**
+ * Atribuicao pelo OPERADOR: a loja passa a usar a chave `poolChaveId` do pool em vez da propria
+ * (fonte unica, SEC-021: `chave_cifrada` fica null). `provedor` e copiado do pool so para exibicao
+ * (a loja ve "configurada" no provedor certo); `modelo_preferido` existente e preservado.
+ */
+export async function atribuirPool(
+  exec: Executor,
+  lojaId: string,
+  poolChaveId: string,
+  provedor: ProvedorLlm,
+): Promise<CredencialMeta> {
+  const linha = await consultarUm<CredencialMeta>(
+    exec,
+    sql`insert into public.credenciais_llm (loja_id, provedor, chave_cifrada, pool_chave_id, ativo)
+        values (${lojaId}, ${provedor}, null, ${poolChaveId}, true)
+        on conflict (loja_id) do update set
+          provedor = excluded.provedor,
+          chave_cifrada = null,
+          pool_chave_id = ${poolChaveId},
+          ativo = true
+        returning ${SAIDA_META}`,
+  )
+  return linha!
 }

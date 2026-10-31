@@ -15,6 +15,13 @@ import {
   CredencialLlmPatch,
   CredencialLlmTestarEntrada,
   CredencialLlmTesteSaida,
+  LojaIdParam,
+  PoolIdParam,
+  PoolLlmAtribuicao,
+  PoolLlmCriar,
+  PoolLlmItem,
+  PoolLlmLista,
+  PoolLlmPatch,
   UsoLlmResumo,
 } from './schemas'
 import type { DepsConfigLlm } from './service'
@@ -100,6 +107,44 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsConfigLlm): void {
     { ...leitura, schema: { response: { 200: UsoLlmResumo } } },
     async (req) => service.obterUso(app.pool, lojaAtiva(req)),
   )
+
+  // --- Pool de chaves de LLM da plataforma (admin: acesso 'plataforma', nao 'conteudo_de_loja') ---
+
+  const plataforma = {
+    config: { acesso: 'plataforma' as const, rateLimit: LIMITE_SENSIVEL },
+    preHandler: [app.autenticar, app.escopoOperador, app.exigirPermissao('chaves_api:gerir')],
+  }
+
+  // GET /llm/pool: lista o pool inteiro (metadado; nunca a chave).
+  r.get('/pool', { ...plataforma, schema: { response: { 200: PoolLlmLista } } },
+    async () => service.listarPool(app.pool))
+
+  // POST /llm/pool: cria uma chave nova do pool.
+  r.post('/pool', { ...plataforma, schema: { body: PoolLlmCriar, response: { 201: PoolLlmItem } } },
+    async (req, reply) => {
+      const item = await service.criarPool(app.pool, obterDeps(), req.body)
+      req.log.info({ id: item.id, nome: item.nome, provedor: item.provedor, acao: 'pool_criar' }, 'chave do pool de llm criada')
+      void reply.code(201)
+      return item
+    })
+
+  // PATCH /llm/pool/:id: renomear, ativar/desativar e/ou rotacionar a chave.
+  r.patch('/pool/:id',
+    { ...plataforma, schema: { params: PoolIdParam, body: PoolLlmPatch, response: { 200: PoolLlmItem } } },
+    async (req) => {
+      const item = await service.ajustarPool(app.pool, obterDeps(), req.params.id, req.body)
+      req.log.info({ id: item.id, ativo: item.ativo, acao: 'pool_ajustar' }, 'chave do pool de llm ajustada')
+      return item
+    })
+
+  // PUT /llm/pool/atribuicoes/:lojaId: operador atribui a chave do pool a uma loja (em vez da BYO).
+  r.put('/pool/atribuicoes/:lojaId',
+    { ...plataforma, schema: { params: LojaIdParam, body: PoolLlmAtribuicao, response: { 200: CredencialLlmEstado } } },
+    async (req) => {
+      const estado = await service.atribuirPool(app.pool, req.params.lojaId, req.body.pool_chave_id)
+      req.log.info({ loja_id: req.params.lojaId, pool_chave_id: req.body.pool_chave_id, acao: 'pool_atribuir' }, 'chave do pool atribuida a loja')
+      return estado
+    })
 }
 
 /** Leitura: membro autenticado, escopo resolvido e permissao `ia:ver` (padrao: dono e gerente). */

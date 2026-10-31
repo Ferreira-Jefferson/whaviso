@@ -18,12 +18,20 @@ export interface CredencialLlmRow {
 /**
  * Credencial ATIVA da loja, ou null. Projeta so as colunas necessarias (nunca `ultimos4`/datas que
  * nao usamos aqui). `ativo = true` embutido no WHERE: credencial inativa resolve como ausente.
+ *
+ * Fonte unica (SEC-021): `credenciais_llm.chave_cifrada` (BYO, a propria loja) OU
+ * `credenciais_llm_pool.chave_cifrada` (quando `pool_chave_id` aponta pra uma chave do pool,
+ * atribuida pelo operador). `coalesce` pega a que estiver setada; o join so entra quando ha
+ * `pool_chave_id`. Chave do pool DESATIVADA (`p.ativo = false`) resolve como ausente tambem
+ * (falha fechada: uma loja nunca "cai" numa chave diferente so porque a atribuida foi desligada).
  */
 export async function lerCredencialAtiva(exec: Executor, lojaId: string): Promise<CredencialLlmRow | null> {
   return consultarUm<CredencialLlmRow>(
     exec,
-    sql`select id, provedor, chave_cifrada, modelo_preferido
-          from public.credenciais_llm
-         where loja_id = ${lojaId} and ativo = true`,
+    sql`select c.id, c.provedor, coalesce(p.chave_cifrada, c.chave_cifrada) as chave_cifrada, c.modelo_preferido
+          from public.credenciais_llm c
+          left join public.credenciais_llm_pool p on p.id = c.pool_chave_id
+         where c.loja_id = ${lojaId} and c.ativo = true
+           and (c.pool_chave_id is null or p.ativo = true)`,
   )
 }

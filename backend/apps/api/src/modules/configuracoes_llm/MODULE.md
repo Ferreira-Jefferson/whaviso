@@ -6,6 +6,13 @@ preferido), troca (rotate) quando quiser e ve so o ESTADO ("configurada, termina
 validada em ..."). Expoe tambem o consumo (`uso_llm`) para o painel de gasto. O segredo mais
 caro do banco: tratamento mais apertado do sistema.
 
+Tambem e dono do POOL de chaves da PLATAFORMA (migration 0097): o admin mantem uma lista de
+chaves (ex.: uma conta OpenRouter do whaviso) que uma loja pode usar em vez de cadastrar a
+propria. A loja sempre tem exatamente UMA fonte (`credenciais_llm.chave_cifrada` OU
+`pool_chave_id`, nunca os dois); quem decide a atribuicao e o OPERADOR (rota de plataforma
+`PUT /llm/pool/atribuicoes/:lojaId`), nao a propria loja. Trocar a chave do pool desativa todas
+as lojas atribuidas (falha fechada: nenhuma cai numa chave diferente).
+
 ## Regras de ouro (nao quebrar)
 - NUNCA ler a chave de volta: a api e write-only sobre `chave_cifrada`. O grant por coluna barra
   o SELECT (SEC-021); o repo projeta SO metadado (lista explicita, nunca `select *`).
@@ -30,6 +37,9 @@ caro do banco: tratamento mais apertado do sistema.
 ## Tabelas
 - dono de ESCRITA: `credenciais_llm` (insert/update de `chave_cifrada`+metadado; sem SELECT da
   chave, sem DELETE; "remover" = `PATCH ativo=false`). Unique `(loja_id)`: uma credencial por loja.
+  `pool_chave_id` (0097) referencia `credenciais_llm_pool`; exatamente uma fonte setada
+  (`chave_cifrada` XOR `pool_chave_id`, check de banco).
+- dono de ESCRITA tambem: `credenciais_llm_pool` (0097) - mesmo molde write-only; sem DELETE.
 - le de: `uso_llm` (read-model de consumo; quem grava e o atendente)
 - `eventos`: append de auditoria sem a chave (`credencial_llm.definida`)
 
@@ -50,6 +60,9 @@ caro do banco: tratamento mais apertado do sistema.
 - `GET /credencial` estado (dono/gerente) · `PUT /credencial` set/rotate (dono; rate limit)
 - `PATCH /credencial` ativar/desativar/modelo (dono) · `POST /credencial/testar` (dono; rate limit)
 - `GET /uso` resumo de consumo (dono/gerente)
+- Pool (operador, `acesso: 'plataforma'`, permissao `chaves_api:gerir`, rate limit):
+  `GET /pool` lista (sem chave) · `POST /pool` cria · `PATCH /pool/:id` renomeia/ativa/rotaciona
+  · `PUT /pool/atribuicoes/:lojaId` atribui uma chave ATIVA do pool a uma loja (422 se inativa)
 
 ## Config de producao
 - `LLM_MASTER_KEY` (min 32 chars) lida de `process.env` em `config.ts` (propor promover ao

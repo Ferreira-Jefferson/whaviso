@@ -79,6 +79,24 @@ async function semearCredencial(lojaId: string, chave: string, masterKey = LLM_M
   )
 }
 
+/** Cria uma chave do pool e atribui a loja (molde do fluxo do operador em configuracoes_llm). */
+async function semearPool(lojaId: string, chave: string, ativo = true): Promise<string> {
+  const cifrada = criarCifra(LLM_MASTER_KEY).cifrar(Buffer.from(chave, 'utf8'))
+  const ultimos4 = chave.replace(/[^0-9A-Za-z]/g, '').slice(-4)
+  const { rows } = await poolSuper.query<{ id: string }>(
+    `insert into public.credenciais_llm_pool (nome, provedor, chave_cifrada, ultimos4, ativo)
+     values ($1, 'openrouter', $2, $3, $4) returning id`,
+    [`pool-${Math.random().toString(36).slice(2, 8)}`, cifrada, ultimos4, ativo],
+  )
+  const poolId = rows[0]!.id
+  await poolSuper.query(
+    `insert into public.credenciais_llm (loja_id, provedor, chave_cifrada, pool_chave_id, ativo)
+     values ($1, 'openrouter', null, $2, true)`,
+    [lojaId, poolId],
+  )
+  return poolId
+}
+
 async function usoDaLoja(lojaId: string): Promise<Array<{ origem: string; custo: number; tin: number }>> {
   const { rows } = await poolSuper.query(
     `select origem, custo_estimado_centavos as custo, tokens_entrada as tin
@@ -188,6 +206,30 @@ describe.skipIf(!online)('AT-llm (integracao, role whaviso_atendente)', () => {
     )
     const serie = await seriePorDiaCentavos(poolAtendente, a.lojaId, 7)
     expect(serie.reduce((s, d) => s + d.custo, 0)).toBe(42)
+  })
+
+  it('pool: loja sem chave propria, mas atribuida a uma chave do pool, usa a chave do pool', async () => {
+    const a = await semear()
+    contas.push(a.contaId)
+    const SENTINELA_POOL = 'sk-or-chave-do-pool-sentinela-002'
+    await semearPool(a.lojaId, SENTINELA_POOL)
+
+    const ad = fakeAdaptador()
+    const r = await servicoCom(ad).completar({ exec: poolAtendente, escopo: escopoLoja(a.lojaId), origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
+    expect(r.ok).toBe(true)
+    expect(ad.credVistas).toEqual([SENTINELA_POOL])
+  })
+
+  it('pool: chave do pool DESATIVADA pelo operador falha fechada (nao cai em outra chave)', async () => {
+    const a = await semear()
+    contas.push(a.contaId)
+    await semearPool(a.lojaId, 'sk-or-chave-do-pool-desativada', false)
+
+    const ad = fakeAdaptador()
+    const r = await servicoCom(ad).completar({ exec: poolAtendente, escopo: escopoLoja(a.lojaId), origem: 'atendente', mensagens: [{ papel: 'user', conteudo: 'oi' }] })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.erro.codigo).toBe('llm_indisponivel')
+    expect(ad.credVistas).toEqual([])
   })
 
   it('SEC-021/022: matriz por SET ROLE: so whaviso_atendente le chave_cifrada', async () => {
