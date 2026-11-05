@@ -23,6 +23,12 @@ export interface OpcoesRequisicao {
   publico?: boolean
   /** Rota fora do escopo de loja (nao envia x-loja-id). */
   semLoja?: boolean
+  /**
+   * Override explicito do `x-loja-id` desta chamada, independente da loja ativa global. Usado pelo
+   * operador na sessao de acesso assistido (ler o conteudo de uma loja alvo sob consentimento). Tem
+   * precedencia sobre a loja ativa; ignorado quando `publico`.
+   */
+  lojaId?: string
 }
 
 export interface DepsApiClient {
@@ -88,8 +94,9 @@ export function criarApiClient(deps: DepsApiClient) {
   ): Promise<Response> {
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (!op.publico && token) headers.Authorization = `Bearer ${token}`
-    if (!op.publico && !op.semLoja) {
-      const loja = lerLojaAtiva()
+    if (!op.publico) {
+      // Override explicito (sessao assistida) tem precedencia; senao, a loja ativa global, salvo semLoja.
+      const loja = op.lojaId ?? (op.semLoja ? null : lerLojaAtiva())
       if (loja) headers['x-loja-id'] = loja
     }
     if (op.body !== undefined) headers['Content-Type'] = 'application/json'
