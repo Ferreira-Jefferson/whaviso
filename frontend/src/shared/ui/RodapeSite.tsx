@@ -41,6 +41,9 @@ export function RodapeSite() {
             <Link to="/termos-de-uso" className="hover:text-salvia hover:underline">
               Termos
             </Link>
+            <Link to="/exclusao-de-dados" className="hover:text-salvia hover:underline">
+              Exclusão de dados
+            </Link>
           </nav>
         </div>
         <p className="mt-3 text-center text-[10px] leading-relaxed text-tinta-2 opacity-60">

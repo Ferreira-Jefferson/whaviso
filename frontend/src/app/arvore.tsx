@@ -27,7 +27,7 @@ const PlataformaConfiguracoes = lazy(() => import('@/modules/plataforma_configur
 // Paginas publicas de compliance ja em producao (politica e termos): seguem servidas pelo
 // modulo legado ate o FR de compliance reassumir. Unica dependencia de modules/** do shell.
 import { Landing } from '@/modules/landing'
-import { PoliticaPrivacidadePage, TermosUsoPage } from '@/modules/legal'
+import { PoliticaPrivacidadePage, TermosUsoPage, ExclusaoDadosPage } from '@/modules/legal'
 
 export const rotas: RouteObject[] = [
   {
@@ -55,6 +55,7 @@ export const rotas: RouteObject[] = [
         children: [
           { path: '/politica-de-privacidade', element: <PoliticaPrivacidadePage /> },
           { path: '/termos-de-uso', element: <TermosUsoPage /> },
+          { path: '/exclusao-de-dados', element: <ExclusaoDadosPage /> },
         ],
       },
       {
