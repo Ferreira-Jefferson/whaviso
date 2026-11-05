@@ -15,6 +15,7 @@ import { registrarModulos, type ModuloRota } from './routes'
 import { autenticarPlugin, criarVerificadorSupabase, type Verificador } from './shared/auth'
 import { escopoLojaPlugin, criarLeitorEscopoSql, comCoalescencia } from './shared/tenant'
 import { escopoOperadorPlugin } from './shared/operador'
+import { servicoAcessoSuporte } from './shared/acesso_suporte'
 import { realtimePlugin } from './shared/realtime'
 import type { EnvApi } from './env'
 
@@ -97,7 +98,33 @@ export async function construirApp(deps: DepsApi) {
   // de staleness (ver cache_escopo.ts). Um leitor compartilhado pelos dois plugins de escopo.
   const leitor = comCoalescencia(criarLeitorEscopoSql(deps.pool))
   await app.register(autenticarPlugin, { verificador })
-  await app.register(escopoLojaPlugin, { leitor, auditoria: deps.pool })
+  // Ponte de acesso assistido: o operador com consentimento ATIVO da loja alcanca o escopo
+  // READ-ONLY dela (so leitura, auditada). Injetada para o kernel de escopo nao importar o
+  // dominio de suporte. Sem consentimento, o operador segue barrado do conteudo (SEC-003).
+  await app.register(escopoLojaPlugin, {
+    leitor,
+    auditoria: deps.pool,
+    acessoAssistido: {
+      grantAtivo: (lojaId) =>
+        servicoAcessoSuporte
+          .acessoAtivo(deps.pool, lojaId)
+          .then((g) => (g ? { id: g.id } : null)),
+      contaDaLoja: async (lojaId) => {
+        const { rows } = await deps.pool.query<{ conta_id: string }>(
+          'select conta_id from public.lojas where id = $1 and ativo',
+          [lojaId],
+        )
+        return rows[0]?.conta_id ?? null
+      },
+      registrarUso: (p) =>
+        servicoAcessoSuporte.registrarUso(deps.pool, {
+          acessoId: p.acessoId,
+          operadorUserId: p.operadorUserId,
+          lojaId: p.lojaId,
+          acao: p.acao,
+        }),
+    },
+  })
   await app.register(escopoOperadorPlugin, { leitor })
 
   // F5: SSE (GET /realtime/stream). LISTEN dedicado (conexao direta), aberto no 1o cliente.

@@ -36,16 +36,39 @@ export interface OpcoesGuardaPermissao {
   lojaAusente?: 'proibido' | 'obrigatoria'
 }
 
+/**
+ * Ponte de acesso assistido (consentimento da loja para o operador). Injetada para manter o
+ * kernel de escopo DESACOPLADO do dominio de suporte (shared/tenant nao importa o kernel de
+ * acesso). Sem ela, o operador sem vinculo de membro e negado como antes.
+ */
+export interface AcessoAssistido {
+  /** Grant de suporte ATIVO para a loja (revogado_em null e nao expirado), ou null. */
+  grantAtivo(lojaId: string): Promise<{ id: string } | null>
+  /** conta_id da loja ATIVA alvo, ou null se nao existe ou esta inativa. */
+  contaDaLoja(lojaId: string): Promise<string | null>
+  /** Auditoria append-only de cada requisicao atendida em sessao assistida. */
+  registrarUso(p: {
+    acessoId: string
+    operadorUserId: string
+    lojaId: string
+    acao: string
+  }): Promise<void>
+}
+
 export interface OpcoesEscopoLoja {
   leitor: LeitorEscopo
   /** Executor para gravar a auditoria de negacao; opcional (sem ele, nao audita). */
   auditoria?: ExecutorAuditoria
+  /** Ponte de acesso assistido; opcional (sem ela, operador sem vinculo e negado). */
+  acessoAssistido?: AcessoAssistido
 }
 
 declare module 'fastify' {
   interface FastifyRequest {
     /** Escopo de loja resolvido; null ate `escopoLoja` rodar com sucesso. */
     escopo: EscopoLoja | null
+    /** Sessao assistida ativa (operador com consentimento da loja); null fora dela. Read-only. */
+    assistido: { acesso_id: string } | null
   }
   interface FastifyInstance {
     escopoLoja: preHandlerHookHandler
@@ -74,11 +97,53 @@ function lerLojaSolicitada(req: FastifyRequest): string | null {
 
 const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
   app.decorateRequest('escopo', null)
+  app.decorateRequest('assistido', null)
+
+  /**
+   * Tenta a ponte de acesso assistido para a loja solicitada: se o usuario for operador da
+   * plataforma COM consentimento ativo daquela loja, monta um escopo READ-ONLY (sem papel) e
+   * registra o uso na auditoria. Retorna true se assumiu o escopo (o chamador deve parar).
+   * A restricao a somente-leitura e imposta em `exigirPermissao` (GET + chave `:ver`).
+   */
+  const tentarAssistido = async (
+    req: FastifyRequest,
+    reply: FastifyReply,
+    userId: string,
+    solicitada: string | null,
+  ): Promise<boolean> => {
+    if (!solicitada || !opcoes.acessoAssistido) return false
+    const operador = await opcoes.leitor.operadorDoUsuario(userId).catch(() => null)
+    if (!operador) return false
+    const grant = await opcoes.acessoAssistido.grantAtivo(solicitada)
+    if (!grant) return false
+    const contaId = await opcoes.acessoAssistido.contaDaLoja(solicitada)
+    if (!contaId) return false
+    req.escopo = {
+      tipo: 'loja',
+      user_id: userId,
+      conta_id: contaId,
+      loja_ids: [solicitada],
+      papel_por_loja: {},
+      loja_ativa: solicitada,
+    }
+    req.assistido = { acesso_id: grant.id }
+    // Toda requisicao atendida em sessao assistida e auditada (acao = metodo + rota, sem PII).
+    await opcoes.acessoAssistido.registrarUso({
+      acessoId: grant.id,
+      operadorUserId: userId,
+      lojaId: solicitada,
+      acao: `${req.method} ${req.routeOptions?.url ?? ''}`.trim(),
+    })
+    reply.header('cache-control', 'no-store')
+    return true
+  }
 
   // Nucleo compartilhado. `tolerante`: usuario sem vinculo nao e negado (req.escopo fica null).
   const resolver = async (req: FastifyRequest, reply: FastifyReply, tolerante: boolean) => {
     const userId = req.usuario?.user_id
     if (!userId) throw naoAutorizado()
+
+    const solicitada = lerLojaSolicitada(req)
 
     let vinculos
     try {
@@ -100,8 +165,11 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
     }
 
     if (!escopo) {
-      // Sem vinculo. No modo tolerante o usuario ainda vai criar a 1a loja: nao nega, deixa o
-      // handler decidir (lista vazia). Conta ambigua acima continua negando nos dois modos.
+      // Sem vinculo de membro. Antes de negar, tenta a ponte de acesso assistido (operador com
+      // consentimento ativo da loja solicitada).
+      if (await tentarAssistido(req, reply, userId, solicitada)) return
+      // No modo tolerante o usuario ainda vai criar a 1a loja: nao nega, deixa o handler decidir
+      // (lista vazia). Conta ambigua acima continua negando nos dois modos.
       if (tolerante) {
         req.escopo = null
         reply.header('cache-control', 'no-store')
@@ -111,9 +179,11 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
       throw proibido('Sem acesso a nenhuma loja')
     }
 
-    const solicitada = lerLojaSolicitada(req)
     if (solicitada) {
       if (!escopo.loja_ids.includes(solicitada)) {
+        // Loja fora do escopo de membro: ainda pode ser uma sessao assistida (operador com
+        // consentimento daquela loja de outra conta).
+        if (await tentarAssistido(req, reply, userId, solicitada)) return
         await auditarNegacao(opcoes, userId, 'loja_fora_do_escopo')
         // 404 em vez de 403: nao confirma a existencia de uma loja de outra conta.
         throw naoEncontrado()
@@ -158,6 +228,13 @@ const plugin: FastifyPluginAsync<OpcoesEscopoLoja> = async (app, opcoes) => {
           throw regraNegocio('loja_ativa_obrigatoria', 'Informe a loja ativa no header x-loja-id')
         }
         throw proibido('Loja ativa nao definida')
+      }
+      // Sessao assistida (operador com consentimento): SOMENTE leitura. Passa apenas em GET e em
+      // permissao de visualizacao (`:ver`); qualquer escrita (`:gerir`/`:operar`/...) e negada, e
+      // `dados_sensiveis:revelar` tambem (operador nunca ve telefone/Pix em claro).
+      if (req.assistido) {
+        if (req.method === 'GET' && permissao.endsWith(':ver')) return
+        throw proibido('Acesso assistido e somente leitura')
       }
       const papel = escopo.papel_por_loja[escopo.loja_ativa]
       if (!papel || !papelPermite(papel, permissao)) throw proibido()
