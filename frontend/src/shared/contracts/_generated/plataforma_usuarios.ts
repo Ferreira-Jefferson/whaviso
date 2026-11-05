@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/plataforma_usuarios.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo plataforma_usuarios (console do operador: cadastro de usuarios do
 // Whaviso, sejam donos de restaurante, equipe de um restaurante ou equipe interna da Whaviso).

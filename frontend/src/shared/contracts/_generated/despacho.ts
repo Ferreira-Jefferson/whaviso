@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/despacho.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo despacho (basico/manual): atribuir motoboy ao pedido e montar a
 // corrida (1 motoboy, N pedidos, ordem de parada definida a mao). Fonte unica (o codegen reemite

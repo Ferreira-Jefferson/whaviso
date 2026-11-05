@@ -44,7 +44,7 @@ Escreva em `${REPORTS_ROOT}/<run-id>/triage/`:
 - **Nao invente correcao:** hipotetize e cite; o fluxo de implementacao e dono da correcao real.
 - **Objetivo, escala, nao insiste:** uma hipotese de localizacao e correcao por causa raiz, com `file:line`. Nao gere varias tentativas no escuro. Causa raiz ambigua, ou correcao que cruzaria a fronteira de modulo (modulo nao importa modulo, sinal de desenho errado): marque para **revisao Opus 4.8** em vez de chutar, com a pergunta exata. Triagem nunca implementa.
 - **Seguranca cita o catalogo:** achado de seguranca referencia o `SEC-###` de `docs/pivot/SEGURANCA.md` que viola; a correcao aceita vira (ou atualiza) um teste da suite `security/`.
-- **Amarre de volta:** toda tarefa referencia o(s) id(s) do achado de origem e o doc dono da tela (`docs/pivot/`, ou o plano do modulo em `historias/`).
+- **Amarre de volta:** toda tarefa referencia o(s) id(s) do achado de origem e o doc dono da tela (`docs/pivot/`).
 - **Respeite as fronteiras do whaviso:** modulo nao importa modulo (ver `backend/AGENTS.md`); api, zap e atendente se coordenam pelo banco/outbox, nunca importando um ao outro. Uma correcao que cruzaria essa fronteira e sinal de que o desenho esta errado, sinalize.
 - **Disciplina de token:** use `Grep`/`Glob` para localizar e leia so o necessario; para pastas grandes de relatorio, leia so o `_INDEX.md` e os achados aceitos.
 

@@ -2,7 +2,7 @@
 
 Manifesto do Chrome QA Loop: mapeia **rota do painel -> doc dono -> cenarios** e carrega os guardrails e o contrato de relatorio. O explorador (`chrome-qa-explorer`) le este arquivo, navega o app rodando (`http://localhost:5173`) e escreve um relatorio por achado.
 
-> O comportamento esperado e o contrato de seguranca vem de `docs/pivot/` (ARQUITETURA, BANCO, SEGURANCA, HARNESS-ATENDENTE, RAG). A lente de Security cita o catalogo `SEC-###` de `docs/pivot/SEGURANCA.md`. `historias/` e plano de execucao, nao especificacao de tela.
+> O comportamento esperado e o contrato de seguranca vem de `docs/pivot/` (ARQUITETURA, BANCO, SEGURANCA, HARNESS-ATENDENTE, RAG). A lente de Security cita o catalogo `SEC-###` de `docs/pivot/SEGURANCA.md`.
 
 ## Estado do ambiente (ler antes de rodar)
 
@@ -51,7 +51,7 @@ Um arquivo por achado em `docs/qa/reports/<run-id>/`, escrito na hora (nao acumu
 | 11 | `/crm` | painel | SEGURANCA.md (PII, consentimento) | segmentos; **nenhum telefone trafega**; opt-out com confirmacao |
 | 12 | `/campanhas` | painel | SEGURANCA.md | aviso de que opt-out nunca entra; **nao disparar**; previa de destinatarios sem PII em log |
 | 13 | `/avaliacoes` | painel | BANCO.md (avaliacoes) | resumo e lista; so leitura |
-| 14 | `/onboarding` | painel | historias/ | checklist perfil/numero/cardapio/1o pedido com atalhos |
+| 14 | `/onboarding` | painel | ARQUITETURA.md | checklist perfil/numero/cardapio/1o pedido com atalhos |
 | 15 | `/despacho` | entrega | BANCO.md (corridas) | pedidos prontos; montar corrida; **nao despachar** real |
 | 16 | `/motoboys` | entrega | BANCO.md (motoboys) | cadastro + fechamento do dia; Pix do motoboy mascarado; **nao marcar pago** real |
 | 17 | `/zonas` | entrega | BANCO.md (zonas_entrega) | zonas por bairro/raio/poligono; taxas em centavos |
@@ -63,7 +63,7 @@ Um arquivo por achado em `docs/qa/reports/<run-id>/`, escrito na hora (nao acumu
 | 23 | `/disponibilidade` | config | BANCO.md (janela_atendente) | horarios de atendimento |
 | 24 | `/fidelidade` | config | BANCO.md (fidelidade) | programa pontos/cashback; exemplo e so ilustrativo |
 | 25 | `/promocoes` | config | BANCO.md (promocoes) | cupons/combos; testar cupom simula, nao aplica |
-| 26 | `/cardapio-importacao` | config | RAG.md / historias | upload foto/PDF; **nao aprovar** o lote de verdade |
+| 26 | `/cardapio-importacao` | config | RAG.md | upload foto/PDF; **nao aprovar** o lote de verdade |
 | 27 | `/canais` | config | SEGURANCA.md (credencial) | iFood/Outro; **credencial write-only** (`••••ultimos4`); sync 501 vira aviso, nao erro |
 | 28 | `/fiscal` | config | SEGURANCA.md (credencial) | emissor; **credencial write-only**; link do documento so se https |
 | 29 | `/llm` (Atendente) | config | docs/pivot/ (cifra LLM) | **chave do provedor write-only** (SEC LLM): so provedor/"termina em ####"; "Testar" nao salva; consumo em centavos |

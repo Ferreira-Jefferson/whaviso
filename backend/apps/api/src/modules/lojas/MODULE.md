@@ -5,7 +5,7 @@ Perfil da loja dentro da conta: criar/editar loja, branding (cores e logo) e end
 Horarios/disponibilidade NAO vivem aqui: tem fonte unica nas tabelas normalizadas (modulo
 `disponibilidade`, regras-negocio/05). Entrega tambem NAO vive aqui: tem fonte unica em
 `zonas_entrega` (por loja, operacional; a coluna legada `lojas.area_entrega` foi removida na
-migration 0062). Fonte: `historias/backend-api/lojas.md`.
+migration 0062).
 
 ## Entry points
 - `index.ts`: `lojasRoutes` (registrado em `src/routes.ts`) e `criarLojasRoutes({ hostsLogoExtras })`.

@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/cardapio_importacao.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda da importacao de cardapio por foto/PDF (fonte unica; o codegen reemite para o
 // front). O arquivo vai inline (base64) e a extracao por LLM roda no atendente (assincrona): a api

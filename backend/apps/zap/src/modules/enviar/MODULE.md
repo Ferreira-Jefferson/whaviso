@@ -22,7 +22,7 @@ enfileira; este modulo nunca cria linha em `envios`.
 - le de: `envios`, `numeros_whatsapp` (`token_cifrado`), `clientes` (`telefone_cifrado`, para
   resolver o destino), `conversas` (`ultima_entrada_em`, base da janela de 24h), `templates`
   (nome aprovado + idioma + ordem das variaveis).
-  Nota: `clientes` nao consta na lista de tabelas de `historias/backend-zap/enviar.md`, mas o
+  Nota: `clientes` nao consta na lista de tabelas declarada do modulo, mas o
   destino (E.164) so existe cifrado ali (`destinatario_hash` e so sha256); leitura permitida ao
   `whaviso_zap` por grant. Registrado aqui como leitura cruzada documentada.
 

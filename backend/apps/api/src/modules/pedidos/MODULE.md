@@ -3,7 +3,7 @@
 ## Proposito
 Kanban de pedidos da loja: criacao manual pelo painel com snapshot de nome/preco (item e opcoes),
 maquina de estados validada no servidor, cancelamento de linha com recalculo, comanda para impressao e
-evento ao vivo. Fonte: `historias/backend-api/pedidos.md`.
+evento ao vivo.
 
 ## Entry points
 - `index.ts`: `pedidosRoutes` (registry) e `criarPedidosRoutes(cifra?)` (cifra injetavel em teste).

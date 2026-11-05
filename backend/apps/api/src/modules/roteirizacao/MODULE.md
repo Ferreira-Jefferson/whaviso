@@ -4,8 +4,6 @@ Sugere corridas automaticas: agrupa pedidos de entrega prontos por **tempo de pr
 ordena as paradas. O operador aceita a sugestao; a corrida so existe depois do `aceitar`. Operacao manual
 de corridas continua no modulo `despacho` (este modulo nao o importa; le o que precisa por SQL).
 
-Fonte de regra: `historias/backend-api/roteirizacao.md`.
-
 ## Rotas
 
 | Metodo e caminho | Permissao | O que faz |

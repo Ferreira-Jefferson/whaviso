@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/pix.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Inferência do TIPO de uma chave pix a partir do formato. FONTE ÚNICA
 // (api + zap): o front mantém uma cópia espelhada (não importa @whaviso/shared), como

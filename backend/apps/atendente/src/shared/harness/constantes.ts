@@ -1,5 +1,5 @@
 // Constantes do harness: limites, textos fixos ao cliente e a versao do prompt. Textos em linguagem
-// neutra de genero e sem palavras proibidas (historias/13); sem acento, como os demais textos do motor.
+// neutra de genero e sem palavras proibidas; sem acento, como os demais textos do motor.
 import type { LimitesHarness } from './tipos'
 
 export const ORIGEM_LLM = 'harness'

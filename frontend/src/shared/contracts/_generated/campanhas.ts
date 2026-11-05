@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/campanhas.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo campanhas (fonte unica; o codegen reemite para o front).
 // Campanha de WhatsApp da loja sobre o consumidor final: nasce rascunho, dispara via template

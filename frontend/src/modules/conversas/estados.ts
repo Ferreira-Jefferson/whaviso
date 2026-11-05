@@ -28,8 +28,8 @@ export const COR_PONTO_STATUS: Record<StatusConversa, string> = {
 
 /**
  * Ordem dos estados no filtro: UM eixo so, a progressao de vida da conversa (nao dois eixos).
- * O status_conversa e um snapshot mutuamente exclusivo de quem conduz agora + aberta/fechada
- * (ver historias/backend-api/handoff.md): a automacao conduz (ia) -> pede humano e fica na fila
+ * O status_conversa e um snapshot mutuamente exclusivo de quem conduz agora + aberta/fechada:
+ * a automacao conduz (ia) -> pede humano e fica na fila
  * (aguardando) -> um humano assume (humano) -> encerrada (terminal). 'todas' fica fora, no topo.
  */
 export const ESTADOS_ORDEM: ReadonlyArray<StatusConversa> = ['ia', 'aguardando', 'humano', 'encerrada']

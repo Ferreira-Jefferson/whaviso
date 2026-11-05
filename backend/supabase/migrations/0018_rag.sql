@@ -1,6 +1,6 @@
 -- Camada de conhecimento do atendente (RAG): documento curavel + chunk embeddado + golden set +
 -- fila de realimentacao, mais os deltas em uso_llm e cache_semantico. Fonte do desenho:
--- docs/pivot/RAG.md (secoes 2, 4, 5 e 7.1). Historia: historias/backend-atendente/rag.md.
+-- docs/pivot/RAG.md (secoes 2, 4, 5 e 7.1).
 --
 -- Principios materializados aqui (nao reverter sem combinar):
 --   * Isolamento por loja e imposto no SQL: todo chunk/documento carrega loja_id e o retrieval

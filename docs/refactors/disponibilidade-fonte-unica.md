@@ -2,7 +2,7 @@
 
 > Projeto único, executado por lanes paralelas. **Leia este arquivo inteiro antes de começar.** As
 > interfaces abaixo estão **congeladas**: cada lane programa contra elas e não as renegocia. Fonte da
-> verdade de produto: [../../historias/regras-negocio/05-disponibilidade-loja.md](../../historias/regras-negocio/05-disponibilidade-loja.md).
+> verdade de produto: `docs/pivot/` (ARQUITETURA, BANCO).
 
 ## O que estamos fazendo (uma frase)
 

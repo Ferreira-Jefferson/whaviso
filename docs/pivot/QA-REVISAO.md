@@ -5,8 +5,8 @@
 > **Data:** 2026-10-27. Produto novo: automação de pedidos de restaurante por WhatsApp, multi-tenant.
 > **Escopo:** o Chrome QA Loop vendorizado no repo (`.claude/skills/chrome-qa-loop/`,
 > `.claude/agents/chrome-qa-explorer.md`, `.claude/agents/qa-report-triage.md`,
-> `chrome-qa-loop.config.json`), avaliado contra `docs/pivot/ARQUITETURA.md`, `BANCO.md`,
-> `SEGURANCA.md` e `historias/`.
+> `chrome-qa-loop.config.json`), avaliado contra `docs/pivot/ARQUITETURA.md`, `BANCO.md`
+> e `SEGURANCA.md`.
 
 ## 1. O que o QA é hoje
 
@@ -14,8 +14,8 @@ Um loop de QA exploratório com humano no meio: um agente explorador (`chrome-qa
 um Chrome real pelo Chrome DevTools MCP, navega a SPA tela a tela, aplica quatro lentes (QA,
 Product, Engineering, Security) e escreve um relatório markdown por achado; o humano revisa; um
 agente de triagem (`qa-report-triage`) deduplica, prioriza (P0 a P3) e emite `TASKS.md` mais stubs
-de `PLAN.md`. O explorador fundamenta o "esperado" de cada tela num doc dono, hoje apontado para
-`historias/`. A infraestrutura (MCP já conectado, 1 relatório por achado escrito na hora, triagem
+de `PLAN.md`. O explorador fundamenta o "esperado" de cada tela num doc dono. A
+infraestrutura (MCP já conectado, 1 relatório por achado escrito na hora, triagem
 como ponte revisão para implementação) é boa e deve ser preservada.
 
 ## 2. Diagnóstico honesto
@@ -26,13 +26,12 @@ como ponte revisão para implementação) é boa e deve ser preservada.
   o skill e o agente chamam esse arquivo de "contrato autoritativo" que vence tudo, e a pasta
   `docs/qa/` inteira não existe no repo. O loop depende de um artefato ausente. No pivô isso é
   oportuno: o manifesto do produto velho teria que ser jogado fora de qualquer forma.
-- **O grounding aponta para o lugar errado.** `OWNER_DOCS_ROOT` é `historias/`, mas `historias/`
-  deixou de descrever comportamento de tela. Hoje é um **plano de execução por módulo** (só o
-  `README.md` existe). O explorador foi desenhado para ler "a história dona da tela" e derivar dela
-  o comportamento esperado; essa fonte sumiu. A fonte real de comportamento e contrato agora é
-  `docs/pivot/` (ARQUITETURA, BANCO, SEGURANCA) mais o arquivo de plano do módulo em `historias/`.
-- **Referência a arquivo morto.** O explorador cita `historias/13-compliance.md` para regras de copy
-  de cobrança. Esse arquivo não existe mais.
+- **O grounding apontava para o lugar errado.** O `OWNER_DOCS_ROOT` apontava para uma fonte que
+  deixou de descrever comportamento de tela. O explorador foi desenhado para ler "a história dona da
+  tela" e derivar dela o comportamento esperado; essa fonte sumiu. A fonte real de comportamento e
+  contrato agora é `docs/pivot/` (ARQUITETURA, BANCO, SEGURANCA).
+- **Referência a arquivo morto.** O explorador cita um arquivo de regras de copy de cobrança que
+  não existe mais.
 
 ### 2.2 Acoplado ao produto velho de cobrança (precisa sumir)
 
@@ -99,8 +98,7 @@ mudanças são de **foco** e de **custo**, não de reescrever a máquina.
 
 - **Grounding na fonte certa.** `OWNER_DOCS_ROOT` passa a ser `docs/pivot/`. Para a lente de
   Security, a fonte autoritativa é o catálogo `SEC-###` de `SEGURANCA.md`: cada achado de segurança
-  cita o `SEC-###` que viola. Para o comportamento de uma tela, o explorador lê também o arquivo de
-  plano do módulo em `historias/` quando existir.
+  cita o `SEC-###` que viola.
 - **Manifesto adiado, não fingido.** O `SCREEN_MANIFEST` continua apontando para `docs/qa/PLAN.md`,
   mas fica registrado que ele **não existe** e só deve ser escrito quando o front do produto novo
   tiver rotas reais. Rodar o loop antes disso é prematuro (o app novo ainda não existe).
@@ -172,9 +170,8 @@ painel e o vazamento passivo (resposta, DOM, bundle, rede).
 
 - **Não criar `docs/qa/PLAN.md` agora.** O produto novo não tem front com rotas; um manifesto seria
   inventado. Fica registrado como pendência para quando o front existir.
-- **`OWNER_DOCS_ROOT` passa a `docs/pivot/`**, não `historias/`. `historias/` virou plano de
-  execução, não especificação de comportamento de tela; a fonte de "esperado" e de contrato de
-  segurança é `docs/pivot/`. O arquivo de módulo em `historias/` entra como leitura secundária.
+- **`OWNER_DOCS_ROOT` passa a `docs/pivot/`.** A fonte de "esperado" e de contrato de
+  segurança é `docs/pivot/`.
 - **Opus só por escalonamento, explorador sem ferramenta de subagent.** Justificado na seção 3.3.
 - **Lente de prompt injection mantida, com escopo corrigido** para as superfícies de IA do painel,
   não para a conversa do WhatsApp.
@@ -195,7 +192,7 @@ Mudanças cirúrgicas, preservando MCP conectado, 1 relatório por achado e a tr
 - **`.claude/agents/chrome-qa-explorer.md`:** `model: sonnet` e ferramentas `WebSearch`/`WebFetch`
   no frontmatter; tabela de placeholders, guardrails, lista de PII/segredos, papéis e lente de
   Security reescritos para o produto novo (multi-tenant `loja_id`, chave de LLM, operador x
-  conteúdo, SSE); referência a `historias/13-compliance.md` removida; regra de compliance de
+  conteúdo, SSE); referência ao arquivo morto de compliance de cobrança removida; regra de compliance de
   cobrança substituída por travessão e gênero neutro; contrato de comportamento "objetivo, escala,
   não insiste" nas condições de parada.
 - **`.claude/agents/qa-report-triage.md`:** `model: sonnet` no frontmatter; regra de escalonamento

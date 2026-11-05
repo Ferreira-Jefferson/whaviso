@@ -5,7 +5,7 @@ description: Loop de QA exploratorio sobre o app whaviso rodando de verdade num 
 
 # Chrome QA Loop (whaviso)
 
-Ciclo de QA exploratorio com humano no meio, dirigido pelo Claude via **Chrome DevTools MCP** (`chrome-devtools-mcp`). Adaptado do plugin `chrome-qa-loop@lemon-ai-hub` para o whaviso: os "docs donos" sao os docs de pivo em `docs/pivot/` (ARQUITETURA, BANCO, SEGURANCA; a Security fundamenta no catalogo `SEC-###` de `SEGURANCA.md`) mais o plano do modulo em `historias/` quando existir, e o triage localiza o codigo com Grep/Glob.
+Ciclo de QA exploratorio com humano no meio, dirigido pelo Claude via **Chrome DevTools MCP** (`chrome-devtools-mcp`). Adaptado do plugin `chrome-qa-loop@lemon-ai-hub` para o whaviso: os "docs donos" sao os docs de pivo em `docs/pivot/` (ARQUITETURA, BANCO, SEGURANCA; a Security fundamenta no catalogo `SEC-###` de `SEGURANCA.md`), e o triage localiza o codigo com Grep/Glob.
 
 ```
 voce dispara > EXPLORE (Chrome DevTools MCP) > REPORT (1 md por achado) > voce REVISA > TRIAGE > IMPLEMENTA (loop de feature) > REFLETE > (volta pra voce)

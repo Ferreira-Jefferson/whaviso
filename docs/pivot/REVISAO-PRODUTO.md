@@ -1,11 +1,11 @@
 # Revisão de produto do whaviso: necessidade real x plano atual
 
-> **Status:** análise para o dono decidir. Confronta o plano do rebuild (`docs/pivot/` +
-> `historias/`) com o objetivo final, a necessidade real do restaurante e a do consumidor final,
+> **Status:** análise para o dono decidir. Confronta o plano do rebuild (`docs/pivot/`)
+> com o objetivo final, a necessidade real do restaurante e a do consumidor final,
 > e com o que os concorrentes do mercado brasileiro fazem em 2026.
 > **Data:** 2026-10-27. Produto: automação de pedidos de restaurante por WhatsApp, multi-tenant.
-> **Método:** leitura de ARQUITETURA, BANCO, SEGURANCA, RAG, QA-REVISAO e dos arquivos de módulo em
-> `historias/**`, mais pesquisa de concorrentes (fontes ao final; muito é material de fornecedor, e
+> **Método:** leitura de ARQUITETURA, BANCO, SEGURANCA, RAG, QA-REVISAO,
+> mais pesquisa de concorrentes (fontes ao final; muito é material de fornecedor, e
 > está sinalizado).
 
 ## 1. Objetivo final e posicionamento

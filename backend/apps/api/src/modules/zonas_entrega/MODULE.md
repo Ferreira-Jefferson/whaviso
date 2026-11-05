@@ -4,7 +4,6 @@
 Zonas de entrega da loja: cada zona (bairro, poligono ou raio) define a **taxa cobrada do cliente**,
 o **valor pago ao motoboy**, o **pedido minimo** e o **frete gratis acima de** (tudo em centavos).
 Tambem resolve "este endereco cai em qual zona e quanto custa a entrega", que precifica o pedido.
-Fonte: `historias/backend-api/zonas_entrega.md`.
 
 ## Entry points
 - `index.ts`: `zonasEntregaRoutes` (registry em `src/routes.ts`, prefixo `zonas`).

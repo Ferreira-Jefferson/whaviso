@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/caixa.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo caixa (PDV). Fonte unica; o codegen reemite para o front.
 // Dinheiro sempre em centavos (inteiro). Valor de 'ajuste' pode ser negativo (correcao); os

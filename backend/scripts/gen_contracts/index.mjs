@@ -22,7 +22,7 @@ const ORIGEM_REL = 'backend/packages/shared/src/contracts'
 
 const CABECALHO = (nome) =>
   `// GERADO POR scripts/gen_contracts a partir de ${ORIGEM_REL}/${nome}.\n` +
-  `// NAO EDITAR A MAO: rode \`npm run gen:contracts\` no backend. Ver historias/00-fundacao/kernel-contratos.md.\n\n`
+  `// NAO EDITAR A MAO: rode \`npm run gen:contracts\` no backend.\n\n`
 
 /** Lista ordenada dos arquivos de contrato de origem (sem testes). */
 function arquivosDeOrigem() {

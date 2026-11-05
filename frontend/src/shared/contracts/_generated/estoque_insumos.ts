@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/estoque_insumos.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo estoque_insumos (materia-prima do restaurante). Fonte unica;
 // o codegen reemite para o front. Schemas Zod estritos (SEC-081). Quantidades em numeric(14,3)

@@ -1,7 +1,6 @@
 # Módulo plataforma_funil
 
 CRM de aquisição da Whaviso (P-funil): prospectos (restaurantes), estágios, atividades e follow-ups.
-Fonte da verdade: `historias/plataforma/funil.md`.
 
 - **Dono de escrita:** `prospectos`, `prospecto_atividades` (append-only: só INSERT/SELECT). **Leitura:** `operadores`, `contas`.
 - **Rotas** (`/v1/plataforma-funil/*`): `GET|POST /prospectos`, `GET|PATCH /prospectos/:id`,

@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/fornecedores.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo contas a pagar: FORNECEDORES (quem a loja paga e nao e pessoa).
 // Fonte unica; o codegen reemite para o front. Schemas estritos (SEC-081). A loja efetiva vem do

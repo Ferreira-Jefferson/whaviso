@@ -1,8 +1,8 @@
 # Limpeza: coluna legada `lojas.horarios` + codigo morto
 
 Plano comum congelado (2026-10-28). Executado por subagentes; o orquestrador verifica e commita cada
-lane (subagente NAO roda git). Fonte da verdade do dominio: `historias/`, em especial
-`regras-negocio/05-disponibilidade-loja.md` e [[disponibilidade-fonte-unica]].
+lane (subagente NAO roda git). Fonte da verdade do dominio: `docs/pivot/` (ARQUITETURA, BANCO) e
+[[disponibilidade-fonte-unica]].
 
 ## Contexto
 

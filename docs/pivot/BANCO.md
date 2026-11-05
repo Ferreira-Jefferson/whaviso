@@ -145,8 +145,8 @@ pelo kernel da api por role de aplicação, não por RLS.
   (como `planos`), em `tarifas_meta`; alerta de gasto diário anômalo por loja. Reserva 0023+.
 - **Migrations pós-baseline (reserva):** novas tabelas levantadas no detalhamento (convites, `ativo`
   nos vínculos de cardápio, estado de processamento em `mensagens`, importação de cardápio, RAG,
-  Pix do atendente, suspensão de loja, config de despacho, fluxos) seguem a **numeração reservada em
-  [../../historias/STATUS.md](../../historias/STATUS.md)** (a partir de `0013`), para não colidir. A
+  Pix do atendente, suspensão de loja, config de despacho, fluxos) seguem a **numeração reservada a
+  partir de `0013`**, para não colidir. A
   leva da revisão de produto acrescenta (reserva 0023+): `campanhas`, `campanha_envios`,
   `cliente_consentimento` (opt-out/LGPD), a view `clientes_metricas` (RFM: recência, frequência, valor,
   o que compra), `pedidos.forma_pagamento`/`troco_para`, `zonas.pedido_minimo`/`frete_gratis`,

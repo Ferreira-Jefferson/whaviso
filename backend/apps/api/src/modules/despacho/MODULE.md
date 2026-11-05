@@ -3,7 +3,6 @@
 ## Proposito
 Despacho **manual** (basico): atribuir motoboy a um pedido e montar a **corrida** (1 motoboy, N pedidos,
 ordem de parada definida a mao). Roteirizacao automatica e de outra onda (`sugerida` e sempre `false`).
-Fonte: `historias/backend-api/despacho.md`.
 
 ## Entry points
 - `index.ts`: `despachoRoutes` (registry em `src/routes.ts`, prefixo `despacho`).

@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/zonas_entrega.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo zonas_entrega (fonte unica; o codegen reemite para o front).
 // Schemas Zod estritos (SEC-081). Zona de entrega precifica a entrega: taxa cobrada do cliente e

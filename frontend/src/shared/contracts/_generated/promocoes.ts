@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/promocoes.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo promocoes (fonte unica; o codegen reemite para o front).
 // Cupons (percentual/fixo) e combos: camada de preco promocional aplicada ao SUBTOTAL do pedido

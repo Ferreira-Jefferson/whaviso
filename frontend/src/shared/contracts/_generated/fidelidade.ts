@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/fidelidade.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo fidelidade (fonte unica; o codegen reemite para o front).
 // Schemas Zod estritos. Dinheiro em centavos (int). Datas em ISO UTC. Nenhum telefone trafega

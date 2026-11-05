@@ -77,9 +77,7 @@ migrations) que recria só o que sobra. Tabelas/conceitos que **saem** do novo b
 - Rotas legadas e redirects (`/aviso`, `/sair-lembretes`, `/meus/*`, `/app/avisos`,
   `/app/metricas`, `/app/categorias`)
 
-### 2.6 Histórias, docs e raiz
-- `historias/` : apaga **o conteúdo** (19 épicos + `planos/` + `verificacao/`); **mantém a
-  pasta** para as histórias novas de restaurante.
+### 2.6 Docs e raiz
 - `PROJETO.md`, `README.md`, `ESTUDO-revendedores-venda-direta.md`
 - `docs/feedback-2026-07-22.md`, `docs/planos/*`, `docs/qa/PLAN.md`
 - `business/` (marketing do produto antigo: briefing, ideias, criativos, potenciais clientes)
@@ -163,7 +161,7 @@ Proposta de ordem, em passos reversíveis por commit, sem quebrar o build a cada
 3. Schema: criar o baseline novo (apagar as 103 migrations antigas e escrever as poucas que
    recriam profiles/auth/templates/envios/webhook/config/chaves_pix/roles). Sem cliente em
    produção, não há migração de dados.
-4. Docs/raiz/historias/business: apagar os arquivos de cobrança; esvaziar `historias/`.
+4. Docs, raiz e business: apagar os arquivos de cobrança.
 5. Atualizar `CLAUDE.md`, rodar lint+typecheck+test (devem passar
    vazios/adaptados) antes de commitar.
 

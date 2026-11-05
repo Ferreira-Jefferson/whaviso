@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/conhecimento.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda da curadoria da base de conhecimento (RAG) da loja: documentos versionados
 // (rascunho -> aprovado -> arquivado), golden set (base_avaliacao) e triagem da realimentacao

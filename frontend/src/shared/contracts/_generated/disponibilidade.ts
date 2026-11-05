@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/disponibilidade.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo disponibilidade (fonte unica; o codegen reemite para o front).
 // America/Sao_Paulo e nomeado no servidor; aqui so tratamos "HH:mm" e datas "YYYY-MM-DD".

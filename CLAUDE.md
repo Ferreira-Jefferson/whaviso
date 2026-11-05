@@ -2,7 +2,7 @@
 
 Automatize avisos de pagamento por WhatsApp e controle tudo pelo painel: o que está pendente, o que já recebeu, o que ainda vai pagar.
 
-> **Fonte da verdade do produto/negócio: a pasta [historias/](historias/).** Toda regra de negócio (estados e transições, fluxos receber/pagar, convite e aceite, ciclo de lembretes, interação do devedor, confirmação de pagamento, painel, notificações, planos/limites, templates, linguagem e compliance) vive nas histórias de usuário, já verificadas e aprovadas. Este CLAUDE.md cobre **apenas** arquitetura, comandos e ferramentas de desenvolvimento, e **não define regra de negócio**. Se algo aqui contradisser uma história, a história vence. Na dúvida sobre comportamento do produto, leia `historias/` (comece por [historias/README.md](historias/README.md)), não este arquivo.
+Este CLAUDE.md cobre arquitetura, comandos e ferramentas de desenvolvimento. O comportamento do produto é o que está implementado no código e no banco: confirme sempre no repo, não há documento de regra de negócio a seguir.
 
 **Layout (dois projetos independentes, um checkout, deploy numa VPS, sem Vercel):**
 - **`backend/`**: monorepo Node: `apps/api` (REST p/ SPA, :3001) · `apps/zap` (scheduler + webhook WhatsApp, :3002) · `packages/shared` (`@whaviso/shared`) · `supabase/` (migrations + seed) · `scripts/`. Workspace e install próprios.
@@ -10,7 +10,7 @@ Automatize avisos de pagamento por WhatsApp e controle tudo pelo painel: o que e
 
 As três peças (frontend, `api`, `zap`) são **independentes**: o front só consome a API REST (nunca conhece implementação do backend); `api` e `zap` se integram pelo **banco Supabase compartilhado** (outbox), nunca importando um ao outro.
 
-Leia sob demanda: regras de produto/negócio → [historias/](historias/) (fonte da verdade) · fronteiras/especialistas do backend → [backend/AGENTS.md](backend/AGENTS.md) · visão de produto (referência, pode estar desatualizada) → [PROJETO.md](PROJETO.md).
+Leia sob demanda: fronteiras/especialistas do backend → [backend/AGENTS.md](backend/AGENTS.md) · visão de produto (referência, pode estar desatualizada) → [PROJETO.md](PROJETO.md).
 
 ## Comandos (sempre verifique o trabalho)
 
@@ -57,11 +57,11 @@ VPS Hostinger `srv1779602` (Ubuntu 24.04, IP atual `187.127.22.133`). O Claude C
 
 ## Arquitetura e stack (decisões técnicas, não reverter sem combinar)
 
-Decisões de **engenharia**. Não são regra de negócio (essas estão em `historias/`).
+Decisões de **engenharia** (não são regra de negócio).
 
 - Supabase = **Postgres + Auth apenas**. Sem Edge Functions; sem PostgREST p/ dados (RLS deny-all p/ anon/authenticated). Frontend usa `supabase-js` só p/ login; dados 100% via `api`.
 - Backend: só Node.js; Fastify + TS estrito + Zod; runtime `tsx` (sem build/emit). JWT do Supabase validado localmente via JWKS na api.
-- WhatsApp via **Meta Cloud API oficial** (canal sancionado para mensagem de negócio: templates aprovados + janela de 24h; inbound por webhook), rodando no próprio `zap`. O provider fica isolado atrás da interface `ClienteWhats` no `zap` (`shared/meta_client/`) para que trocar de versão ou detalhe do transporte seja pontual. Evite provedores não oficiais (Z-API/Evolution). (Quais recursos dependem de aprovação/verificação na Meta é regra de produto, ver `historias/`.)
+- WhatsApp via **Meta Cloud API oficial** (canal sancionado para mensagem de negócio: templates aprovados + janela de 24h; inbound por webhook), rodando no próprio `zap`. O provider fica isolado atrás da interface `ClienteWhats` no `zap` (`shared/meta_client/`) para que trocar de versão ou detalhe do transporte seja pontual. Evite provedores não oficiais (Z-API/Evolution). (Quais recursos dependem de aprovação/verificação na Meta é regra de produto.)
 - Frontend: **React 19 + Vite 7 + TS estrito + Tailwind v4**, SPA puro; estado de servidor via TanStack Query; contratos Zod **próprios** (não compartilha pacote com o backend).
 - Integração entre serviços = banco compartilhado + outbox (`envios`, `notificacoes_cobrador`): quem produz só **enfileira**, o consumidor **drena/envia**, com claim `FOR UPDATE SKIP LOCKED`. Sem fila/Redis.
 - Roles de privilégio mínimo (`whaviso_api`/`whaviso_zap`); **sem DELETE em auditoria/negócio** (tabelas de negócio mudam de estado, nunca somem; auditoria é append-only). **Exceção:** `templates` é configuração, não auditoria → `whaviso_api` tem DELETE só nessa tabela (com guarda na api).
@@ -78,6 +78,6 @@ Decisões de **engenharia**. Não são regra de negócio (essas estão em `histo
 
 Valem para tudo que você escreve (código, comentários, commits, docs). Não são regra de negócio, mas são inegociáveis:
 
-- **Nunca usar travessão (—, em dash)** em texto algum: prefira vírgula, dois-pontos, parênteses ou reescreva a frase. (A linguagem das mensagens ao usuário, palavras proibidas e gênero neutro, é regra de produto: ver `historias/13-compliance.md`.)
+- **Nunca usar travessão (—, em dash)** em texto algum: prefira vírgula, dois-pontos, parênteses ou reescreva a frase. (A linguagem das mensagens ao usuário, palavras proibidas e gênero neutro é regra de produto.)
 - **Acentuação correta sempre**: o conteúdo é em português, então todo texto (comentários, strings de tela, commits, docs) leva acento e cedilha normalmente (não/está/é/você/código, etc.), nunca a forma sem acento. Erro recorrente: escrever uma tela ou um arquivo inteiro sem acentuação por hábito de outro idioma/contexto; revise antes de entregar.
 - **Nenhum modelo de IA (Claude, Anthropic, etc.) pode aparecer como autor ou co-autor** em commits nem em qualquer lugar do projeto. Proibido: trailer `Co-Authored-By: Claude...`, rodapés tipo `Generated with Claude Code`, ou menção a modelo/IA em mensagens de commit, código, comentários e docs. Commits saem **apenas** no nome do humano (autor do git).

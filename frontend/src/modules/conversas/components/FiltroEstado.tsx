@@ -1,7 +1,7 @@
 // Filtro de estado da lista de conversas: um dropdown de opcao unica. Numa coluna estreita os
 // 5 estados nao cabem em pilulas lado a lado (sobrepoem), entao viram um menu. E UM eixo so: a
 // progressao de vida da conversa (automacao -> aguardando -> em atendimento -> encerrada), nao dois
-// eixos cruzados (o status_conversa e mutuamente exclusivo; ver historias/backend-api/handoff.md).
+// eixos cruzados (o status_conversa e mutuamente exclusivo).
 // Cada opcao leva o ponto colorido do estado, a mesma cor que ele tem na lista. 'todas' fica no topo,
 // separada por um divisor. Mecanica (abrir/fechar, clique fora, teclado) espelha o SeletorLoja do shell.
 import { useEffect, useId, useRef, useState } from 'react'

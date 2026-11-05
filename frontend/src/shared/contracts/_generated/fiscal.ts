@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/fiscal.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo fiscal (emissao de NFC-e/NFS-e por emissor de terceiro).
 // Schemas estritos. SEGREDO: a credencial do emissor e WRITE-ONLY: so a entrada a carrega; nenhuma

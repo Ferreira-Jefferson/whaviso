@@ -1,8 +1,7 @@
 # shared/harness (AT-harness)
 
 Laco agentico do atendente, em `shared/` para o motor chama-lo sem import modulo->modulo. Fonte:
-[docs/pivot/HARNESS-ATENDENTE.md](../../../../../docs/pivot/HARNESS-ATENDENTE.md) e
-`historias/regras-negocio/09-atendente-ia-guardrails.md`.
+[docs/pivot/HARNESS-ATENDENTE.md](../../../../../docs/pivot/HARNESS-ATENDENTE.md).
 
 ## Fronteira sagrada
 O harness ENTENDE e PROPOE; o motor deterministico EFETIVA. Saida do modelo e DADO (SEC-061): eventos so

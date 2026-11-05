@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/agendamento.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo agendamento (pedido para data/hora futura). Fonte unica (o codegen
 // reemite para o front). `agendado_para` e um instante absoluto em ISO UTC; a loja exibe em

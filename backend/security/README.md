@@ -54,7 +54,7 @@ A fonte dos grants e `supabase/migrations/0001..00NN`; se um grant mudar, a matr
 
 ## Como acrescentar um SEC
 
-1. Descreva o `SEC-###` em `docs/pivot/SEGURANCA.md` e na `historias/seguranca/catalogo.md`.
+1. Descreva o `SEC-###` em `docs/pivot/SEGURANCA.md`.
 2. Escreva o teste com o id **no titulo** (`SEC-###: ...`), no modulo dono ou aqui.
 3. Registre em `catalogo_estado.json` (`estado`, `modulo`, `teste`). O teste de rastreabilidade
    (`test/rastreabilidade.test.ts`) **falha** se: um SEC do documento nao estiver no registro, um

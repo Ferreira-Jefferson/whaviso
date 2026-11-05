@@ -3,7 +3,7 @@
 Plano comum congelado (2026-10-28). Decisao do Jeff: tudo que pertence a UMA loja (zonas de entrega e
 horarios de atendimento) mora na edicao daquela loja, nao em modulos/paineis soltos. Executado por
 subagentes; o orquestrador verifica e commita cada lane (subagente NAO roda git). Fonte da verdade do
-dominio: `historias/`.
+dominio: `docs/pivot/` (ARQUITETURA, BANCO).
 
 ## Contexto (estado atual, verificado)
 

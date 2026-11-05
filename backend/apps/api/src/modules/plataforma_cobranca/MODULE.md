@@ -4,8 +4,7 @@ Cobranca **restaurante -> Whaviso**: assinatura por conta (opcionalmente por loj
 competencia, inadimplencia e **suspensao/reativacao** da loja. Conferencia de pagamento manual na v1
 (o operador baixa a fatura), sem gateway. A loja enxerga apenas a propria fatura.
 
-Fonte da verdade do comportamento: `historias/plataforma/cobranca.md`. Este arquivo cobre so a
-fronteira tecnica do modulo.
+Este arquivo cobre so a fronteira tecnica do modulo.
 
 ## Audiencias e rotas (registry: prefixo `plataforma-cobranca` -> `/v1/plataforma-cobranca/*`)
 
@@ -49,8 +48,8 @@ Alvo: a loja da assinatura, ou TODAS as lojas da conta quando `loja_id` e NULL.
 
 ## Decisoes
 
-- **Franquia + excedente (nota 2026-10-27):** segue preco MENSAL FIXO (`valor_mensal_centavos`),
-  conforme `historias/plataforma/cobranca.md` (fonte da verdade). Migrar para franquia + excedente
+- **Franquia + excedente (nota 2026-10-27):** segue preco MENSAL FIXO (`valor_mensal_centavos`).
+  Migrar para franquia + excedente
   por evento, apoiado em `eventos_custo`, permanece uma DECISAO FUTURA DO DONO em aberto (rastreada
   em REVISAO-PRODUTO); nada da logica de cobranca muda ate essa decisao.
 - **Franquia + excedente (STATUS.md):** o novo preco da Meta (out/2026) deve virar franquia +

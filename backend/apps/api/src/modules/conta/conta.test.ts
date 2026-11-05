@@ -170,8 +170,8 @@ d('conta e membros (integracao)', () => {
       expect(r.json().error.code).toBe('apenas_dono')
     })
 
-    // Trava do comportamento INTENCIONAL da fonte da verdade (historias/backend-api/conta.md,
-    // etapas 7-8): gestao de membros e de dono E gerente; gerente promove ate gerente, nunca a dono.
+    // Trava do comportamento INTENCIONAL: gestao de membros e de dono E gerente; gerente promove
+    // ate gerente, nunca a dono.
     // Em conjunto, confirma que a authz do service e aplicada chamando a rota direto (B3).
     it('gerente (alcance todas) gere e promove ate gerente, nunca a dono; atendente nao gere', async () => {
       const t = await montar(c)

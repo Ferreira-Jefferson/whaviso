@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/configuracoes_llm.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo configuracoes_llm (BYO key de LLM da loja). Fonte unica;
 // o codegen reemite para o front. Schemas estritos (SEC-081): z.strictObject, tamanhos e

@@ -8,7 +8,6 @@
 //   - gerente:   tudo na loja, EXCETO conta/membros/billing
 //   - atendente: so conversas e pedidos
 //   - convidado: so leitura
-// Spec: historias/00-fundacao/tenant-auth.md, Notas.
 import type { PapelMembro, PapelOperador } from '@whaviso/shared/contracts'
 import {
   CATALOGO,

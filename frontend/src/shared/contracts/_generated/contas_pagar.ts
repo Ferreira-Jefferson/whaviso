@@ -1,5 +1,5 @@
 // GERADO POR scripts/gen_contracts a partir de backend/packages/shared/src/contracts/contas_pagar.ts.
-// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend. Ver historias/00-fundacao/kernel-contratos.md.
+// NAO EDITAR A MAO: rode `npm run gen:contracts` no backend.
 
 // Contratos de borda do modulo contas a pagar: LANCAMENTOS MANUAIS (o que a loja paga a fornecedor
 // ou a pessoa nao-motoboy). Fonte unica; o codegen reemite para o front. Schemas estritos (SEC-081).

@@ -180,7 +180,7 @@ conversa (loja x cliente) e da categoria (marketing/utility/authentication/servi
 vem do provedor (o OpenRouter devolve o custo da geração) e é guardado em micros (o sub-centavo importa).
 O operador vê **métrica, nunca conteúdo** (mantém a regra dos dois planos). O livro-razão alimenta o
 alerta de gasto anômalo e o billing franquia + excedente. Schema no [BANCO.md](BANCO.md); módulo
-`API-custos` e as telas em [../../historias/STATUS.md](../../historias/STATUS.md).
+`API-custos` e as telas correspondentes.
 
 ## Insights da pesquisa (fundamentam as decisões)
 
