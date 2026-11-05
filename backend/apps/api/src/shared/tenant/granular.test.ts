@@ -77,6 +77,8 @@ describe('granularidade: padroes reproduzem o guard antigo', () => {
       'clientes:ver', 'clientes:gerir', 'dados_sensiveis:revelar', 'pessoas:ver', 'pessoas:gerir', 'fiscal:ver',
       'fiscal:gerir', 'fiscal:configurar', 'custos:ver', 'contas_pagar:ver', 'contas_pagar:gerir', 'promocoes:ver',
       'promocoes:gerir',
+      // Chave de feature nova (nao vem da granularizacao 0073): acesso assistido de suporte.
+      'suporte_loja:gerir',
     ])
     const novas = CATALOGO.filter((d) => d.escopo === 'loja' && !antigas.has(d.chave)).map((d) => d.chave as string)
     expect(novas.sort()).toEqual(Object.keys(NOVA_DE_ANTIGO).sort())

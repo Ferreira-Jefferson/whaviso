@@ -43,6 +43,10 @@ const CONSOLE = [
   { chave: 'acessos:gerir', rotulo: 'Gerir acessos (esta grade)', padrao: [] },
   { chave: 'evals:ver', rotulo: 'Ver a central de evals (suites, casos e execucoes)', padrao: ['operador'] },
   { chave: 'evals:rodar', rotulo: 'Gerir suites e casos e disparar execucoes de evals', padrao: ['operador'] },
+  { chave: 'numeros_plataforma:ver', rotulo: 'Ver numeros de WhatsApp das lojas (todas as contas)', padrao: ['suporte', 'operador'] },
+  { chave: 'numeros_plataforma:gerir', rotulo: 'Conectar, pausar e reconectar numeros de qualquer loja', padrao: ['operador'] },
+  { chave: 'suporte_plataforma:ver', rotulo: 'Ver chamados de suporte e acessos assistidos', padrao: ['suporte', 'operador'] },
+  { chave: 'suporte_plataforma:atender', rotulo: 'Responder chamados e abrir sessao de acesso assistido', padrao: ['suporte', 'operador'] },
 ] as const satisfies readonly Def<PapelOperador>[]
 
 const LOJA = [
@@ -108,6 +112,7 @@ const LOJA = [
   { chave: 'roteirizacao:ver', rotulo: 'Ver configuracao de despacho', padrao: ['atendente', 'gerente'] },
   { chave: 'roteirizacao:operar', rotulo: 'Operar roteirizacao (sugerir, aceitar, reordenar)', padrao: ['atendente', 'gerente'] },
   { chave: 'roteirizacao:gerir', rotulo: 'Configurar despacho e geocodificar enderecos', padrao: ['gerente'] },
+  { chave: 'suporte_loja:gerir', rotulo: 'Abrir chamado de suporte e conceder ou revogar acesso assistido', padrao: ['gerente'] },
 ] as const satisfies readonly Def<PapelMembro>[]
 
 export type PermissaoConsole = (typeof CONSOLE)[number]['chave']

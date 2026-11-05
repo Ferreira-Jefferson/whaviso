@@ -32,6 +32,8 @@ export interface LinhaMatriz {
 export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }>> = {
   acertos_motoboy: { apiDelete: 'negado' },
   acessos_permitidos: { apiDelete: 'negado' },
+  acessos_suporte: { apiDelete: 'negado' },
+  acessos_suporte_log: { apiDelete: 'negado' },
   assinaturas: { apiDelete: 'negado' },
   avaliacoes: { apiDelete: 'negado' },
   base_avaliacao: { apiDelete: 'negado' },
@@ -45,6 +47,8 @@ export const TABELAS_CONHECIDAS: Readonly<Record<string, { apiDelete: Esperado }
   cargos: { apiDelete: 'negado' },
   categoria_grupos: { apiDelete: 'negado' },
   categorias: { apiDelete: 'negado' },
+  chamados_suporte: { apiDelete: 'negado' },
+  chamados_suporte_mensagens: { apiDelete: 'negado' },
   chaves_api: { apiDelete: 'negado' },
   chunks: { apiDelete: 'negado' },
   cliente_consentimento: { apiDelete: 'negado' },
