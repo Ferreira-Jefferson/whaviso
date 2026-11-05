@@ -89,8 +89,8 @@ describe('console: padroes reproduzem o comportamento anterior', () => {
     const consolePerms = CATALOGO.filter((d) => d.escopo === 'console').map((d) => d.chave as string).sort()
     expect([...OPERADOR_ANTES, ...SO_ADMIN_ANTES].sort()).toEqual(consolePerms)
   })
-  it('convidado (console) nao ve faturas/assinaturas, mas ve clientes e o painel (fonte da verdade item 14)', () => {
-    // `ver fatura` = `-` para convidado na grade do console (docs/pendencias-pos-corte.md item 14):
+  it('convidado (console) nao ve faturas/assinaturas, mas ve clientes e o painel (por desenho)', () => {
+    // `ver fatura` = `-` para convidado na grade do console (por desenho):
     // o papel de menor privilegio NAO le cobranca de nenhum tenant.
     expect(operadorPermite('convidado', 'cobranca:ver')).toBe(false)
     expect(operadorPermite('convidado', 'cobranca:gerir')).toBe(false)

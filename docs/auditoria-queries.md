@@ -13,7 +13,7 @@ nascer pronto para volume grande, não corrigir gargalo depois.
 
 ## Como ler este documento
 
-As mesmas regras do `pendencias-pos-corte.md`:
+As mesmas regras do `pendencias.md`:
 
 - Português simples. Frases curtas. Voz ativa.
 - Nunca usar travessão. Vírgula, dois-pontos ou parênteses.

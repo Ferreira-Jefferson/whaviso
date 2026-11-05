@@ -30,7 +30,7 @@ const CONSOLE = [
   { chave: 'usuarios_plataforma:ver', rotulo: 'Ver usuarios (contas e fichas)', padrao: ['convidado', 'suporte', 'financeiro', 'operador'] },
   { chave: 'usuarios_plataforma:criar', rotulo: 'Cadastrar usuario (nova conta ou vinculo a loja existente)', padrao: [] },
   // `convidado` NAO ve faturas/assinaturas por desenho (so usuarios e o painel de metricas):
-  // fonte da verdade docs/pendencias-pos-corte.md item 14, grade do console (`ver fatura` = `-`).
+  // por desenho na grade do console (`ver fatura` = `-` para `convidado`).
   { chave: 'cobranca:ver', rotulo: 'Ver assinaturas e faturas', padrao: ['suporte', 'financeiro', 'operador'] },
   { chave: 'cobranca:gerir', rotulo: 'Gerir assinaturas, dar baixa e gerar faturas', padrao: ['financeiro', 'operador'] },
   { chave: 'planos:gerir', rotulo: 'Gerir catalogo de planos', padrao: ['financeiro'] },
