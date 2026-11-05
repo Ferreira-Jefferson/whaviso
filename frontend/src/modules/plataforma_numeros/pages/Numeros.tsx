@@ -17,6 +17,7 @@ import {
 } from '@/shared/ui'
 import { ApiError } from '@/shared/api_client'
 import {
+  useAnexarNumero,
   useConectarNumero,
   useMudarStatusNumero,
   useNumerosLoja,
@@ -24,6 +25,7 @@ import {
   type NumeroSaida,
 } from '../api'
 import { CardNumero } from '../components/CardNumero'
+import { AnexarNumeroDialog } from '../components/AnexarNumeroDialog'
 import { ConectarNumeroDialog, type ModoConexao } from '../components/ConectarNumeroDialog'
 import { AreaErro } from '../components/AreaErro'
 import { SeletorLoja, type LojaAlvo } from '../components/SeletorLoja'
@@ -52,6 +54,7 @@ export default function Numeros() {
 function GestaoNumeros({ alvo, aoTrocarLoja }: { alvo: LojaAlvo; aoTrocarLoja: () => void }) {
   const lista = useNumerosLoja(alvo.lojaId)
   const conectar = useConectarNumero(alvo.lojaId)
+  const anexar = useAnexarNumero(alvo.lojaId)
   const reconectar = useReconectarNumero(alvo.lojaId)
   const mudarStatus = useMudarStatusNumero(alvo.lojaId)
   const { mostrarToast } = useToast()
@@ -60,6 +63,9 @@ function GestaoNumeros({ alvo, aoTrocarLoja }: { alvo: LojaAlvo; aoTrocarLoja: (
   const [modo, setModo] = useState<ModoConexao | null>(null)
   const [alvoReconectar, setAlvoReconectar] = useState<string | null>(null)
   const [erroDialog, setErroDialog] = useState<string | null>(null)
+  // Dialog de anexar WABA existente (sem Embedded Signup): aberto + erro inline.
+  const [anexarAberto, setAnexarAberto] = useState(false)
+  const [erroAnexar, setErroAnexar] = useState<string | null>(null)
   // Confirmacao de remocao (pessimista).
   const [aRemover, setARemover] = useState<NumeroSaida | null>(null)
 
@@ -69,6 +75,22 @@ function GestaoNumeros({ alvo, aoTrocarLoja }: { alvo: LojaAlvo; aoTrocarLoja: (
     setErroDialog(null)
     setAlvoReconectar(null)
     setModo('conectar')
+  }
+
+  function abrirAnexar() {
+    setErroAnexar(null)
+    setAnexarAberto(true)
+  }
+
+  function confirmarAnexo(dados: { waba_id: string; phone_number_id: string; access_token: string }) {
+    setErroAnexar(null)
+    anexar.mutate(dados, {
+      onSuccess: () => {
+        setAnexarAberto(false)
+        mostrarToast('Número anexado.')
+      },
+      onError: (e) => setErroAnexar(e instanceof ApiError ? e.message : 'Não foi possível anexar o número.'),
+    })
   }
 
   function abrirReconectar(numero: NumeroSaida) {
@@ -158,10 +180,15 @@ function GestaoNumeros({ alvo, aoTrocarLoja }: { alvo: LojaAlvo; aoTrocarLoja: (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-lg font-bold text-tinta">Números da loja</h2>
         {numeros.length > 0 && (
-          <Button variante="primary" onClick={abrirConectar}>
-            <Plus strokeWidth={1.75} className="size-4" aria-hidden />
-            Conectar número
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variante="secondary" onClick={abrirAnexar}>
+              Anexar WABA existente
+            </Button>
+            <Button variante="primary" onClick={abrirConectar}>
+              <Plus strokeWidth={1.75} className="size-4" aria-hidden />
+              Conectar número
+            </Button>
+          </div>
         )}
       </div>
 
@@ -191,10 +218,15 @@ function GestaoNumeros({ alvo, aoTrocarLoja }: { alvo: LojaAlvo; aoTrocarLoja: (
           titulo="Nenhum número conectado"
           descricao="Esta loja ainda não tem número de WhatsApp. Conecte um pela Meta (Cloud API) para a loja começar a atender. A conexão é por credenciais, sem QR."
           acao={
-            <Button variante="primary" onClick={abrirConectar}>
-              <Plus strokeWidth={1.75} className="size-4" aria-hidden />
-              Conectar número
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button variante="primary" onClick={abrirConectar}>
+                <Plus strokeWidth={1.75} className="size-4" aria-hidden />
+                Conectar número
+              </Button>
+              <Button variante="secondary" onClick={abrirAnexar}>
+                Anexar WABA existente
+              </Button>
+            </div>
           }
         />
       )}
@@ -228,6 +260,18 @@ function GestaoNumeros({ alvo, aoTrocarLoja }: { alvo: LojaAlvo; aoTrocarLoja: (
         erro={erroDialog}
         onConfirmar={confirmarConexao}
         onFechar={fecharDialog}
+      />
+
+      <AnexarNumeroDialog
+        aberto={anexarAberto}
+        nomeLoja={alvo.lojaNome}
+        carregando={anexar.isPending}
+        erro={erroAnexar}
+        onConfirmar={confirmarAnexo}
+        onFechar={() => {
+          setAnexarAberto(false)
+          setErroAnexar(null)
+        }}
       />
 
       <ConfirmDialog

@@ -6,6 +6,7 @@
 //   GET   /v1/plataforma-usuarios/contas/:id                        ficha (lojas da conta)
 //   GET   /v1/plataforma-numeros/lojas/:lojaId/numeros              lista numeros da loja
 //   POST  /v1/plataforma-numeros/lojas/:lojaId/numeros              conecta numero (Embedded Signup)
+//   POST  /v1/plataforma-numeros/lojas/:lojaId/numeros/anexar       anexa WABA existente (sem code)
 //   PATCH /v1/plataforma-numeros/numeros/:id/status                 pausar|reativar|remover
 //   POST  /v1/plataforma-numeros/numeros/:id/reconectar             rotaciona o token
 import {
@@ -92,6 +93,35 @@ export function useConectarNumero(lojaId: string) {
   return useMutation<NumeroSaida, Error, NumeroConectarEntrada>({
     mutationFn: (body) =>
       apiClient.post<NumeroSaida>(`/plataforma-numeros/lojas/${lojaId}/numeros`, {
+        body,
+        schema: numeroSaida,
+        semLoja: true,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [RAIZ, 'numeros', lojaId] })
+      void qc.invalidateQueries({ queryKey: [RAIZ, 'ficha'] })
+    },
+  })
+}
+
+/** Corpo de "anexar WABA existente" (console): token de system user + ids, sem code. */
+export interface NumeroAnexarEntrada {
+  waba_id: string
+  phone_number_id: string
+  access_token: string
+}
+
+/**
+ * POST /v1/plataforma-numeros/lojas/:lojaId/numeros/anexar: anexa uma WABA que a plataforma JA
+ * possui, sem Embedded Signup (nao ha code quando o dono do app roda o fluxo). O operador informa
+ * os ids e um access_token de system user com acesso a WABA. O token e segredo: so vai no corpo,
+ * nunca volta nem fica guardado no front.
+ */
+export function useAnexarNumero(lojaId: string) {
+  const qc = useQueryClient()
+  return useMutation<NumeroSaida, Error, NumeroAnexarEntrada>({
+    mutationFn: (body) =>
+      apiClient.post<NumeroSaida>(`/plataforma-numeros/lojas/${lojaId}/numeros/anexar`, {
         body,
         schema: numeroSaida,
         semLoja: true,
