@@ -48,6 +48,7 @@ import { chavesApiRoutes } from './modules/chaves_api'
 import { acessosRoutes } from './modules/acessos'
 import { acessosLoginRoutes } from './modules/acessos_login'
 import { credenciaisPlataformaRoutes } from './modules/credenciais_plataforma'
+import { suporteRoutes, plataformaSuporteRoutes } from './modules/suporte'
 
 export interface ModuloRota {
   /** Segmento unico, minusculo (ex.: 'pedidos'); a rota final e /v1/<prefixo>/... */
@@ -105,6 +106,8 @@ export const MODULOS: ModuloRota[] = [
   { prefixo: 'acessos', plugin: acessosRoutes },
   { prefixo: 'acessos-login', plugin: acessosLoginRoutes },
   { prefixo: 'credenciais-plataforma', plugin: credenciaisPlataformaRoutes },
+  { prefixo: 'suporte', plugin: suporteRoutes },
+  { prefixo: 'plataforma-suporte', plugin: plataformaSuporteRoutes },
 ]
 
 const PREFIXO_VALIDO = /^[a-z][a-z0-9_-]*$/

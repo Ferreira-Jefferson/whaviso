@@ -48,8 +48,9 @@
     "roteirizacao.ts",
     "salao.ts",
     "sessao.ts",
+    "suporte.ts",
     "tool.ts",
     "zonas_entrega.ts"
   ],
-  "hash": "2ff3ab9afeb3a6a8ae73ab8ab4158b0a251ad3923bd5e971ac0f4fda05ddb850"
+  "hash": "0469b224e49111bf46f75fb3020556183692480dff96e5a7ecf80da9677513c0"
 }
