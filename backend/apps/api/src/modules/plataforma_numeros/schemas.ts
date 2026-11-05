@@ -15,5 +15,16 @@ export {
 /** Parametro de rota :lojaId (loja alvo). */
 export const lojaIdParam = z.strictObject({ lojaId: z.uuid() })
 
+/**
+ * Corpo de "anexar WABA existente" (console, sem Embedded Signup): ids da WABA/numero + um
+ * access_token de system user com acesso a WABA. O `access_token` e segredo (SEC-020): entra so
+ * no corpo, e cifrado no servico e nunca volta nem e logado (a redaction cobre `access_token`).
+ */
+export const numeroAnexarEntrada = z.strictObject({
+  waba_id: z.string().trim().min(1).max(200),
+  phone_number_id: z.string().trim().min(1).max(200),
+  access_token: z.string().trim().min(1).max(1000),
+})
+
 /** Parametro de rota :id (numero); a loja e resolvida a partir dele. */
 export const numeroIdParam = z.strictObject({ id: z.uuid() })

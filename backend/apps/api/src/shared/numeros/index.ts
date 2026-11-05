@@ -5,7 +5,7 @@
 // direto na tabela nem importa o outro (fronteira feature-first). O segredo (token_cifrado) e
 // write-only: nunca sai em projecao de leitura, resposta ou log (SEC-020/023/024).
 export * as servicoNumeros from './service'
-export type { DepsNumeros, EntradaConectar } from './service'
+export type { DepsNumeros, EntradaConectar, EntradaAnexar } from './service'
 export { depsDeProducao } from './config'
 export { criarCripto, ErroCifra, type Cripto } from './cripto'
 export {

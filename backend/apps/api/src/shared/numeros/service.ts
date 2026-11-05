@@ -94,6 +94,53 @@ export async function conectar(
   })
 }
 
+export interface EntradaAnexar {
+  lojaId: string
+  wabaId: string
+  phoneNumberId: string
+  token: string
+}
+
+/**
+ * Anexa uma WABA que o proprio provedor/operador JA possui, SEM Embedded Signup (nesse caso nao
+ * ha `code`: o dono do app nao consegue se auto-onboardar pelo popup, e o fluxo volta vazio).
+ * Recebe um access_token de system user com acesso a WABA e segue o mesmo caminho do `conectar`,
+ * so que sem o `trocarCodigo`: le o telefone, assina o webhook, registra (best-effort), cifra o
+ * token e grava. Mesmas garantias de segredo (token so em claro aqui dentro, nunca devolvido/
+ * logado/persistido em claro) e de atomicidade (so grava apos sucesso da Meta).
+ */
+export async function anexar(
+  exec: Executor,
+  deps: DepsNumeros,
+  e: EntradaAnexar,
+): Promise<NumeroSaida> {
+  let tokenCifrado: Buffer
+  let numeroHash: string
+  let verificado: boolean
+  try {
+    const tel = await deps.onboarding.lerTelefone(e.token, e.phoneNumberId)
+    await deps.onboarding.assinarWebhook(e.token, e.wabaId)
+    // Register best-effort (pulado sem PIN): nunca falha a conexao, por isso roda antes de cifrar.
+    await registrarBestEffort(deps, e.token, e.phoneNumberId, e.lojaId)
+    numeroHash = sha256Hex(tel.numero_e164)
+    verificado = tel.verificado
+    tokenCifrado = deps.cripto.cifrar(e.token)
+    // token (claro) sai de escopo aqui; nada alem do cifrado segue adiante.
+  } catch (err) {
+    if (err instanceof ErroMeta) throw erroMeta()
+    throw err
+  }
+
+  return repo.inserir(exec, {
+    lojaId: e.lojaId,
+    phoneNumberId: e.phoneNumberId,
+    wabaId: e.wabaId,
+    numeroHash,
+    tokenCifrado,
+    verificado,
+  })
+}
+
 /** Lista os numeros da loja. */
 export async function listar(exec: Executor, lojaId: string): Promise<NumeroSaida[]> {
   return repo.listarPorLoja(exec, lojaId)

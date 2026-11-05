@@ -141,6 +141,7 @@ describe('escopo do console (SEC-003 / SEC-001)', () => {
     const rotas: [string, string, unknown?][] = [
       ['GET', `/lojas/${f.lojaId}/numeros`],
       ['POST', `/lojas/${f.lojaId}/numeros`, { codigo: 'c', waba_id: 'W', phone_number_id: 'PN' }],
+      ['POST', `/lojas/${f.lojaId}/numeros/anexar`, { waba_id: 'W', phone_number_id: 'PN', access_token: 't' }],
       ['GET', `/numeros/${randomUUID()}`],
       ['PATCH', `/numeros/${randomUUID()}/status`, { acao: 'pausar' }],
       ['POST', `/numeros/${randomUUID()}/reconectar`, { codigo: 'c' }],
@@ -159,6 +160,7 @@ describe('escopo do console (SEC-003 / SEC-001)', () => {
     const rotas: [string, string, unknown?][] = [
       ['GET', `/lojas/${f.lojaId}/numeros`],
       ['POST', `/lojas/${f.lojaId}/numeros`, { codigo: 'c', waba_id: 'W', phone_number_id: 'PN' }],
+      ['POST', `/lojas/${f.lojaId}/numeros/anexar`, { waba_id: 'W', phone_number_id: 'PN', access_token: 't' }],
       ['GET', `/numeros/${randomUUID()}`],
       ['PATCH', `/numeros/${randomUUID()}/status`, { acao: 'pausar' }],
       ['POST', `/numeros/${randomUUID()}/reconectar`, { codigo: 'c' }],
@@ -363,6 +365,84 @@ describe('grade de permissao do console (:ver vs :gerir)', () => {
     })
     expect(recon.statusCode).toBe(403)
     await app.close()
+  })
+})
+
+describe('anexar WABA existente (sem Embedded Signup)', () => {
+  const ACCESS_TOKEN = 'SYS_USER_TOKEN_anexar_round_trip'
+
+  it('operador anexa com access_token (201), cifra o segredo em repouso e nao vaza', async () => {
+    if (!disponivel) return
+    const f = registrar(await seed())
+    // No anexar nao ha troca de code: se trocarCodigo for chamado, o teste falha de proposito.
+    const onboarding: MetaOnboarding = {
+      trocarCodigo: async () => { throw new ErroMeta('nao deve trocar code no anexar') },
+      lerTelefone: async () => ({ numero_e164: NUMERO, verificado: true }),
+      assinarWebhook: async () => {},
+    }
+    const app = await montarApp(onboarding)
+    const res = await app.inject({
+      method: 'POST', url: `${BASE}/lojas/${f.lojaId}/numeros/anexar`, headers: auth(f.operador),
+      payload: { waba_id: 'WABA_AX', phone_number_id: 'PN_AX', access_token: ACCESS_TOKEN },
+    })
+    expect(res.statusCode, res.body).toBe(201)
+    const numero = res.json()
+    expect(numero).toMatchObject({ loja_id: f.lojaId, phone_number_id: 'PN_AX', status: 'conectado' })
+    expect(res.body).not.toContain(ACCESS_TOKEN)
+    expect(res.body.toLowerCase()).not.toContain('token')
+    await app.close()
+
+    // O token do CORPO foi cifrado em repouso (round trip com a mesma master key).
+    const cifrado = await sobRole('whaviso_zap', async (q) => {
+      const { rows } = await q('select token_cifrado from public.numeros_whatsapp where id=$1', [numero.id])
+      return rows[0].token_cifrado as Buffer
+    })
+    expect(cripto.decifrar(cifrado)).toBe(ACCESS_TOKEN)
+  })
+
+  it('suporte (so :ver) nao anexa (403)', async () => {
+    if (!disponivel) return
+    const f = registrar(await seed())
+    const app = await montarApp(stubOk())
+    const res = await app.inject({
+      method: 'POST', url: `${BASE}/lojas/${f.lojaId}/numeros/anexar`, headers: auth(f.suporte),
+      payload: { waba_id: 'W', phone_number_id: 'PN', access_token: 'tok' },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('loja inexistente => 404', async () => {
+    if (!disponivel) return
+    const f = registrar(await seed())
+    const app = await montarApp(stubOk())
+    const res = await app.inject({
+      method: 'POST', url: `${BASE}/lojas/${randomUUID()}/numeros/anexar`, headers: auth(f.operador),
+      payload: { waba_id: 'W', phone_number_id: 'PN', access_token: 'tok' },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('falha da Meta nao grava registro parcial (502, zero linhas)', async () => {
+    if (!disponivel) return
+    const f = registrar(await seed())
+    const onboarding: MetaOnboarding = {
+      trocarCodigo: async () => ({ token: TOKEN }),
+      lerTelefone: async () => ({ numero_e164: NUMERO, verificado: true }),
+      assinarWebhook: async () => { throw new ErroMeta('subscribe falhou') },
+    }
+    const app = await montarApp(onboarding)
+    const res = await app.inject({
+      method: 'POST', url: `${BASE}/lojas/${f.lojaId}/numeros/anexar`, headers: auth(f.operador),
+      payload: { waba_id: 'W', phone_number_id: 'PN_AX_FALHA', access_token: 'tok' },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(502)
+    const { rows } = await poolApi.query(
+      'select count(*)::int n from public.numeros_whatsapp where loja_id=$1', [f.lojaId],
+    )
+    expect(rows[0].n).toBe(0)
   })
 })
 

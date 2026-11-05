@@ -17,6 +17,7 @@ import {
 import {
   listaNumerosSaida,
   lojaIdParam,
+  numeroAnexarEntrada,
   numeroConectarEntrada,
   numeroIdParam,
   numeroReconectarEntrada,
@@ -66,6 +67,35 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsNumeros): void {
       req.log.info(
         { numero_id: saida.id, loja_id: saida.loja_id, acao: 'conectado', via: 'console' },
         'numero conectado (console)',
+      )
+      void reply.code(201)
+      return saida
+    },
+  )
+
+  // POST /lojas/:lojaId/numeros/anexar: anexa uma WABA que o provedor/operador JA possui, SEM
+  // Embedded Signup (nao ha code quando o dono do app roda o fluxo). Recebe um access_token de
+  // system user com acesso a WABA. Rate limit (sensivel: recebe token).
+  r.post(
+    '/lojas/:lojaId/numeros/anexar',
+    {
+      ...sensivel,
+      preHandler: gerir,
+      schema: { params: lojaIdParam, body: numeroAnexarEntrada, response: { 201: numeroSaida } },
+    },
+    async (req, reply) => {
+      await service.garantirLoja(app.pool, req.params.lojaId)
+      const b = req.body
+      const saida = await service.anexar(app.pool, obterDeps(), {
+        lojaId: req.params.lojaId,
+        wabaId: b.waba_id,
+        phoneNumberId: b.phone_number_id,
+        token: b.access_token,
+      })
+      // Log so com ids/estado; nunca o token (SEC-024).
+      req.log.info(
+        { numero_id: saida.id, loja_id: saida.loja_id, acao: 'anexado', via: 'console' },
+        'numero anexado (console)',
       )
       void reply.code(201)
       return saida
