@@ -1,9 +1,9 @@
-// Fiacao de PRODUCAO das dependencias do modulo (cifra + porta Meta HTTP).
+// Fiacao de PRODUCAO das dependencias do numero (cifra + porta Meta HTTP), compartilhada entre
+// as rotas da loja e as do console.
 //
-// Nao depende de `env.ts` (fora do escopo desta tarefa): a master key vem de `app.env`
-// (`MASTER_KEY`, ja existente no envApiSchema) e as credenciais do app Meta sao lidas
-// aqui, pontualmente, de `process.env` com validacao Zod local. PROPOSTA de promocao para
-// `env.ts`/`envApiSchema` registrada no relatorio: `META_APP_ID`, `META_APP_SECRET`.
+// Nao depende de `env.ts`: a master key vem de `app.env` (`MASTER_KEY`, ja no envApiSchema) e as
+// credenciais do app Meta sao lidas aqui, pontualmente, de `process.env` com validacao Zod local.
+// PROPOSTA de promocao para `env.ts`/`envApiSchema`: `META_APP_ID`, `META_APP_SECRET`.
 //
 // A resolucao e PREGUICOSA (so no primeiro uso real): o registro do modulo no boot nunca
 // quebra por falta dessas vars; quem nao as configurou so falha ao chamar a rota.

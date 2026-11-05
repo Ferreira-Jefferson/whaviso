@@ -1,11 +1,12 @@
-// Acesso a dados do modulo: SO via @whaviso/shared/db, sempre com sql`...` (parametrizado).
+// Acesso a dados do kernel de numero: SO via @whaviso/shared/db, sempre com sql`...`
+// (parametrizado). Este kernel e o UNICO dono da tabela `numeros_whatsapp` na api: tanto as
+// rotas da loja quanto as do console passam por aqui (nenhum modulo escreve direto na tabela).
 //
 // REGRA DE SEGREDO (SEC-020): `token_cifrado` NUNCA aparece nas projecoes de leitura. As
 // listas/detalhes selecionam apenas as COLUNAS PUBLICAS. A unica escrita do token acontece
 // em `inserir`/`trocarToken`, que mesmo assim fazem `RETURNING` so das colunas publicas.
 import { consultar, consultarUm, sql, sqlBruto, type Executor } from '@whaviso/shared/db'
-import type { NumeroSaida } from './schemas'
-import type { StatusNumero } from '@whaviso/shared/contracts'
+import type { NumeroSaida, StatusNumero } from '@whaviso/shared/contracts'
 
 /** Linha crua das colunas publicas; `criado_em` chega como Date do pg. */
 interface LinhaNumero {
@@ -81,6 +82,28 @@ export async function buscarPorId(
   return linha ? mapear(linha) : null
 }
 
+/**
+ * Resolve a loja dona de um numero SEM restricao de tenant. Uso exclusivo do CONSOLE do
+ * operador (global por desenho): a rota so chega aqui apos `escopoOperador` + permissao de
+ * console. So devolve o `loja_id` (metadado de roteamento), nunca o segredo.
+ */
+export async function lojaDoNumero(exec: Executor, id: string): Promise<string | null> {
+  const linha = await consultarUm<{ loja_id: string }>(
+    exec,
+    sql`select loja_id from public.numeros_whatsapp where id = ${id}`,
+  )
+  return linha ? linha.loja_id : null
+}
+
+/** true se a loja existe. Usado pelo console para distinguir loja inexistente (404). */
+export async function lojaExiste(exec: Executor, lojaId: string): Promise<boolean> {
+  const linha = await consultarUm<{ existe: boolean }>(
+    exec,
+    sql`select true as existe from public.lojas where id = ${lojaId}`,
+  )
+  return linha !== null
+}
+
 /** Atualiza so o status; `limparToken` zera `token_cifrado` (usado no remover). */
 export async function atualizarStatus(
   exec: Executor,
@@ -102,7 +125,7 @@ export async function atualizarStatus(
 
 /**
  * Metodo DEDICADO e interno de troca de token (rotacao / reconectar). Grava o token cifrado
- * e o hash novos; o `RETURNING` nunca inclui o segredo. So faz efeito dentro da loja ativa.
+ * e o hash novos; o `RETURNING` nunca inclui o segredo. So faz efeito dentro da loja alvo.
  */
 export async function trocarToken(
   exec: Executor,

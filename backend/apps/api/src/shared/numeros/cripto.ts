@@ -2,12 +2,13 @@
 //
 // O formato (versao|nonce|tag|ciphertext) e a derivacao da chave a partir da MASTER_KEY sao
 // UNICOS no monorepo: a api cifra o token aqui e o zap decifra com a MESMA MASTER_KEY. Antes
-// este arquivo derivava a chave como sha256(MASTER_KEY); agora delega ao kernel (sha256 com
-// separacao de dominio), de modo que api e zap interoperem. A MASTER_KEY vem de fora (env),
-// NUNCA do codigo e NUNCA do log.
+// isto vivia dentro do modulo numeros_whatsapp; agora e kernel compartilhado, consumido tanto
+// pelas rotas da loja quanto pelas do console. Delega ao kernel (sha256 com separacao de
+// dominio), de modo que api e zap interoperem. A MASTER_KEY vem de fora (env), NUNCA do codigo
+// e NUNCA do log.
 //
 // A interface local `Cripto` (texto em string) e so um adaptador fino sobre o kernel (Buffer),
-// mantida para o service e os testes deste modulo continuarem lidando com o token como string.
+// mantida para o service e os testes continuarem lidando com o token como string.
 import { criarCifra, ErroCifra } from '@whaviso/shared/cifra'
 
 export { ErroCifra }

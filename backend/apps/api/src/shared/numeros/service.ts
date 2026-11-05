@@ -1,15 +1,18 @@
-// Regra do modulo. Sem acesso HTTP aqui; erros de dominio via shared/http_errors.
+// Regra de dominio do numero (kernel compartilhado). Sem acesso HTTP aqui; erros de dominio
+// via shared/http_errors. Consumido pelas rotas da LOJA e pelas rotas do CONSOLE: a `lojaId`
+// SEMPRE chega como parametro (da loja ativa no caso da loja, ou da loja alvo resolvida por
+// params/numero no caso do console). O kernel nao conhece escopo nem papel; isso fica nas rotas.
 //
 // Fluxo de segredo: o token em claro existe SO dentro destas funcoes, o tempo minimo para
 // ser cifrado; nunca e devolvido, logado nem persistido em claro. O numero (E.164) so vira
 // `numero_hash = sha256(E.164)`; o claro e descartado ao sair do escopo da funcao.
 import type { Executor } from '@whaviso/shared/db'
-import { HttpError, NaoEncontrado } from '../../shared/http_errors'
-import { sha256Hex } from '../../shared/tokens'
+import type { NumeroSaida, NumeroStatusEntrada } from '@whaviso/shared/contracts'
+import { HttpError, NaoEncontrado } from '../http_errors'
+import { sha256Hex } from '../tokens'
 import type { Cripto } from './cripto'
 import type { MetaOnboarding } from './meta_onboarding'
 import { ErroMeta } from './meta_onboarding'
-import type { NumeroSaida, NumeroStatusEntrada } from './schemas'
 import * as repo from './repo'
 
 export interface DepsNumeros {
@@ -65,12 +68,12 @@ export async function conectar(
   })
 }
 
-/** Lista os numeros da loja ativa. */
+/** Lista os numeros da loja. */
 export async function listar(exec: Executor, lojaId: string): Promise<NumeroSaida[]> {
   return repo.listarPorLoja(exec, lojaId)
 }
 
-/** Detalhe de um numero da loja ativa; 404 fora do escopo (nao confirma existencia). */
+/** Detalhe de um numero da loja; 404 fora do escopo (nao confirma existencia). */
 export async function detalhar(
   exec: Executor,
   lojaId: string,
@@ -129,4 +132,19 @@ export async function reconectar(
   const trocado = await repo.trocarToken(exec, id, lojaId, tokenCifrado, numeroHash, verificado)
   if (!trocado) throw new NaoEncontrado('Numero nao encontrado')
   return trocado
+}
+
+/**
+ * Resolve a loja dona de um numero (uso do CONSOLE, global). 404 se o numero nao existe.
+ * Nao verifica escopo: a rota ja passou por `escopoOperador` + permissao de console.
+ */
+export async function resolverLoja(exec: Executor, id: string): Promise<string> {
+  const lojaId = await repo.lojaDoNumero(exec, id)
+  if (!lojaId) throw new NaoEncontrado('Numero nao encontrado')
+  return lojaId
+}
+
+/** Garante que a loja alvo existe (uso do CONSOLE); 404 caso contrario. */
+export async function garantirLoja(exec: Executor, lojaId: string): Promise<void> {
+  if (!(await repo.lojaExiste(exec, lojaId))) throw new NaoEncontrado('Loja nao encontrada')
 }

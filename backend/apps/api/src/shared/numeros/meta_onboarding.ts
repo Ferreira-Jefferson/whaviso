@@ -1,12 +1,13 @@
-// Porta de onboarding da Meta (Embedded Signup) usada SO pelo cadastro do numero.
+// Porta de onboarding da Meta (Embedded Signup), kernel compartilhado de numero.
 //
 // Decisao (spec Notas): a api NAO importa o `zap`. O envio de mensagem continua exclusivo
 // do `ClienteWhats` no `zap`; aqui ha uma porta minima e propria do fluxo de cadastro
 // (trocar codigo, ler telefone, assinar webhook). Quando F2 definir um contrato comum,
 // migrar a implementacao sem mudar as rotas.
 //
-// PROMOCAO: a spec aponta o lar definitivo em `apps/api/src/shared/meta_onboarding/**`.
-// Enquanto o escopo desta tarefa e so o modulo, a porta vive aqui; promover depois.
+// Este arquivo e o lar definitivo da porta: tanto as rotas da LOJA (`modules/numeros_whatsapp`)
+// quanto as rotas do CONSOLE (`modules/plataforma_numeros`) consomem este kernel. Nenhum modulo
+// e dono da tabela nem da porta: o kernel e.
 //
 // SEC-070 (SSRF): host FIXO `graph.facebook.com`, sem seguir redirect (`redirect: 'error'`),
 // timeout curto. A URL e sempre construida sobre o host fixo e reconferida antes de sair.

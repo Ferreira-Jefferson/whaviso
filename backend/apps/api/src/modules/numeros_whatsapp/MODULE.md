@@ -1,40 +1,38 @@
 # numeros_whatsapp
 
 ## Proposito
-Cadastro do numero de WhatsApp da loja via Embedded Signup da Meta. Troca o `code` por token,
-persiste `phone_number_id`/`waba_id`, `numero_hash` (sha256) e `token_cifrado` (AES-256-GCM),
-e expoe o estado `conectado`/`pausado`/`removido`. Segredo: o token (write-only para a api).
+Rotas da LOJA para o numero de WhatsApp (Embedded Signup da Meta): conectar, listar, detalhar,
+pausar/reativar/remover e reconectar. E uma camada FINA de HTTP sobre o kernel compartilhado
+`shared/numeros`, que detem a tabela, a regra de dominio, a cifra e a porta Meta. A loja efetiva
+vem SEMPRE do escopo (`req.escopo.loja_ativa`), nunca do corpo/query (SEC-002).
 
 ## Entry points
 - `index.ts` -> `numerosRoutes` (plugin Fastify registrado em `src/routes.ts`, prefixo `numeros`)
+- `criarRotasNumeros(deps)` -> fabrica de teste (injeta `onboarding` stub + `cripto`)
 
 ## Especialistas consumidos
-- `@whaviso/shared/db` (consultar/sql: unica via de dados)
-- `@whaviso/shared/contracts` (`statusNumero`)
-- `shared/http_errors` (envelope de erro), `shared/tokens` (`sha256Hex`)
+- `shared/numeros` (kernel): `servicoNumeros`, `depsDeProducao`, `DepsNumeros`, tipos de porta/cifra
+- `shared/http_errors` (envelope de erro)
 - `shared/auth` + `shared/tenant` (preHandlers `autenticar`/`escopoLoja`/`exigirPermissao`)
+- `@whaviso/shared/contracts` (schemas via `./schemas`)
 
 ## Tabelas
-- dono de: `numeros_whatsapp` (insert/update completos; `token_cifrado` nunca sai em SELECT de leitura)
-- le de: `lojas`/`membros` via kernel de escopo (nao direto)
+- NAO e dono de tabela: quem detem `numeros_whatsapp` e o kernel `shared/numeros`. Este modulo
+  nao acessa o banco direto; toda escrita/leitura passa pelo service do kernel.
 
 ## Segredo (token da Meta)
-- `token_cifrado` e WRITE-ONLY na pratica da api: o repo so projeta colunas publicas; o claro
-  nunca volta em resposta (SEC-020), log (SEC-024) nem persiste.
-- A cifra (`cripto.ts`) delega ao kernel `@whaviso/shared/cifra`: so adapta token string <-> Buffer.
-  O `zap` (role `whaviso_zap`) decifra `token_cifrado` com a MESMA `MASTER_KEY` via o mesmo kernel.
-- Porta Meta (`meta_onboarding.ts`): host fixo `graph.facebook.com`, sem redirect (SEC-070).
-  Promover para `shared/meta_onboarding/**` quando F2 definir o contrato comum.
+- O token (`token_cifrado`) e write-only e vive no kernel: nunca sai em resposta (SEC-020), log
+  (SEC-024) nem persiste em claro. Aqui so logamos ids/estado.
 
 ## Contratos
 - publica (espelhar no front): `numeroConectarEntrada`, `numeroReconectarEntrada`,
-  `numeroStatusEntrada`, `numeroSaida`, `listaNumerosSaida` (schemas.ts)
+  `numeroStatusEntrada`, `numeroSaida`, `listaNumerosSaida` (reexportados em `schemas.ts`)
+- local: `numeroIdParam` (parametro de rota `:id`)
 
 ## Rotas (`/v1/numeros`)
 - `POST /` conectar (dono/gerente; rate limit) · `GET /` listar · `GET /:id` detalhe
 - `PATCH /:id/status` pausar|reativar|remover · `POST /:id/reconectar` rotacionar token (rate limit)
 
-## Config de producao
-- `MASTER_KEY` (envApiSchema, ja existe) deriva a chave AES no kernel `@whaviso/shared/cifra`
-  (sha256 com separacao de dominio). `META_APP_ID`/
-  `META_APP_SECRET` lidos de `process.env` em `config.ts` (propor promover ao envApiSchema).
+## Testes
+- `numeros_whatsapp.test.ts`: integracao + seguranca das rotas da loja (SEC-001/002/020/022/023/024/031/101).
+- A cifra e a porta Meta (kernel) sao testadas em `shared/numeros/cripto.test.ts`.

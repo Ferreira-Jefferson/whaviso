@@ -5,9 +5,8 @@ import { randomUUID } from 'node:crypto'
 import { construirApp } from '../../app'
 import { envSchema } from '../../env'
 import { verificadorFake } from '../../../test/app'
-import { criarCripto } from './cripto'
+import { criarCripto, ErroMeta, type MetaOnboarding } from '../../shared/numeros'
 import { criarRotasNumeros } from './routes'
-import { ErroMeta, type MetaOnboarding } from './meta_onboarding'
 import { criarPool, criarPoolSuper, bancoDoWorker, HOST } from '../../../../../test-support/banco'
 
 const poolApi = criarPool('whaviso_api', 'whaviso_api_dev', 3)

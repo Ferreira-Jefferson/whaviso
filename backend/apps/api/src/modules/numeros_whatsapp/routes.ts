@@ -1,6 +1,14 @@
+// Rotas da LOJA (`/v1/numeros`): camada FINA sobre o kernel compartilhado `shared/numeros`.
+// O kernel e o dono da tabela e da regra de dominio; aqui so resolvemos a loja ativa do escopo,
+// aplicamos escopo/permissao de loja e logamos com ids/estado (nunca token nem numero).
 import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { proibido } from '../../shared/http_errors'
+import {
+  depsDeProducao,
+  servicoNumeros as service,
+  type DepsNumeros,
+} from '../../shared/numeros'
 import {
   listaNumerosSaida,
   numeroConectarEntrada,
@@ -9,9 +17,6 @@ import {
   numeroSaida,
   numeroStatusEntrada,
 } from './schemas'
-import type { DepsNumeros } from './service'
-import * as service from './service'
-import { depsDeProducao } from './config'
 
 const ACESSO_LOJA = 'conteudo_de_loja' as const
 const LIMITE_SENSIVEL = { max: 5, timeWindow: '1 minute' }
@@ -103,7 +108,7 @@ function registrar(app: FastifyInstance, obterDeps: () => DepsNumeros): void {
   )
 }
 
-/** Membro autenticado, escopo de loja resolvido e permissao de gestao da loja. */
+/** Membro autenticado, escopo de loja resolvido e permissao de leitura da loja. */
 function guardaLoja(app: FastifyInstance) {
   return [app.autenticar, app.escopoLoja, app.exigirPermissao('numeros_whatsapp:ver')]
 }
