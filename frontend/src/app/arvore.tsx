@@ -16,6 +16,7 @@ import NotFound from './NotFound'
 const PlataformaPainel = lazy(() => import('@/modules/plataforma_painel'))
 const PlataformaUsuarios = lazy(() => import('@/modules/plataforma_usuarios'))
 const PlataformaNumeros = lazy(() => import('@/modules/plataforma_numeros'))
+const PlataformaSuporte = lazy(() => import('@/modules/plataforma_suporte'))
 const PlataformaCobranca = lazy(() => import('@/modules/plataforma_cobranca'))
 const PlataformaPlanos = lazy(() => import('@/modules/plataforma_cobranca').then((m) => ({ default: m.PlanosPage })))
 const PlataformaFunil = lazy(() => import('@/modules/plataforma_funil'))
@@ -82,6 +83,7 @@ export const rotas: RouteObject[] = [
           { path: '/plataforma/painel', element: <PlataformaPainel /> },
           { path: '/plataforma/usuarios', element: <PlataformaUsuarios /> },
           { path: '/plataforma/numeros', element: <PlataformaNumeros /> },
+          { path: '/plataforma/suporte', element: <PlataformaSuporte /> },
           { path: '/plataforma/cobranca', element: <PlataformaCobranca /> },
           { path: '/plataforma/planos', element: <PlataformaPlanos /> },
           { path: '/plataforma/funil', element: <PlataformaFunil /> },

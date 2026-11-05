@@ -3,7 +3,7 @@
 // (as telas usam apiClient semLoja). A guarda RequireOperador decide quem entra; a seguranca
 // real e a autorizacao por rota na api. Nav fixa: Painel, Usuários, Cobranca, Planos, Funil, Acessos.
 import { NavLink, Outlet } from 'react-router'
-import { BarChart3, FlaskConical, Filter, KeyRound, Package, Settings, ShieldCheck, Smartphone, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { BarChart3, FlaskConical, Filter, KeyRound, LifeBuoy, Package, Settings, ShieldCheck, Smartphone, Store, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { BotaoSair } from './BotaoSair'
 import { BellLogo, cn } from '@/shared/ui'
 import { ROTA_INICIAL } from '../rotas'
@@ -23,6 +23,9 @@ const NAV_OPERADOR: readonly ItemOperador[] = [
   // Gestao de numeros de WhatsApp de qualquer loja (suporte); a api responde 403 a quem nao tem
   // numeros_plataforma:ver/:gerir.
   { caminho: 'numeros', rotulo: 'Números', icone: Smartphone },
+  // Suporte: chamados de todas as lojas + visualizador read-only de conversas sob consentimento; a api
+  // responde 403 a quem nao tem suporte_plataforma:ver/:atender.
+  { caminho: 'suporte', rotulo: 'Suporte', icone: LifeBuoy },
   { caminho: 'cobranca', rotulo: 'Cobrança', icone: Wallet },
   { caminho: 'planos', rotulo: 'Planos', icone: Package },
   { caminho: 'funil', rotulo: 'Funil', icone: Filter },

@@ -17,6 +17,7 @@ import {
   Gift,
   HandCoins,
   LayoutGrid,
+  LifeBuoy,
   Link2,
   Megaphone,
   MessageCircle,
@@ -98,6 +99,9 @@ export const ROTAS: readonly RotaModulo[] = [
   { caminho: 'canais', rotulo: 'Canais', descricao: 'WhatsApp, iFood e outros canais de pedidos.', icone: Link2, grupo: 'config', permissao: 'canais:ver', pagina: lazy(() => import('@/modules/canais')) },
   { caminho: 'llm', rotulo: 'Atendente', descricao: 'A IA que atende: chave e consumo, conhecimento e fluxo da conversa.', icone: Bot, grupo: 'config', permissao: 'ia:ver', pagina: lazy(() => import('@/modules/llm')) },
   { caminho: 'onboarding', rotulo: 'Primeiros passos', descricao: 'Configure a loja para receber pedidos.', icone: Rocket, grupo: 'config', ocultoNoMenu: true, pagina: lazy(() => import('@/modules/onboarding')) },
+  // Suporte: fala com a equipe Whaviso (chamados) e concede/revoga o acesso assistido as conversas.
+  // Chave de loja dedicada `suporte_loja:gerir` (nao ha `:ver`); a api decide o acesso real (403).
+  { caminho: 'suporte', rotulo: 'Suporte', descricao: 'Fale com a equipe Whaviso e gerencie o acesso dela às suas conversas.', icone: LifeBuoy, grupo: 'config', permissao: 'suporte_loja:gerir', pagina: lazy(() => import('@/modules/suporte')) },
 ]
 
 /** Metadados de cada grupo da navegação, na ordem em que aparecem no menu. */
