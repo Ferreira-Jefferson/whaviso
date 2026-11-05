@@ -95,3 +95,72 @@ describe('porta Meta: host allowlist e sem redirect (SEC-070)', () => {
     await expect(porta.trocarCodigo('x')).rejects.toBeInstanceOf(ErroMeta)
   })
 })
+
+describe('porta Meta: versao do Graph configuravel (e validada)', () => {
+  /** fetch que so captura a URL e responde um token valido. */
+  function fetchCapturaUrl(): { fetchFn: typeof fetch; urls: Array<URL | string> } {
+    const urls: Array<URL | string> = []
+    const fetchFn = (async (url: URL | string) => {
+      urls.push(url)
+      return new Response(JSON.stringify({ access_token: 't' }), { status: 200 })
+    }) as typeof fetch
+    return { fetchFn, urls }
+  }
+
+  it('a versao das opcoes entra no PATH da URL', async () => {
+    const { fetchFn, urls } = fetchCapturaUrl()
+    const porta = criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', versao: 'v42.7', fetchFn })
+    await porta.trocarCodigo('c')
+    expect(new URL(String(urls[0])).pathname).toContain('/v42.7/')
+  })
+
+  it('sem versao, usa o DEFAULT v23.0', async () => {
+    const { fetchFn, urls } = fetchCapturaUrl()
+    const porta = criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', fetchFn })
+    await porta.trocarCodigo('c')
+    expect(new URL(String(urls[0])).pathname).toContain('/v23.0/')
+  })
+
+  it('versao fora do formato e rejeitada na construcao (sem injecao de path)', () => {
+    expect(() => criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', versao: '../evil' })).toThrow(ErroMeta)
+    expect(() => criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', versao: 'v1' })).toThrow(ErroMeta)
+  })
+})
+
+describe('porta Meta: passo register (opcional, gated por PIN)', () => {
+  it('sem PIN: registrarNumero fica AUSENTE (passo pulado)', () => {
+    const porta = criarMetaOnboardingHttp({ appId: 'a', appSecret: 's' })
+    expect(porta.registrarNumero).toBeUndefined()
+  })
+
+  it('PIN fora do formato (6 digitos) e rejeitado na construcao', () => {
+    expect(() => criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', registerPin: '12' })).toThrow(ErroMeta)
+    expect(() => criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', registerPin: 'abcdef' })).toThrow(ErroMeta)
+  })
+
+  it('com PIN valido: POST /<phone>/register no host fixo, body e Bearer corretos (SEC-070)', async () => {
+    let urlVista: URL | string | undefined
+    let opc: RequestInit | undefined
+    const fetchFn = (async (url: URL | string, o?: RequestInit) => {
+      urlVista = url
+      opc = o
+      return new Response('{}', { status: 200 })
+    }) as typeof fetch
+    const porta = criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', registerPin: '123456', fetchFn })
+    expect(porta.registrarNumero).toBeDefined()
+    await porta.registrarNumero!('TOKEN_X', 'PN1')
+    const u = new URL(String(urlVista))
+    expect(u.host).toBe('graph.facebook.com')
+    expect(u.pathname).toContain('/PN1/register')
+    expect(opc?.method).toBe('POST')
+    expect(opc?.redirect).toBe('error')
+    expect((opc?.headers as Record<string, string>).authorization).toBe('Bearer TOKEN_X')
+    expect(JSON.parse(String(opc?.body))).toEqual({ messaging_product: 'whatsapp', pin: '123456' })
+  })
+
+  it('register com 4xx vira ErroMeta (o service e quem engole; aqui a porta so sinaliza)', async () => {
+    const fetchFn = (async () => new Response('bad', { status: 400 })) as typeof fetch
+    const porta = criarMetaOnboardingHttp({ appId: 'a', appSecret: 's', registerPin: '123456', fetchFn })
+    await expect(porta.registrarNumero!('t', 'PN')).rejects.toBeInstanceOf(ErroMeta)
+  })
+})

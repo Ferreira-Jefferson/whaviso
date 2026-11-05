@@ -197,6 +197,53 @@ describe('POST /numeros (conectar via Embedded Signup)', () => {
     expect(res.body.toLowerCase()).not.toContain('token')
   })
 
+  it('register best-effort que FALHA nao derruba a conexao (grava o numero mesmo assim)', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('dono'))
+    const stub: MetaOnboarding = {
+      ...stubOk(),
+      registrarNumero: async () => {
+        throw new ErroMeta('register falhou (numero ja registrado, PIN errado, etc.)')
+      },
+    }
+    const app = await montarApp(stub)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/numeros',
+      headers: auth(f.userId, f.lojaId),
+      payload: { codigo: 'c', waba_id: 'W', phone_number_id: 'PN_REG_FALHA' },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(201)
+    const { rows } = await poolApi.query(
+      'select count(*)::int n from public.numeros_whatsapp where loja_id=$1',
+      [f.lojaId],
+    )
+    expect(rows[0].n).toBe(1)
+  })
+
+  it('register best-effort que PASSA tambem conecta (passo executado sem erro)', async () => {
+    if (!disponivel) return
+    const f = registrar(await seedLojaComMembro('dono'))
+    let registrou = false
+    const stub: MetaOnboarding = {
+      ...stubOk(),
+      registrarNumero: async () => {
+        registrou = true
+      },
+    }
+    const app = await montarApp(stub)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/numeros',
+      headers: auth(f.userId, f.lojaId),
+      payload: { codigo: 'c', waba_id: 'W', phone_number_id: 'PN_REG_OK' },
+    })
+    await app.close()
+    expect(res.statusCode).toBe(201)
+    expect(registrou).toBe(true)
+  })
+
   it('phone_number_id duplicado => 409 sem revelar a loja', async () => {
     if (!disponivel) return
     const f = registrar(await seedLojaComMembro('dono'))

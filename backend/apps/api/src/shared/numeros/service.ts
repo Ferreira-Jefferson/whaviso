@@ -8,6 +8,7 @@
 // `numero_hash = sha256(E.164)`; o claro e descartado ao sair do escopo da funcao.
 import type { Executor } from '@whaviso/shared/db'
 import type { NumeroSaida, NumeroStatusEntrada } from '@whaviso/shared/contracts'
+import { criarLogger } from '@whaviso/shared/logger'
 import { HttpError, NaoEncontrado } from '../http_errors'
 import { sha256Hex } from '../tokens'
 import type { Cripto } from './cripto'
@@ -20,9 +21,32 @@ export interface DepsNumeros {
   cripto: Cripto
 }
 
+const log = criarLogger('numeros')
+
 /** Erro padronizado para qualquer falha de integracao com a Meta (sem vazar detalhe). */
 function erroMeta(): HttpError {
   return new HttpError(502, 'meta_indisponivel', 'Nao foi possivel concluir com a Meta')
+}
+
+/**
+ * Passo `register` do Embedded Signup, BEST-EFFORT. So roda se a porta expoe `registrarNumero`
+ * (ha PIN configurado); senao, pula em silencio. Qualquer erro (numero ja registrado, PIN errado,
+ * 4xx/5xx, transporte) e ENGOLIDO: apenas registra um aviso com ids/estado (nunca token/pin/
+ * telefone, SEC-024) e deixa a conexao seguir. O register NUNCA pode derrubar a conexao do numero.
+ */
+async function registrarBestEffort(
+  deps: DepsNumeros,
+  token: string,
+  phoneNumberId: string,
+  lojaId: string,
+): Promise<void> {
+  if (!deps.onboarding.registrarNumero) return
+  try {
+    await deps.onboarding.registrarNumero(token, phoneNumberId)
+    log.info({ loja_id: lojaId, passo: 'register' }, 'numero registrado na Meta')
+  } catch {
+    log.warn({ loja_id: lojaId, passo: 'register' }, 'register best-effort falhou; conexao segue')
+  }
 }
 
 export interface EntradaConectar {
@@ -49,6 +73,8 @@ export async function conectar(
     const { token } = await deps.onboarding.trocarCodigo(e.codigo)
     const tel = await deps.onboarding.lerTelefone(token, e.phoneNumberId)
     await deps.onboarding.assinarWebhook(token, e.wabaId)
+    // Register best-effort (pulado sem PIN): nunca falha a conexao, por isso roda antes de cifrar.
+    await registrarBestEffort(deps, token, e.phoneNumberId, e.lojaId)
     numeroHash = sha256Hex(tel.numero_e164)
     verificado = tel.verificado
     tokenCifrado = deps.cripto.cifrar(token)
@@ -121,6 +147,8 @@ export async function reconectar(
     const { token } = await deps.onboarding.trocarCodigo(codigo)
     const tel = await deps.onboarding.lerTelefone(token, atual.phone_number_id)
     await deps.onboarding.assinarWebhook(token, atual.waba_id)
+    // Register best-effort tambem na rotacao do token (pulado sem PIN; nunca falha a reconexao).
+    await registrarBestEffort(deps, token, atual.phone_number_id, lojaId)
     numeroHash = sha256Hex(tel.numero_e164)
     verificado = tel.verificado
     tokenCifrado = deps.cripto.cifrar(token)
